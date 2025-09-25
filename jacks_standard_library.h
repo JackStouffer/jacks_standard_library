@@ -128,6 +128,7 @@
 extern "C" {
 #endif
 
+#include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
 #if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L
@@ -178,14 +179,40 @@ extern "C" {
 #endif
 
 
+// TODO: Docs
 #ifndef JSL_MAX
     #define JSL_MAX(a,b) ((a) > (b) ? (a) : (b))
 #endif
 
+// TODO: Docs
 #ifndef JSL_MIN
     #define JSL_MIN(a,b) ((a) < (b) ? (a) : (b))
 #endif
 
+// TODO: Docs
+#ifndef JSL_SET_BITFLAG
+    #define JSL_SET_BITFLAG(flags, flag) *flags |= flag
+#endif
+
+// TODO: Docs
+#ifndef JSL_UNSET_BITFLAG
+    #define JSL_UNSET_BITFLAG(flags, flag) *flags &= ~(flag)
+#endif
+
+// TODO: Docs
+#ifndef JSL_IS_BITFLAG_SET
+    #define JSL_IS_BITFLAG_SET(flags, flag) ((flags & flag) == flag)
+#endif
+
+// TODO: Docs
+#ifndef JSL_IS_BITFLAG_NOT_SET
+    #define JSL_IS_BITFLAG_NOT_SET(flags, flag) ((flags & flag) == 0)
+#endif
+
+// TODO: Docs
+#ifndef JSL_MAKE_BITFLAG
+    #define JSL_MAKE_BITFLAG(position) 1U << position
+#endif
 
 /** 
  * A fat pointer is a representation of a chunk of memory. It **is not** a container
@@ -648,7 +675,7 @@ JSL_WARN_UNUSED JSL_DEF JSLWriteFileResult jsl_fatptr_write_file_contents_cstr(J
 
     #ifndef JSL_MEMCMP
         #include <string.h>
-        #define JSL_MEMCPY memcmp
+        #define JSL_MEMCMP memcmp
     #endif
 
     JSLFatPtr jsl_fatptr_ctor(uint8_t* ptr, int64_t length)
@@ -1499,7 +1526,7 @@ JSL_WARN_UNUSED JSL_DEF JSLWriteFileResult jsl_fatptr_write_file_contents_cstr(J
     static int32_t stbsp__real_to_parts(int64_t *bits, int32_t *expo, double value);
     #define STBSP__SPECIAL 0x7000
 
-    #if defined(__GNUC__) && (__GNUC__ >= 5 || (__GNUC__ == 4 && __GNUC_MINOR__ >= 8))
+    #if defined(__GNUC__) || defined(__clang__)
         #if defined(__SANITIZE_ADDRESS__) && __SANITIZE_ADDRESS__
             #define JSL_ASAN_OFF __attribute__((__no_sanitize_address__))
         #endif
@@ -1509,20 +1536,27 @@ JSL_WARN_UNUSED JSL_DEF JSLWriteFileResult jsl_fatptr_write_file_contents_cstr(J
         #define JSL_ASAN_OFF
     #endif
 
+    #if defined(__GNUC__) || defined(__clang__)
+        #define JSL_NO_INLINE __attribute__((noinline))
+    #endif
+
+    #ifndef JSL_NO_INLINE
+        #define JSL_NO_INLINE
+    #endif
 
     static char stbsp__period = '.';
     static char stbsp__comma = ',';
     static struct
     {
-    short temp; // force next field to be 2-byte aligned
-    char pair[201];
+        short temp; // force next field to be 2-byte aligned
+        char pair[201];
     } stbsp__digitpair =
     {
-    0,
-    "00010203040506070809101112131415161718192021222324"
-    "25262728293031323334353637383940414243444546474849"
-    "50515253545556575859606162636465666768697071727374"
-    "75767778798081828384858687888990919293949596979899"
+        0,
+        "00010203040506070809101112131415161718192021222324"
+        "25262728293031323334353637383940414243444546474849"
+        "50515253545556575859606162636465666768697071727374"
+        "75767778798081828384858687888990919293949596979899"
     };
 
     JSL_ASAN_OFF void jsl_fatptr_format_set_separators(char pcomma, char pperiod)
@@ -1849,8 +1883,6 @@ JSL_WARN_UNUSED JSL_DEF JSLWriteFileResult jsl_fatptr_write_file_contents_cstr(J
             precision = -1;
             formatting_flags = 0;
             trailing_zeros = 0;
-
-            END_CYCLE_COUNTER(COUNTER_FORMAT_FIND_PERCENTAGE);
 
             // flags
             for (;;) {
