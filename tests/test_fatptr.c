@@ -29,7 +29,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define JACKS_STANDARD_LIBRARY_IMPLEMENTATION
+#define JSL_IMPLEMENTATION
+#define JSL_INCLUDE_FILE_UTILS
 #include "../jacks_standard_library.h"
 
 #include "minctest.h"

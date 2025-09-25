@@ -15,7 +15,7 @@
  * Then, in ONE AND ONLY ONE file, do this:
  * 
  * ```c
- * #define JACKS_STANDARD_LIBRARY_IMPLEMENTATION
+ * #define JSL_IMPLEMENTATION
  * #include "jacks_standard_library.h"
  * ```
  * 
@@ -68,7 +68,8 @@
  *      * Anything with UTF-16. Just use UTF-8
  *      * Threading. Just use pthreads or win api calls
  *      * Atomics. This is really platform specific and you should just use intrinsics
- *      * Date/time utilities. Also something I haven't needed much. Storing the unix timestamp get's me 99% of what I need.
+ *      * Date/time utilities. Also something I haven't needed much. Storing the unix
+ *        timestamp get's me 99% of what I need.
  *      * Random numbers.
  * 
  * This library is slow for ARM as I haven't gotten around to writing the NEON
@@ -105,6 +106,9 @@
  * 
  * `JSL_MEMCPY` - Controls memcmp calls in the library. By default this will include
  * `string.h` and use `memcmp`.
+ * 
+ * `JSL_DEFAULT_ALLOCATION_ALIGNMENT` - Sets the alignment of allocations that aren't
+ * explicitly set. Defaults to 16 bytes.
  * 
  * ## Unicode
  * 
@@ -185,13 +189,13 @@ extern "C" {
 #if defined(__SANITIZE_ADDRESS__) && __SANITIZE_ADDRESS__
     #include <sanitizer/asan_interface.h>
 #else
-
     #define ASAN_POISON_MEMORY_REGION(ptr, len)
     #define ASAN_UNPOISON_MEMORY_REGION(ptr, len)
-
 #endif
 
-#define JSL_DEFAULT_ALLOCATION_ALIGNMENT 16
+#ifndef JSL_DEFAULT_ALLOCATION_ALIGNMENT
+    #define JSL_DEFAULT_ALLOCATION_ALIGNMENT 16
+#endif
 
 /**
  * 
@@ -290,22 +294,6 @@ typedef struct JSLArena
 } JSLArena;
 
 /**
- * The result of a file write operation 
- */
-typedef struct JSLWriteFileResult
-{
-    int64_t bytes_written;
-    int32_t result_code;
-} JSLWriteFileResult;
-
-// TODO, docs
-typedef struct JSLLoadFileResult
-{
-    JSLFatPtr file_contents;
-    int32_t result_code;
-} JSLLoadFileResult;
-
-/**
  * Constructor utility function to make a fat pointer out of a pointer and a length.
  * Useful in cases where you can't use C's struct init syntax, like as a parameter
  * to a function.
@@ -388,7 +376,11 @@ JSL_DEF int64_t jsl_fatptr_memory_copy(JSLFatPtr* destination, JSLFatPtr source)
  * Returns:
  *      Number of bytes written or `-1` if `string` or the fat pointer was null.
  */
-JSL_DEF int64_t jsl_fatptr_cstr_memory_copy(JSLFatPtr* destination, char* cstring, bool include_null_terminator);
+JSL_DEF int64_t jsl_fatptr_cstr_memory_copy(
+    JSLFatPtr* destination,
+    char* cstring,
+    bool include_null_terminator
+);
 
 // TODO, docs. Remember to mention Unicode normalization. Mention difference between code units and graphemes in UTF
 JSL_DEF int64_t jsl_fatptr_substring_search(JSLFatPtr string, JSLFatPtr substring);
@@ -491,7 +483,11 @@ JSL_DEF JSLFatPtr jsl_arena_allocate_aligned(JSLArena* arena, int64_t bytes, int
  * In debug mode, this function will set `original_allocation->data` to null to
  * help detect stale pointer bugs.
  */
-JSL_DEF JSLFatPtr jsl_arena_reallocate(JSLArena* arena, JSLFatPtr original_allocation, int64_t new_num_bytes);
+JSL_DEF JSLFatPtr jsl_arena_reallocate(
+    JSLArena* arena,
+    JSLFatPtr original_allocation,
+    int64_t new_num_bytes
+);
 
 /**
  * Resize the allocation if it was the last allocation, otherwise, allocate a new
@@ -500,7 +496,12 @@ JSL_DEF JSLFatPtr jsl_arena_reallocate(JSLArena* arena, JSLFatPtr original_alloc
  * In debug mode, this function will set `original_allocation->data` to null to
  * help detect stale pointer bugs. 
  */
-JSL_DEF JSLFatPtr jsl_arena_reallocate_aligned(JSLArena* arena, JSLFatPtr original_allocation, int64_t new_num_bytes, int32_t align);
+JSL_DEF JSLFatPtr jsl_arena_reallocate_aligned(
+    JSLArena* arena,
+    JSLFatPtr original_allocation,
+    int64_t new_num_bytes,
+    int32_t align
+);
 
 /**
  * Set the current pointer back to the start of the arena.
@@ -651,23 +652,62 @@ JSL_DEF int64_t jsl_fatptr_format_callback(
  */
 JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
 
-// TODO, docs
-JSL_WARN_UNUSED JSL_DEF JSLLoadFileResult jsl_fatptr_load_file_contents(JSLArena* arena, JSLFatPtr path);
+#ifdef JSL_INCLUDE_FILE_UTILS
 
-// TODO, docs
-JSL_WARN_UNUSED JSL_DEF JSLLoadFileResult jsl_fatptr_load_file_contents_cstr(JSLArena* arena, char* path);
+    typedef enum
+    {
+        // zero should always be an error condition!
+        JSL_FILE_LOAD_BAD_PARAMETERS,
+        JSL_FILE_LOAD_COULD_NOT_OPEN,
+        JSL_FILE_LOAD_SUCCESS,
+        JSL_FILE_LOAD_WRITE_FAILED,
+        JSL_FILE_LOAD_CLOSE_FAILED,
+        JSL_FILE_LOAD_NOT_ENOUGH_MEMORY,
 
-// TODO, docs
-JSL_WARN_UNUSED JSL_DEF JSLLoadFileResult jsl_fatptr_load_file_contents_buffer(JSLFatPtr* buffer, JSLFatPtr path);
+        JSL_FILE_LOAD_ENUM_COUNT
+    } JSLLoadFileResultEnum;
 
-// TODO, docs
-JSL_WARN_UNUSED JSL_DEF JSLWriteFileResult jsl_fatptr_write_contents_to_file_cstr(char* path, JSLFatPtr contents);
+    /**
+     * Load the contents of the file at `path` into a newly allocated buffer
+     * from the given arena. The buffer will be the exact size of the file contents.
+     * 
+     * If the arena does not have enough space, 
+     */
+    JSL_WARN_UNUSED JSL_DEF JSLLoadFileResultEnum jsl_fatptr_load_file_contents(
+        JSLArena* arena,
+        JSLFatPtr path,
+        JSLFatPtr* out_contents
+    );
 
-// TODO, docs
-JSL_WARN_UNUSED JSL_DEF JSLWriteFileResult jsl_fatptr_write_file_contents(JSLFatPtr* buffer, JSLFatPtr path);
+    // TODO, docs
+    JSL_WARN_UNUSED JSL_DEF JSLLoadFileResultEnum jsl_fatptr_load_file_contents_cstr(
+        JSLArena* arena,
+        const char* path,
+        JSLFatPtr* out_contents
+    );
 
-// TODO, docs
-JSL_WARN_UNUSED JSL_DEF JSLWriteFileResult jsl_fatptr_write_file_contents_cstr(JSLFatPtr* buffer, char* path);
+    // TODO, docs
+    JSL_WARN_UNUSED JSL_DEF JSLLoadFileResultEnum jsl_fatptr_load_file_contents_buffer(
+        JSLFatPtr* buffer,
+        JSLFatPtr path
+    );
+
+    // TODO, docs
+    JSL_WARN_UNUSED JSL_DEF JSLLoadFileResultEnum jsl_fatptr_load_file_contents_buffer_cstr(
+        JSLFatPtr* buffer,
+        const char* path
+    );
+
+    // TODO, docs
+    JSL_WARN_UNUSED JSL_DEF int32_t jsl_fatptr_write_contents_to_file_cstr(char* path, JSLFatPtr contents);
+
+    // TODO, docs
+    JSL_WARN_UNUSED JSL_DEF int32_t jsl_fatptr_write_file_contents(JSLFatPtr* buffer, JSLFatPtr path);
+
+    // TODO, docs
+    JSL_WARN_UNUSED JSL_DEF int32_t jsl_fatptr_write_file_contents_cstr(JSLFatPtr* buffer, char* path);
+
+#endif
 
 #ifdef __cplusplus
 } /* extern "C" */
@@ -687,7 +727,7 @@ JSL_WARN_UNUSED JSL_DEF JSLWriteFileResult jsl_fatptr_write_file_contents_cstr(J
 
 
 
- #ifdef JACKS_STANDARD_LIBRARY_IMPLEMENTATION
+ #ifdef JSL_IMPLEMENTATION
 
     #if defined(__i386__) || defined(__x86_64__) || defined(_M_IX86) || defined(_M_X64)
         #include <immintrin.h>
@@ -821,104 +861,6 @@ JSL_WARN_UNUSED JSL_DEF JSLWriteFileResult jsl_fatptr_write_file_contents_cstr(J
         destination->length -= length;
 
         return length;
-    }
-
-    JSLLoadFileResult jsl_fatptr_load_file_contents(JSLArena* arena, JSLFatPtr path)
-    {
-        if (path.data == NULL || path.length < 1 || arena == NULL)
-        {
-            JSLLoadFileResult empty = {0};
-            return empty;
-        }
-
-        char path_buffer[FILENAME_MAX + 1];
-        JSL_MEMCPY(path_buffer, path.data, path.length);
-        path_buffer[path.length] = '\0';
-        return jsl_fatptr_load_file_contents_cstr(arena, path_buffer);
-    }
-
-    JSLLoadFileResult jsl_fatptr_load_file_contents_cstr(JSLArena* arena, char* path)
-    {
-        JSLLoadFileResult res = {0};
-
-        if (path != NULL && arena != NULL)
-        {
-            int32_t file_descriptor = open(path, 0);
-            if (file_descriptor > 0)
-            {
-                int64_t file_size = jsl__get_file_size_from_fileno(file_descriptor);
-                JSLFatPtr allocation = jsl_arena_allocate(arena, file_size, false);
-
-                int64_t written = JSL_MIN(file_size, allocation.length);
-                int64_t read_res = read(file_descriptor, allocation.data, written);
-
-                if (read_res > 0)
-                {
-                    res.file_contents.data = allocation.data;
-                    res.file_contents.length = read_res;
-                }
-                else
-                {
-                    res.result_code = errno;
-                    errno = 0;
-                }
-
-                close(file_descriptor);
-            }
-            else
-            {
-                res.result_code = errno;
-                errno = 0;
-            }
-        }
-
-        return res;
-    }
-
-    JSLLoadFileResult jsl_fatptr_load_file_contents_buffer(JSLFatPtr* buffer, JSLFatPtr path)
-    {
-        // TODO, incomplete
-        JSL_ASSERT(0);
-        JSLLoadFileResult res = {0};
-        return res;
-    }
-
-    JSLWriteFileResult jsl_fatptr_write_contents_to_file_cstr(char* path, JSLFatPtr contents)
-    {
-        JSLWriteFileResult res = {
-            .bytes_written = -1,
-            .result_code = 0
-        };
-
-        if (path != NULL && contents.data != NULL && contents.length > 0)
-        {
-            // TODO: LINUX ONLY
-
-            int32_t file_descriptor = open(path, O_CREAT, S_IRUSR | S_IWUSR);
-            if (file_descriptor > 0)
-            {
-                int64_t write_res = write(file_descriptor, contents.data, (size_t) contents.length);
-
-                if (write_res > 0)
-                {
-                    res.bytes_written = write_res;
-                }
-                else
-                {
-                    res.result_code = errno;
-                    errno = 0;
-                }
-
-                close(file_descriptor);
-            }
-            else
-            {
-                res.result_code = errno;
-                errno = 0;
-            }
-        }
-
-        return res;
     }
 
     bool jsl_fatptr_memory_compare(JSLFatPtr a, JSLFatPtr b)
@@ -1591,7 +1533,7 @@ JSL_WARN_UNUSED JSL_DEF JSLWriteFileResult jsl_fatptr_write_file_contents_cstr(J
         return jsl_arena_allocate_aligned(arena, bytes, JSL_DEFAULT_ALLOCATION_ALIGNMENT, zeroed);
     }
 
-    static bool jss__is_power_of_two(int32_t x)
+    static bool jsl__is_power_of_two(int32_t x)
     {
         return (x & (x-1)) == 0;
     }
@@ -1633,10 +1575,17 @@ JSL_WARN_UNUSED JSL_DEF JSLWriteFileResult jsl_fatptr_write_file_contents_cstr(J
 
     JSLFatPtr jsl_arena_reallocate(JSLArena* arena, JSLFatPtr original_allocation, int64_t new_num_bytes)
     {
-        return jsl_arena_reallocate_aligned(arena, original_allocation, new_num_bytes, JSL_DEFAULT_ALLOCATION_ALIGNMENT);
+        return jsl_arena_reallocate_aligned(
+            arena, original_allocation, new_num_bytes, JSL_DEFAULT_ALLOCATION_ALIGNMENT
+        );
     }
 
-    JSLFatPtr jsl_arena_reallocate_aligned(JSLArena* arena, JSLFatPtr original_allocation, int64_t new_num_bytes, int32_t align)
+    JSLFatPtr jsl_arena_reallocate_aligned(
+        JSLArena* arena,
+        JSLFatPtr original_allocation,
+        int64_t new_num_bytes,
+        int32_t align
+    )
     {
         JSL_ASSERT(align > 0);
         JSL_ASSERT(jsl__is_power_of_two(align));
@@ -3476,7 +3425,153 @@ JSL_WARN_UNUSED JSL_DEF JSLWriteFileResult jsl_fatptr_write_file_contents_cstr(J
     #undef STBSP__COPYFP
     #undef STBSP__UNALIGNED
 
+    #ifdef JSL_INCLUDE_FILE_UTILS
 
-#endif /* JACKS_STANDARD_LIBRARY_IMPLEMENTATION */
+    #if defined(_WIN32)
+    
+        #define JSL_WIN32
 
-#endif /* JACKS_STANDARD_LIBRARY */
+        #include <io.h>
+        #include <sys\stat.h>
+
+    #elif defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+
+        #define JSL_POSIX
+
+        #include <unistd.h>
+        #include <unistd.h>
+        #include <limits.h>
+
+    #endif
+
+    #include <fcntl.h>
+
+    JSLLoadFileResultEnum jsl_fatptr_load_file_contents(
+        JSLArena* arena,
+        JSLFatPtr path,
+        JSLFatPtr* out_contents
+    )
+    {
+        JSLLoadFileResultEnum result = JSL_FILE_LOAD_BAD_PARAMETERS;
+
+        if (path.data != NULL
+            && path.length > 0
+            && path.length < FILENAME_MAX
+            && arena != NULL
+            && out_contents != NULL
+        )
+        {
+            // File system APIs require a null terminated string
+
+            char path_buffer[FILENAME_MAX + 1];
+            JSL_MEMCPY(path_buffer, path.data, path.length);
+            path_buffer[path.length] = '\0';
+            result = jsl_fatptr_load_file_contents_cstr(arena, path_buffer, out_contents);
+        }
+
+        return result;
+    }
+
+    JSLLoadFileResultEnum jsl_fatptr_load_file_contents_cstr(
+        JSLArena* arena,
+        const char* path,
+        JSLFatPtr* out_contents
+    )
+    {
+        JSLLoadFileResultEnum res = JSL_FILE_LOAD_BAD_PARAMETERS;
+
+        if (path != NULL && arena != NULL && out_contents != NULL)
+        {
+            int32_t file_descriptor = open(path, 0);
+            if (file_descriptor > 0)
+            {
+                int64_t file_size = jsl__get_file_size_from_fileno(file_descriptor);
+                JSLFatPtr allocation = jsl_arena_allocate(arena, file_size, false);
+
+                int64_t written = JSL_MIN(file_size, allocation.length);
+                int64_t read_res = read(file_descriptor, allocation.data, written);
+
+                if (read_res > 0)
+                {
+                    res.file_contents.data = allocation.data;
+                    res.file_contents.length = read_res;
+                }
+                else
+                {
+                    res.result_code = errno;
+                    errno = 0;
+                }
+
+                close(file_descriptor);
+            }
+            else
+            {
+                res.result_code = errno;
+                errno = 0;
+            }
+        }
+
+        return res;
+    }
+
+    JSLLoadFileResult jsl_fatptr_load_file_contents_buffer(JSLFatPtr* buffer, JSLFatPtr path)
+    {
+        // TODO, incomplete
+        JSL_ASSERT(0);
+        JSLLoadFileResult res = {0};
+        return res;
+    }
+
+    JSLWriteFileResult jsl_fatptr_write_contents_to_file_cstr(char* path, JSLFatPtr contents)
+    {
+        JSLWriteFileResult res = {
+            .bytes_written = -1,
+            .result_code = 0
+        };
+
+        if (path != NULL && contents.data != NULL && contents.length > 0)
+        {
+            // TODO: LINUX ONLY
+
+            #if defined(JSL_WIN32)
+                int32_t file_descriptor = _open(path, _O_CREAT, _S_IREAD | _S_IWRITE);
+            #elif defined(JSL_POSIX)
+                int32_t file_descriptor = open(path, O_CREAT, S_IRUSR | S_IWUSR);
+            #endif
+            
+            if (file_descriptor > 0)
+            {
+                int64_t write_res = write(
+                    file_descriptor,
+                    contents.data,
+                    (size_t) contents.length
+                );
+
+                if (write_res > 0)
+                {
+                    res.bytes_written = write_res;
+                }
+                else
+                {
+                    res.result_code = errno;
+                    errno = 0;
+                }
+
+                close(file_descriptor);
+            }
+            else
+            {
+                res.result_code = errno;
+                errno = 0;
+            }
+        }
+
+        return res;
+    }
+
+    #endif // JSL_INCLUDE_FILE_UTILS
+
+
+#endif // JSL_IMPLEMENTATION
+
+#endif // JACKS_STANDARD_LIBRARY
