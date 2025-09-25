@@ -27,12 +27,6 @@
  * for the C standard library functions like `assert` and `memcmp`. See the
  * "Preprocessor Switches" section for more information.
  * 
- * ## Caveat
- * 
- * This library is slow for ARM as I haven't gotten around to writing the NEON
- * versions of the SIMD code yet. glibc will be significantly faster for comparable
- * operations.
- *
  * ## Why
  * 
  * Much of the C Standard Library is outdated, very unsafe, or poorly designed. 
@@ -49,16 +43,48 @@
  * And unfortunately it was decided as part of the language that arrays decay to
  * pointers, and there's no way to stop it.
  * 
- * In contrast, this library:
+ * ## What's Included
  * 
- *      * Defines a length based buffer type which is the basis of most operations
- *          * Pointers should always carry around their length
- *      * Provides an Arena allocator (a.k.a. monotonic, region, dump allocator)
- *        interface which provide many separate, reset-able heaps
- *      * File utilities for the most common operations
- *      * Errors are values.
+ *      * A buffer/slice type called a fat pointer
+ *          * used everywhere
+ *          * standardizes that pointers should carry their length
+ *          * vastly simplifies writing functions like file reading]
+ *      * Common string and buffer utilities for fat pointers
+ *          * things like fat pointer memcmp, substring search, etc.
+ *      * An arena allocator
+ *          * Easy to create, use, reset-able, allocators
+ *          * Great for things with known lifetimes (which is 99% of the things you allocate) 
+ *          * a.k.a monotonic, region, bump allocator
+ *      * A snprintf replacement
+ *          * writes directly into a fat pointer
+ *          * Removes all compiler specific weirdness
+ *      * Really common macros
+ *          * min, max
+ *          * bitflag checks
+ * 
+ * ## What's Not Included
+ * 
+ *      * There's no scanf alternative. I've never really used that for parsing, so I don't see the point
+ *      * Anything with UTF-16. Just use UTF-8
+ *      * Threading. Just use pthreads or win api calls
+ *      * Atomics. This is really platform specific and you should just use intrinsics
+ *      * Date/time utilities. Also something I haven't needed much. Storing the unix timestamp get's me 99% of what I need.
+ *      * Random numbers.
+ * 
+ * This library is slow for ARM as I haven't gotten around to writing the NEON
+ * versions of the SIMD code yet. glibc will be significantly faster for comparable
+ * operations.
+ * 
+ * ## What's Supported
+ * 
+ * Windows, macOS, and Linux with MSVC, GCC, and clang.
+ * 
+ * This might work on other POSIX systems, but I have not tested it.
  * 
  * ## Preprocessor Switches
+ * 
+ * `JSL_DEBUG` - turns on some debugging features, like overwriting stale memory with
+ * `0xfeefee`.
  * 
  * `JSL_DEF` - allows you to override linkage/visibility (e.g., __declspec(dllexport)).
  * By default this is empty.
@@ -89,10 +115,11 @@
  * determining two string's equality.
  * 
  * If you don't, you should learn the following terms:
- * 
+ *
  *      * Code unit
  *      * Code point
  *      * Grapheme
+ *      * How those three things are completely different from each other
  *      * Normalization
  * 
  * That would be the bare minimum needed to not shoot yourself in the foot.
@@ -154,6 +181,17 @@ extern "C" {
     #endif
 
 #endif
+
+#if defined(__SANITIZE_ADDRESS__) && __SANITIZE_ADDRESS__
+    #include <sanitizer/asan_interface.h>
+#else
+
+    #define ASAN_POISON_MEMORY_REGION(ptr, len)
+    #define ASAN_UNPOISON_MEMORY_REGION(ptr, len)
+
+#endif
+
+#define JSL_DEFAULT_ALLOCATION_ALIGNMENT 16
 
 /**
  * 
@@ -1520,6 +1558,156 @@ JSL_WARN_UNUSED JSL_DEF JSLWriteFileResult jsl_fatptr_write_file_contents_cstr(J
             *result = ret;
         
         return i;
+    }
+
+    JSLArena jsl_arena_ctor(void* memory, int64_t length)
+    {
+        JSLArena ret = {
+            .start = memory,
+            .current = memory,
+            .end = (uint8_t*) memory + length
+        };
+
+        ASAN_POISON_MEMORY_REGION(memory, length);
+
+        return ret;
+    }
+
+    JSLArena jsl_arena_ctor2(JSLFatPtr memory)
+    {
+        JSLArena ret = {
+            .start = memory.data,
+            .current = memory.data,
+            .end = memory.data + memory.length
+        };
+
+        ASAN_POISON_MEMORY_REGION(memory.data, memory.length);
+
+        return ret;
+    }
+
+    JSLFatPtr jsl_arena_allocate(JSLArena* arena, int64_t bytes, bool zeroed)
+    {
+        return jsl_arena_allocate_aligned(arena, bytes, JSL_DEFAULT_ALLOCATION_ALIGNMENT, zeroed);
+    }
+
+    static bool jss__is_power_of_two(int32_t x)
+    {
+        return (x & (x-1)) == 0;
+    }
+
+    static inline uint8_t* align_ptr_upwards(uint8_t* ptr, int32_t align)
+    {
+        uintptr_t addr = (uintptr_t) ptr;
+        addr = (addr + (align - 1)) & -align;
+        return (uint8_t*) addr;
+    }
+
+    JSLFatPtr jsl_arena_allocate_aligned(JSLArena* arena, int64_t bytes, int32_t alignment, bool zeroed)
+    {
+        JSL_ASSERT(alignment > 0 && jsl__is_power_of_two(alignment));
+
+        JSLFatPtr res = {0};
+        uint8_t* aligned_current = align_ptr_upwards(arena->current, alignment);
+        uint8_t* potential_end = aligned_current + bytes;
+
+        if (potential_end <= arena->end)
+        {
+            res.data = aligned_current;
+            res.length = bytes;
+
+            #if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
+                // Add 8 to leave "guard" zones between allocations
+                arena->current = potential_end + 8;
+                ASAN_UNPOISON_MEMORY_REGION(res.data, res.length);
+            #else
+                arena->current = potential_end;
+            #endif
+
+            if (zeroed)
+                memset((void*) res.data, 0, res.length);
+        }
+
+        return res;
+    }
+
+    JSLFatPtr jsl_arena_reallocate(JSLArena* arena, JSLFatPtr original_allocation, int64_t new_num_bytes)
+    {
+        return jsl_arena_reallocate_aligned(arena, original_allocation, new_num_bytes, JSL_DEFAULT_ALLOCATION_ALIGNMENT);
+    }
+
+    JSLFatPtr jsl_arena_reallocate_aligned(JSLArena* arena, JSLFatPtr original_allocation, int64_t new_num_bytes, int32_t align)
+    {
+        JSL_ASSERT(align > 0);
+        JSL_ASSERT(jsl__is_power_of_two(align));
+
+        JSLFatPtr res = {0};
+        uint8_t* aligned_current = align_ptr_upwards(arena->current, align);
+        uint8_t* potential_end = aligned_current + new_num_bytes;
+
+        // Only resize if this given allocation was the last thing alloc-ed
+        bool same_pointer =
+            (arena->current - original_allocation.length) == original_allocation.data;
+        bool is_space_left = potential_end <= arena->end;
+
+        if (same_pointer && is_space_left)
+        {
+            res.data = original_allocation.data;
+            res.length = new_num_bytes;
+            arena->current = original_allocation.data + new_num_bytes;
+
+            ASAN_UNPOISON_MEMORY_REGION(res.data, res.length);
+        }
+        else
+        {
+            res = jsl_arena_allocate_aligned(arena, new_num_bytes, align, false);
+            if (res.data != NULL)
+            {
+                memcpy(res.data, original_allocation.data, original_allocation.length);
+
+                #ifdef JSL_DEBUG
+                    memset((void*) original_allocation.data, 0xfeeefeee, original_allocation.length);
+                #endif
+
+                ASAN_POISON_MEMORY_REGION(original_allocation.data, original_allocation.length);
+            }
+        }
+
+        return res;
+    }
+
+    void jsl_arena_reset(JSLArena* arena)
+    {
+        ASAN_UNPOISON_MEMORY_REGION(arena->start, arena->end - arena->start);
+
+        #ifdef JSL_DEBUG
+            memset((void*) arena->start, 0xfeeefeee, arena->current - arena->start);
+        #endif
+
+        arena->current = arena->start;
+
+        ASAN_POISON_MEMORY_REGION(arena->start, arena->end - arena->start);
+    }
+
+    uint8_t* jsl_arena_save_restore_point(JSLArena* arena)
+    {
+        return arena->current;
+    }
+
+    void jsl_arena_load_restore_point(JSLArena* arena, uint8_t* restore_point)
+    {
+        JSL_ASSERT(restore_point >= arena->start);
+        JSL_ASSERT(restore_point <= arena->end);
+
+        ASAN_UNPOISON_MEMORY_REGION(restore_point, arena->current - restore_point);
+
+        #ifdef JSL_DEBUG
+            memset((void*) restore_point, 0xfeeefeee, arena->current - restore_point);
+        #endif
+
+        ASAN_POISON_MEMORY_REGION(restore_point, arena->current - restore_point);
+
+        arena->current = restore_point;
     }
 
     static int32_t stbsp__real_to_str(char const **start, uint32_t *len, char *out, int32_t *decimal_pos, double value, uint32_t frac_digits);
