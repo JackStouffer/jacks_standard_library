@@ -131,6 +131,67 @@ E.g. an object checked out from an object pool and then checked back in might st
 have valid data inside it, but accessing that data outside of the pool is invalid
 because the object reached the end of its *lifetime*, according to the usage semantics.
 
+### Why Memory Matters
+
+Why not just throw all allocations into a garbage collector or smart pointers? As engineers,
+we do have a limited amount of time. If there's tooling that makes our programs 20% slower
+but we ship 200% faster, that seems like a no-brainer. 
+
+I'd agree, with that was actually the calculus. The first problem is it's not a 20% cost
+and it doesn't save me a huge amount of time.
+
+#### Programmer Time
+
+The question is, does garbage collection or automatic reference counting save me a huge amount
+of time over the thing I write by default (explained below)? Not really. It may seem flippant
+but when I'm writing code with this library I really don't ever think about memory other
+than a short bit at the very beginning and end of the project.
+
+If the garbage collector is working fine, then everything is ok. But when it's slow, now I have
+a giant black box dead center in my program that I can't do anything about. At this point most
+people start doing things like pre-allocating arrays or writing pool allocators. I'm sorry
+guys, **you're doing manual memory management**. Except way worse because now you have the
+worst of both worlds: you're slow as hell and you have a bunch of allocation code.
+
+#### Performance
+
+Time is money. The faster your program is the more money you will make; it's just that
+simple [^1] [^2] [^3] [^4]
+
+For the people that say 
+
+> Performance doesn't matter because computers are so fast that we can afford to spend less
+> time making it fast and more time building things
+
+I'm sorry but that is completely unsupported by the data.
+
+To be absolutely clear, **the data and industry leaders agree that if the program is faster
+you will have more users and make more money**.
+
+Well, what does manual memory management have to do with performance? 
+
+If you look at a graph of the performance of a single CPU thread over the past 30 years,
+you'd notice that we hit diminishing returns sometime around 2005. You'd be lucky now to
+have a 10% year over year speed improvement from each new CPU generation.
+
+If you chart the memory bandwidth increases, the hit is even more dire. DDR5 was a nice
+leap but averaged out your getting maybe a 3% bump per year. So that means that over time
+the processing speed and the memory speed have been slowly diverging, to the point where
+modern programs are basically spending all of their time waiting for memory. Meaning, the
+CPU is just sitting there doing nothing with your program. If you improve your memory usage
+it will have massive impacts on the speed of your program.
+
+This a very condensed and shorthand list of things you can do to make your memory faster
+
+1. Never conceptualize the things (structs/objects/entities etc) in your program as being
+   completely separate and allocated one at a time.
+2. Instead conceptualize your programs as a small set of lifetimes (more details below)
+3. If your program will need a bunch of the same thing, reserve the virtual address space
+   for the maximum amount that your program will allow and then put a pool allocator in
+   front of that address space.
+
+### It's Not That Hard
+
 The main thing to understand is that manual memory management is not that complicated
 once you change your perspective.
 
@@ -141,6 +202,8 @@ functions make two major bad design decisions
 * Each allocation is treated as a completely separate lifetime. 
 * All allocations pull from a single, implicitly global, heap with a
   conceptually unlimited amount of memory.
+
+More on the "conceptually unlimited amount of memory" bit later.
 
 These design decisions actually make thinking about memory way more complicated than
 it needs to be. In a C program which exclusively uses the standard library allocator,
@@ -161,7 +224,8 @@ of the allocations in your program
 ### Make The Problem Simpler
 
 To make manual memory allocation actually manageable in real world projects, we need to
-reframe the way you think of your program's execution into distinct, understandable lifetimes.
+reframe the way you think of your program's execution into distinct chucks, each 
+with understandable lifetimes.
 
 For example, in an HTTP web application, there are really only three lifetimes:
 
@@ -218,13 +282,14 @@ Just to show you "nothing is up my sleave" with the HTTP example, let's use anot
 this time a compiler. A very complicated problem in many people's minds, and I'm sure
 great optimization is pretty hard. However memory management for a compiler is not.
 
-A compiler can be broken down into four lifetimes based on the four main parts of
+A compiler can be broken down into five lifetimes based on the five main steps of
 the compiler process
 
 1. File Loading -> File text
 2. Lexing -> Token stream
 3. Parsing -> AST
-4. Executable writing
+4. Intermediate representation -> IR file data
+5. Assembler -> executable file
 
 In modern compilers it's more complicated, with multiple stages of intermediate
 representation, but the basic fact remains, that:
@@ -233,10 +298,17 @@ representation, but the basic fact remains, that:
 * The n-1 step can be freed once n step is done, e.g. once lexing is done you don't
   need the file data anymore, once parsing is done and you have an AST you don't need
   the token stream anymore.
+* Therefore, just make a separate heap for each step and then free the n-1 heap when
+  you're done with step n.
 
 ASTs are pretty complex tree structures with lots of different node types with disparate
 internals. That's completely irrelevant for the memory though. When you no longer need
 the AST just call `free_all` on your AST specific heap and you're done.
+
+As one final note, you can also just never free any memory ever. The obvious use case 
+is something like a batch file. But the reference D compiler has been doing this for
+decades now. For short running programs that need less than 4 gb of RAM total this is a
+perfectly valid strategy.
 
 ### Breaking Out of the Constructor/Destructor Mindset
 
@@ -286,11 +358,25 @@ struct {
 };
 ```
 
+Essentially, you have a contiguous address range represented by `start` and `end`. When you
+ask for memory, `current` is stored, `current` is incremented by the requested allocation,
+and then the stored value is returned. That's it.
 
-They are also extremely useful in cases where,
+The flip side is there's only one free operation, which is setting the `current` value to
+the `end`.
+
+They are extremely useful in cases where,
 
 * You can group together many things with the same lifetime
 * This lifetime has a very well understood terminus
-* You're in a situation where every byte isn't precious
+* You're in a situation where every single byte isn't precious
 
 TODO: mention aiming for L2 cache size
+
+[^1] Milliseconds Make Millions, (2019). 100ms speed improvement lead to 10% increase in revenue https://www.thinkwithgoogle.com/_qs/documents/9757/Milliseconds_Make_Millions_report_hQYAbZJ.pdf
+
+[^2] Find Out How You Stack Up to New Industry Benchmarks for Mobile Page Speed, (2017). Longer load times have a linear relationship with people closing the browser tab and moving on https://think.storage.googleapis.com/docs/mobile-page-speed-new-industry-benchmarks.pdf
+
+[^3] Amazon study: Every 100ms in Added Page Load Time Cost 1% in Revenue (2006) https://www.conductor.com/academy/page-speed-resources/faq/amazon-page-speed-study/
+
+[^4] Walmart engineer's talk on their internal studies. 100ms slower equals 1% loss in revenue https://www.slideshare.net/slideshow/walmart-pagespeedslide/25991009
