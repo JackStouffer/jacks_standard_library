@@ -373,10 +373,10 @@ They are extremely useful in cases where,
 
 TODO: mention aiming for L2 cache size
 
-[^1] Milliseconds Make Millions, (2019). 100ms speed improvement lead to 10% increase in revenue https://www.thinkwithgoogle.com/_qs/documents/9757/Milliseconds_Make_Millions_report_hQYAbZJ.pdf
+[^1]: Milliseconds Make Millions, (2019). 100ms speed improvement lead to 10% increase in revenue https://www.thinkwithgoogle.com/_qs/documents/9757/Milliseconds_Make_Millions_report_hQYAbZJ.pdf
 
-[^2] Find Out How You Stack Up to New Industry Benchmarks for Mobile Page Speed, (2017). Longer load times have a linear relationship with people closing the browser tab and moving on https://think.storage.googleapis.com/docs/mobile-page-speed-new-industry-benchmarks.pdf
+[^2]: Find Out How You Stack Up to New Industry Benchmarks for Mobile Page Speed, (2017). Longer load times have a linear relationship with people closing the browser tab and moving on https://think.storage.googleapis.com/docs/mobile-page-speed-new-industry-benchmarks.pdf
 
-[^3] Amazon study: Every 100ms in Added Page Load Time Cost 1% in Revenue (2006) https://www.conductor.com/academy/page-speed-resources/faq/amazon-page-speed-study/
+[^3]: Amazon study: Every 100ms in Added Page Load Time Cost 1% in Revenue (2006) https://www.conductor.com/academy/page-speed-resources/faq/amazon-page-speed-study/
 
-[^4] Walmart engineer's talk on their internal studies. 100ms slower equals 1% loss in revenue https://www.slideshare.net/slideshow/walmart-pagespeedslide/25991009
+[^4]: Walmart engineer's talk on their internal studies. 100ms slower equals 1% loss in revenue https://www.slideshare.net/slideshow/walmart-pagespeedslide/25991009
