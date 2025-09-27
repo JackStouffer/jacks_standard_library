@@ -221,47 +221,92 @@ extern "C" {
 #endif
 
 
-// TODO: Docs
-#ifndef JSL_MAX
-    #define JSL_MAX(a,b) ((a) > (b) ? (a) : (b))
-#endif
+/**
+ * Evaluates the maximum of two values.
+ *
+ * @warning This macro evaluates its arguments multiple times. Do not use with
+ * arguments that have side effects (e.g., function calls, increment/decrement
+ * operations) as they will be executed more than once.
+ * 
+ * Example:
+ * ```c
+ * int max_val = JSL_MAX(10, 20);        // Returns 20
+ * double max_d = JSL_MAX(3.14, 2.71);   // Returns 3.14
+ * 
+ * // DANGER: Don't do this - increment happens twice!
+ * // int bad = JSL_MAX(++x, y);
+ * ```
+ */
+#define JSL_MAX(a,b) ((a) > (b) ? (a) : (b))
+
+/**
+ * Evaluates the minimum of two values.
+ *
+ * @warning This macro evaluates its arguments multiple times. Do not use with
+ * arguments that have side effects (e.g., function calls, increment/decrement
+ * operations) as they will be executed more than once.
+ * 
+ * Example:
+ * ```c
+ * int max_val = JSL_MAX(10, 20);        // Returns 20
+ * double max_d = JSL_MAX(3.14, 2.71);   // Returns 3.14
+ * 
+ * // DANGER: Don't do this - increment happens twice!
+ * // int bad = JSL_MAX(++x, y);
+ * ```
+ */
+#define JSL_MIN(a,b) ((a) < (b) ? (a) : (b))
+
+/**
+ * Sets a specific bit flag in a bitfield by performing a bitwise OR operation.
+ *
+ * @param flags Pointer to the bitfield variable where the flag should be set
+ * @param flag The flag value(s) to set. Can be a single flag or multiple flags OR'd together
+ *
+ * @note This macro evaluates its arguments multiple times. Do not use with
+ * arguments that have side effects (e.g., function calls, increment/decrement
+ * operations) as they will be executed more than once.
+ *
+ * Example:
+ * 
+ * ```
+ * #define FLAG_READ    JSL_MAKE_BITFLAG(1)
+ * #define FLAG_WRITE   JSL_MAKE_BITFLAG(2) 
+ *
+ * uint32_t permissions = 0;
+ * 
+ * JSL_SET_BITFLAG(&permissions, FLAG_READ);
+ * JSL_SET_BITFLAG(&permissions, FLAG_WRITE);
+ * 
+ * // DANGER: Don't do this - increment happens twice!
+ * // JSL_SET_BITFLAG(&array[++index], some_flag);
+ * ```
+ */
+#define JSL_SET_BITFLAG(flags, flag) *flags |= flag
 
 // TODO: Docs
-#ifndef JSL_MIN
-    #define JSL_MIN(a,b) ((a) < (b) ? (a) : (b))
-#endif
+#define JSL_UNSET_BITFLAG(flags, flag) *flags &= ~(flag)
 
 // TODO: Docs
-#ifndef JSL_SET_BITFLAG
-    #define JSL_SET_BITFLAG(flags, flag) *flags |= flag
-#endif
+#define JSL_IS_BITFLAG_SET(flags, flag) ((flags & flag) == flag)
 
 // TODO: Docs
-#ifndef JSL_UNSET_BITFLAG
-    #define JSL_UNSET_BITFLAG(flags, flag) *flags &= ~(flag)
-#endif
+#define JSL_IS_BITFLAG_NOT_SET(flags, flag) ((flags & flag) == 0)
 
 // TODO: Docs
-#ifndef JSL_IS_BITFLAG_SET
-    #define JSL_IS_BITFLAG_SET(flags, flag) ((flags & flag) == flag)
-#endif
-
-// TODO: Docs
-#ifndef JSL_IS_BITFLAG_NOT_SET
-    #define JSL_IS_BITFLAG_NOT_SET(flags, flag) ((flags & flag) == 0)
-#endif
-
-// TODO: Docs
-#ifndef JSL_MAKE_BITFLAG
-    #define JSL_MAKE_BITFLAG(position) 1U << position
-#endif
+#define JSL_MAKE_BITFLAG(position) 1U << position
 
 /** 
  * A fat pointer is a representation of a chunk of memory. It **is not** a container
  * or an abstract data type.
  *
- * A fat pointer is a pointer + length, very similar to D or Go's slices. This provides
- * several useful functions like bounds checked reads/writes.
+ * A fat pointer is very similar to D or Go's slices. This provides several useful
+ * functions like bounds checked reads/writes.
+ * 
+ * One very important thing to note is that the fat pointer is always defined as mutable.
+ * In my opinion, const in C provides very little protection and a world a headaches during
+ * refactors, especially since C does not have generics or function overloading. I find the
+ * cost benefit analysis to be in the negative.
  */
 typedef struct JSLFatPtr
 {
@@ -285,6 +330,24 @@ typedef struct JSLFatPtr
     int64_t length;
 } JSLFatPtr;
 
+/**
+ * Creates a JSLFatPtr from a string literal at compile time.
+ *
+ * @note The resulting fat pointer points directly to the string literal's memory,
+ * so no copying occurs.
+ *
+ * Example:
+ * 
+ * ```c
+ * // Create fat pointers from string literals
+ * JSLFatPtr hello = JSL_FATPTR_LITERAL("Hello, World!");
+ * JSLFatPtr path = JSL_FATPTR_LITERAL("/usr/local/bin");
+ * JSLFatPtr empty = JSL_FATPTR_LITERAL("");
+ * ```
+ */
+#define JSL_FATPTR_LITERAL(s) \
+    ((JSLFatPtr){ .data = (uint8_t*)(s), .length = (int64_t)(sizeof("" s "") - 1) })
+
 // TODO: Docs explaining arenas
 typedef struct JSLArena
 {
@@ -292,6 +355,39 @@ typedef struct JSLArena
     uint8_t* current;
     uint8_t* end;
 } JSLArena;
+
+/**
+ * Creates an arena from stack memory.
+ *
+ * Example
+ * 
+ * ```
+ * uint8_t buffer[2048];
+ * JSLArena stack_arena = JSL_ARENA_FROM_STACK(buffer);
+ * ```
+ *
+ * This incredibly useful for getting a dynamic allocator for things which will only
+ * last the lifetime of the current function. For example, if the current function
+ * needs a hash map, you can use this macro and then there's no cleanup at the end
+ * because the stack pointer will be reset at the end of the function.
+ *
+ * ```
+ * void some_func(void)
+ * {
+ *      uint8_t buffer[16 * 1024]; // yes this breaks the standard but it's supported everywhere that matters
+ *      JSLArena stack_arena = JSL_ARENA_FROM_STACK(buffer);
+ * 
+ *      IntToStrMap map = int_to_str_ctor(&arena);
+ *      int_to_str_add(&map, 64, JSL_FATPTR_LITERAL("This is my string data!"));
+ * }
+ * ```
+ *
+ * Fast, cheap, easy automatic memory management!
+ */
+#define JSL_ARENA_FROM_STACK(buf) \
+    (JSLArena){ .start = (uint8_t *)(buf), \
+                .current = (uint8_t *)(buf), \
+                .end = (uint8_t *)(buf) + sizeof(buf) }
 
 /**
  * Constructor utility function to make a fat pointer out of a pointer and a length.
@@ -322,10 +418,12 @@ JSL_DEF int64_t jsl_fatptr_total_write_length(JSLFatPtr original_fatptr, JSLFatP
  * Returns the slice in `original_fatptr` that represents the written to portion, given
  * the size and pointer in `writer_fatptr`.
  * 
+ * @note 
+ * 
  * Example:
  * 
  * ```
- * JSLFatPtr original = jsl_arena_allocate(arena, 128);
+ * JSLFatPtr original = jsl_arena_allocate(arena, 128 * 1024 * 1024);
  * JSLFatPtr writer = original;
  * jsl_fatptr_write_file_contents(&writer, "file_one.txt");
  * jsl_fatptr_write_file_contents(&writer, "file_two.txt");
@@ -337,7 +435,7 @@ JSL_DEF JSLFatPtr jsl_fatptr_auto_slice(JSLFatPtr original_fatptr, JSLFatPtr wri
 /**
  * Build a fat pointer from a null terminated string. **DOES NOT** copy the data.
  * It simply sets the data pointer to `str` and the length value to the result of
- * `strlen`.
+ * `JSL_STRLEN`.
  *
  * @param str = the str to create the fat ptr from
  * @return A fat ptr
@@ -368,7 +466,7 @@ JSL_DEF int64_t jsl_fatptr_memory_copy(JSLFatPtr* destination, JSLFatPtr source)
  * pointers.
  * 
  * If `cstring` is not a valid null terminated string then this function's behavior
- * is undefined, as it uses `strlen`.
+ * is undefined, as it uses `JSL_STRLEN`.
  *
  * `destination` is modified to point to the remaining data in the buffer. I.E.
  * if the entire buffer was used then `destination->length` will be `0`.
@@ -658,14 +756,25 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
     {
         // zero should always be an error condition!
         JSL_FILE_LOAD_BAD_PARAMETERS,
-        JSL_FILE_LOAD_COULD_NOT_OPEN,
         JSL_FILE_LOAD_SUCCESS,
-        JSL_FILE_LOAD_WRITE_FAILED,
+        JSL_FILE_LOAD_COULD_NOT_OPEN,
+        JSL_FILE_LOAD_COULD_NOT_GET_FILE_SIZE,
+        JSL_FILE_LOAD_COULD_NOT_GET_MEMORY,
+        JSL_FILE_LOAD_READ_FAILED,
         JSL_FILE_LOAD_CLOSE_FAILED,
-        JSL_FILE_LOAD_NOT_ENOUGH_MEMORY,
+        JSL_FILE_LOAD_ERROR_UNKNOWN,
 
         JSL_FILE_LOAD_ENUM_COUNT
     } JSLLoadFileResultEnum;
+
+    typedef enum
+    {
+        // zero should always be an error condition!
+        JSL_FILE_WRITE_BAD_PARAMETERS,
+        JSL_FILE_WRITE_SUCCESS,
+
+        JSL_FILE_WRITE_ENUM_COUNT
+    } JSLWriteFileResultEnum;
 
     /**
      * Load the contents of the file at `path` into a newly allocated buffer
@@ -676,36 +785,54 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
     JSL_WARN_UNUSED JSL_DEF JSLLoadFileResultEnum jsl_fatptr_load_file_contents(
         JSLArena* arena,
         JSLFatPtr path,
-        JSLFatPtr* out_contents
+        JSLFatPtr* out_contents,
+        errno_t* out_errno
     );
 
     // TODO, docs
     JSL_WARN_UNUSED JSL_DEF JSLLoadFileResultEnum jsl_fatptr_load_file_contents_cstr(
         JSLArena* arena,
         const char* path,
-        JSLFatPtr* out_contents
+        JSLFatPtr* out_contents,
+        errno_t* out_errno
     );
 
     // TODO, docs
     JSL_WARN_UNUSED JSL_DEF JSLLoadFileResultEnum jsl_fatptr_load_file_contents_buffer(
         JSLFatPtr* buffer,
-        JSLFatPtr path
+        JSLFatPtr path,
+        errno_t* out_errno
     );
 
     // TODO, docs
     JSL_WARN_UNUSED JSL_DEF JSLLoadFileResultEnum jsl_fatptr_load_file_contents_buffer_cstr(
         JSLFatPtr* buffer,
-        const char* path
+        const char* path,
+        errno_t* out_errno
     );
 
     // TODO, docs
-    JSL_WARN_UNUSED JSL_DEF int32_t jsl_fatptr_write_contents_to_file_cstr(char* path, JSLFatPtr contents);
+    JSL_WARN_UNUSED JSL_DEF JSLWriteFileResultEnum jsl_fatptr_write_contents_to_file_cstr(
+        char* path,
+        JSLFatPtr contents,
+        int64_t* out_bytes_written,
+        errno_t* out_errno
+    );
 
     // TODO, docs
-    JSL_WARN_UNUSED JSL_DEF int32_t jsl_fatptr_write_file_contents(JSLFatPtr* buffer, JSLFatPtr path);
+    JSL_WARN_UNUSED JSL_DEF JSLWriteFileResultEnum jsl_fatptr_write_file_contents(
+        JSLFatPtr path,
+        JSLFatPtr* buffer,
+        int64_t* out_bytes_written,
+        errno_t* out_errno
+    );
 
     // TODO, docs
-    JSL_WARN_UNUSED JSL_DEF int32_t jsl_fatptr_write_file_contents_cstr(JSLFatPtr* buffer, char* path);
+    JSL_WARN_UNUSED JSL_DEF JSLWriteFileResultEnum jsl_fatptr_write_file_contents_cstr(
+        JSLFatPtr* buffer,
+        char* path,
+        errno_t* out_errno
+    );
 
 #endif
 
@@ -754,6 +881,11 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
     #ifndef JSL_MEMCMP
         #include <string.h>
         #define JSL_MEMCMP memcmp
+    #endif
+
+    #ifndef JSL_STRLEN
+        #include <string.h>
+        #define JSL_STRLEN strlen
     #endif
 
     JSLFatPtr jsl_fatptr_ctor(uint8_t* ptr, int64_t length)
@@ -809,7 +941,7 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
     {
         JSLFatPtr ret = {
             .data = (uint8_t*) str,
-            .length = str == NULL ? 0 : (int64_t) strlen(str)
+            .length = str == NULL ? 0 : (int64_t) JSL_STRLEN(str)
         };
         return ret;
     }
@@ -852,7 +984,7 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
             return -1;
 
         int64_t length = JSL_MIN(
-            include_null_terminator ? (int64_t) strlen(cstring) + 1 : (int64_t) strlen(cstring),
+            include_null_terminator ? (int64_t) JSL_STRLEN(cstring) + 1 : (int64_t) JSL_STRLEN(cstring),
             destination->length
         );
         JSL_MEMCPY(destination->data, cstring, length);
@@ -879,7 +1011,7 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
         if (cstr == NULL || string.data == NULL)
             return false;
 
-        size_t cstr_length = strlen(cstr);
+        size_t cstr_length = JSL_STRLEN(cstr);
 
         if (string.length != cstr_length)
             return false;
@@ -1326,7 +1458,7 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
         if (arena == NULL || str == NULL)
             return ret;
 
-        size_t length = strlen(str);
+        size_t length = JSL_STRLEN(str);
         if (length == 0)
             return ret;
 
@@ -1889,7 +2021,7 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
                     // memory. While technically this is a buffer overflow, as we're reading
                     // memory that isn't "ours", I don't think it's possible that this is a
                     // security hole. I can't think of a way that info past the buffer could possibly leak
-                    // out of this function. Also, if have to have a string without a null terminator
+                    // out of this function. Also, if you have a string without a null terminator
                     // you would result in a page fault with or without this code. Additionally,
                     // this is a very common technique that's taken directly from glibc's strlen.
 
@@ -2170,7 +2302,7 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
                     string = (char *)"null";
                 // get the length, limited to desired precision
                 // always limit to ~0u chars since our counts are 32b
-                l = (precision >= 0) ? stbsp__strlen_limited(string, precision) : strlen(string);
+                l = (precision >= 0) ? stbsp__strlen_limited(string, precision) : JSL_STRLEN(string);
                 lead[0] = 0;
                 tail[0] = 0;
                 precision = 0;
@@ -3431,6 +3563,10 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
     
         #define JSL_WIN32
 
+        #include <errno.h>
+        #include <fcntl.h>
+        #include <limits.h>
+        #include <fcntl.h>
         #include <io.h>
         #include <sys\stat.h>
 
@@ -3438,18 +3574,54 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
 
         #define JSL_POSIX
 
-        #include <unistd.h>
-        #include <unistd.h>
+        #include <errno.h>
         #include <limits.h>
+        #include <fcntl.h>
+        #include <unistd.h>
+        #include <sys/types.h>
+        #include <sys/stat.h>
 
     #endif
 
-    #include <fcntl.h>
+
+    static int64_t jsl__get_file_size_from_fileno(int32_t file_descriptor)
+    {
+        int64_t result_size = -1;
+        bool stat_success = false;
+
+        #if defined(JSL_WIN32)
+            struct _stat64 file_info;
+            int stat_result = _fstat64(file_descriptor, &file_info);
+            if (stat_result == 0)
+            {
+                stat_success = true;
+                result_size = file_info.st_size;
+            }
+
+        #elif defined(JSL_POSIX)
+            struct stat file_info;
+            int stat_result = fstat(file_descriptor, &file_info);
+            if (stat_result == 0)
+            {
+                stat_success = true;
+                result_size = (int64_t) file_info.st_size;
+            }
+
+        #endif
+
+        if (!stat_success)
+        {
+            result_size = -1;
+        }
+
+        return result_size;
+    }
 
     JSLLoadFileResultEnum jsl_fatptr_load_file_contents(
         JSLArena* arena,
         JSLFatPtr path,
-        JSLFatPtr* out_contents
+        JSLFatPtr* out_contents,
+        errno_t* out_errno
     )
     {
         JSLLoadFileResultEnum result = JSL_FILE_LOAD_BAD_PARAMETERS;
@@ -3466,7 +3638,7 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
             char path_buffer[FILENAME_MAX + 1];
             JSL_MEMCPY(path_buffer, path.data, path.length);
             path_buffer[path.length] = '\0';
-            result = jsl_fatptr_load_file_contents_cstr(arena, path_buffer, out_contents);
+            result = jsl_fatptr_load_file_contents_cstr(arena, path_buffer, out_contents, out_errno);
         }
 
         return result;
@@ -3475,59 +3647,131 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
     JSLLoadFileResultEnum jsl_fatptr_load_file_contents_cstr(
         JSLArena* arena,
         const char* path,
-        JSLFatPtr* out_contents
+        JSLFatPtr* out_contents,
+        errno_t* out_errno
     )
     {
         JSLLoadFileResultEnum res = JSL_FILE_LOAD_BAD_PARAMETERS;
-
+        int32_t file_descriptor = -1;
+        
+        bool opened_file = false;
         if (path != NULL && arena != NULL && out_contents != NULL)
         {
-            int32_t file_descriptor = open(path, 0);
-            if (file_descriptor > 0)
-            {
-                int64_t file_size = jsl__get_file_size_from_fileno(file_descriptor);
-                JSLFatPtr allocation = jsl_arena_allocate(arena, file_size, false);
+            #if defined(JSL_WIN32)
+                file_descriptor = _open(path, 0);
+            #elif defined(JSL_POSIX)
+                file_descriptor = open(path, 0);
+            #else
+                #error "Unsupported platform"
+            #endif
+            
+            opened_file = file_descriptor > -1;
+        }
 
-                int64_t written = JSL_MIN(file_size, allocation.length);
-                int64_t read_res = read(file_descriptor, allocation.data, written);
+        int64_t file_size = -1;
+        bool got_file_size = false;
+        if (opened_file)
+        {
+            file_size = jsl__get_file_size_from_fileno(file_descriptor);
+            got_file_size = file_size > -1;
+        }
+        else
+        {
+            res = JSL_FILE_LOAD_COULD_NOT_OPEN;
+            if (out_errno != NULL)
+                *out_errno = errno;
+        }
 
-                if (read_res > 0)
-                {
-                    res.file_contents.data = allocation.data;
-                    res.file_contents.length = read_res;
-                }
-                else
-                {
-                    res.result_code = errno;
-                    errno = 0;
-                }
+        JSLFatPtr allocation = {0};
+        bool got_memory = false;
+        if (got_file_size)
+        {
+            allocation = jsl_arena_allocate(arena, file_size, false);
+            got_memory = allocation.data != NULL && allocation.length >= file_size;
+        }
+        else
+        {
+            res = JSL_FILE_LOAD_COULD_NOT_GET_FILE_SIZE;
+            if (out_errno != NULL)
+                *out_errno = errno;
+        }
 
-                close(file_descriptor);
-            }
-            else
-            {
-                res.result_code = errno;
-                errno = 0;
-            }
+        int64_t read_res = -1;
+        bool did_read_data = false;
+        if (got_memory)
+        {
+            #if defined(JSL_WIN32)
+                read_res = _read(file_descriptor, allocation.data, file_size);
+            #elif defined(JSL_POSIX)
+                read_res = read(file_descriptor, allocation.data, file_size);
+            #else
+                #error "Unsupported platform"
+            #endif
+
+            did_read_data = read_res > -1;
+        }
+        else
+        {
+            res = JSL_FILE_LOAD_COULD_NOT_GET_MEMORY;
+        }
+
+        bool did_close = false;
+        if (did_read_data)
+        {
+            out_contents->data = allocation.data;
+            out_contents->length = read_res;
+
+            #if defined(JSL_WIN32)
+                int32_t close_res = _close(file_descriptor);
+            #elif defined(JSL_POSIX)
+                int32_t close_res = close(file_descriptor);
+            #else
+                #error "Unsupported platform"
+            #endif
+
+            did_close = close_res > -1;
+        }
+        else
+        {
+            res = JSL_FILE_LOAD_READ_FAILED;
+            if (out_errno != NULL)
+                *out_errno = errno;
+        }
+
+        if (did_close)
+        {
+            res = JSL_FILE_LOAD_SUCCESS;
+        }
+        else
+        {
+            res = JSL_FILE_LOAD_CLOSE_FAILED;
+            if (out_errno != NULL)
+                *out_errno = errno;
         }
 
         return res;
     }
 
-    JSLLoadFileResult jsl_fatptr_load_file_contents_buffer(JSLFatPtr* buffer, JSLFatPtr path)
+    JSLLoadFileResultEnum jsl_fatptr_load_file_contents_buffer(
+        JSLFatPtr* buffer,
+        JSLFatPtr path,
+        errno_t* out_errno
+    )
     {
         // TODO, incomplete
         JSL_ASSERT(0);
-        JSLLoadFileResult res = {0};
+        JSLLoadFileResultEnum res = 0;
         return res;
     }
 
-    JSLWriteFileResult jsl_fatptr_write_contents_to_file_cstr(char* path, JSLFatPtr contents)
+    JSLWriteFileResultEnum jsl_fatptr_write_contents_to_file_cstr(
+        char* path,
+        JSLFatPtr contents,
+        int64_t* out_bytes_written,
+        errno_t* out_errno
+    )
     {
-        JSLWriteFileResult res = {
-            .bytes_written = -1,
-            .result_code = 0
-        };
+        JSLWriteFileResultEnum res = JSL_FILE_WRITE_BAD_PARAMETERS;
 
         if (path != NULL && contents.data != NULL && contents.length > 0)
         {
