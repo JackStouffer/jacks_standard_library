@@ -66,8 +66,8 @@ void test_jsl_fatptr_cstr_memory_copy()
 
 void test_jsl_fatptr_load_file_contents()
 {
-    char* path = "./tests/example.html";
-    char stack_buffer[2048];
+    char* path = "./tests/example.txt";
+    char stack_buffer[4*1024];
     int64_t file_size;
 
     // Load the comparison using libc
@@ -81,11 +81,18 @@ void test_jsl_fatptr_load_file_contents()
         fread(stack_buffer, file_size, 1, file);
     }
 
-    JSLArena arena = jsl_arena_ctor(malloc(2048), 2048);
-    JSLLoadFileResult res = jsl_fatptr_load_file_contents_cstr(&arena, path);
+    JSLArena arena = jsl_arena_ctor(malloc(4*1024), 4*1024);
 
-    lok(res.result_code == 0);
-    lok(memcmp(stack_buffer, res.file_contents.data, file_size) == 0);
+    JSLFatPtr contents;
+    JSLLoadFileResultEnum res = jsl_fatptr_load_file_contents(
+        &arena,
+        JSL_FATPTR_LITERAL("./tests/example.txt"),
+        &contents,
+        NULL
+    );
+
+    lok(res == JSL_FILE_LOAD_SUCCESS);
+    lok(memcmp(stack_buffer, contents.data, file_size) == 0);
 }
 
 void test_jsl_fatptr_memory_compare()

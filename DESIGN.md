@@ -186,7 +186,9 @@ This a very condensed and shorthand list of things you can do to make your memor
 1. Never conceptualize the things (structs/objects/entities etc) in your program as being
    completely separate and allocated one at a time.
 2. Instead conceptualize your programs as a small set of lifetimes (more details below)
-3. If your program will need a bunch of the same thing, reserve the virtual address space
+3. Make each lifetime's footprint small as you possibly can by setting max limits on total
+   bytes used. L1, L2, L3 cache sizes are great places to start for limits
+4. If your program will need a bunch of the same thing, reserve the virtual address space
    for the maximum amount that your program will allow and then put a pool allocator in
    front of that address space.
 

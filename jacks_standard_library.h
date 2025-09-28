@@ -33,11 +33,8 @@
  * Some bad design decisions include
  * 
  *      * Null terminated strings
- *      * A single global heap
- *          * which is called silently and you're expected
- *            to remember to call free
- *      * An object based file interface
- *          * based around seeking with tiny reads and writes
+ *      * A single global heap, which is called silently, and you're expected to remember to call free
+ *      * An object based file interface based around seeking with tiny reads and writes
  *      * Errors get special treatment
  * 
  * And unfortunately it was decided as part of the language that arrays decay to
@@ -68,9 +65,8 @@
  *      * Anything with UTF-16. Just use UTF-8
  *      * Threading. Just use pthreads or win api calls
  *      * Atomics. This is really platform specific and you should just use intrinsics
- *      * Date/time utilities. Also something I haven't needed much. Storing the unix
- *        timestamp get's me 99% of what I need.
- *      * Random numbers.
+ *      * Date/time utilities
+ *      * Random numbers
  * 
  * This library is slow for ARM as I haven't gotten around to writing the NEON
  * versions of the SIMD code yet. glibc will be significantly faster for comparable
@@ -78,7 +74,7 @@
  * 
  * ## What's Supported
  * 
- * Windows, macOS, and Linux with MSVC, GCC, and clang.
+ * Official support for Windows, macOS, and Linux with MSVC, GCC, and clang.
  * 
  * This might work on other POSIX systems, but I have not tested it.
  * 
@@ -96,7 +92,7 @@
  * C11 compatible implementation for MSVC. If you want to turn this off, just define it as
  * empty string.
  * 
- * `JSL_ASSERT` - Controls asseertions in the library. By default this will use `assert.h`.
+ * `JSL_ASSERT` - Assertion function definition. By default this will use `assert.h`.
  * If you wish to override it, it must be a function which takes three parameters, a int
  * conditional, a char* of the filename, and an int line number. You can also provide an
  * empty function if you just want to turn off asserts altogether.
@@ -772,6 +768,9 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
         // zero should always be an error condition!
         JSL_FILE_WRITE_BAD_PARAMETERS,
         JSL_FILE_WRITE_SUCCESS,
+        JSL_FILE_WRITE_COULD_NOT_OPEN,
+        JSL_FILE_WRITE_COULD_NOT_WRITE,
+        JSL_FILE_WRITE_COULD_NOT_CLOSE,
 
         JSL_FILE_WRITE_ENUM_COUNT
     } JSLWriteFileResultEnum;
@@ -790,14 +789,6 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
     );
 
     // TODO, docs
-    JSL_WARN_UNUSED JSL_DEF JSLLoadFileResultEnum jsl_fatptr_load_file_contents_cstr(
-        JSLArena* arena,
-        const char* path,
-        JSLFatPtr* out_contents,
-        errno_t* out_errno
-    );
-
-    // TODO, docs
     JSL_WARN_UNUSED JSL_DEF JSLLoadFileResultEnum jsl_fatptr_load_file_contents_buffer(
         JSLFatPtr* buffer,
         JSLFatPtr path,
@@ -805,32 +796,10 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
     );
 
     // TODO, docs
-    JSL_WARN_UNUSED JSL_DEF JSLLoadFileResultEnum jsl_fatptr_load_file_contents_buffer_cstr(
-        JSLFatPtr* buffer,
-        const char* path,
-        errno_t* out_errno
-    );
-
-    // TODO, docs
-    JSL_WARN_UNUSED JSL_DEF JSLWriteFileResultEnum jsl_fatptr_write_contents_to_file_cstr(
-        char* path,
-        JSLFatPtr contents,
-        int64_t* out_bytes_written,
-        errno_t* out_errno
-    );
-
-    // TODO, docs
     JSL_WARN_UNUSED JSL_DEF JSLWriteFileResultEnum jsl_fatptr_write_file_contents(
+        JSLFatPtr contents,
         JSLFatPtr path,
-        JSLFatPtr* buffer,
-        int64_t* out_bytes_written,
-        errno_t* out_errno
-    );
-
-    // TODO, docs
-    JSL_WARN_UNUSED JSL_DEF JSLWriteFileResultEnum jsl_fatptr_write_file_contents_cstr(
-        JSLFatPtr* buffer,
-        char* path,
+        int64_t* bytes_written,
         errno_t* out_errno
     );
 
@@ -3624,43 +3593,35 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
         errno_t* out_errno
     )
     {
-        JSLLoadFileResultEnum result = JSL_FILE_LOAD_BAD_PARAMETERS;
+        JSLLoadFileResultEnum res = JSL_FILE_LOAD_BAD_PARAMETERS;
+        char path_buffer[FILENAME_MAX + 1];
 
+        bool got_path = false;
         if (path.data != NULL
             && path.length > 0
             && path.length < FILENAME_MAX
             && arena != NULL
+            && arena->current != NULL
+            && arena->start != NULL
+            && arena->end != NULL
             && out_contents != NULL
         )
         {
             // File system APIs require a null terminated string
 
-            char path_buffer[FILENAME_MAX + 1];
             JSL_MEMCPY(path_buffer, path.data, path.length);
             path_buffer[path.length] = '\0';
-            result = jsl_fatptr_load_file_contents_cstr(arena, path_buffer, out_contents, out_errno);
+            got_path = true;
         }
 
-        return result;
-    }
-
-    JSLLoadFileResultEnum jsl_fatptr_load_file_contents_cstr(
-        JSLArena* arena,
-        const char* path,
-        JSLFatPtr* out_contents,
-        errno_t* out_errno
-    )
-    {
-        JSLLoadFileResultEnum res = JSL_FILE_LOAD_BAD_PARAMETERS;
         int32_t file_descriptor = -1;
-        
         bool opened_file = false;
-        if (path != NULL && arena != NULL && out_contents != NULL)
+        if (got_path)
         {
             #if defined(JSL_WIN32)
-                file_descriptor = _open(path, 0);
+                file_descriptor = _open(path_buffer, 0);
             #elif defined(JSL_POSIX)
-                file_descriptor = open(path, 0);
+                file_descriptor = open(path_buffer, 0);
             #else
                 #error "Unsupported platform"
             #endif
@@ -3715,12 +3676,21 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
             res = JSL_FILE_LOAD_COULD_NOT_GET_MEMORY;
         }
 
-        bool did_close = false;
         if (did_read_data)
         {
             out_contents->data = allocation.data;
             out_contents->length = read_res;
+        }
+        else
+        {
+            res = JSL_FILE_LOAD_READ_FAILED;
+            if (out_errno != NULL)
+                *out_errno = errno;
+        }
 
+        bool did_close = false;
+        if (opened_file)
+        {
             #if defined(JSL_WIN32)
                 int32_t close_res = _close(file_descriptor);
             #elif defined(JSL_POSIX)
@@ -3731,18 +3701,12 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
 
             did_close = close_res > -1;
         }
-        else
-        {
-            res = JSL_FILE_LOAD_READ_FAILED;
-            if (out_errno != NULL)
-                *out_errno = errno;
-        }
 
-        if (did_close)
+        if (opened_file && did_close)
         {
             res = JSL_FILE_LOAD_SUCCESS;
         }
-        else
+        if (opened_file && !did_close)
         {
             res = JSL_FILE_LOAD_CLOSE_FAILED;
             if (out_errno != NULL)
@@ -3752,61 +3716,206 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
         return res;
     }
 
+
     JSLLoadFileResultEnum jsl_fatptr_load_file_contents_buffer(
         JSLFatPtr* buffer,
         JSLFatPtr path,
         errno_t* out_errno
     )
     {
-        // TODO, incomplete
-        JSL_ASSERT(0);
-        JSLLoadFileResultEnum res = 0;
+        char path_buffer[FILENAME_MAX + 1];
+        JSLLoadFileResultEnum res = JSL_FILE_LOAD_BAD_PARAMETERS;
+
+        bool got_path = false;
+        if (path.data != NULL
+            && path.length > 0
+            && path.length < FILENAME_MAX
+            && buffer != NULL
+            && buffer->data != NULL
+            && buffer->length > 0
+        )
+        {
+            // File system APIs require a null terminated string
+
+            JSL_MEMCPY(path_buffer, path.data, path.length);
+            path_buffer[path.length] = '\0';
+            got_path = true;
+        }
+
+        int32_t file_descriptor = -1;
+        bool opened_file = false;
+        if (got_path)
+        {
+            #if defined(JSL_WIN32)
+                file_descriptor = _open(path_buffer, 0);
+            #elif defined(JSL_POSIX)
+                file_descriptor = open(path_buffer, 0);
+            #else
+                #error "Unsupported platform"
+            #endif
+            
+            opened_file = file_descriptor > -1;
+        }
+
+        int64_t file_size = -1;
+        bool got_file_size = false;
+        if (opened_file)
+        {
+            file_size = jsl__get_file_size_from_fileno(file_descriptor);
+            got_file_size = file_size > -1;
+        }
+        else
+        {
+            res = JSL_FILE_LOAD_COULD_NOT_OPEN;
+            if (out_errno != NULL)
+                *out_errno = errno;
+        }
+
+        int64_t read_res = -1;
+        bool did_read_data = false;
+        if (got_file_size)
+        {
+            int64_t read_size = JSL_MIN(file_size, buffer->length);
+
+            #if defined(JSL_WIN32)
+                read_res = _read(file_descriptor, buffer->data, read_size);
+            #elif defined(JSL_POSIX)
+                read_res = read(file_descriptor, buffer->data, read_size);
+            #else
+                #error "Unsupported platform"
+            #endif
+
+            did_read_data = read_res > -1;
+        }
+        else
+        {
+            res = JSL_FILE_LOAD_COULD_NOT_GET_FILE_SIZE;
+            if (out_errno != NULL)
+                *out_errno = errno;
+        }
+
+        if (did_read_data)
+        {
+            buffer->data += read_res;
+            buffer->length -= read_res;
+        }
+        else
+        {
+            res = JSL_FILE_LOAD_READ_FAILED;
+            if (out_errno != NULL)
+                *out_errno = errno;
+        }
+
+        bool did_close = false;
+        if (opened_file)
+        {
+            #if defined(JSL_WIN32)
+                int32_t close_res = _close(file_descriptor);
+            #elif defined(JSL_POSIX)
+                int32_t close_res = close(file_descriptor);
+            #else
+                #error "Unsupported platform"
+            #endif
+
+            did_close = close_res > -1;
+        }
+
+        if (opened_file && did_close)
+        {
+            res = JSL_FILE_LOAD_SUCCESS;
+        }
+        if (opened_file && !did_close)
+        {
+            res = JSL_FILE_LOAD_CLOSE_FAILED;
+            if (out_errno != NULL)
+                *out_errno = errno;
+        }
+
         return res;
     }
 
-    JSLWriteFileResultEnum jsl_fatptr_write_contents_to_file_cstr(
-        char* path,
+    JSLWriteFileResultEnum jsl_fatptr_write_file_contents(
         JSLFatPtr contents,
+        JSLFatPtr path,
         int64_t* out_bytes_written,
         errno_t* out_errno
     )
     {
+        char path_buffer[FILENAME_MAX + 1];
         JSLWriteFileResultEnum res = JSL_FILE_WRITE_BAD_PARAMETERS;
 
-        if (path != NULL && contents.data != NULL && contents.length > 0)
+        bool got_path = false;
+        if (path.data != NULL
+            && contents.data != NULL
+            && contents.length > 0
+        )
         {
-            // TODO: LINUX ONLY
+            JSL_MEMCPY(path_buffer, path.data, path.length);
+            path_buffer[path.length] = '\0';
+            got_path = true;
+        }
 
+        int32_t file_descriptor = -1;
+        bool opened_file = false;
+        if (got_path)
+        {
             #if defined(JSL_WIN32)
-                int32_t file_descriptor = _open(path, _O_CREAT, _S_IREAD | _S_IWRITE);
+                int32_t file_descriptor = _open(path_buffer, _O_CREAT, _S_IREAD | _S_IWRITE);
             #elif defined(JSL_POSIX)
-                int32_t file_descriptor = open(path, O_CREAT, S_IRUSR | S_IWUSR);
+                int32_t file_descriptor = open(path_buffer, O_CREAT, S_IRUSR | S_IWUSR);
             #endif
-            
-            if (file_descriptor > 0)
-            {
+    
+            opened_file = file_descriptor > -1;
+        }
+
+        int64_t write_res = -1;
+        bool wrote_file = false;
+        if (opened_file)
+        {
+            #if defined(JSL_WIN32)
+                int64_t write_res = _write(
+                    file_descriptor,
+                    contents.data,
+                    (size_t) contents.length
+                );
+            #elif defined(JSL_POSIX)
                 int64_t write_res = write(
                     file_descriptor,
                     contents.data,
                     (size_t) contents.length
                 );
+            #endif
 
-                if (write_res > 0)
-                {
-                    res.bytes_written = write_res;
-                }
-                else
-                {
-                    res.result_code = errno;
-                    errno = 0;
-                }
+            wrote_file = write_res > 0;
+        }
+        else
+        {
+            res = JSL_FILE_WRITE_COULD_NOT_OPEN;
+            if (out_errno != NULL)
+                *out_errno = errno;
+        }
 
-                close(file_descriptor);
-            }
-            else
+        if (write_res > 0)
+        {
+            *out_bytes_written = write_res;
+        }
+        else
+        {
+            res = JSL_FILE_WRITE_COULD_NOT_WRITE;
+            if (out_errno != NULL)
+                *out_errno = errno;
+        }
+
+        int32_t close_res = -1;
+        if (opened_file)
+        {
+            close_res = close(file_descriptor);
+
+            if (close_res < 0)
             {
-                res.result_code = errno;
-                errno = 0;
+                res = JSL_FILE_WRITE_COULD_NOT_CLOSE;
+                if (out_errno != NULL)
+                    *out_errno = errno;
             }
         }
 
