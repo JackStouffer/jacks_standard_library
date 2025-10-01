@@ -183,14 +183,16 @@ it will have massive impacts on the speed of your program.
 
 This a very condensed and shorthand list of things you can do to make your memory faster
 
-1. Never conceptualize the things (structs/objects/entities etc) in your program as being
-   completely separate and allocated one at a time.
-2. Instead conceptualize your programs as a small set of lifetimes (more details below)
-3. Make each lifetime's footprint small as you possibly can by setting max limits on total
+1. Smaller is better. Smaller memory footprints mean your code is more likely to fit in
+   cache
+2. Things that are used together should be as close to each other in the virtual address
+   space as possible.
+3. Never conceptualize the things (structs/objects/entities etc) in your program as being
+   completely separate and allocated one at a time. Instead conceptualize your programs as
+   a small set of lifetimes (more details below).
+4. Make each lifetime's footprint small as you possibly can by setting max limits on total
    bytes used. L1, L2, L3 cache sizes are great places to start for limits
-4. If your program will need a bunch of the same thing, reserve the virtual address space
-   for the maximum amount that your program will allow and then put a pool allocator in
-   front of that address space.
+5. Reuse memory as much as possible
 
 ### It's Not That Hard
 
