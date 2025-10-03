@@ -95,6 +95,36 @@ void test_jsl_fatptr_load_file_contents()
     lok(memcmp(stack_buffer, contents.data, file_size) == 0);
 }
 
+void test_jsl_fatptr_load_file_contents_buffer()
+{
+    char* path = "./tests/example.txt";
+    char stack_buffer[4*1024];
+    int64_t file_size;
+
+    // Load the comparison using libc
+    {
+        FILE* file = fopen(path, "rb");
+        fseek(file, 0, SEEK_END);
+        file_size = ftell(file);
+        lok(file_size > 0);
+        rewind(file);
+
+        fread(stack_buffer, file_size, 1, file);
+    }
+
+    JSLFatPtr buffer = jsl_fatptr_ctor(malloc(4*1024), 4*1024);
+    JSLFatPtr writer = buffer;
+
+    JSLLoadFileResultEnum res = jsl_fatptr_load_file_contents_buffer(
+        &writer,
+        JSL_FATPTR_LITERAL("./tests/example.txt"),
+        NULL
+    );
+
+    lok(res == JSL_FILE_LOAD_SUCCESS);
+    lok(memcmp(stack_buffer, buffer.data, file_size) == 0);
+}
+
 void test_jsl_fatptr_memory_compare()
 {
     JSLFatPtr buffer1 = jsl_fatptr_ctor(malloc(13), 13);
@@ -593,7 +623,6 @@ int main()
 {
     lrun("Test jsl_fatptr_from_cstr", test_jsl_fatptr_from_cstr);
     lrun("Test jsl_fatptr_cstr_memory_copy", test_jsl_fatptr_cstr_memory_copy);
-    lrun("Test jsl_fatptr_load_file_contents", test_jsl_fatptr_load_file_contents);
     lrun("Test jsl_fatptr_memory_compare", test_jsl_fatptr_memory_compare);
     lrun("Test jsl_fatptr_slice", test_jsl_fatptr_slice);
     lrun("Test jsl_fatptr_index_of", test_jsl_fatptr_index_of);
@@ -604,6 +633,9 @@ int main()
     lrun("Test jsl_fatptr_starts_with", test_jsl_fatptr_starts_with);
     lrun("Test jsl_fatptr_ends_with", test_jsl_fatptr_ends_with);
     lrun("Test jsl_fatptr_compare_ascii_insensitive", test_jsl_fatptr_compare_ascii_insensitive);
+
+    lrun("Test jsl_fatptr_load_file_contents", test_jsl_fatptr_load_file_contents);
+    lrun("Test jsl_fatptr_load_file_contents_buffer", test_jsl_fatptr_load_file_contents_buffer);
 
     lresults();
     return lfails != 0;
