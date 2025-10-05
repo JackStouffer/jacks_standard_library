@@ -110,61 +110,142 @@
         JSL_HASHMAP_ITERATOR_TYPE_NAME(name) function_prefix##_iterator_start(JSL_HASHMAP_TYPE_NAME(name)* hashmap);                \
         JSL_HASHMAP_ITEM_TYPE_NAME(name)* function_prefix##_iterator_next(JSL_HASHMAP_ITERATOR_TYPE_NAME(name)* iterator);
 
+const char* hash_map_header_docstring = "/**\n"
+" * AUTO GENERATED FILE\n"
+" *\n"
+" * This file contains the header for a hash map %s which maps `%s` keys to `%s` values.\n"
+" *\n"
+" * This file was auto generated from the hash map generation utility that's part of the \"Jack's Standard Library\" project.\n"
+" * The utility generates a header file and a C file for a type safe, open addressed, hash map.\n"
+" * By generating the code rather than using macros, two benefits are gained. One, the code is\n"
+" * much easier to debug. Two, it's much more obvious how much code you're generating, which means\n"
+" * you are much less likely to accidentally create the combinatoric explosion of code that's\n"
+" * so common in C++ projects. Adding friction to things is actually good sometimes.\n"
+" *\n"
+" * Much like the arena allocator it uses, this hash map is designed for situations where\n"
+" * you can set an upper bound on the number of items you will have and that upper bound is\n"
+" * still a reasonable amount of memory. This represents the vast majority case, as most hash\n"
+" * maps will never have more than 100 items. Even in cases where the struct is quite large\n"
+" * e.g. over a kilobyte, and you have a large upper bound, say 100k, thats still ~100MB of\n"
+" * data. This is an incredibly rare case and you probably only have one of these in your\n"
+" * program; this hash map would still work for that case.\n"
+" *\n"
+" * This hash map is not suited for cases where the hash map will shrink and grow quite\n"
+" * substantially or there's no known upper bound. The most common example would be user\n"
+" * input that cannot reasonably be limited, e.g. a word processing application cannot simply\n"
+" * refuse to open very large (+10gig) documents. If you have some hash map which is built\n"
+" * from the document file then you need some other allocation strategy (you probably don't\n"
+" * want a normal hash map either as you'd be streaming things in and out of memory).\n"
+" */\n\n";
+
+const char* map_type_typedef = "/**\n"
+    " * A hash map which maps `%s` keys to `%s` values.\n"
+    " *\n"
+    " * This hash map uses open addressing with linear probing. However, it never grows.\n"
+    " * When initalized with the init function, all the memory this hash map will have\n"
+    " * is allocated right away.\n"
+    " */\n"
+    "typedef struct %s {\n"
+    "    %s* keys_array;\n"
+    "    %s* items_array;\n"
+    "    int64_t slots_array_length;\n"
+    "    uint32_t* is_set_flags_array;\n"
+    "    int64_t is_set_flags_array_length;\n"
+    "    int64_t item_count;\n"
+    "    uint16_t generational_id;\n"
+    "    uint8_t flags;\n"
+    "} %s;\n"
+    "\n";
 
 /// @brief param 1 is the hash map type name, param 2 is the function prefix, param 3 is the hash map type name
 const char* init_function_signature = "/**\n"
-    "* Initialize an instance of the hash map %s. The hash map will save a reference to `arena`\n"
-    "* so it can allocate the memory it needs during operations. Therefore, `arena` must have an equal\n"
-    "* or greater lifetime than the hash map.\n"
-    "*\n"
-    "* @note This hash map uses a well distributed hash \"rapidhash\". But in order to properly protect\n"
-    "* against hash flooding attacks you must provide good random data for the seed value. This means\n"
-    "* using your OS's secure random number generator, not `rand`\n"
-    "*\n"
-    "* @param hash_map The pointer to the hash map instance to initialize\n"
-    "* @param arena The arena that this hash map will use to allocate memory\n"
-    "* @param seed Seed value for the hash function to protect against hash flooding attacks\n"
-    "*/\n"
-    "void %s_init(%s* hash_map, JSLArena* arena, uint64_t seed);\n\n";
-
-/// @brief param 1 is the hash map type name, param 2 is the function prefix, param 3 is the hash map type name
-const char* init2_function_signature = "/**\n"
-    "* Initialize an instance of the hash map %s. The hash map will save a reference to `arena`\n"
-    "* so it can allocate the memory it needs during operations. Therefore, `arena` must have an equal\n"
-    "* or greater lifetime than the hash map.\n"
-    "*\n"
-    "* @note This hash map uses a well distributed hash \"rapidhash\". But in order to properly protect\n"
-    "* against hash flooding attacks you must provide good random data for the seed value. This means\n"
-    "* using your OS's secure random number generator, not `rand`\n"
-    "*\n"
-    "* @param hash_map The pointer to the hash map instance to initialize\n"
-    "* @param arena The arena that this hash map will use to allocate memory\n"
-    "* @param seed Seed value for the hash function to protect against hash flooding attacks\n"
-    "* @param item_count_guess Pre allocate enough space for this amount of items\n"
-    "*/\n"
-    "void %s_init2(%s* hash_map, JSLArena* arena, uint64_t seed, int64_t item_count_guess);\n\n";
-
-/// @brief param 1 is the hash map type name, param 2 is the key type, param 3 is the value type
-const char* get_function_signature = "/**\n"
-    "* Insert the given value into the hash map. This function will allocate if there's not\n"
-    "* enough space.\n"
-    "*\n"
-    "* @param hash_map The pointer to the hash map instance to initialize\n"
-    "* @param key Hash map key\n"
-    "* @param value Value to store\n"
-    "*/\n"
-    "void %s_init2(%s* hash_map, %s key, %s value);\n\n";
+    " * Initialize an instance of the hash map.\n"
+    " *\n"
+    " * All of the memory that this hash map will need will be allocated from the passed in arena.\n"
+    " * The hash map does not save a reference to the arena, but the arena memory must have the same\n"
+    " * or greater lifetime than the hash map itself.\n"
+    " *\n"
+    " * @note This hash map uses a well distributed hash \"rapidhash\". But in order to properly protect\n"
+    " * against hash flooding attacks you must provide good random data for the seed value. This means\n"
+    " * using your OS's secure random number generator, not `rand`\n"
+    " *\n"
+    " * @param hash_map The pointer to the hash map instance to initialize\n"
+    " * @param arena The arena that this hash map will use to allocate memory\n"
+    " * @param seed Seed value for the hash function to protect against hash flooding attacks\n"
+    " * @param max_item_count The maximum amount of items this hash map can hold\n"
+    " */\n"
+    "void %s_init(%s* hash_map, JSLArena* arena, int64_t max_item_count, uint64_t seed);\n\n";
 
 /// @brief param 1 is the hash map type name, param 2 is the key type, param 3 is the value type
 const char* insert_function_signature = "/**\n"
-    "* Insert the given value into the hash map. This function will allocate if there's not\n"
-    "* enough space.\n"
-    "*\n"
-    "* @param hash_map The pointer to the hash map instance to initialize\n"
-    "* @param key Hash map key\n"
-    "* @param value Value to store\n"
-    "*/\n"
-    "void %s_init2(%s* hash_map, %s key, %s value);\n\n";
+    " * Insert the given value into the hash map. This function will allocate if there's not\n"
+    " * enough space. If the key already exists in the map the value will be overwritten. If\n"
+    " * the key type for this hash map is a pointer, then a NULL key is accepted.\n"
+    " *\n"
+    " * @param hash_map The pointer to the hash map instance to initialize\n"
+    " * @param key Hash map key\n"
+    " * @param value Value to store\n"
+    " * @returns A bool representing success or failure of insertion. Insertion can fail if memory cannot be allocated.\n"
+    " */\n"
+    "bool %s_insert(%s* hash_map, %s key, %s value);\n\n";
+
+const char* get_function_signature = "/**\n"
+    " * Get a value from the hash map if it exists. If it does not NULL is returned\n"
+    " *\n"
+    " * @warning The pointer returned actually points to value stored inside of hash map.\n"
+    " * If you change the value though the pointer you change the hash, therefore screwing\n"
+    " * up the map. Don't do this.\n"
+    " *\n"
+    " * @param hash_map The pointer to the hash map instance to initialize\n"
+    " * @param key Hash map key\n"
+    " * @param value Value to store\n"
+    " * @returns The pointer to the value in the hash map, or null.\n"
+    " */\n"
+    "%s* %s_get(%s* hash_map, %s key);\n\n";
+
+const char* delete_function_signature = "/**\n"
+    " * Remove a key/value pair from the hash map if it exists. If it does not false is returned\n"
+    " */\n"
+    "bool %s_delete(%s* hashmap, %s key);\n\n";
+
+const char* iterator_start_function_signature = "/**\n"
+    " * Create a new iterator over this hash map.\n"
+    " *\n"
+    " * An iterator is a struct which holds enough state that it allows a loop to visit\n"
+    " * each key/value pair in the hash map.\n"
+    " *\n"
+    " * Iterating over a hash map while modifying it is allowed. However, it's likely you\n"
+    " * will iterate over items you've added during the iteration.\n"
+    " *\n"
+    " * Example usage:\n"
+    " * @code\n"
+    " * %s key;\n"
+    " * %s value;\n"
+    " * %sIterator iterator;\n"
+    " * %s_iterator_start(hash_map);\n"
+    " * while (%s_iterator_next(&iterator, &key, &value))\n"
+    " * {\n"
+    " *     ...\n"
+    " * }\n"
+    " * @endcode\n"
+    " */\n"
+    "void %s_iterator_start(%s* hashmap, %sIterator* iterator);\n\n";
+
+const char* iterator_next_function_signature = "/**\n"
+    " * Iterate over the hash map. If a key/value was found then true is returned.\n"
+    " *\n"
+    " * Example usage:\n"
+    " * @code\n"
+    " * %s key;\n"
+    " * %s value;\n"
+    " * %s iterator = %s_iterator_start(hash_map);\n"
+    " * while (%s_iterator_next(&iterator, &key, &value))\n"
+    " * {\n"
+    " *     ...\n"
+    " * }\n"
+    " * @endcode\n"
+    " */\n"
+    "bool %s_iterator_next(%sIterator* iterator, %s key, %s value);\n\n";
 
 #define JSL_HASHMAP_DECLARE(name, function_prefix, key_type, value_type)                                                            \
         JSL_HASHMAP_TYPES(name, key_type, value_type)                                                                               \
@@ -471,29 +552,97 @@ const char* insert_function_signature = "/**\n"
         return result;                                                                                                          \
     }
 
+// NOTE:
+// This isn't the cleanest or best way to do this sort of thing, but it's quick
+// and this is a tooling file so it's fine.
+#define CHECK_LENGTH_AND_EXPAND()                           \
+    if (writer.length < JSL_KILOBYTES(2))                   \
+    {                                                       \
+        JSLFatPtr expanded = jsl_arena_reallocate(          \
+            arena,                                          \
+            buffer_allocation,                              \
+            buffer_allocation.length + JSL_KILOBYTES(32)    \
+        );                                                  \
+        assert(expanded.data != NULL);                      \
+        assert(expanded.length >= JSL_KILOBYTES(32));       \
+        assert(buffer_allocation.data == expanded.data);    \
+        buffer_allocation = expanded;                       \
+        writer.length += JSL_KILOBYTES(32);                 \
+    }
 
+/**
+ * Generates the header file data for your hash map. This file includes all the typedefs
+ * and function signatures for this hash map.
+ * 
+ * The generated header file includes "jacks_hash_map.h", and it's assumed to be in the
+ * same directory as where this header file will live.
+ * 
+ * If your type needs a custom hash function, it must have the function signature
+ * `uint64_t my_hash_function(void* data, int64_t length, uint64_t seed);`.
+ *
+ * @param arena Arena allocator used for memory allocation. The arena must have
+ *              sufficient space (at least 512KB recommended) to hold the generated
+ *              header content.
+ * @param hash_map_name The name of the hash map type (e.g., "StringIntHashMap").
+ *                      This will be used as the main type name in the generated code.
+ * @param function_prefix The prefix for all generated function names (e.g., "string_int_map").
+ *                        Functions will be named like: {function_prefix}_init, {function_prefix}_insert, etc.
+ * @param key_type_name The C type name for hash map keys (e.g., "const char*", "int", "MyStruct").
+ * @param value_type_name The C type name for hash map values (e.g., "int", "MyData*", "float").
+ * @param hash_function_name Name of your custom hash function if you have one, NULL otherwise.
+ * @param include_header_count Number of additional header files to include in the generated header.
+ * @param ... Variable argument list of const char* strings representing additional header
+ *            file names to include (e.g., "my_types.h", "custom_structs.h").
+ *            Must provide exactly `include_header_count` string arguments.
+ *
+ * @return JSLFatPtr containing the generated header file content
+ *
+ * @warning Ensure the arena has sufficient space (minimum 512KB recommended) to avoid
+ *          allocation failures during header generation.
+ *
+ * Example usage:
+ * @code
+ * JSLArena arena;
+ * jsl_arena_init(&arena, malloc(JSL_MEGABYTES(1)), JSL_MEGABYTES(1));
+ * 
+ * JSLFatPtr header = write_hash_map_header(
+ *     &arena,
+ *     "StringIntMap",           // hash_map_name
+ *     "string_int_map",         // function_prefix  
+ *     "const char*",            // key_type_name
+ *     "int",                    // value_type_name
+ *     NULL,                     // hash_function_name (unused)
+ *     2,                        // include_header_count
+ *     "my_string_utils.h",      // additional include 1
+ *     "my_common_types.h"       // additional include 2
+ * );
+ * 
+ * // Write to file or use the generated header content
+ * printf("%.*s", (int)header.length, (char*)header.data);
+ * @endcode
+ */
 JSLFatPtr write_hash_map_header(
     JSLArena* arena,
     const char* hash_map_name,
     const char* function_prefix,
     const char* key_type_name,
     const char* value_type_name,
+    const char* hash_function_name,
     int32_t include_header_count,
     ...
 )
 {
-    JSLFatPtr original_allocation = jsl_arena_allocate(arena, JSL_KILOBYTES(512), false);
+    JSLFatPtr buffer_allocation = jsl_arena_allocate(arena, JSL_KILOBYTES(16), true);
 
-    JSLFatPtr writer = original_allocation;
+    JSLFatPtr writer = buffer_allocation;
 
-    jsl_fatptr_format_buffer(&writer, "//\t\t\t\tAUTO GENERATED FILE\n");
-    jsl_fatptr_format_buffer(&writer, "// This file is generated by the generate hash map utility that's part\n");
-    jsl_fatptr_format_buffer(&writer, "// of the \"Jack's Standard Library\" project. It contains header file\n");
-    jsl_fatptr_format_buffer(&writer, "// definitions for a type safe hash map. See that file for more details.\n\n");
+    jsl_fatptr_format_buffer(&writer, hash_map_header_docstring, hash_map_name, key_type_name, value_type_name);
 
     jsl_fatptr_format_buffer(&writer, "#pragma once\n\n");
     jsl_fatptr_format_buffer(&writer, "#include <stdint.h>\n");
     jsl_fatptr_format_buffer(&writer, "#include \"jacks_hash_map.h\"\n\n");
+
+    CHECK_LENGTH_AND_EXPAND()
 
     va_list args;
     va_start(args, include_header_count);
@@ -501,15 +650,57 @@ JSLFatPtr write_hash_map_header(
     for (int32_t i = 0; i < include_header_count; ++i)
     {
         jsl_fatptr_format_buffer(&writer, "#include \"%s\"\n", va_arg(args, char*));
+        CHECK_LENGTH_AND_EXPAND()
     }
 
     va_end(args);
+    
+    jsl_fatptr_format_buffer(&writer, map_type_typedef, key_type_name, value_type_name, hash_map_name, key_type_name, value_type_name, hash_map_name);
+    CHECK_LENGTH_AND_EXPAND()
 
-    jsl_fatptr_format_buffer(&writer, init_function_signature, hash_map_name, function_prefix, hash_map_name);
-    jsl_fatptr_format_buffer(&writer, init2_function_signature, hash_map_name, function_prefix, hash_map_name);
-    jsl_fatptr_format_buffer(&writer, insert_function_signature, key_type_name, value_type_name);
+    jsl_fatptr_format_buffer(&writer, init_function_signature, function_prefix, hash_map_name, hash_map_name);
+    CHECK_LENGTH_AND_EXPAND()
 
-    JSLFatPtr result = jsl_fatptr_auto_slice(original_allocation, writer);
+    jsl_fatptr_format_buffer(&writer, insert_function_signature, function_prefix, hash_map_name, key_type_name, value_type_name);
+    CHECK_LENGTH_AND_EXPAND()
+
+    jsl_fatptr_format_buffer(&writer, get_function_signature, value_type_name, function_prefix, hash_map_name, key_type_name);
+    CHECK_LENGTH_AND_EXPAND()
+
+    jsl_fatptr_format_buffer(&writer, delete_function_signature, function_prefix, hash_map_name, key_type_name);
+    CHECK_LENGTH_AND_EXPAND()
+
+    jsl_fatptr_format_buffer(
+        &writer,
+        iterator_start_function_signature,
+        key_type_name,
+        value_type_name,
+        hash_map_name,
+        function_prefix,
+        function_prefix,
+        function_prefix,
+        hash_map_name,
+        hash_map_name,
+        hash_map_name
+    );
+    CHECK_LENGTH_AND_EXPAND()
+
+    jsl_fatptr_format_buffer(
+        &writer,
+        iterator_next_function_signature,
+        key_type_name,
+        value_type_name,
+        hash_map_name,
+        function_prefix,
+        function_prefix,
+        function_prefix,
+        hash_map_name,
+        key_type_name,
+        value_type_name
+    );
+    CHECK_LENGTH_AND_EXPAND()
+
+    JSLFatPtr result = jsl_fatptr_auto_slice(buffer_allocation, writer);
     return result;
 }
 
@@ -600,7 +791,7 @@ int32_t main(int32_t argc, char** argv)
     JSLFatPtr buffer = jsl_arena_allocate(&memory, JSL_MEGABYTES(1), false);
     JSLFatPtr writer = buffer;
 
-    JSLFatPtr header = write_hash_map_header(&memory, name, function_prefix, key_type, value_type, 0);
+    JSLFatPtr header = write_hash_map_header(&memory, name, function_prefix, key_type, value_type, NULL, 0);
 
     printf("%.*s", (int32_t) header.length, (char*) header.data);
 
