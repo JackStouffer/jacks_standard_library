@@ -428,6 +428,9 @@ typedef struct JSLFatPtr
 #define JSL_FATPTR_LITERAL(s) \
     ((JSLFatPtr){ .data = (uint8_t*)(s), .length = (int64_t)(sizeof("" s "") - 1) })
 
+#define JSL_FATPTR_ADVANCE(fatptr, n) \
+    fatptr.data += n; fatptr.length -= n;
+
 /**
  * TODO: docs
  *
@@ -790,7 +793,7 @@ typedef uint8_t* JSL_FORMAT_CALLBACK(uint8_t* buf, void *user, int64_t len);
  * you're using this function to print multiple gigabytes at a time, break it
  * into chunks.
  */
-JSL_DEF JSLFatPtr jsl_fatptr_format(JSLArena* arena, char const *fmt, ...);
+JSL_DEF JSLFatPtr jsl_fatptr_format(JSLArena* arena, JSLFatPtr fmt, ...);
 
 /**
  * TODO: docs
@@ -800,7 +803,7 @@ JSL_DEF JSLFatPtr jsl_fatptr_format(JSLArena* arena, char const *fmt, ...);
  */
 JSL_DEF int64_t jsl_fatptr_format_buffer(
     JSLFatPtr* buffer,
-    char const *fmt,
+    JSLFatPtr fmt,
     ...
 );
 
@@ -810,7 +813,7 @@ JSL_DEF int64_t jsl_fatptr_format_buffer(
  */
 JSL_DEF int64_t jsl_fatptr_format_valist(
     JSLFatPtr* buffer,
-    char const *fmt,
+    JSLFatPtr fmt,
     va_list va
 );
 
@@ -826,7 +829,7 @@ JSL_DEF int64_t jsl_fatptr_format_callback(
    JSL_FORMAT_CALLBACK* callback,
    void* user,
    uint8_t* buf,
-   char const* fmt,
+   JSLFatPtr fmt,
    va_list va
 );
 
@@ -2001,14 +2004,14 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
         JSL_FORMAT_CALLBACK* callback,
         void* user,
         uint8_t* buffer,
-        char const* fmt,
+        JSLFatPtr fmt,
         va_list va
     )
     {
         static char hex[] = "0123456789abcdefxp";
         static char hexu[] = "0123456789ABCDEFXP";
         uint8_t* buffer_cursor;
-        char const* f;
+        JSLFatPtr f;
         int32_t tlen = 0;
 
         buffer_cursor = buffer;
@@ -2025,32 +2028,32 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
             );
         #endif
 
-        for (;;)
+        while (f.length > 0)
         {
             int32_t field_width, precision, trailing_zeros;
             uint32_t formatting_flags;
 
             // macros for the callback buffer stuff
-            #define stbsp__chk_cb_bufL(bytes)                                                \
-                {                                                                             \
-                    int32_t len = (int32_t)(buffer_cursor - buffer);                           \
-                    if ((len + (bytes)) >= JSL_FORMAT_MIN_BUFFER) {                            \
-                    tlen += len;                                                            \
-                    if (0 == (buffer_cursor = buffer = callback(buffer, user, len)))        \
-                        goto done;                                                           \
-                    }                                                                          \
+            #define stbsp__chk_cb_bufL(bytes)                                                   \
+                {                                                                               \
+                    int32_t len = (int32_t)(buffer_cursor - buffer);                            \
+                    if ((len + (bytes)) >= JSL_FORMAT_MIN_BUFFER) {                             \
+                        tlen += len;                                                            \
+                        if (0 == (buffer_cursor = buffer = callback(buffer, user, len)))        \
+                            goto done;                                                          \
+                    }                                                                           \
                 }
 
-            #define stbsp__chk_cb_buf(bytes)                                  \
-                {                                                              \
+            #define stbsp__chk_cb_buf(bytes)                                    \
+                {                                                               \
                     if (callback) {                                             \
-                    stbsp__chk_cb_bufL(bytes);                               \
+                        stbsp__chk_cb_bufL(bytes);                              \
                     }                                                           \
                 }
 
-            #define stbsp__flush_cb()                                         \
-                {                                                              \
-                    stbsp__chk_cb_bufL(JSL_FORMAT_MIN_BUFFER - 1);              \
+            #define stbsp__flush_cb()                                                           \
+                {                                                                               \
+                    stbsp__chk_cb_bufL(JSL_FORMAT_MIN_BUFFER - 1);                              \
                 } // flush if there is even one byte in the buffer
 
             #define stbsp__cb_buf_clamp(cl, v)                                                  \
@@ -2063,50 +2066,42 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
 
             #if defined(__AVX2__)
 
-                // Copy everything up to the next % or NULL
-                for (;;)
+                // Copy everything up to the next %
+                while (f.length > 0)
                 {
                     // SAFETY CONCERN:
                     // This is safe because when reading 32 bytes from a 32 byte aligned pointer
                     // it's impossible to read past the current page boundary into unmapped
                     // memory. While technically this is a buffer overflow, as we're reading
                     // memory that isn't "ours", I don't think it's possible that this is a
-                    // security hole. I can't think of a way that info past the buffer could possibly leak
-                    // out of this function. Also, if you have a string without a null terminator
-                    // you would result in a page fault with or without this code. Additionally,
-                    // this is a very common technique that's taken directly from glibc's strlen.
-
+                    // security hole. I can't think of a way that info past the buffer could
+                    // possibly leak out of this function.
 
                     // Get up to 32-byte alignment so that we can safely read past the
                     // end of the given format string using an aligned read.
-                    while (((uintptr_t)f) & 31)
+                    while (((uintptr_t)f) & 31 && f.length > 0)
                     {
-                    if (f[0] == '%')
-                        goto L_PROCESS_PERCENT;
+                        if (f.data[0] == '%')
+                            goto L_PROCESS_PERCENT;
 
-                    if (f[0] == 0)
-                        goto L_END_FORMAT;
-
-                    stbsp__chk_cb_buf(1);
-                    *buffer_cursor++ = f[0];
-                    ++f;
+                        stbsp__chk_cb_buf(1);
+                        *buffer_cursor = f.data[0];
+                        ++buffer_cursor;
+                        JSL_FATPTR_ADVANCE(f, 1);
                     }
 
-                    const __m256i* source_wide = (const __m256i*) f;
+                    const __m256i* source_wide = (const __m256i*) f.data;
                     __m256i* wide_dest = (__m256i*) buffer_cursor;
 
                     __m256i data = _mm256_load_si256(source_wide);
-
                     __m256i percent_mask = _mm256_cmpeq_epi8(data, percent_wide);
-                    __m256i null_terminator_mask = _mm256_cmpeq_epi8(data, zero_wide);
-
-                    int mask = _mm256_movemask_epi8(percent_mask) | _mm256_movemask_epi8(null_terminator_mask);
+                    int mask = _mm256_movemask_epi8(percent_mask);
 
                     if (mask == 0)
                     {
                         // No special characters found, store entire block
                         _mm256_storeu_si256(wide_dest, data);
-                        f += 32;
+                        JSL_FATPTR_ADVANCE(f, 32);
                         buffer_cursor += 32;
                     }
                     else
@@ -2132,71 +2127,69 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
                         f += special_pos;
                         buffer_cursor += special_pos;
 
-                        if (f[0] == '%')
+                        if (f.data[0] == '%')
                             goto L_PROCESS_PERCENT;
-                        if (f[0] == 0)
-                            goto L_END_FORMAT;
                     }
                 }
 
             #else
                 
-                // fast copy everything up to the next % (or end of string)
-                for (;;)
+                // get up to 4-byte alignment
+                while (((uintptr_t) f.data) & 3 && f.length > 0)
                 {
-                    // get up to 4-byte alignment
-                    while (((uintptr_t)f) & 3)
-                    {
                     schk1:
-                    if (f[0] == '%')
+                    if (f.data[0] == '%')
                         goto L_PROCESS_PERCENT;
-                    schk2:
-                    if (f[0] == 0)
-                        goto L_END_FORMAT;
-                    stbsp__chk_cb_buf(1);
-                    *buffer_cursor++ = f[0];
-                    ++f;
-                    }
 
-                    for (;;)
-                    {
+                    stbsp__chk_cb_buf(1);
+                    *buffer_cursor = f.data[0];
+                    ++buffer_cursor;
+                    JSL_FATPTR_ADVANCE(f, 1);
+                }
+
+                // fast copy everything up to the next % (or end of string)
+                while (f.length > 0)
+                {
                     // Check if the next 4 bytes contain % or end of string.
                     // Using the 'hasless' trick:
                     // https://graphics.stanford.edu/~seander/bithacks.html#HasLessInWord
                     uint32_t v, c;
-                    v = *(uint32_t *)f;
+                    v = *(uint32_t *) f.data;
                     c = (~v) & 0x80808080;
 
                     if (((v ^ 0x25252525) - 0x01010101) & c)
                         goto schk1;
-                    if ((v - 0x01010101) & c)
-                        goto schk2;
 
                     if (callback)
+                    {
                         if ((JSL_FORMAT_MIN_BUFFER - (int32_t)(buffer_cursor - buffer)) < 4)
                             goto schk1;
+                    }
 
-                    if(((uintptr_t)buffer_cursor) & 3)
+                    if(((uintptr_t) buffer_cursor) & 3)
                     {
-                        buffer_cursor[0] = f[0];
-                        buffer_cursor[1] = f[1];
-                        buffer_cursor[2] = f[2];
-                        buffer_cursor[3] = f[3];
+                        buffer_cursor[0] = f.data[0];
+                        buffer_cursor[1] = f.data[1];
+                        buffer_cursor[2] = f.data[2];
+                        buffer_cursor[3] = f.data[3];
                     }
                     else
                     {
-                        *(uint32_t *)buffer_cursor = v;
+                        *((uint32_t*) buffer_cursor) = v;
                     }
+
                     buffer_cursor += 4;
-                    f += 4;
-                    }
+                    JSL_FATPTR_ADVANCE(f, 4);
                 }
+
+                if (f.length == 0)
+                    goto L_END_FORMAT;
 
             #endif
 
-        L_PROCESS_PERCENT:
+            L_PROCESS_PERCENT:
 
-            ++f;
+            JSL_FATPTR_ADVANCE(f, 1);
 
             // ok, we have a percent, read the modifiers first
             field_width = 0;
@@ -2206,31 +2199,31 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
 
             // flags
             for (;;) {
-                switch (f[0]) {
+                switch (f.data[0]) {
                 // if we have left justify
                 case '-':
                     formatting_flags |= STBSP__LEFTJUST;
-                    ++f;
+                    JSL_FATPTR_ADVANCE(f, 1);
                     continue;
                 // if we have leading plus
                 case '+':
                     formatting_flags |= STBSP__LEADINGPLUS;
-                    ++f;
+                    JSL_FATPTR_ADVANCE(f, 1);
                     continue;
                 // if we have leading space
                 case ' ':
                     formatting_flags |= STBSP__LEADINGSPACE;
-                    ++f;
+                    JSL_FATPTR_ADVANCE(f, 1);
                     continue;
                 // if we have leading 0x
                 case '#':
                     formatting_flags |= STBSP__LEADING_0X;
-                    ++f;
+                    JSL_FATPTR_ADVANCE(f, 1);
                     continue;
                 // if we have thousand commas
                 case '\'':
                     formatting_flags |= STBSP__TRIPLET_COMMA;
-                    ++f;
+                    JSL_FATPTR_ADVANCE(f, 1);
                     continue;
                 // if we have kilo marker (none->kilo->kibi->jedec)
                 case '$':
@@ -2243,97 +2236,99 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
                     } else {
                     formatting_flags |= STBSP__METRIC_SUFFIX;
                     }
-                    ++f;
+                    JSL_FATPTR_ADVANCE(f, 1);
                     continue;
                 // if we don't want space between metric suffix and number
                 case '_':
                     formatting_flags |= STBSP__METRIC_NOSPACE;
-                    ++f;
+                    JSL_FATPTR_ADVANCE(f, 1);
                     continue;
                 // if we have leading zero
                 case '0':
                     formatting_flags |= STBSP__LEADINGZERO;
-                    ++f;
+                    JSL_FATPTR_ADVANCE(f, 1);
                     goto flags_done;
                 default: goto flags_done;
                 }
             }
-        flags_done:
+            flags_done:
 
             // get the field width
-            if (f[0] == '*') {
+            if (f.data[0] == '*') {
                 field_width = va_arg(va, uint32_t);
-                ++f;
+                JSL_FATPTR_ADVANCE(f, 1);
             } else {
-                while ((f[0] >= '0') && (f[0] <= '9')) {
-                    field_width = field_width * 10 + f[0] - '0';
-                    f++;
+                while ((f.data[0] >= '0') && (f.data[0] <= '9')) {
+                    field_width = field_width * 10 + f.data[0] - '0';
+                    JSL_FATPTR_ADVANCE(f, 1);
                 }
             }
             // get the precision
-            if (f[0] == '.') {
-                ++f;
-                if (f[0] == '*') {
+            if (f.data[0] == '.') {
+                JSL_FATPTR_ADVANCE(f, 1);
+                if (f.data[0] == '*') {
                     precision = va_arg(va, uint32_t);
-                    ++f;
+                    JSL_FATPTR_ADVANCE(f, 1);
                 } else {
                     precision = 0;
-                    while ((f[0] >= '0') && (f[0] <= '9')) {
-                    precision = precision * 10 + f[0] - '0';
-                    f++;
+                    while ((f.data[0] >= '0') && (f.data[0] <= '9')) {
+                    precision = precision * 10 + f.data[0] - '0';
+                    JSL_FATPTR_ADVANCE(f, 1);
                     }
                 }
             }
 
             // handle integer size overrides
-            switch (f[0]) {
-            // are we halfwidth?
-            case 'h':
-                formatting_flags |= STBSP__HALFWIDTH;
-                ++f;
-                if (f[0] == 'h')
-                    ++f;  // QUARTERWIDTH
-                break;
-            // are we 64-bit (unix style)
-            case 'l':
-                formatting_flags |= ((sizeof(long) == 8) ? STBSP__INTMAX : 0);
-                ++f;
-                if (f[0] == 'l') {
-                    formatting_flags |= STBSP__INTMAX;
-                    ++f;
-                }
-                break;
-            // are we 64-bit on intmax? (c99)
-            case 'j':
-                formatting_flags |= (sizeof(size_t) == 8) ? STBSP__INTMAX : 0;
-                ++f;
-                break;
-            // are we 64-bit on size_t or ptrdiff_t? (c99)
-            case 'z':
-                formatting_flags |= (sizeof(ptrdiff_t) == 8) ? STBSP__INTMAX : 0;
-                ++f;
-                break;
-            case 't':
-                formatting_flags |= (sizeof(ptrdiff_t) == 8) ? STBSP__INTMAX : 0;
-                ++f;
-                break;
-            // are we 64-bit (msft style)
-            case 'I':
-                if ((f[1] == '6') && (f[2] == '4')) {
-                    formatting_flags |= STBSP__INTMAX;
-                    f += 3;
-                } else if ((f[1] == '3') && (f[2] == '2')) {
-                    f += 3;
-                } else {
-                    formatting_flags |= ((sizeof(void *) == 8) ? STBSP__INTMAX : 0);
-                    ++f;
-                }
-                break;
-            default: break;
+            switch (f.data[0])
+            {
+                // are we halfwidth?
+                case 'h':
+                    formatting_flags |= STBSP__HALFWIDTH;
+                    JSL_FATPTR_ADVANCE(f, 1);
+                    if (f.data[0] == 'h')
+                        JSL_FATPTR_ADVANCE(f, 1);  // QUARTERWIDTH
+                    break;
+                // are we 64-bit (unix style)
+                case 'l':
+                    formatting_flags |= ((sizeof(long) == 8) ? STBSP__INTMAX : 0);
+                    JSL_FATPTR_ADVANCE(f, 1);
+                    if (f.data[0] == 'l') {
+                        formatting_flags |= STBSP__INTMAX;
+                        JSL_FATPTR_ADVANCE(f, 1);
+                    }
+                    break;
+                // are we 64-bit on intmax? (c99)
+                case 'j':
+                    formatting_flags |= (sizeof(size_t) == 8) ? STBSP__INTMAX : 0;
+                    JSL_FATPTR_ADVANCE(f, 1);
+                    break;
+                // are we 64-bit on size_t or ptrdiff_t? (c99)
+                case 'z':
+                    formatting_flags |= (sizeof(ptrdiff_t) == 8) ? STBSP__INTMAX : 0;
+                    JSL_FATPTR_ADVANCE(f, 1);
+                    break;
+                case 't':
+                    formatting_flags |= (sizeof(ptrdiff_t) == 8) ? STBSP__INTMAX : 0;
+                    JSL_FATPTR_ADVANCE(f, 1);
+                    break;
+                // are we 64-bit (msft style)
+                case 'I':
+                    if ((f.data[1] == '6') && (f.data[2] == '4')) {
+                        formatting_flags |= STBSP__INTMAX;
+                        JSL_FATPTR_ADVANCE(f, 3);
+                    } else if ((f.data[1] == '3') && (f.data[2] == '2')) {
+                        JSL_FATPTR_ADVANCE(f, 3);
+                    } else {
+                        formatting_flags |= ((sizeof(void *) == 8) ? STBSP__INTMAX : 0);
+                        JSL_FATPTR_ADVANCE(f, 1);
+                    }
+                    break;
+                default: break;
             }
 
             // handle each replacement
-            switch (f[0]) {
+            switch (f.data[0])
+            {
                 #define STBSP__NUMSZ 512 // big enough for e308 (with commas) or e-307
                 char num[STBSP__NUMSZ];
                 char lead[8];
@@ -2346,717 +2341,718 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
                 int32_t decimal_precision;
                 char const* source_ptr;
 
-            case 's':
-                // get the string
-                string = va_arg(va, char *);
-                if (string == 0)
-                    string = (char *)"null";
-                // get the length, limited to desired precision
-                // always limit to ~0u chars since our counts are 32b
-                l = (precision >= 0) ? stbsp__strlen_limited(string, precision) : JSL_STRLEN(string);
-                lead[0] = 0;
-                tail[0] = 0;
-                precision = 0;
-                decimal_precision = 0;
-                comma_spacing = 0;
-                // copy the string in
-                goto L_STRING_COPY;
+                case 's':
+                    // get the string
+                    string = va_arg(va, char *);
+                    if (string == 0)
+                        string = (char *)"null";
+                    // get the length, limited to desired precision
+                    // always limit to ~0u chars since our counts are 32b
+                    l = (precision >= 0) ? stbsp__strlen_limited(string, precision) : JSL_STRLEN(string);
+                    lead[0] = 0;
+                    tail[0] = 0;
+                    precision = 0;
+                    decimal_precision = 0;
+                    comma_spacing = 0;
+                    // copy the string in
+                    goto L_STRING_COPY;
 
-            case 'c': // char
-                // get the character
-                string = num + STBSP__NUMSZ - 1;
-                *string = (char)va_arg(va, int32_t);
-                l = 1;
-                lead[0] = 0;
-                tail[0] = 0;
-                precision = 0;
-                decimal_precision = 0;
-                comma_spacing = 0;
-                goto L_STRING_COPY;
+                case 'c': // char
+                    // get the character
+                    string = num + STBSP__NUMSZ - 1;
+                    *string = (char)va_arg(va, int32_t);
+                    l = 1;
+                    lead[0] = 0;
+                    tail[0] = 0;
+                    precision = 0;
+                    decimal_precision = 0;
+                    comma_spacing = 0;
+                    goto L_STRING_COPY;
 
-            case 'n': // weird write-bytes specifier
-            {
-                int32_t *d = va_arg(va, int32_t *);
-                *d = tlen + (int32_t)(buffer_cursor - buffer);
-            } break;
+                case 'n': // weird write-bytes specifier
+                {
+                    int32_t *d = va_arg(va, int32_t *);
+                    *d = tlen + (int32_t)(buffer_cursor - buffer);
+                } break;
 
-            case 'A': // hex float
-            case 'a': // hex float
-                h = (f[0] == 'A') ? hexu : hex;
-                float_value = va_arg(va, double);
-                if (precision == -1)
-                    precision = 6; // default is 6
-                // read the double into a string
-                if (stbsp__real_to_parts((int64_t *)&n64, &decimal_precision, float_value))
-                    formatting_flags |= STBSP__NEGATIVE;
+                case 'A': // hex float
+                case 'a': // hex float
+                    h = (f.data[0] == 'A') ? hexu : hex;
+                    float_value = va_arg(va, double);
+                    if (precision == -1)
+                        precision = 6; // default is 6
+                    // read the double into a string
+                    if (stbsp__real_to_parts((int64_t *)&n64, &decimal_precision, float_value))
+                        formatting_flags |= STBSP__NEGATIVE;
 
-                string = num + 64;
+                    string = num + 64;
 
-                stbsp__lead_sign(formatting_flags, lead);
+                    stbsp__lead_sign(formatting_flags, lead);
 
-                if (decimal_precision == -1023)
-                    decimal_precision = (n64) ? -1022 : 0;
-                else
-                    n64 |= (((uint64_t)1) << 52);
-                n64 <<= (64 - 56);
-                if (precision < 15)
-                    n64 += ((((uint64_t)8) << 56) >> (precision * 4));
-        // add leading chars
+                    if (decimal_precision == -1023)
+                        decimal_precision = (n64) ? -1022 : 0;
+                    else
+                        n64 |= (((uint64_t)1) << 52);
+                    n64 <<= (64 - 56);
+                    if (precision < 15)
+                        n64 += ((((uint64_t)8) << 56) >> (precision * 4));
+                    // add leading chars
 
-                lead[1 + lead[0]] = '0';
-                lead[2 + lead[0]] = 'x';
-                lead[0] += 2;
+                    lead[1 + lead[0]] = '0';
+                    lead[2 + lead[0]] = 'x';
+                    lead[0] += 2;
 
-                *string++ = h[(n64 >> 60) & 15];
-                n64 <<= 4;
-                if (precision)
-                    *string++ = stbsp__period;
-                source_ptr = string;
-
-                // print the bits
-                n = precision;
-                if (n > 13)
-                    n = 13;
-                if (precision > (int32_t)n)
-                    trailing_zeros = precision - n;
-                precision = 0;
-                while (n--) {
                     *string++ = h[(n64 >> 60) & 15];
                     n64 <<= 4;
-                }
-
-                // print the expo
-                tail[1] = h[17];
-                if (decimal_precision < 0) {
-                    tail[2] = '-';
-                    decimal_precision = -decimal_precision;
-                } else
-                    tail[2] = '+';
-                n = (decimal_precision >= 1000) ? 6 : ((decimal_precision >= 100) ? 5 : ((decimal_precision >= 10) ? 4 : 3));
-                tail[0] = (char)n;
-                for (;;) {
-                    tail[n] = '0' + decimal_precision % 10;
-                    if (n <= 3)
-                    break;
-                    --n;
-                    decimal_precision /= 10;
-                }
-
-                decimal_precision = (int32_t)(string - source_ptr);
-                l = (int32_t)(string - (num + 64));
-                string = num + 64;
-                comma_spacing = 1 + (3 << 24);
-                goto L_STRING_COPY;
-
-            case 'G': // float
-            case 'g': // float
-                h = (f[0] == 'G') ? hexu : hex;
-                float_value = va_arg(va, double);
-                if (precision == -1)
-                    precision = 6;
-                else if (precision == 0)
-                    precision = 1; // default is 6
-                // read the double into a string
-                if (stbsp__real_to_str(&source_ptr, &l, num, &decimal_precision, float_value, (precision - 1) | 0x80000000))
-                    formatting_flags |= STBSP__NEGATIVE;
-
-                // clamp the precision and delete extra zeros after clamp
-                n = precision;
-                if (l > (uint32_t)precision)
-                    l = precision;
-                while ((l > 1) && (precision) && (source_ptr[l - 1] == '0')) {
-                    --precision;
-                    --l;
-                }
-
-                // should we use %e
-                if ((decimal_precision <= -4) || (decimal_precision > (int32_t)n)) {
-                    if (precision > (int32_t)l)
-                    precision = l - 1;
-                    else if (precision)
-                    --precision; // when using %e, there is one digit before the decimal
-                    goto L_DO_EXP_FROMG;
-                }
-                // this is the insane action to get the precision to match %g semantics for %f
-                if (decimal_precision > 0) {
-                    precision = (decimal_precision < (int32_t)l) ? l - decimal_precision : 0;
-                } else {
-                    precision = -decimal_precision + ((precision > (int32_t)l) ? (int32_t) l : precision);
-                }
-                goto L_DO_FLOAT_FROMG;
-
-            case 'E': // float
-            case 'e': // float
-                h = (f[0] == 'E') ? hexu : hex;
-                float_value = va_arg(va, double);
-                if (precision == -1)
-                    precision = 6; // default is 6
-                // read the double into a string
-                if (stbsp__real_to_str(&source_ptr, &l, num, &decimal_precision, float_value, precision | 0x80000000))
-                    formatting_flags |= STBSP__NEGATIVE;
-            L_DO_EXP_FROMG:
-                tail[0] = 0;
-                stbsp__lead_sign(formatting_flags, lead);
-                if (decimal_precision == STBSP__SPECIAL) {
-                    string = (char *)source_ptr;
-                    comma_spacing = 0;
-                    precision = 0;
-                    goto L_STRING_COPY;
-                }
-                string = num + 64;
-                // handle leading chars
-                *string++ = source_ptr[0];
-
-                if (precision)
-                    *string++ = stbsp__period;
-
-                // handle after decimal
-                if ((l - 1) > (uint32_t)precision)
-                    l = precision + 1;
-                for (n = 1; n < l; n++)
-                    *string++ = source_ptr[n];
-                // trailing zeros
-                trailing_zeros = precision - (l - 1);
-                precision = 0;
-                // dump expo
-                tail[1] = h[0xe];
-                decimal_precision -= 1;
-                if (decimal_precision < 0) {
-                    tail[2] = '-';
-                    decimal_precision = -decimal_precision;
-                } else
-                    tail[2] = '+';
-
-                n = (decimal_precision >= 100) ? 5 : 4;
-
-                tail[0] = (char)n;
-                for (;;) {
-                    tail[n] = '0' + decimal_precision % 10;
-                    if (n <= 3)
-                    break;
-                    --n;
-                    decimal_precision /= 10;
-                }
-                comma_spacing = 1 + (3 << 24); // how many tens
-                goto flt_lead;
-
-            case 'f': // float
-                float_value = va_arg(va, double);
-            doafloat:
-                // do kilos
-                if (formatting_flags & STBSP__METRIC_SUFFIX) {
-                    double divisor;
-                    divisor = 1000.0f;
-                    if (formatting_flags & STBSP__METRIC_1024)
-                    divisor = 1024.0;
-                    while (formatting_flags < 0x4000000) {
-                    if ((float_value < divisor) && (float_value > -divisor))
-                        break;
-                    float_value /= divisor;
-                    formatting_flags += 0x1000000;
-                    }
-                }
-                if (precision == -1)
-                    precision = 6; // default is 6
-                // read the double into a string
-                if (stbsp__real_to_str(&source_ptr, &l, num, &decimal_precision, float_value, precision))
-                    formatting_flags |= STBSP__NEGATIVE;
-            L_DO_FLOAT_FROMG:
-                tail[0] = 0;
-                stbsp__lead_sign(formatting_flags, lead);
-                if (decimal_precision == STBSP__SPECIAL) {
-                    string = (char *)source_ptr;
-                    comma_spacing = 0;
-                    precision = 0;
-                    goto L_STRING_COPY;
-                }
-                string = num + 64;
-
-                // handle the three decimal varieties
-                if (decimal_precision <= 0)
-                {
-                    // handle 0.000*000xxxx
-                    *string++ = '0';
                     if (precision)
-                    *string++ = stbsp__period;
-                    n = -decimal_precision;
-                    if ((int32_t)n > precision)
+                        *string++ = stbsp__period;
+                    source_ptr = string;
+
+                    // print the bits
                     n = precision;
+                    if (n > 13)
+                        n = 13;
+                    if (precision > (int32_t)n)
+                        trailing_zeros = precision - n;
+                    precision = 0;
+                    while (n--) {
+                        *string++ = h[(n64 >> 60) & 15];
+                        n64 <<= 4;
+                    }
 
-                    memset(string, '0', n);
-                    string += n;
-
-                    if ((int32_t)(l + n) > precision)
-                    l = precision - n;
-
-                    memcpy(string, source_ptr, l);
-                    string += l;
-                    source_ptr += l;
-                    
-                    trailing_zeros = precision - (n + l);
-                    comma_spacing = 1 + (3 << 24); // how many tens did we write (for commas below)
-                }
-                else
-                {
-                    comma_spacing = (formatting_flags & STBSP__TRIPLET_COMMA) ? ((600 - (uint32_t)decimal_precision) % 3) : 0;
-                    if ((uint32_t)decimal_precision >= l) {
-                    // handle xxxx000*000.0
-                    n = 0;
+                    // print the expo
+                    tail[1] = h[17];
+                    if (decimal_precision < 0) {
+                        tail[2] = '-';
+                        decimal_precision = -decimal_precision;
+                    } else
+                        tail[2] = '+';
+                    n = (decimal_precision >= 1000) ? 6 : ((decimal_precision >= 100) ? 5 : ((decimal_precision >= 10) ? 4 : 3));
+                    tail[0] = (char)n;
                     for (;;) {
-                        if ((formatting_flags & STBSP__TRIPLET_COMMA) && (++comma_spacing == 4)) {
-                            comma_spacing = 0;
-                            *string++ = stbsp__comma;
-                        } else {
-                            *string++ = source_ptr[n];
-                            ++n;
-                            if (n >= l)
-                                break;
+                        tail[n] = '0' + decimal_precision % 10;
+                        if (n <= 3)
+                        break;
+                        --n;
+                        decimal_precision /= 10;
+                    }
+
+                    decimal_precision = (int32_t)(string - source_ptr);
+                    l = (int32_t)(string - (num + 64));
+                    string = num + 64;
+                    comma_spacing = 1 + (3 << 24);
+                    goto L_STRING_COPY;
+
+                case 'G': // float
+                case 'g': // float
+                    h = (f.data[0] == 'G') ? hexu : hex;
+                    float_value = va_arg(va, double);
+                    if (precision == -1)
+                        precision = 6;
+                    else if (precision == 0)
+                        precision = 1; // default is 6
+                    // read the double into a string
+                    if (stbsp__real_to_str(&source_ptr, &l, num, &decimal_precision, float_value, (precision - 1) | 0x80000000))
+                        formatting_flags |= STBSP__NEGATIVE;
+
+                    // clamp the precision and delete extra zeros after clamp
+                    n = precision;
+                    if (l > (uint32_t)precision)
+                        l = precision;
+                    while ((l > 1) && (precision) && (source_ptr[l - 1] == '0')) {
+                        --precision;
+                        --l;
+                    }
+
+                    // should we use %e
+                    if ((decimal_precision <= -4) || (decimal_precision > (int32_t)n)) {
+                        if (precision > (int32_t)l)
+                        precision = l - 1;
+                        else if (precision)
+                        --precision; // when using %e, there is one digit before the decimal
+                        goto L_DO_EXP_FROMG;
+                    }
+                    // this is the insane action to get the precision to match %g semantics for %f
+                    if (decimal_precision > 0) {
+                        precision = (decimal_precision < (int32_t)l) ? l - decimal_precision : 0;
+                    } else {
+                        precision = -decimal_precision + ((precision > (int32_t)l) ? (int32_t) l : precision);
+                    }
+                    goto L_DO_FLOAT_FROMG;
+
+                case 'E': // float
+                case 'e': // float
+                    h = (f.data[0] == 'E') ? hexu : hex;
+                    float_value = va_arg(va, double);
+                    if (precision == -1)
+                        precision = 6; // default is 6
+                    // read the double into a string
+                    if (stbsp__real_to_str(&source_ptr, &l, num, &decimal_precision, float_value, precision | 0x80000000))
+                        formatting_flags |= STBSP__NEGATIVE;
+                L_DO_EXP_FROMG:
+                    tail[0] = 0;
+                    stbsp__lead_sign(formatting_flags, lead);
+                    if (decimal_precision == STBSP__SPECIAL) {
+                        string = (char *)source_ptr;
+                        comma_spacing = 0;
+                        precision = 0;
+                        goto L_STRING_COPY;
+                    }
+                    string = num + 64;
+                    // handle leading chars
+                    *string++ = source_ptr[0];
+
+                    if (precision)
+                        *string++ = stbsp__period;
+
+                    // handle after decimal
+                    if ((l - 1) > (uint32_t)precision)
+                        l = precision + 1;
+                    for (n = 1; n < l; n++)
+                        *string++ = source_ptr[n];
+                    // trailing zeros
+                    trailing_zeros = precision - (l - 1);
+                    precision = 0;
+                    // dump expo
+                    tail[1] = h[0xe];
+                    decimal_precision -= 1;
+                    if (decimal_precision < 0) {
+                        tail[2] = '-';
+                        decimal_precision = -decimal_precision;
+                    } else
+                        tail[2] = '+';
+
+                    n = (decimal_precision >= 100) ? 5 : 4;
+
+                    tail[0] = (char)n;
+                    for (;;) {
+                        tail[n] = '0' + decimal_precision % 10;
+                        if (n <= 3)
+                        break;
+                        --n;
+                        decimal_precision /= 10;
+                    }
+                    comma_spacing = 1 + (3 << 24); // how many tens
+                    goto flt_lead;
+
+                case 'f': // float
+                    float_value = va_arg(va, double);
+                doafloat:
+                    // do kilos
+                    if (formatting_flags & STBSP__METRIC_SUFFIX) {
+                        double divisor;
+                        divisor = 1000.0f;
+                        if (formatting_flags & STBSP__METRIC_1024)
+                        divisor = 1024.0;
+                        while (formatting_flags < 0x4000000) {
+                        if ((float_value < divisor) && (float_value > -divisor))
+                            break;
+                        float_value /= divisor;
+                        formatting_flags += 0x1000000;
                         }
                     }
-                    if (n < (uint32_t)decimal_precision) {
-                        n = decimal_precision - n;
-                        if ((formatting_flags & STBSP__TRIPLET_COMMA) == 0) {
-                            while (n) {
-                                if ((((uintptr_t)string) & 3) == 0)
-                                break;
-                                *string++ = '0';
-                                --n;
-                            }
-                            while (n >= 4) {
-                                *(uint32_t *)string = 0x30303030;
-                                string += 4;
-                                n -= 4;
-                            }
-                        }
-                        while (n) {
+                    if (precision == -1)
+                        precision = 6; // default is 6
+                    // read the double into a string
+                    if (stbsp__real_to_str(&source_ptr, &l, num, &decimal_precision, float_value, precision))
+                        formatting_flags |= STBSP__NEGATIVE;
+                L_DO_FLOAT_FROMG:
+                    tail[0] = 0;
+                    stbsp__lead_sign(formatting_flags, lead);
+                    if (decimal_precision == STBSP__SPECIAL) {
+                        string = (char *)source_ptr;
+                        comma_spacing = 0;
+                        precision = 0;
+                        goto L_STRING_COPY;
+                    }
+                    string = num + 64;
+
+                    // handle the three decimal varieties
+                    if (decimal_precision <= 0)
+                    {
+                        // handle 0.000*000xxxx
+                        *string++ = '0';
+                        if (precision)
+                        *string++ = stbsp__period;
+                        n = -decimal_precision;
+                        if ((int32_t)n > precision)
+                        n = precision;
+
+                        memset(string, '0', n);
+                        string += n;
+
+                        if ((int32_t)(l + n) > precision)
+                        l = precision - n;
+
+                        memcpy(string, source_ptr, l);
+                        string += l;
+                        source_ptr += l;
+                        
+                        trailing_zeros = precision - (n + l);
+                        comma_spacing = 1 + (3 << 24); // how many tens did we write (for commas below)
+                    }
+                    else
+                    {
+                        comma_spacing = (formatting_flags & STBSP__TRIPLET_COMMA) ? ((600 - (uint32_t)decimal_precision) % 3) : 0;
+                        if ((uint32_t)decimal_precision >= l) {
+                        // handle xxxx000*000.0
+                        n = 0;
+                        for (;;) {
                             if ((formatting_flags & STBSP__TRIPLET_COMMA) && (++comma_spacing == 4)) {
                                 comma_spacing = 0;
                                 *string++ = stbsp__comma;
                             } else {
-                                *string++ = '0';
-                                --n;
+                                *string++ = source_ptr[n];
+                                ++n;
+                                if (n >= l)
+                                    break;
                             }
                         }
-                    }
-                    comma_spacing = (int32_t)(string - (num + 64)) + (3 << 24); // comma_spacing is how many tens
-                    if (precision) {
-                        *string++ = stbsp__period;
-                        trailing_zeros = precision;
-                    }
-                    } else {
-                    // handle xxxxx.xxxx000*000
-                    n = 0;
-                    for (;;) {
-                        if ((formatting_flags & STBSP__TRIPLET_COMMA) && (++comma_spacing == 4)) {
-                            comma_spacing = 0;
-                            *string++ = stbsp__comma;
+                        if (n < (uint32_t)decimal_precision) {
+                            n = decimal_precision - n;
+                            if ((formatting_flags & STBSP__TRIPLET_COMMA) == 0) {
+                                while (n) {
+                                    if ((((uintptr_t)string) & 3) == 0)
+                                    break;
+                                    *string++ = '0';
+                                    --n;
+                                }
+                                while (n >= 4) {
+                                    *(uint32_t *)string = 0x30303030;
+                                    string += 4;
+                                    n -= 4;
+                                }
+                            }
+                            while (n) {
+                                if ((formatting_flags & STBSP__TRIPLET_COMMA) && (++comma_spacing == 4)) {
+                                    comma_spacing = 0;
+                                    *string++ = stbsp__comma;
+                                } else {
+                                    *string++ = '0';
+                                    --n;
+                                }
+                            }
+                        }
+                        comma_spacing = (int32_t)(string - (num + 64)) + (3 << 24); // comma_spacing is how many tens
+                        if (precision) {
+                            *string++ = stbsp__period;
+                            trailing_zeros = precision;
+                        }
                         } else {
+                        // handle xxxxx.xxxx000*000
+                        n = 0;
+                        for (;;) {
+                            if ((formatting_flags & STBSP__TRIPLET_COMMA) && (++comma_spacing == 4)) {
+                                comma_spacing = 0;
+                                *string++ = stbsp__comma;
+                            } else {
+                                *string++ = source_ptr[n];
+                                ++n;
+                                if (n >= (uint32_t)decimal_precision)
+                                    break;
+                            }
+                        }
+                        comma_spacing = (int32_t)(string - (num + 64)) + (3 << 24); // comma_spacing is how many tens
+                        if (precision)
+                            *string++ = stbsp__period;
+                        if ((l - decimal_precision) > (uint32_t)precision)
+                            l = precision + decimal_precision;
+                        while (n < l) {
                             *string++ = source_ptr[n];
                             ++n;
-                            if (n >= (uint32_t)decimal_precision)
-                                break;
+                        }
+                        trailing_zeros = precision - (l - decimal_precision);
                         }
                     }
-                    comma_spacing = (int32_t)(string - (num + 64)) + (3 << 24); // comma_spacing is how many tens
-                    if (precision)
-                        *string++ = stbsp__period;
-                    if ((l - decimal_precision) > (uint32_t)precision)
-                        l = precision + decimal_precision;
-                    while (n < l) {
-                        *string++ = source_ptr[n];
-                        ++n;
-                    }
-                    trailing_zeros = precision - (l - decimal_precision);
-                    }
-                }
-                precision = 0;
+                    precision = 0;
 
-                // handle k,m,g,t
-                if (formatting_flags & STBSP__METRIC_SUFFIX) {
-                    char idx;
-                    idx = 1;
-                    if (formatting_flags & STBSP__METRIC_NOSPACE)
-                    idx = 0;
-                    tail[0] = idx;
-                    tail[1] = ' ';
-                    {
-                    if (formatting_flags >> 24) { // SI kilo is 'k', JEDEC and SI kibits are 'K'.
-                        if (formatting_flags & STBSP__METRIC_1024)
-                            tail[idx + 1] = "_KMGT"[formatting_flags >> 24];
-                        else
-                            tail[idx + 1] = "_kMGT"[formatting_flags >> 24];
-                        idx++;
-                        // If printing kibits and not in jedec, add the 'i'.
-                        if (formatting_flags & STBSP__METRIC_1024 && !(formatting_flags & STBSP__METRIC_JEDEC)) {
-                            tail[idx + 1] = 'i';
-                            idx++;
-                        }
+                    // handle k,m,g,t
+                    if (formatting_flags & STBSP__METRIC_SUFFIX) {
+                        char idx;
+                        idx = 1;
+                        if (formatting_flags & STBSP__METRIC_NOSPACE)
+                        idx = 0;
                         tail[0] = idx;
-                    }
-                    }
-                };
+                        tail[1] = ' ';
+                        {
+                        if (formatting_flags >> 24) { // SI kilo is 'k', JEDEC and SI kibits are 'K'.
+                            if (formatting_flags & STBSP__METRIC_1024)
+                                tail[idx + 1] = "_KMGT"[formatting_flags >> 24];
+                            else
+                                tail[idx + 1] = "_kMGT"[formatting_flags >> 24];
+                            idx++;
+                            // If printing kibits and not in jedec, add the 'i'.
+                            if (formatting_flags & STBSP__METRIC_1024 && !(formatting_flags & STBSP__METRIC_JEDEC)) {
+                                tail[idx + 1] = 'i';
+                                idx++;
+                            }
+                            tail[0] = idx;
+                        }
+                        }
+                    };
 
-            flt_lead:
-                // get the length that we copied
-                l = (uint32_t)(string - (num + 64));
-                string = num + 64;
-                goto L_STRING_COPY;
-
-            case 'B': // upper binary
-            case 'b': // lower binary
-                h = (f[0] == 'B') ? hexu : hex;
-                lead[0] = 0;
-                if (formatting_flags & STBSP__LEADING_0X) {
-                    lead[0] = 2;
-                    lead[1] = '0';
-                    lead[2] = h[0xb];
-                }
-                l = (8 << 4) | (1 << 8);
-                goto L_RADIX_NUM;
-
-            case 'o': // octal
-                h = hexu;
-                lead[0] = 0;
-                if (formatting_flags & STBSP__LEADING_0X) {
-                    lead[0] = 1;
-                    lead[1] = '0';
-                }
-                l = (3 << 4) | (3 << 8);
-                goto L_RADIX_NUM;
-
-            case 'p': // pointer
-                formatting_flags |= (sizeof(void *) == 8) ? STBSP__INTMAX : 0;
-                precision = sizeof(void *) * 2;
-                formatting_flags &= ~STBSP__LEADINGZERO; // 'p' only prints the pointer with zeros
-                                            // fall through - to X
-
-            case 'X': // upper hex
-            case 'x': // lower hex
-                h = (f[0] == 'X') ? hexu : hex;
-                l = (4 << 4) | (4 << 8);
-                lead[0] = 0;
-                if (formatting_flags & STBSP__LEADING_0X) {
-                    lead[0] = 2;
-                    lead[1] = '0';
-                    lead[2] = h[16];
-                }
-
-            L_RADIX_NUM:
-                // get the number
-                if (formatting_flags & STBSP__INTMAX)
-                    n64 = va_arg(va, uint64_t);
-                else
-                    n64 = va_arg(va, uint32_t);
-
-                string = num + STBSP__NUMSZ;
-                decimal_precision = 0;
-                // clear tail, and clear leading if value is zero
-                tail[0] = 0;
-                if (n64 == 0) {
-                    lead[0] = 0;
-                    if (precision == 0) {
-                    l = 0;
-                    comma_spacing = 0;
+                flt_lead:
+                    // get the length that we copied
+                    l = (uint32_t)(string - (num + 64));
+                    string = num + 64;
                     goto L_STRING_COPY;
-                    }
-                }
-                // convert to string
-                for (;;) {
-                    *--string = h[n64 & ((1 << (l >> 8)) - 1)];
-                    n64 >>= (l >> 8);
-                    if (!((n64) || ((int32_t)((num + STBSP__NUMSZ) - string) < precision)))
-                    break;
-                    if (formatting_flags & STBSP__TRIPLET_COMMA) {
-                    ++l;
-                    if ((l & 15) == ((l >> 4) & 15)) {
-                        l &= ~15;
-                        *--string = stbsp__comma;
-                    }
-                    }
-                };
-                // get the tens and the comma pos
-                comma_spacing = (uint32_t)((num + STBSP__NUMSZ) - string) + ((((l >> 4) & 15)) << 24);
-                // get the length that we copied
-                l = (uint32_t)((num + STBSP__NUMSZ) - string);
-                // copy it
-                goto L_STRING_COPY;
 
-            case 'u': // unsigned
-            case 'i':
-            case 'd': // integer
-                // get the integer and abs it
-                if (formatting_flags & STBSP__INTMAX) {
-                    int64_t i64 = va_arg(va, int64_t);
-                    n64 = (uint64_t)i64;
-                    if ((f[0] != 'u') && (i64 < 0)) {
-                    n64 = (uint64_t)-i64;
-                    formatting_flags |= STBSP__NEGATIVE;
+                case 'B': // upper binary
+                case 'b': // lower binary
+                    h = (f.data[0] == 'B') ? hexu : hex;
+                    lead[0] = 0;
+                    if (formatting_flags & STBSP__LEADING_0X) {
+                        lead[0] = 2;
+                        lead[1] = '0';
+                        lead[2] = h[0xb];
                     }
-                } else {
-                    int32_t i = va_arg(va, int32_t);
-                    n64 = (uint32_t)i;
-                    if ((f[0] != 'u') && (i < 0)) {
-                    n64 = (uint32_t)-i;
-                    formatting_flags |= STBSP__NEGATIVE;
-                    }
-                }
+                    l = (8 << 4) | (1 << 8);
+                    goto L_RADIX_NUM;
 
-                if (formatting_flags & STBSP__METRIC_SUFFIX) {
-                    if (n64 < 1024)
-                    precision = 0;
-                    else if (precision == -1)
-                    precision = 1;
-                    float_value = (double)(int64_t)n64;
-                    goto doafloat;
-                }
+                case 'o': // octal
+                    h = hexu;
+                    lead[0] = 0;
+                    if (formatting_flags & STBSP__LEADING_0X) {
+                        lead[0] = 1;
+                        lead[1] = '0';
+                    }
+                    l = (3 << 4) | (3 << 8);
+                    goto L_RADIX_NUM;
 
-                // convert to string
-                string = num + STBSP__NUMSZ;
-                l = 0;
+                case 'p': // pointer
+                    formatting_flags |= (sizeof(void *) == 8) ? STBSP__INTMAX : 0;
+                    precision = sizeof(void *) * 2;
+                    formatting_flags &= ~STBSP__LEADINGZERO; // 'p' only prints the pointer with zeros
+                                                // fall through - to X
 
-                for (;;) {
-                    // do in 32-bit chunks (avoid lots of 64-bit divides even with constant denominators)
-                    char *o = string - 8;
-                    if (n64 >= 100000000) {
-                    n = (uint32_t)(n64 % 100000000);
-                    n64 /= 100000000;
-                    } else {
-                    n = (uint32_t)n64;
-                    n64 = 0;
+                case 'X': // upper hex
+                case 'x': // lower hex
+                    h = (f.data[0] == 'X') ? hexu : hex;
+                    l = (4 << 4) | (4 << 8);
+                    lead[0] = 0;
+                    if (formatting_flags & STBSP__LEADING_0X) {
+                        lead[0] = 2;
+                        lead[1] = '0';
+                        lead[2] = h[16];
                     }
-                    if ((formatting_flags & STBSP__TRIPLET_COMMA) == 0) {
-                    do {
-                        string -= 2;
-                        *(uint16_t *)string = *(uint16_t *)&stbsp__digitpair.pair[(n % 100) * 2];
-                        n /= 100;
-                    } while (n);
-                    }
-                    while (n) {
-                    if ((formatting_flags & STBSP__TRIPLET_COMMA) && (l++ == 3)) {
-                        l = 0;
-                        *--string = stbsp__comma;
-                        --o;
-                    } else {
-                        *--string = (char)(n % 10) + '0';
-                        n /= 10;
-                    }
-                    }
+
+                L_RADIX_NUM:
+                    // get the number
+                    if (formatting_flags & STBSP__INTMAX)
+                        n64 = va_arg(va, uint64_t);
+                    else
+                        n64 = va_arg(va, uint32_t);
+
+                    string = num + STBSP__NUMSZ;
+                    decimal_precision = 0;
+                    // clear tail, and clear leading if value is zero
+                    tail[0] = 0;
                     if (n64 == 0) {
-                    if ((string[0] == '0') && (string != (num + STBSP__NUMSZ)))
-                        ++string;
-                    break;
-                    }
-                    while (string != o)
-                    if ((formatting_flags & STBSP__TRIPLET_COMMA) && (l++ == 3)) {
+                        lead[0] = 0;
+                        if (precision == 0) {
                         l = 0;
-                        *--string = stbsp__comma;
-                        --o;
+                        comma_spacing = 0;
+                        goto L_STRING_COPY;
+                        }
+                    }
+                    // convert to string
+                    for (;;) {
+                        *--string = h[n64 & ((1 << (l >> 8)) - 1)];
+                        n64 >>= (l >> 8);
+                        if (!((n64) || ((int32_t)((num + STBSP__NUMSZ) - string) < precision)))
+                        break;
+                        if (formatting_flags & STBSP__TRIPLET_COMMA) {
+                        ++l;
+                        if ((l & 15) == ((l >> 4) & 15)) {
+                            l &= ~15;
+                            *--string = stbsp__comma;
+                        }
+                        }
+                    };
+                    // get the tens and the comma pos
+                    comma_spacing = (uint32_t)((num + STBSP__NUMSZ) - string) + ((((l >> 4) & 15)) << 24);
+                    // get the length that we copied
+                    l = (uint32_t)((num + STBSP__NUMSZ) - string);
+                    // copy it
+                    goto L_STRING_COPY;
+
+                case 'u': // unsigned
+                case 'i':
+                case 'd': // integer
+                    // get the integer and abs it
+                    if (formatting_flags & STBSP__INTMAX) {
+                        int64_t i64 = va_arg(va, int64_t);
+                        n64 = (uint64_t)i64;
+                        if ((f.data[0] != 'u') && (i64 < 0)) {
+                        n64 = (uint64_t)-i64;
+                        formatting_flags |= STBSP__NEGATIVE;
+                        }
                     } else {
+                        int32_t i = va_arg(va, int32_t);
+                        n64 = (uint32_t)i;
+                        if ((f.data[0] != 'u') && (i < 0)) {
+                        n64 = (uint32_t)-i;
+                        formatting_flags |= STBSP__NEGATIVE;
+                        }
+                    }
+
+                    if (formatting_flags & STBSP__METRIC_SUFFIX) {
+                        if (n64 < 1024)
+                        precision = 0;
+                        else if (precision == -1)
+                        precision = 1;
+                        float_value = (double)(int64_t)n64;
+                        goto doafloat;
+                    }
+
+                    // convert to string
+                    string = num + STBSP__NUMSZ;
+                    l = 0;
+
+                    for (;;) {
+                        // do in 32-bit chunks (avoid lots of 64-bit divides even with constant denominators)
+                        char *o = string - 8;
+                        if (n64 >= 100000000) {
+                        n = (uint32_t)(n64 % 100000000);
+                        n64 /= 100000000;
+                        } else {
+                        n = (uint32_t)n64;
+                        n64 = 0;
+                        }
+                        if ((formatting_flags & STBSP__TRIPLET_COMMA) == 0) {
+                        do {
+                            string -= 2;
+                            *(uint16_t *)string = *(uint16_t *)&stbsp__digitpair.pair[(n % 100) * 2];
+                            n /= 100;
+                        } while (n);
+                        }
+                        while (n) {
+                        if ((formatting_flags & STBSP__TRIPLET_COMMA) && (l++ == 3)) {
+                            l = 0;
+                            *--string = stbsp__comma;
+                            --o;
+                        } else {
+                            *--string = (char)(n % 10) + '0';
+                            n /= 10;
+                        }
+                        }
+                        if (n64 == 0) {
+                        if ((string[0] == '0') && (string != (num + STBSP__NUMSZ)))
+                            ++string;
+                        break;
+                        }
+                        while (string != o)
+                        if ((formatting_flags & STBSP__TRIPLET_COMMA) && (l++ == 3)) {
+                            l = 0;
+                            *--string = stbsp__comma;
+                            --o;
+                        } else {
+                            *--string = '0';
+                        }
+                    }
+
+                    tail[0] = 0;
+                    stbsp__lead_sign(formatting_flags, lead);
+
+                    // get the length that we copied
+                    l = (uint32_t)((num + STBSP__NUMSZ) - string);
+                    if (l == 0) {
                         *--string = '0';
+                        l = 1;
                     }
-                }
+                    comma_spacing = l + (3 << 24);
+                    if (precision < 0)
+                        precision = 0;
 
-                tail[0] = 0;
-                stbsp__lead_sign(formatting_flags, lead);
+                L_STRING_COPY:
+                    // get field_width=leading/trailing space, precision=leading zeros
+                    if (precision < (int32_t)l)
+                        precision = l;
+                    n = precision + lead[0] + tail[0] + trailing_zeros;
+                    if (field_width < (int32_t)n)
+                        field_width = n;
+                    field_width -= n;
+                    precision -= l;
 
-                // get the length that we copied
-                l = (uint32_t)((num + STBSP__NUMSZ) - string);
-                if (l == 0) {
-                    *--string = '0';
-                    l = 1;
-                }
-                comma_spacing = l + (3 << 24);
-                if (precision < 0)
-                    precision = 0;
-
-            L_STRING_COPY:
-                // get field_width=leading/trailing space, precision=leading zeros
-                if (precision < (int32_t)l)
-                    precision = l;
-                n = precision + lead[0] + tail[0] + trailing_zeros;
-                if (field_width < (int32_t)n)
-                    field_width = n;
-                field_width -= n;
-                precision -= l;
-
-                // handle right justify and leading zeros
-                if ((formatting_flags & STBSP__LEFTJUST) == 0) {
-                    if (formatting_flags & STBSP__LEADINGZERO) // if leading zeros, everything is in precision
-                    {
-                    precision = (field_width > precision) ? field_width : precision;
-                    field_width = 0;
-                    } else {
-                    formatting_flags &= ~STBSP__TRIPLET_COMMA; // if no leading zeros, then no commas
+                    // handle right justify and leading zeros
+                    if ((formatting_flags & STBSP__LEFTJUST) == 0) {
+                        if (formatting_flags & STBSP__LEADINGZERO) // if leading zeros, everything is in precision
+                        {
+                        precision = (field_width > precision) ? field_width : precision;
+                        field_width = 0;
+                        } else {
+                        formatting_flags &= ~STBSP__TRIPLET_COMMA; // if no leading zeros, then no commas
+                        }
                     }
-                }
 
-                // copy the spaces and/or zeros
-                if (field_width + precision)
-                {
-                    int32_t i;
-                    uint32_t c;
-
-                    // copy leading spaces (or when doing %8.4d stuff)
-                    if ((formatting_flags & STBSP__LEFTJUST) == 0)
+                    // copy the spaces and/or zeros
+                    if (field_width + precision)
                     {
-                    while (field_width > 0)
-                    {
-                        stbsp__cb_buf_clamp(i, field_width);
+                        int32_t i;
+                        uint32_t c;
 
-                        field_width -= i;
-                        memset(buffer_cursor, ' ', i);
+                        // copy leading spaces (or when doing %8.4d stuff)
+                        if ((formatting_flags & STBSP__LEFTJUST) == 0)
+                        {
+                        while (field_width > 0)
+                        {
+                            stbsp__cb_buf_clamp(i, field_width);
+
+                            field_width -= i;
+                            memset(buffer_cursor, ' ', i);
+                            buffer_cursor += i;
+                            
+                            stbsp__chk_cb_buf(1);
+                        }
+                        }
+
+                        // copy leader
+                        source_ptr = lead + 1;
+                        while (lead[0])
+                        {
+                        stbsp__cb_buf_clamp(i, lead[0]);
+
+                        lead[0] -= (char) i;
+                        memcpy(buffer_cursor, source_ptr, i);
                         buffer_cursor += i;
-                        
+                        source_ptr += i;
+
                         stbsp__chk_cb_buf(1);
-                    }
+                        }
+
+                        // copy leading zeros
+                        c = comma_spacing >> 24;
+                        comma_spacing &= 0xffffff;
+                        comma_spacing = (formatting_flags & STBSP__TRIPLET_COMMA) ? ((uint32_t)(c - ((precision + comma_spacing) % (c + 1)))) : 0;
+
+                        while (precision > 0)
+                        {
+                        stbsp__cb_buf_clamp(i, precision);
+                        precision -= i;
+                        
+                        if (JSL_IS_BITFLAG_NOT_SET(formatting_flags, STBSP__TRIPLET_COMMA))
+                        {
+                            memset(buffer_cursor, '0', i);
+                            buffer_cursor += i;
+                        }
+                        else
+                        {
+                            while (i)
+                            {
+                                if (comma_spacing == c)
+                                {
+                                    comma_spacing = 0;
+                                    *buffer_cursor = stbsp__comma;
+                                }
+                                else
+                                {
+                                    *buffer_cursor = '0';
+                                }
+
+                                ++buffer_cursor;
+                                ++comma_spacing;
+                                --i;
+                            }
+                        }
+
+                        stbsp__chk_cb_buf(1);
+                        }
+
                     }
 
-                    // copy leader
+                    // copy leader if there is still one
                     source_ptr = lead + 1;
                     while (lead[0])
                     {
-                    stbsp__cb_buf_clamp(i, lead[0]);
+                        int32_t i;
+                        stbsp__cb_buf_clamp(i, lead[0]);
 
-                    lead[0] -= (char) i;
-                    memcpy(buffer_cursor, source_ptr, i);
-                    buffer_cursor += i;
-                    source_ptr += i;
-
-                    stbsp__chk_cb_buf(1);
-                    }
-
-                    // copy leading zeros
-                    c = comma_spacing >> 24;
-                    comma_spacing &= 0xffffff;
-                    comma_spacing = (formatting_flags & STBSP__TRIPLET_COMMA) ? ((uint32_t)(c - ((precision + comma_spacing) % (c + 1)))) : 0;
-
-                    while (precision > 0)
-                    {
-                    stbsp__cb_buf_clamp(i, precision);
-                    precision -= i;
-                    
-                    if (JSL_IS_BITFLAG_NOT_SET(formatting_flags, STBSP__TRIPLET_COMMA))
-                    {
-                        memset(buffer_cursor, '0', i);
+                        lead[0] -= (char) i;
+                        memcpy(buffer_cursor, source_ptr, i);
                         buffer_cursor += i;
-                    }
-                    else
-                    {
-                        while (i)
-                        {
-                            if (comma_spacing == c)
-                            {
-                                comma_spacing = 0;
-                                *buffer_cursor = stbsp__comma;
-                            }
-                            else
-                            {
-                                *buffer_cursor = '0';
-                            }
+                        source_ptr += i;
 
-                            ++buffer_cursor;
-                            ++comma_spacing;
-                            --i;
-                        }
+                        stbsp__chk_cb_buf(1);
                     }
 
-                    stbsp__chk_cb_buf(1);
-                    }
-
-                }
-
-                // copy leader if there is still one
-                source_ptr = lead + 1;
-                while (lead[0])
-                {
-                    int32_t i;
-                    stbsp__cb_buf_clamp(i, lead[0]);
-
-                    lead[0] -= (char) i;
-                    memcpy(buffer_cursor, source_ptr, i);
-                    buffer_cursor += i;
-                    source_ptr += i;
-
-                    stbsp__chk_cb_buf(1);
-                }
-
-                // copy the string
-                n = l;
-                while (n)
-                {
-                    int32_t i;
-                    stbsp__cb_buf_clamp(i, n);
-
-                    n -= i;
-                    memcpy(buffer_cursor, string, i);
-                    buffer_cursor += i;
-                    string += i;
-
-                    stbsp__chk_cb_buf(1);
-                }
-
-                // copy trailing zeros
-                while (trailing_zeros)
-                {
-                    int32_t i;
-                    stbsp__cb_buf_clamp(i, trailing_zeros);
-                    
-                    trailing_zeros -= i;
-                    memset(buffer_cursor, '0', i);
-                    buffer_cursor += i;
-
-                    stbsp__chk_cb_buf(1);
-                }
-
-                // copy tail if there is one
-                source_ptr = tail + 1;
-                while (tail[0])
-                {
-                    int32_t i;
-                    stbsp__cb_buf_clamp(i, tail[0]);
-                    
-                    tail[0] -= (char)i;
-                    memcpy(buffer_cursor, source_ptr, i);
-                    buffer_cursor += i;
-                    source_ptr += i;
-                    
-                    stbsp__chk_cb_buf(1);
-                }
-
-                // handle the left justify
-                if (formatting_flags & STBSP__LEFTJUST)
-                {
-                    if (field_width > 0)
-                    {
-                    while (field_width)
+                    // copy the string
+                    n = l;
+                    while (n)
                     {
                         int32_t i;
-                        stbsp__cb_buf_clamp(i, field_width);
+                        stbsp__cb_buf_clamp(i, n);
 
-                        field_width -= i;
-                        memset(buffer_cursor, ' ', i);
+                        n -= i;
+                        memcpy(buffer_cursor, string, i);
+                        buffer_cursor += i;
+                        string += i;
+
+                        stbsp__chk_cb_buf(1);
+                    }
+
+                    // copy trailing zeros
+                    while (trailing_zeros)
+                    {
+                        int32_t i;
+                        stbsp__cb_buf_clamp(i, trailing_zeros);
+                        
+                        trailing_zeros -= i;
+                        memset(buffer_cursor, '0', i);
                         buffer_cursor += i;
 
                         stbsp__chk_cb_buf(1);
                     }
+
+                    // copy tail if there is one
+                    source_ptr = tail + 1;
+                    while (tail[0])
+                    {
+                        int32_t i;
+                        stbsp__cb_buf_clamp(i, tail[0]);
+                        
+                        tail[0] -= (char)i;
+                        memcpy(buffer_cursor, source_ptr, i);
+                        buffer_cursor += i;
+                        source_ptr += i;
+                        
+                        stbsp__chk_cb_buf(1);
                     }
-                }
 
-                break;
+                    // handle the left justify
+                    if (formatting_flags & STBSP__LEFTJUST)
+                    {
+                        if (field_width > 0)
+                        {
+                        while (field_width)
+                        {
+                            int32_t i;
+                            stbsp__cb_buf_clamp(i, field_width);
 
-            default: // unknown, just copy code
-                string = num + STBSP__NUMSZ - 1;
-                *string = f[0];
-                l = 1;
-                field_width = formatting_flags = 0;
-                lead[0] = 0;
-                tail[0] = 0;
-                precision = 0;
-                decimal_precision = 0;
-                comma_spacing = 0;
-                goto L_STRING_COPY;
+                            field_width -= i;
+                            memset(buffer_cursor, ' ', i);
+                            buffer_cursor += i;
+
+                            stbsp__chk_cb_buf(1);
+                        }
+                        }
+                    }
+
+                    break;
+
+                default: // unknown, just copy code
+                    string = num + STBSP__NUMSZ - 1;
+                    *string = f.data[0];
+                    l = 1;
+                    field_width = formatting_flags = 0;
+                    lead[0] = 0;
+                    tail[0] = 0;
+                    precision = 0;
+                    decimal_precision = 0;
+                    comma_spacing = 0;
+                    goto L_STRING_COPY;
             }
-            ++f;
+
+            JSL_FATPTR_ADVANCE(f, 1);
         }
 
 
@@ -3139,7 +3135,7 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
         return context->tmp; // go direct into buffer if you can
     }
 
-    JSL_ASAN_OFF int64_t jsl_fatptr_format_valist(JSLFatPtr* buffer, char const* fmt, va_list va )
+    JSL_ASAN_OFF int64_t jsl_fatptr_format_valist(JSLFatPtr* buffer, JSLFatPtr fmt, va_list va )
     {
         stbsp__context context;
 
@@ -3213,7 +3209,7 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
         return context->buffer;
     }
 
-    JSL_ASAN_OFF JSLFatPtr jsl_fatptr_format(JSLArena* arena, char const *fmt, ...)
+    JSL_ASAN_OFF JSLFatPtr jsl_fatptr_format(JSLArena* arena, JSLFatPtr fmt, ...)
     {
         va_list va;
         va_start(va, fmt);
@@ -3245,7 +3241,7 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
         return ret;
     }
 
-    JSL_ASAN_OFF int64_t jsl_fatptr_format_buffer(JSLFatPtr* buffer, char const *fmt, ...)
+    JSL_ASAN_OFF int64_t jsl_fatptr_format_buffer(JSLFatPtr* buffer, JSLFatPtr fmt, ...)
     {
         int64_t result;
         va_list va;

@@ -31,7 +31,7 @@
 
 #define JSL_IMPLEMENTATION
 #define JSL_INCLUDE_FILE_UTILS
-#include "../jacks_standard_library.h"
+#include "../src/jacks_standard_library.h"
 
 #include "minctest.h"
 
@@ -49,7 +49,7 @@ void test_jsl_fatptr_from_cstr()
 
 void test_jsl_fatptr_cstr_memory_copy()
 {
-    JSLFatPtr buffer = jsl_fatptr_ctor(malloc(1024), 1024);
+    JSLFatPtr buffer = jsl_fatptr_init(malloc(1024), 1024);
     lok((int64_t) buffer.length == (int64_t) 1024);
 
     JSLFatPtr writer = buffer;
@@ -81,7 +81,8 @@ void test_jsl_fatptr_load_file_contents()
         fread(stack_buffer, file_size, 1, file);
     }
 
-    JSLArena arena = jsl_arena_ctor(malloc(4*1024), 4*1024);
+    JSLArena arena;
+    jsl_arena_init(&arena, malloc(4*1024), 4*1024);
 
     JSLFatPtr contents;
     JSLLoadFileResultEnum res = jsl_fatptr_load_file_contents(
@@ -112,7 +113,7 @@ void test_jsl_fatptr_load_file_contents_buffer()
         fread(stack_buffer, file_size, 1, file);
     }
 
-    JSLFatPtr buffer = jsl_fatptr_ctor(malloc(4*1024), 4*1024);
+    JSLFatPtr buffer = jsl_fatptr_init(malloc(4*1024), 4*1024);
     JSLFatPtr writer = buffer;
 
     JSLLoadFileResultEnum res = jsl_fatptr_load_file_contents_buffer(
@@ -127,10 +128,10 @@ void test_jsl_fatptr_load_file_contents_buffer()
 
 void test_jsl_fatptr_memory_compare()
 {
-    JSLFatPtr buffer1 = jsl_fatptr_ctor(malloc(13), 13);
-    JSLFatPtr buffer2 = jsl_fatptr_ctor(malloc(13), 13);
-    JSLFatPtr buffer3 = jsl_fatptr_ctor(malloc(13), 13);
-    JSLFatPtr buffer4 = jsl_fatptr_ctor(malloc(20), 20);
+    JSLFatPtr buffer1 = jsl_fatptr_init(malloc(13), 13);
+    JSLFatPtr buffer2 = jsl_fatptr_init(malloc(13), 13);
+    JSLFatPtr buffer3 = jsl_fatptr_init(malloc(13), 13);
+    JSLFatPtr buffer4 = jsl_fatptr_init(malloc(20), 20);
 
     JSLFatPtr writer1 = buffer1;
     JSLFatPtr writer2 = buffer2;
@@ -150,7 +151,7 @@ void test_jsl_fatptr_memory_compare()
 
 void test_jsl_fatptr_slice()
 {
-    JSLFatPtr buffer1 = jsl_fatptr_ctor(malloc(13), 13);
+    JSLFatPtr buffer1 = jsl_fatptr_init(malloc(13), 13);
 
     {
         JSLFatPtr writer1 = buffer1;
@@ -161,7 +162,7 @@ void test_jsl_fatptr_slice()
     }
 
     {
-        JSLFatPtr buffer2 = jsl_fatptr_ctor(malloc(10), 10);
+        JSLFatPtr buffer2 = jsl_fatptr_init(malloc(10), 10);
         JSLFatPtr writer2 = buffer2;
         jsl_fatptr_cstr_memory_copy(&writer2, "Hello, Wor", false);
 
@@ -170,7 +171,7 @@ void test_jsl_fatptr_slice()
     }
 
     {
-        JSLFatPtr buffer3 = jsl_fatptr_ctor(malloc(5), 5);
+        JSLFatPtr buffer3 = jsl_fatptr_init(malloc(5), 5);
         JSLFatPtr writer3 = buffer3;
         jsl_fatptr_cstr_memory_copy(&writer3, "lo, W", false);
 
@@ -386,7 +387,8 @@ void test_jsl_fatptr_get_file_extension()
 
 void test_jsl_fatptr_to_lowercase_ascii()
 {
-    JSLArena arena = jsl_arena_ctor(malloc(1024), 1024);
+    JSLArena arena;
+    jsl_arena_init(&arena, malloc(1024), 1024);
 
     JSLFatPtr buffer1 = jsl_arena_cstr_to_fatptr(&arena, "10023");
     jsl_fatptr_to_lowercase_ascii(buffer1);
