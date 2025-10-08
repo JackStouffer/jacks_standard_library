@@ -6,7 +6,7 @@ the MIT license.
 
 ## stb_sprintf
 
-The fat pointer printf-style function, `jss_fatptr_format` is a derivation of stb_sprintf
+The fat pointer printf-style function, `jsl_fatptr_format` is a derivation of stb_sprintf
 
 Copyright (c) 2017 Sean Barrett
 

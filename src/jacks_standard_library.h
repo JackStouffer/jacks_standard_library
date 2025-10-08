@@ -2017,7 +2017,7 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
         buffer_cursor = buffer;
         f = fmt;
 
-        #if defined(__AVX2__)
+        #if defined(__AVX2__) && (defined(__x86_64__) || defined(_M_X64))
             __m256i percent_wide = _mm256_set1_epi8('%');
             __m256i zero_wide = _mm256_setzero_si256();
             __m256i vector_of_indexes = _mm256_set_epi8(
@@ -2066,8 +2066,20 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
 
             #if defined(__AVX2__)
 
+                // Get 32 byte aligned address
+                while (((uintptr_t) f.data) & 31 && f.length > 0)
+                {
+                    if (f.data[0] == '%')
+                        goto L_PROCESS_PERCENT;
+
+                    stbsp__chk_cb_buf(1);
+                    *buffer_cursor = f.data[0];
+                    ++buffer_cursor;
+                    JSL_FATPTR_ADVANCE(f, 1);
+                }
+
                 // Copy everything up to the next %
-                while (f.length > 0)
+                for (;;)
                 {
                     // SAFETY CONCERN:
                     // This is safe because when reading 32 bytes from a 32 byte aligned pointer
@@ -2079,16 +2091,9 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
 
                     // Get up to 32-byte alignment so that we can safely read past the
                     // end of the given format string using an aligned read.
-                    while (((uintptr_t)f) & 31 && f.length > 0)
-                    {
-                        if (f.data[0] == '%')
-                            goto L_PROCESS_PERCENT;
 
-                        stbsp__chk_cb_buf(1);
-                        *buffer_cursor = f.data[0];
-                        ++buffer_cursor;
-                        JSL_FATPTR_ADVANCE(f, 1);
-                    }
+                    if (f.length < 1)
+                        goto L_END_FORMAT;
 
                     const __m256i* source_wide = (const __m256i*) f.data;
                     __m256i* wide_dest = (__m256i*) buffer_cursor;
@@ -2124,17 +2129,16 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
                             );
                             _mm256_storeu_si256(wide_dest, partial_data);
                         }
-                        f += special_pos;
+                        JSL_FATPTR_ADVANCE(f, special_pos);
                         buffer_cursor += special_pos;
 
-                        if (f.data[0] == '%')
-                            goto L_PROCESS_PERCENT;
+                        goto L_PROCESS_PERCENT;
                     }
                 }
 
             #else
                 
-                // get up to 4-byte alignment
+                // loop one byte at a time to get up to 4-byte alignment
                 while (((uintptr_t) f.data) & 3 && f.length > 0)
                 {
                     schk1:
@@ -2147,10 +2151,10 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
                     JSL_FATPTR_ADVANCE(f, 1);
                 }
 
-                // fast copy everything up to the next % (or end of string)
-                while (f.length > 0)
+                // fast copy everything up to the next %
+                while (f.length > 3)
                 {
-                    // Check if the next 4 bytes contain % or end of string.
+                    // Check if the next 4 bytes contain %
                     // Using the 'hasless' trick:
                     // https://graphics.stanford.edu/~seander/bithacks.html#HasLessInWord
                     uint32_t v, c;
@@ -2184,6 +2188,8 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
 
                 if (f.length == 0)
                     goto L_END_FORMAT;
+                else
+                    goto schk1;
 
             #endif
 
@@ -2875,13 +2881,16 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
                     precision -= l;
 
                     // handle right justify and leading zeros
-                    if ((formatting_flags & STBSP__LEFTJUST) == 0) {
+                    if ((formatting_flags & STBSP__LEFTJUST) == 0)
+                    {
                         if (formatting_flags & STBSP__LEADINGZERO) // if leading zeros, everything is in precision
                         {
-                        precision = (field_width > precision) ? field_width : precision;
-                        field_width = 0;
-                        } else {
-                        formatting_flags &= ~STBSP__TRIPLET_COMMA; // if no leading zeros, then no commas
+                            precision = (field_width > precision) ? field_width : precision;
+                            field_width = 0;
+                        }
+                        else
+                        {
+                            formatting_flags &= ~STBSP__TRIPLET_COMMA; // if no leading zeros, then no commas
                         }
                     }
 
@@ -2894,30 +2903,30 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
                         // copy leading spaces (or when doing %8.4d stuff)
                         if ((formatting_flags & STBSP__LEFTJUST) == 0)
                         {
-                        while (field_width > 0)
-                        {
-                            stbsp__cb_buf_clamp(i, field_width);
+                            while (field_width > 0)
+                            {
+                                stbsp__cb_buf_clamp(i, field_width);
 
-                            field_width -= i;
-                            memset(buffer_cursor, ' ', i);
-                            buffer_cursor += i;
-                            
-                            stbsp__chk_cb_buf(1);
-                        }
+                                field_width -= i;
+                                memset(buffer_cursor, ' ', i);
+                                buffer_cursor += i;
+                                
+                                stbsp__chk_cb_buf(1);
+                            }
                         }
 
                         // copy leader
                         source_ptr = lead + 1;
                         while (lead[0])
                         {
-                        stbsp__cb_buf_clamp(i, lead[0]);
+                            stbsp__cb_buf_clamp(i, lead[0]);
 
-                        lead[0] -= (char) i;
-                        memcpy(buffer_cursor, source_ptr, i);
-                        buffer_cursor += i;
-                        source_ptr += i;
+                            lead[0] -= (char) i;
+                            memcpy(buffer_cursor, source_ptr, i);
+                            buffer_cursor += i;
+                            source_ptr += i;
 
-                        stbsp__chk_cb_buf(1);
+                            stbsp__chk_cb_buf(1);
                         }
 
                         // copy leading zeros
@@ -3138,10 +3147,12 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
     JSL_ASAN_OFF int64_t jsl_fatptr_format_valist(JSLFatPtr* buffer, JSLFatPtr fmt, va_list va )
     {
         stbsp__context context;
+        context.length = 0;
 
         if ((buffer->length == 0) && buffer->data == NULL)
         {
-            context.length = 0;
+            context.buffer.data = NULL;
+            context.buffer.length = 0;
 
             jsl_fatptr_format_callback(
                 stbsp__count_clamp_callback,
@@ -3154,7 +3165,6 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
         else
         {
             context.buffer = *buffer;
-            context.length = 0;
 
             jsl_fatptr_format_callback(
                 stbsp__clamp_callback,
