@@ -341,6 +341,8 @@ So in general four types of allocations
 
 95% of allocations in the programs I've seen fall into the first category.
 
+Honestly, I'm not really sure it's possible to write code which needs allocations
+in the last category. 
 
 memory speed
 

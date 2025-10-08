@@ -4,8 +4,10 @@
 *.pdb
 *.o
 *.a
+*.out
 *.lib
 *.so
 *.dll
 *.i
 bin/
+*.dSYM
