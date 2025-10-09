@@ -24,12 +24,165 @@
  */
 
 #include <stdint.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdarg.h>
 
+#include <stdalign.h>
+
 #define JSL_IMPLEMENTATION
 #include "jacks_standard_library.h"
+
+
+typedef struct JSLStringBuilderChunk
+{
+    JSLFatPtr buffer;
+    JSLFatPtr writer;
+    JSLStringBuilderChunk* next;
+} JSLStringBuilderChunk;
+
+/**
+ * A string builder is a container for building large strings. It's specialized for
+ * situations where many different smaller operations result in small strings being
+ * coalesed into a final result, specifically using an arena as its allocator.
+ * 
+ * While this is called string builder, the underlying data store is just bytes, so
+ * any binary data which is built in chunks can use the string builder.
+ *
+ * A string builder is different from a normal dynamic array in two ways. One, it
+ * has specific operations for writing string data in both fat pointer form but also
+ * as a `snprintf` like operation. Two, the resulting string data is not stored as a
+ * contigious range of memory, but as a series of chunks which is given to the user
+ * as an iterator when the string is finished. 
+ *
+ * This is due to the nature of arena allocations. If you're using an arena for a
+ * life time in your program, then the most common case is 
+ *
+ * 1. You do some operations, these operations themselves allocate
+ * 2. You add generate a string from the operations
+ * 3. The string is concatenated into some buffer
+ * 4. Repeat
+ *
+ * A dynamically sized array which grows would mean throwing away the old memory when
+ * the array resizes. A separate arena that's used purely for the array would work, but
+ * with the string builder allows for less lifetimes to track.
+ */
+typedef struct JSLStringBuilder
+{
+    JSLArena* arena;
+    JSLStringBuilderChunk* head;
+    JSLStringBuilderChunk* tail;
+    int32_t alignment;
+    int32_t chunk_size;
+} JSLStringBuilder;
+
+static bool jsl__string_builder_add_chunk(JSLStringBuilder* builder)
+{
+    JSLStringBuilderChunk* chunk = JSL_ARENA_TYPED_ALLOCATE(JSLStringBuilderChunk, builder->arena);
+    chunk->next = NULL;
+    chunk->buffer = jsl_arena_allocate_aligned(builder->arena, builder->chunk_size, builder->alignment, false);
+
+    if (chunk->buffer.data != NULL)
+    {
+        chunk->writer = chunk->buffer;
+
+        if (builder->head == NULL)
+            builder->head = chunk;
+        
+        if (builder->tail == NULL)
+        {
+            builder->tail = chunk;
+        }
+        else
+        {
+            builder->tail->next = chunk;
+            builder->tail = chunk;
+        }
+        return true;
+    }
+    else
+    {
+        builder->tail = NULL;
+        return false;
+    }
+}
+
+bool jsl_string_builder_init(JSLStringBuilder* builder, JSLArena* arena)
+{
+    builder->head = NULL;
+    builder->tail = NULL;
+    builder->arena = arena;
+    builder->alignment = 32;
+    builder->chunk_size = 256;
+    bool res = jsl__string_builder_add_chunk(builder);
+    return res;
+}
+
+bool jsl_string_builder_insert_char(JSLStringBuilder* builder, char c)
+{
+    bool res = false;
+
+    bool needs_alloc = false;
+    if (builder->tail->writer.length > 0)
+    {
+        builder->tail->writer.data[0] = c;
+        JSL_FATPTR_ADVANCE(builder->tail->writer, 1);
+        res = true;
+    }
+    else
+    {
+        needs_alloc = true;
+    }
+
+    bool has_new_chunk = false;
+    if (needs_alloc)
+    {
+        has_new_chunk = jsl__string_builder_add_chunk(builder)
+    }
+
+    if (has_new_chunk)
+    {
+        builder->tail->writer.data[0] = (uint8_t) c;
+        JSL_FATPTR_ADVANCE(builder->tail->writer, 1);
+        res = true;
+    }
+
+    return res;
+}
+
+bool jsl_string_builder_insert_uint8_t(JSLStringBuilder* builder, uint8_t c)
+{
+    bool res = false;
+
+    bool needs_alloc = false;
+    if (builder->tail->writer.length > 0)
+    {
+        builder->tail->writer.data[0] = c;
+        JSL_FATPTR_ADVANCE(builder->tail->writer, 1);
+        res = true;
+    }
+    else
+    {
+        needs_alloc = true;
+    }
+
+    bool has_new_chunk = false;
+    if (needs_alloc)
+    {
+        has_new_chunk = jsl__string_builder_add_chunk(builder)
+    }
+
+    if (has_new_chunk)
+    {
+        builder->tail->writer.data[0] = c;
+        JSL_FATPTR_ADVANCE(builder->tail->writer, 1);
+        res = true;
+    }
+
+    return res;
+}
+
 
 /**
  * TODO: Documentation: talk about
@@ -46,71 +199,71 @@
  */
 
 
-#define JSL_GET_SET_FLAG_INDEX(slot_number) slot_number >> 5L // divide by 32
-#define JSL_HASHMAP_TYPE_NAME(name) name
-#define JSL_HASHMAP_ITEM_TYPE_NAME(name) name##Item
-#define JSL_HASHMAP_ITERATOR_TYPE_NAME(name) name##Iterator
-#define JSL_HASHMAP_FIND_RES_TYPE_NAME(name) name##FindRes
-#define JSL_HASHMAP_ITERATOR_RET_TYPE_NAME(name) name##IteratorReturn
+// #define JSL_GET_SET_FLAG_INDEX(slot_number) slot_number >> 5L // divide by 32
+// #define JSL_HASHMAP_TYPE_NAME(name) name
+// #define JSL_HASHMAP_ITEM_TYPE_NAME(name) name##Item
+// #define JSL_HASHMAP_ITERATOR_TYPE_NAME(name) name##Iterator
+// #define JSL_HASHMAP_FIND_RES_TYPE_NAME(name) name##FindRes
+// #define JSL_HASHMAP_ITERATOR_RET_TYPE_NAME(name) name##IteratorReturn
 
-#define JSL_HASHMAP_TYPES(name, key_type, value_type)               \
-        typedef struct JSL_HASHMAP_ITEM_TYPE_NAME(name) {           \
-            key_type key;                                           \
-            value_type value;                                       \
-        } JSL_HASHMAP_ITEM_TYPE_NAME(name);                         \
-                                                                    \
-        typedef struct JSL_HASHMAP_TYPE_NAME(name) {                \
-            JSLArena* arena;                                        \
-            JSL_HASHMAP_ITEM_TYPE_NAME(name)* slots_array;          \
-            int64_t slots_array_length;                             \
-            uint32_t* is_set_flags_array;                           \
-            int64_t is_set_flags_array_length;                      \
-            int64_t item_count;                                     \
-            uint16_t generational_id;                               \
-            uint8_t flags;                                          \
-        } JSL_HASHMAP_TYPE_NAME(name);                              \
-                                                                    \
-        typedef struct JSL_HASHMAP_FIND_RES_TYPE_NAME(name) {       \
-            JSL_HASHMAP_ITEM_TYPE_NAME(name)* slot;                 \
-            int64_t is_set_array_index;                             \
-            uint32_t is_set_array_bit;                              \
-            bool is_update;                                         \
-        } JSL_HASHMAP_FIND_RES_TYPE_NAME(name);                     \
-                                                                    \
-        typedef struct JSL_HASHMAP_ITERATOR_TYPE_NAME(name) {       \
-            JSL_HASHMAP_TYPE_NAME(name)* hashmap;                   \
-            int64_t current_slot_index;                             \
-            uint16_t generational_id;                               \
-        } JSL_HASHMAP_ITERATOR_TYPE_NAME(name);
+// #define JSL_HASHMAP_TYPES(name, key_type, value_type)               \
+//         typedef struct JSL_HASHMAP_ITEM_TYPE_NAME(name) {           \
+//             key_type key;                                           \
+//             value_type value;                                       \
+//         } JSL_HASHMAP_ITEM_TYPE_NAME(name);                         \
+//                                                                     \
+//         typedef struct JSL_HASHMAP_TYPE_NAME(name) {                \
+//             JSLArena* arena;                                        \
+//             JSL_HASHMAP_ITEM_TYPE_NAME(name)* slots_array;          \
+//             int64_t slots_array_length;                             \
+//             uint32_t* is_set_flags_array;                           \
+//             int64_t is_set_flags_array_length;                      \
+//             int64_t item_count;                                     \
+//             uint16_t generational_id;                               \
+//             uint8_t flags;                                          \
+//         } JSL_HASHMAP_TYPE_NAME(name);                              \
+//                                                                     \
+//         typedef struct JSL_HASHMAP_FIND_RES_TYPE_NAME(name) {       \
+//             JSL_HASHMAP_ITEM_TYPE_NAME(name)* slot;                 \
+//             int64_t is_set_array_index;                             \
+//             uint32_t is_set_array_bit;                              \
+//             bool is_update;                                         \
+//         } JSL_HASHMAP_FIND_RES_TYPE_NAME(name);                     \
+//                                                                     \
+//         typedef struct JSL_HASHMAP_ITERATOR_TYPE_NAME(name) {       \
+//             JSL_HASHMAP_TYPE_NAME(name)* hashmap;                   \
+//             int64_t current_slot_index;                             \
+//             uint16_t generational_id;                               \
+//         } JSL_HASHMAP_ITERATOR_TYPE_NAME(name);
 
-#ifdef JSL_DEBUG
-    #define JSL_HASHMAP_CHECK_EMPTY(return_value)                   \
-        JSL_ASSERT(hashmap != NULL);                                \
-        JSL_ASSERT(hashmap->arena != NULL);                         \
-        JSL_ASSERT(hashmap->slots_array != NULL);                   \
-        JSL_ASSERT(hashmap->is_set_flags_array != NULL);
-#else
-    #define JSL_HASHMAP_CHECK_EMPTY(return_value)                   \
-        if (                                                        \
-            hashmap == NULL                                         \
-            || hashmap->arena == NULL                               \
-            || hashmap->slots_array == NULL                         \
-            || hashmap->is_set_flags_array == NULL                  \
-        )                                                           \
-            return return_value;
-#endif
+// #ifdef JSL_DEBUG
+//     #define JSL_HASHMAP_CHECK_EMPTY(return_value)                   \
+//         JSL_ASSERT(hashmap != NULL);                                \
+//         JSL_ASSERT(hashmap->arena != NULL);                         \
+//         JSL_ASSERT(hashmap->slots_array != NULL);                   \
+//         JSL_ASSERT(hashmap->is_set_flags_array != NULL);
+// #else
+//     #define JSL_HASHMAP_CHECK_EMPTY(return_value)                   \
+//         if (                                                        \
+//             hashmap == NULL                                         \
+//             || hashmap->arena == NULL                               \
+//             || hashmap->slots_array == NULL                         \
+//             || hashmap->is_set_flags_array == NULL                  \
+//         )                                                           \
+//             return return_value;
+// #endif
 
 
-#define JSL_HASHMAP_PROTOTYPES(name, function_prefix, key_type, value_type)                                                         \
-        void function_prefix##_init(JSL_HASHMAP_TYPE_NAME(name)* hashmap, JSLArena* arena, uint64_t seed);                          \
-        void function_prefix##_init2(JSL_HASHMAP_TYPE_NAME(name)* hashmap, JSLArena* arena, uint64_t seed, int64_t item_count_guess);              \
-        bool function_prefix##_insert(JSL_HASHMAP_TYPE_NAME(name)* hashmap, key_type key, value_type value);                        \
-        value_type* function_prefix##_get(JSL_HASHMAP_TYPE_NAME(name)* hashmap, key_type key);                                      \
-        bool function_prefix##_delete(JSL_HASHMAP_TYPE_NAME(name)* hashmap, key_type key);                                          \
-        JSL_HASHMAP_ITERATOR_TYPE_NAME(name) function_prefix##_iterator_start(JSL_HASHMAP_TYPE_NAME(name)* hashmap);                \
-        JSL_HASHMAP_ITEM_TYPE_NAME(name)* function_prefix##_iterator_next(JSL_HASHMAP_ITERATOR_TYPE_NAME(name)* iterator);
+// #define JSL_HASHMAP_PROTOTYPES(name, function_prefix, key_type, value_type)                                                         \
+//         void function_prefix##_init(JSL_HASHMAP_TYPE_NAME(name)* hashmap, JSLArena* arena, uint64_t seed);                          \
+//         void function_prefix##_init2(JSL_HASHMAP_TYPE_NAME(name)* hashmap, JSLArena* arena, uint64_t seed, int64_t item_count_guess);              \
+//         bool function_prefix##_insert(JSL_HASHMAP_TYPE_NAME(name)* hashmap, key_type key, value_type value);                        \
+//         value_type* function_prefix##_get(JSL_HASHMAP_TYPE_NAME(name)* hashmap, key_type key);                                      \
+//         bool function_prefix##_delete(JSL_HASHMAP_TYPE_NAME(name)* hashmap, key_type key);                                          \
+//         JSL_HASHMAP_ITERATOR_TYPE_NAME(name) function_prefix##_iterator_start(JSL_HASHMAP_TYPE_NAME(name)* hashmap);                \
+//         JSL_HASHMAP_ITEM_TYPE_NAME(name)* function_prefix##_iterator_next(JSL_HASHMAP_ITERATOR_TYPE_NAME(name)* iterator);
 
-const char* hash_map_header_docstring = "/**\n"
+JSLFatPtr hash_map_header_docstring = JSL_FATPTR_LITERAL("/**\n"
 " * AUTO GENERATED FILE\n"
 " *\n"
 " * This file contains the header for a hash map %s which maps `%s` keys to `%s` values.\n"
@@ -136,9 +289,9 @@ const char* hash_map_header_docstring = "/**\n"
 " * refuse to open very large (+10gig) documents. If you have some hash map which is built\n"
 " * from the document file then you need some other allocation strategy (you probably don't\n"
 " * want a normal hash map either as you'd be streaming things in and out of memory).\n"
-" */\n\n";
+" */\n\n");
 
-const char* map_type_typedef = "/**\n"
+JSLFatPtr map_type_typedef = JSL_FATPTR_LITERAL("/**\n"
     " * A hash map which maps `%s` keys to `%s` values.\n"
     " *\n"
     " * This hash map uses open addressing with linear probing. However, it never grows.\n"
@@ -155,10 +308,10 @@ const char* map_type_typedef = "/**\n"
     "    uint16_t generational_id;\n"
     "    uint8_t flags;\n"
     "} %s;\n"
-    "\n";
+    "\n");
 
 /// @brief param 1 is the hash map type name, param 2 is the function prefix, param 3 is the hash map type name
-const char* init_function_signature = "/**\n"
+JSLFatPtr init_function_signature = JSL_FATPTR_LITERAL("/**\n"
     " * Initialize an instance of the hash map.\n"
     " *\n"
     " * All of the memory that this hash map will need will be allocated from the passed in arena.\n"
@@ -174,10 +327,10 @@ const char* init_function_signature = "/**\n"
     " * @param seed Seed value for the hash function to protect against hash flooding attacks\n"
     " * @param max_item_count The maximum amount of items this hash map can hold\n"
     " */\n"
-    "void %s_init(%s* hash_map, JSLArena* arena, int64_t max_item_count, uint64_t seed);\n\n";
+    "void %s_init(%s* hash_map, JSLArena* arena, int64_t max_item_count, uint64_t seed);\n\n");
 
 /// @brief param 1 is the hash map type name, param 2 is the key type, param 3 is the value type
-const char* insert_function_signature = "/**\n"
+JSLFatPtr insert_function_signature = JSL_FATPTR_LITERAL("/**\n"
     " * Insert the given value into the hash map. This function will allocate if there's not\n"
     " * enough space. If the key already exists in the map the value will be overwritten. If\n"
     " * the key type for this hash map is a pointer, then a NULL key is accepted.\n"
@@ -187,9 +340,9 @@ const char* insert_function_signature = "/**\n"
     " * @param value Value to store\n"
     " * @returns A bool representing success or failure of insertion. Insertion can fail if memory cannot be allocated.\n"
     " */\n"
-    "bool %s_insert(%s* hash_map, %s key, %s value);\n\n";
+    "bool %s_insert(%s* hash_map, %s key, %s value);\n\n");
 
-const char* get_function_signature = "/**\n"
+JSLFatPtr get_function_signature = JSL_FATPTR_LITERAL("/**\n"
     " * Get a value from the hash map if it exists. If it does not NULL is returned\n"
     " *\n"
     " * @warning The pointer returned actually points to value stored inside of hash map.\n"
@@ -201,14 +354,14 @@ const char* get_function_signature = "/**\n"
     " * @param value Value to store\n"
     " * @returns The pointer to the value in the hash map, or null.\n"
     " */\n"
-    "%s* %s_get(%s* hash_map, %s key);\n\n";
+    "%s* %s_get(%s* hash_map, %s key);\n\n");
 
-const char* delete_function_signature = "/**\n"
+JSLFatPtr delete_function_signature = JSL_FATPTR_LITERAL("/**\n"
     " * Remove a key/value pair from the hash map if it exists. If it does not false is returned\n"
     " */\n"
-    "bool %s_delete(%s* hashmap, %s key);\n\n";
+    "bool %s_delete(%s* hashmap, %s key);\n\n");
 
-const char* iterator_start_function_signature = "/**\n"
+JSLFatPtr iterator_start_function_signature = JSL_FATPTR_LITERAL("/**\n"
     " * Create a new iterator over this hash map.\n"
     " *\n"
     " * An iterator is a struct which holds enough state that it allows a loop to visit\n"
@@ -229,9 +382,9 @@ const char* iterator_start_function_signature = "/**\n"
     " * }\n"
     " * @endcode\n"
     " */\n"
-    "void %s_iterator_start(%s* hashmap, %sIterator* iterator);\n\n";
+    "void %s_iterator_start(%s* hashmap, %sIterator* iterator);\n\n");
 
-const char* iterator_next_function_signature = "/**\n"
+JSLFatPtr iterator_next_function_signature = JSL_FATPTR_LITERAL("/**\n"
     " * Iterate over the hash map. If a key/value was found then true is returned.\n"
     " *\n"
     " * Example usage:\n"
@@ -245,312 +398,312 @@ const char* iterator_next_function_signature = "/**\n"
     " * }\n"
     " * @endcode\n"
     " */\n"
-    "bool %s_iterator_next(%sIterator* iterator, %s key, %s value);\n\n";
+    "bool %s_iterator_next(%sIterator* iterator, %s key, %s value);\n\n");
 
-#define JSL_HASHMAP_DECLARE(name, function_prefix, key_type, value_type)                                                            \
-        JSL_HASHMAP_TYPES(name, key_type, value_type)                                                                               \
-        JSL_HASHMAP_PROTOTYPES(name, function_prefix, key_type, value_type)
+// #define JSL_HASHMAP_DECLARE(name, function_prefix, key_type, value_type)                                                            \
+//         JSL_HASHMAP_TYPES(name, key_type, value_type)                                                                               \
+//         JSL_HASHMAP_PROTOTYPES(name, function_prefix, key_type, value_type)
 
 
-#define JSL_HASHMAP_IMPLEMENTATION(name, function_prefix, key_type, value_type)                                                 \
-    void function_prefix##_ctor(JSL_HASHMAP_TYPE_NAME(name)* hashmap, JSLArena* arena)                                          \
-    {                                                                                                                           \
-        function_prefix##_ctor2(hashmap, arena, 32);                                                                            \
-    }                                                                                                                           \
-                                                                                                                                \
-    void function_prefix##_ctor2(JSL_HASHMAP_TYPE_NAME(name)* hashmap, JSLArena* arena, int64_t item_count_guess)               \
-    {                                                                                                                           \
-        JSL_DEBUG_ASSERT(hashmap != NULL);                                                                                      \
-        JSL_DEBUG_ASSERT(arena != NULL);                                                                                        \
-                                                                                                                                \
-        hashmap->arena = arena;                                                                                                 \
-        hashmap->item_count = 0;                                                                                                \
-        hashmap->flags = 0;                                                                                                     \
-        hashmap->generational_id = 0;                                                                                           \
-                                                                                                                                \
-        if (item_count_guess <= 16)                                                                                             \
-            hashmap->slots_array_length = 32;                                                                                   \
-        else if (jss__is_power_of_two(item_count_guess))                                                                        \
-            hashmap->slots_array_length = item_count_guess * 2;                                                                 \
-        else                                                                                                                    \
-            hashmap->slots_array_length = jss__next_power_of_two(item_count_guess) * 2;                                         \
-                                                                                                                                \
-        hashmap->is_set_flags_array_length = hashmap->slots_array_length >> 5L;                                                 \
-                                                                                                                                \
-        hashmap->slots_array = (JSL_HASHMAP_ITEM_TYPE_NAME(name)*) jss_arena_allocate(                                          \
-            arena, sizeof(JSL_HASHMAP_ITEM_TYPE_NAME(name)) * hashmap->slots_array_length, false                                \
-        ).data;                                                                                                                 \
-                                                                                                                                \
-        hashmap->is_set_flags_array = (uint32_t*) jss_arena_allocate(                                                           \
-            arena, sizeof(uint32_t) * hashmap->is_set_flags_array_length, true                                                  \
-        ).data;                                                                                                                 \
-    }                                                                                                                           \
-                                                                                                                                \
-    static bool function_prefix##_expand(JSL_HASHMAP_TYPE_NAME(name)* hashmap)                                                  \
-    {                                                                                                                           \
-        JSL_DEBUG_ASSERT(hashmap != NULL);                                                                                      \
-        JSL_DEBUG_ASSERT(hashmap->arena != NULL);                                                                               \
-        JSL_DEBUG_ASSERT(hashmap->slots_array != NULL);                                                                         \
-        JSL_DEBUG_ASSERT(hashmap->is_set_flags_array != NULL);                                                                  \
-                                                                                                                                \
-        bool success;                                                                                                           \
-                                                                                                                                \
-        JSL_HASHMAP_ITEM_TYPE_NAME(name)* old_slots_array = hashmap->slots_array;                                               \
-        int64_t old_slots_array_length = hashmap->slots_array_length;                                                           \
-                                                                                                                                \
-        uint32_t* old_is_set_flags_array = hashmap->is_set_flags_array;                                                         \
-        int64_t old_is_set_flags_array_length = hashmap->is_set_flags_array_length;                                             \
-                                                                                                                                \
-        int64_t new_slots_array_length = jss__hashmap_expand_size(old_slots_array_length);                                      \
-        JSL_HASHMAP_ITEM_TYPE_NAME(name)* new_slots_array = (JSL_HASHMAP_ITEM_TYPE_NAME(name)*) jss_arena_allocate(             \
-            hashmap->arena, sizeof(JSL_HASHMAP_ITEM_TYPE_NAME(name)) * new_slots_array_length, false                            \
-        ).data;                                                                                                                 \
-                                                                                                                                \
-        int64_t new_is_set_flags_array_length = new_slots_array_length >> 5L;                                                   \
-        uint32_t* new_is_set_flags_array = (uint32_t*) jss_arena_allocate(                                                      \
-            hashmap->arena, sizeof(uint32_t) * new_is_set_flags_array_length, true                                              \
-        ).data;                                                                                                                 \
-                                                                                                                                \
-        if (new_slots_array != NULL && new_is_set_flags_array != NULL)                                                          \
-        {                                                                                                                       \
-            hashmap->item_count = 0;                                                                                            \
-            hashmap->slots_array = new_slots_array;                                                                             \
-            hashmap->slots_array_length = new_slots_array_length;                                                               \
-            hashmap->is_set_flags_array = new_is_set_flags_array;                                                               \
-            hashmap->is_set_flags_array_length = new_is_set_flags_array_length;                                                 \
-                                                                                                                                \
-            int64_t slot_index = 0;                                                                                             \
-            for (                                                                                                               \
-                int64_t is_set_flags_index = 0;                                                                                 \
-                is_set_flags_index < old_is_set_flags_array_length;                                                             \
-                is_set_flags_index++                                                                                            \
-            )                                                                                                                   \
-            {                                                                                                                   \
-                for (uint32_t current_bit = 0; current_bit < 32; current_bit++)                                                 \
-                {                                                                                                               \
-                    uint32_t bitflag = JSL_MAKE_BITFLAG(current_bit);                                                           \
-                    if (JSL_IS_BITFLAG_SET(old_is_set_flags_array[is_set_flags_index], bitflag))                                \
-                    {                                                                                                           \
-                        function_prefix##_insert(hashmap, old_slots_array[slot_index].key, old_slots_array[slot_index].value);  \
-                    }                                                                                                           \
-                    ++slot_index;                                                                                               \
-                }                                                                                                               \
-            }                                                                                                                   \
-                                                                                                                                \
-            success = true;                                                                                                     \
-        }                                                                                                                       \
-        else                                                                                                                    \
-        {                                                                                                                       \
-            success = false;                                                                                                    \
-        }                                                                                                                       \
-                                                                                                                                \
-        return success;                                                                                                         \
-    }                                                                                                                           \
-                                                                                                                                \
-                                                                                                                                \
-    static inline JSL_HASHMAP_FIND_RES_TYPE_NAME(name) function_prefix##_hash_and_find_slot(                                    \
-        JSL_HASHMAP_TYPE_NAME(name)* hashmap,                                                                                   \
-        key_type key,                                                                                                           \
-        bool is_insert                                                                                                          \
-    )                                                                                                                           \
-    {                                                                                                                           \
-        JSL_HASHMAP_FIND_RES_TYPE_NAME(name) return_value;                                                                      \
-        return_value.slot = NULL;                                                                                               \
-                                                                                                                                \
-        uint64_t hash = jss__wyhash(&key, sizeof(key_type), jss__hash_seed, jss__wyhash_secret);                                \
-                                                                                                                                \
-        int64_t total_checked = 0;                                                                                              \
-        /* Since our slot array length is always a pow 2, we can avoid a modulo  */                                             \
-        int64_t slot_index = (int64_t) (hash & (hashmap->slots_array_length - 1));                                              \
-        return_value.is_set_array_index = (int64_t) JSL_GET_SET_FLAG_INDEX(slot_index);                                         \
-        /* Manual remainder here too  */                                                                                        \
-        return_value.is_set_array_bit = slot_index - (return_value.is_set_array_index * 32);                                    \
-                                                                                                                                \
-        for (;;)                                                                                                                \
-        {                                                                                                                       \
-            uint32_t bit_flag = JSL_MAKE_BITFLAG(return_value.is_set_array_bit);                                                \
-            uint32_t is_slot_set = JSL_IS_BITFLAG_SET(                                                                           \
-                hashmap->is_set_flags_array[return_value.is_set_array_index],                                                   \
-                bit_flag                                                                                                        \
-            );                                                                                                                  \
-                                                                                                                                \
-            if (is_slot_set == 0 && is_insert)                                                                                  \
-            {                                                                                                                   \
-                return_value.slot = &hashmap->slots_array[slot_index];                                                          \
-                return_value.is_update = false;                                                                                 \
-                break;                                                                                                          \
-            }                                                                                                                   \
-            /* Updating value */                                                                                                \
-            else if (is_slot_set == 1)                                                                                          \
-            {                                                                                                                   \
-                int32_t memcmp_res = memcmp(                                                                                    \
-                    &hashmap->slots_array[slot_index].key,                                                                      \
-                    &key,                                                                                                       \
-                    sizeof(key_type)                                                                                            \
-                );                                                                                                              \
-                if (memcmp_res == 0)                                                                                            \
-                {                                                                                                               \
-                    return_value.slot = &hashmap->slots_array[slot_index];                                                      \
-                    return_value.is_update = true;                                                                              \
-                    break;                                                                                                      \
-                }                                                                                                               \
-            }                                                                                                                   \
-                                                                                                                                \
-            /* Collision. Move to the next spot with linear probing  */                                                         \
-                                                                                                                                \
-            ++total_checked;                                                                                                    \
-            ++return_value.is_set_array_bit;                                                                                    \
-            ++slot_index;                                                                                                       \
-                                                                                                                                \
-            /* We can't expand and the hashmap is completely full  */                                                           \
-            if (total_checked == hashmap->slots_array_length)                                                                   \
-            {                                                                                                                   \
-                break;                                                                                                          \
-            }                                                                                                                   \
-                                                                                                                                \
-            if (return_value.is_set_array_bit == 32)                                                                            \
-            {                                                                                                                   \
-                ++return_value.is_set_array_index;                                                                              \
-                return_value.is_set_array_bit = 0;                                                                              \
-            }                                                                                                                   \
-                                                                                                                                \
-            /* Loop all the way back around */                                                                                  \
-            if (slot_index == hashmap->slots_array_length)                                                                      \
-            {                                                                                                                   \
-                slot_index = 0;                                                                                                 \
-                return_value.is_set_array_bit = 0;                                                                              \
-                return_value.is_set_array_index = 0;                                                                            \
-            }                                                                                                                   \
-        }                                                                                                                       \
-                                                                                                                                \
-        return return_value;                                                                                                    \
-    }                                                                                                                           \
-                                                                                                                                \
-    bool function_prefix##_insert(JSL_HASHMAP_TYPE_NAME(name)* hashmap, key_type key, value_type value)                         \
-    {                                                                                                                           \
-        JSL_HASHMAP_CHECK_EMPTY(false)                                                                                          \
-        bool insert_success = false;                                                                                            \
-                                                                                                                                \
-        if (JSL_IS_BITFLAG_NOT_SET(hashmap->flags, JSL__HASHMAP_CANT_EXPAND)                                                    \
-            && jss__hashmap_should_expand(hashmap->slots_array_length, hashmap->item_count + 1))                                \
-        {                                                                                                                       \
-            bool expand_res = function_prefix##_expand(hashmap);                                                                \
-            if (!expand_res)                                                                                                    \
-            {                                                                                                                   \
-                JSL_SET_BITFLAG(&hashmap->flags, JSL__HASHMAP_CANT_EXPAND);                                                     \
-            }                                                                                                                   \
-        }                                                                                                                       \
-                                                                                                                                \
-        JSL_HASHMAP_FIND_RES_TYPE_NAME(name) find_res = function_prefix##_hash_and_find_slot(                                   \
-            hashmap,                                                                                                            \
-            key,                                                                                                                \
-            true                                                                                                                \
-        );                                                                                                                      \
-        if (find_res.slot != NULL)                                                                                              \
-        {                                                                                                                       \
-            if (find_res.is_update)                                                                                             \
-            {                                                                                                                   \
-                find_res.slot->value = value;                                                                             \
-                insert_success = true;                                                                                          \
-            }                                                                                                                   \
-            else                                                                                                                \
-            {                                                                                                                   \
-                find_res.slot->key = key;                                                                                         \
-                find_res.slot->value = value;                                                                                         \
-                uint32_t bit_flag = JSL_MAKE_BITFLAG(find_res.is_set_array_bit);                                                \
-                JSL_SET_BITFLAG(                                                                                                \
-                    &hashmap->is_set_flags_array[find_res.is_set_array_index],                                                  \
-                    bit_flag                                                                                                    \
-                );                                                                                                              \
-                ++hashmap->item_count;                                                                                          \
-                insert_success = true;                                                                                          \
-            }                                                                                                                   \
-                                                                                                                                \
-            ++hashmap->generational_id;                                                                                         \
-        }                                                                                                                       \
-                                                                                                                                \
-        return insert_success;                                                                                                  \
-    }                                                                                                                           \
-                                                                                                                                \
-    value_type* function_prefix##_get(JSL_HASHMAP_TYPE_NAME(name)* hashmap, key_type key)                                       \
-    {                                                                                                                           \
-        JSL_HASHMAP_CHECK_EMPTY(NULL)                                                                                           \
-        value_type* res = NULL;                                                                                                 \
-                                                                                                                                \
-        JSL_HASHMAP_FIND_RES_TYPE_NAME(name) find_res = function_prefix##_hash_and_find_slot(hashmap, key, false);              \
-        if (find_res.slot != NULL && find_res.is_update)                                                                        \
-        {                                                                                                                       \
-            res = &find_res.slot->value;                                                                                        \
-        }                                                                                                                       \
-                                                                                                                                \
-        return res;                                                                                                             \
-    }                                                                                                                           \
-                                                                                                                                \
-    bool function_prefix##_delete(JSL_HASHMAP_TYPE_NAME(name)* hashmap, key_type key)                                           \
-    {                                                                                                                           \
-        JSL_HASHMAP_CHECK_EMPTY(false)                                                                                          \
-        bool success = false;                                                                                                   \
-        JSL_HASHMAP_FIND_RES_TYPE_NAME(name) find_res = function_prefix##_hash_and_find_slot(hashmap, key, false);              \
-                                                                                                                                \
-        if (find_res.slot != NULL && find_res.is_update)                                                                        \
-        {                                                                                                                       \
-            uint32_t bit_flag = JSL_MAKE_BITFLAG(find_res.is_set_array_bit);                                                    \
-            JSL_UNSET_BITFLAG(                                                                                                  \
-                &hashmap->is_set_flags_array[find_res.is_set_array_index],                                                      \
-                bit_flag                                                                                                        \
-            );                                                                                                                  \
-            --hashmap->item_count;                                                                                              \
-            success = true;                                                                                                     \
-        }                                                                                                                       \
-                                                                                                                                \
-        return success;                                                                                                         \
-    }                                                                                                                           \
-                                                                                                                                \
-    JSL_HASHMAP_ITERATOR_TYPE_NAME(name) function_prefix##_iterator_start(JSL_HASHMAP_TYPE_NAME(name)* hashmap)                 \
-    {                                                                                                                           \
-        JSL_DEBUG_ASSERT(hashmap != NULL);                                                                                      \
-        JSL_DEBUG_ASSERT(hashmap->arena != NULL);                                                                               \
-        JSL_DEBUG_ASSERT(hashmap->slots_array != NULL);                                                                         \
-        JSL_DEBUG_ASSERT(hashmap->is_set_flags_array != NULL);                                                                  \
-                                                                                                                                \
-        JSL_HASHMAP_ITERATOR_TYPE_NAME(name) iterator = {                                                                       \
-            .hashmap = hashmap,                                                                                                 \
-            .current_slot_index = 0                                                                                             \
-        };                                                                                                                      \
-                                                                                                                                \
-        iterator.generational_id = hashmap->generational_id;                                                                    \
-                                                                                                                                \
-        return iterator;                                                                                                        \
-    }                                                                                                                           \
-                                                                                                                                \
-    JSL_HASHMAP_ITEM_TYPE_NAME(name)* function_prefix##_iterator_next(JSL_HASHMAP_ITERATOR_TYPE_NAME(name)* iterator)           \
-    {                                                                                                                           \
-        JSL_DEBUG_ASSERT(iterator != NULL);                                                                                     \
-        JSL_DEBUG_ASSERT(iterator->hashmap != NULL);                                                                            \
-        JSL_DEBUG_ASSERT(iterator->hashmap->slots_array != NULL);                                                               \
-        JSL_DEBUG_ASSERT(iterator->hashmap->is_set_flags_array != NULL);                                                        \
-        JSL_DEBUG_ASSERT(iterator->generational_id == iterator->hashmap->generational_id);                                      \
-                                                                                                                                \
-        JSL_HASHMAP_ITEM_TYPE_NAME(name)* result = NULL;                                                                        \
-                                                                                                                                \
-        for (; iterator->current_slot_index < iterator->hashmap->slots_array_length; iterator->current_slot_index++)            \
-        {                                                                                                                       \
-            int64_t is_set_flags_index = JSL_GET_SET_FLAG_INDEX(iterator->current_slot_index);                                  \
-            int32_t current_is_set_flags_bit = iterator->current_slot_index - (is_set_flags_index * 32);                        \
-            uint32_t bitflag = JSL_MAKE_BITFLAG(current_is_set_flags_bit);                                                      \
-                                                                                                                                \
-            if (JSL_IS_BITFLAG_SET(                                                                                              \
-                iterator->hashmap->is_set_flags_array[is_set_flags_index], bitflag                                              \
-            ))                                                                                                                  \
-            {                                                                                                                   \
-                result = &iterator->hashmap->slots_array[iterator->current_slot_index];                                         \
-                ++iterator->current_slot_index;                                                                                 \
-                break;                                                                                                          \
-            }                                                                                                                   \
-        }                                                                                                                       \
-                                                                                                                                \
-        return result;                                                                                                          \
-    }
+// #define JSL_HASHMAP_IMPLEMENTATION(name, function_prefix, key_type, value_type)                                                 \
+//     void function_prefix##_ctor(JSL_HASHMAP_TYPE_NAME(name)* hashmap, JSLArena* arena)                                          \
+//     {                                                                                                                           \
+//         function_prefix##_ctor2(hashmap, arena, 32);                                                                            \
+//     }                                                                                                                           \
+//                                                                                                                                 \
+//     void function_prefix##_ctor2(JSL_HASHMAP_TYPE_NAME(name)* hashmap, JSLArena* arena, int64_t item_count_guess)               \
+//     {                                                                                                                           \
+//         JSL_DEBUG_ASSERT(hashmap != NULL);                                                                                      \
+//         JSL_DEBUG_ASSERT(arena != NULL);                                                                                        \
+//                                                                                                                                 \
+//         hashmap->arena = arena;                                                                                                 \
+//         hashmap->item_count = 0;                                                                                                \
+//         hashmap->flags = 0;                                                                                                     \
+//         hashmap->generational_id = 0;                                                                                           \
+//                                                                                                                                 \
+//         if (item_count_guess <= 16)                                                                                             \
+//             hashmap->slots_array_length = 32;                                                                                   \
+//         else if (jss__is_power_of_two(item_count_guess))                                                                        \
+//             hashmap->slots_array_length = item_count_guess * 2;                                                                 \
+//         else                                                                                                                    \
+//             hashmap->slots_array_length = jss__next_power_of_two(item_count_guess) * 2;                                         \
+//                                                                                                                                 \
+//         hashmap->is_set_flags_array_length = hashmap->slots_array_length >> 5L;                                                 \
+//                                                                                                                                 \
+//         hashmap->slots_array = (JSL_HASHMAP_ITEM_TYPE_NAME(name)*) jss_arena_allocate(                                          \
+//             arena, sizeof(JSL_HASHMAP_ITEM_TYPE_NAME(name)) * hashmap->slots_array_length, false                                \
+//         ).data;                                                                                                                 \
+//                                                                                                                                 \
+//         hashmap->is_set_flags_array = (uint32_t*) jss_arena_allocate(                                                           \
+//             arena, sizeof(uint32_t) * hashmap->is_set_flags_array_length, true                                                  \
+//         ).data;                                                                                                                 \
+//     }                                                                                                                           \
+//                                                                                                                                 \
+//     static bool function_prefix##_expand(JSL_HASHMAP_TYPE_NAME(name)* hashmap)                                                  \
+//     {                                                                                                                           \
+//         JSL_DEBUG_ASSERT(hashmap != NULL);                                                                                      \
+//         JSL_DEBUG_ASSERT(hashmap->arena != NULL);                                                                               \
+//         JSL_DEBUG_ASSERT(hashmap->slots_array != NULL);                                                                         \
+//         JSL_DEBUG_ASSERT(hashmap->is_set_flags_array != NULL);                                                                  \
+//                                                                                                                                 \
+//         bool success;                                                                                                           \
+//                                                                                                                                 \
+//         JSL_HASHMAP_ITEM_TYPE_NAME(name)* old_slots_array = hashmap->slots_array;                                               \
+//         int64_t old_slots_array_length = hashmap->slots_array_length;                                                           \
+//                                                                                                                                 \
+//         uint32_t* old_is_set_flags_array = hashmap->is_set_flags_array;                                                         \
+//         int64_t old_is_set_flags_array_length = hashmap->is_set_flags_array_length;                                             \
+//                                                                                                                                 \
+//         int64_t new_slots_array_length = jss__hashmap_expand_size(old_slots_array_length);                                      \
+//         JSL_HASHMAP_ITEM_TYPE_NAME(name)* new_slots_array = (JSL_HASHMAP_ITEM_TYPE_NAME(name)*) jss_arena_allocate(             \
+//             hashmap->arena, sizeof(JSL_HASHMAP_ITEM_TYPE_NAME(name)) * new_slots_array_length, false                            \
+//         ).data;                                                                                                                 \
+//                                                                                                                                 \
+//         int64_t new_is_set_flags_array_length = new_slots_array_length >> 5L;                                                   \
+//         uint32_t* new_is_set_flags_array = (uint32_t*) jss_arena_allocate(                                                      \
+//             hashmap->arena, sizeof(uint32_t) * new_is_set_flags_array_length, true                                              \
+//         ).data;                                                                                                                 \
+//                                                                                                                                 \
+//         if (new_slots_array != NULL && new_is_set_flags_array != NULL)                                                          \
+//         {                                                                                                                       \
+//             hashmap->item_count = 0;                                                                                            \
+//             hashmap->slots_array = new_slots_array;                                                                             \
+//             hashmap->slots_array_length = new_slots_array_length;                                                               \
+//             hashmap->is_set_flags_array = new_is_set_flags_array;                                                               \
+//             hashmap->is_set_flags_array_length = new_is_set_flags_array_length;                                                 \
+//                                                                                                                                 \
+//             int64_t slot_index = 0;                                                                                             \
+//             for (                                                                                                               \
+//                 int64_t is_set_flags_index = 0;                                                                                 \
+//                 is_set_flags_index < old_is_set_flags_array_length;                                                             \
+//                 is_set_flags_index++                                                                                            \
+//             )                                                                                                                   \
+//             {                                                                                                                   \
+//                 for (uint32_t current_bit = 0; current_bit < 32; current_bit++)                                                 \
+//                 {                                                                                                               \
+//                     uint32_t bitflag = JSL_MAKE_BITFLAG(current_bit);                                                           \
+//                     if (JSL_IS_BITFLAG_SET(old_is_set_flags_array[is_set_flags_index], bitflag))                                \
+//                     {                                                                                                           \
+//                         function_prefix##_insert(hashmap, old_slots_array[slot_index].key, old_slots_array[slot_index].value);  \
+//                     }                                                                                                           \
+//                     ++slot_index;                                                                                               \
+//                 }                                                                                                               \
+//             }                                                                                                                   \
+//                                                                                                                                 \
+//             success = true;                                                                                                     \
+//         }                                                                                                                       \
+//         else                                                                                                                    \
+//         {                                                                                                                       \
+//             success = false;                                                                                                    \
+//         }                                                                                                                       \
+//                                                                                                                                 \
+//         return success;                                                                                                         \
+//     }                                                                                                                           \
+//                                                                                                                                 \
+//                                                                                                                                 \
+//     static inline JSL_HASHMAP_FIND_RES_TYPE_NAME(name) function_prefix##_hash_and_find_slot(                                    \
+//         JSL_HASHMAP_TYPE_NAME(name)* hashmap,                                                                                   \
+//         key_type key,                                                                                                           \
+//         bool is_insert                                                                                                          \
+//     )                                                                                                                           \
+//     {                                                                                                                           \
+//         JSL_HASHMAP_FIND_RES_TYPE_NAME(name) return_value;                                                                      \
+//         return_value.slot = NULL;                                                                                               \
+//                                                                                                                                 \
+//         uint64_t hash = jss__wyhash(&key, sizeof(key_type), jss__hash_seed, jss__wyhash_secret);                                \
+//                                                                                                                                 \
+//         int64_t total_checked = 0;                                                                                              \
+//         /* Since our slot array length is always a pow 2, we can avoid a modulo  */                                             \
+//         int64_t slot_index = (int64_t) (hash & (hashmap->slots_array_length - 1));                                              \
+//         return_value.is_set_array_index = (int64_t) JSL_GET_SET_FLAG_INDEX(slot_index);                                         \
+//         /* Manual remainder here too  */                                                                                        \
+//         return_value.is_set_array_bit = slot_index - (return_value.is_set_array_index * 32);                                    \
+//                                                                                                                                 \
+//         for (;;)                                                                                                                \
+//         {                                                                                                                       \
+//             uint32_t bit_flag = JSL_MAKE_BITFLAG(return_value.is_set_array_bit);                                                \
+//             uint32_t is_slot_set = JSL_IS_BITFLAG_SET(                                                                           \
+//                 hashmap->is_set_flags_array[return_value.is_set_array_index],                                                   \
+//                 bit_flag                                                                                                        \
+//             );                                                                                                                  \
+//                                                                                                                                 \
+//             if (is_slot_set == 0 && is_insert)                                                                                  \
+//             {                                                                                                                   \
+//                 return_value.slot = &hashmap->slots_array[slot_index];                                                          \
+//                 return_value.is_update = false;                                                                                 \
+//                 break;                                                                                                          \
+//             }                                                                                                                   \
+//             /* Updating value */                                                                                                \
+//             else if (is_slot_set == 1)                                                                                          \
+//             {                                                                                                                   \
+//                 int32_t memcmp_res = memcmp(                                                                                    \
+//                     &hashmap->slots_array[slot_index].key,                                                                      \
+//                     &key,                                                                                                       \
+//                     sizeof(key_type)                                                                                            \
+//                 );                                                                                                              \
+//                 if (memcmp_res == 0)                                                                                            \
+//                 {                                                                                                               \
+//                     return_value.slot = &hashmap->slots_array[slot_index];                                                      \
+//                     return_value.is_update = true;                                                                              \
+//                     break;                                                                                                      \
+//                 }                                                                                                               \
+//             }                                                                                                                   \
+//                                                                                                                                 \
+//             /* Collision. Move to the next spot with linear probing  */                                                         \
+//                                                                                                                                 \
+//             ++total_checked;                                                                                                    \
+//             ++return_value.is_set_array_bit;                                                                                    \
+//             ++slot_index;                                                                                                       \
+//                                                                                                                                 \
+//             /* We can't expand and the hashmap is completely full  */                                                           \
+//             if (total_checked == hashmap->slots_array_length)                                                                   \
+//             {                                                                                                                   \
+//                 break;                                                                                                          \
+//             }                                                                                                                   \
+//                                                                                                                                 \
+//             if (return_value.is_set_array_bit == 32)                                                                            \
+//             {                                                                                                                   \
+//                 ++return_value.is_set_array_index;                                                                              \
+//                 return_value.is_set_array_bit = 0;                                                                              \
+//             }                                                                                                                   \
+//                                                                                                                                 \
+//             /* Loop all the way back around */                                                                                  \
+//             if (slot_index == hashmap->slots_array_length)                                                                      \
+//             {                                                                                                                   \
+//                 slot_index = 0;                                                                                                 \
+//                 return_value.is_set_array_bit = 0;                                                                              \
+//                 return_value.is_set_array_index = 0;                                                                            \
+//             }                                                                                                                   \
+//         }                                                                                                                       \
+//                                                                                                                                 \
+//         return return_value;                                                                                                    \
+//     }                                                                                                                           \
+//                                                                                                                                 \
+//     bool function_prefix##_insert(JSL_HASHMAP_TYPE_NAME(name)* hashmap, key_type key, value_type value)                         \
+//     {                                                                                                                           \
+//         JSL_HASHMAP_CHECK_EMPTY(false)                                                                                          \
+//         bool insert_success = false;                                                                                            \
+//                                                                                                                                 \
+//         if (JSL_IS_BITFLAG_NOT_SET(hashmap->flags, JSL__HASHMAP_CANT_EXPAND)                                                    \
+//             && jss__hashmap_should_expand(hashmap->slots_array_length, hashmap->item_count + 1))                                \
+//         {                                                                                                                       \
+//             bool expand_res = function_prefix##_expand(hashmap);                                                                \
+//             if (!expand_res)                                                                                                    \
+//             {                                                                                                                   \
+//                 JSL_SET_BITFLAG(&hashmap->flags, JSL__HASHMAP_CANT_EXPAND);                                                     \
+//             }                                                                                                                   \
+//         }                                                                                                                       \
+//                                                                                                                                 \
+//         JSL_HASHMAP_FIND_RES_TYPE_NAME(name) find_res = function_prefix##_hash_and_find_slot(                                   \
+//             hashmap,                                                                                                            \
+//             key,                                                                                                                \
+//             true                                                                                                                \
+//         );                                                                                                                      \
+//         if (find_res.slot != NULL)                                                                                              \
+//         {                                                                                                                       \
+//             if (find_res.is_update)                                                                                             \
+//             {                                                                                                                   \
+//                 find_res.slot->value = value;                                                                             \
+//                 insert_success = true;                                                                                          \
+//             }                                                                                                                   \
+//             else                                                                                                                \
+//             {                                                                                                                   \
+//                 find_res.slot->key = key;                                                                                         \
+//                 find_res.slot->value = value;                                                                                         \
+//                 uint32_t bit_flag = JSL_MAKE_BITFLAG(find_res.is_set_array_bit);                                                \
+//                 JSL_SET_BITFLAG(                                                                                                \
+//                     &hashmap->is_set_flags_array[find_res.is_set_array_index],                                                  \
+//                     bit_flag                                                                                                    \
+//                 );                                                                                                              \
+//                 ++hashmap->item_count;                                                                                          \
+//                 insert_success = true;                                                                                          \
+//             }                                                                                                                   \
+//                                                                                                                                 \
+//             ++hashmap->generational_id;                                                                                         \
+//         }                                                                                                                       \
+//                                                                                                                                 \
+//         return insert_success;                                                                                                  \
+//     }                                                                                                                           \
+//                                                                                                                                 \
+//     value_type* function_prefix##_get(JSL_HASHMAP_TYPE_NAME(name)* hashmap, key_type key)                                       \
+//     {                                                                                                                           \
+//         JSL_HASHMAP_CHECK_EMPTY(NULL)                                                                                           \
+//         value_type* res = NULL;                                                                                                 \
+//                                                                                                                                 \
+//         JSL_HASHMAP_FIND_RES_TYPE_NAME(name) find_res = function_prefix##_hash_and_find_slot(hashmap, key, false);              \
+//         if (find_res.slot != NULL && find_res.is_update)                                                                        \
+//         {                                                                                                                       \
+//             res = &find_res.slot->value;                                                                                        \
+//         }                                                                                                                       \
+//                                                                                                                                 \
+//         return res;                                                                                                             \
+//     }                                                                                                                           \
+//                                                                                                                                 \
+//     bool function_prefix##_delete(JSL_HASHMAP_TYPE_NAME(name)* hashmap, key_type key)                                           \
+//     {                                                                                                                           \
+//         JSL_HASHMAP_CHECK_EMPTY(false)                                                                                          \
+//         bool success = false;                                                                                                   \
+//         JSL_HASHMAP_FIND_RES_TYPE_NAME(name) find_res = function_prefix##_hash_and_find_slot(hashmap, key, false);              \
+//                                                                                                                                 \
+//         if (find_res.slot != NULL && find_res.is_update)                                                                        \
+//         {                                                                                                                       \
+//             uint32_t bit_flag = JSL_MAKE_BITFLAG(find_res.is_set_array_bit);                                                    \
+//             JSL_UNSET_BITFLAG(                                                                                                  \
+//                 &hashmap->is_set_flags_array[find_res.is_set_array_index],                                                      \
+//                 bit_flag                                                                                                        \
+//             );                                                                                                                  \
+//             --hashmap->item_count;                                                                                              \
+//             success = true;                                                                                                     \
+//         }                                                                                                                       \
+//                                                                                                                                 \
+//         return success;                                                                                                         \
+//     }                                                                                                                           \
+//                                                                                                                                 \
+//     JSL_HASHMAP_ITERATOR_TYPE_NAME(name) function_prefix##_iterator_start(JSL_HASHMAP_TYPE_NAME(name)* hashmap)                 \
+//     {                                                                                                                           \
+//         JSL_DEBUG_ASSERT(hashmap != NULL);                                                                                      \
+//         JSL_DEBUG_ASSERT(hashmap->arena != NULL);                                                                               \
+//         JSL_DEBUG_ASSERT(hashmap->slots_array != NULL);                                                                         \
+//         JSL_DEBUG_ASSERT(hashmap->is_set_flags_array != NULL);                                                                  \
+//                                                                                                                                 \
+//         JSL_HASHMAP_ITERATOR_TYPE_NAME(name) iterator = {                                                                       \
+//             .hashmap = hashmap,                                                                                                 \
+//             .current_slot_index = 0                                                                                             \
+//         };                                                                                                                      \
+//                                                                                                                                 \
+//         iterator.generational_id = hashmap->generational_id;                                                                    \
+//                                                                                                                                 \
+//         return iterator;                                                                                                        \
+//     }                                                                                                                           \
+//                                                                                                                                 \
+//     JSL_HASHMAP_ITEM_TYPE_NAME(name)* function_prefix##_iterator_next(JSL_HASHMAP_ITERATOR_TYPE_NAME(name)* iterator)           \
+//     {                                                                                                                           \
+//         JSL_DEBUG_ASSERT(iterator != NULL);                                                                                     \
+//         JSL_DEBUG_ASSERT(iterator->hashmap != NULL);                                                                            \
+//         JSL_DEBUG_ASSERT(iterator->hashmap->slots_array != NULL);                                                               \
+//         JSL_DEBUG_ASSERT(iterator->hashmap->is_set_flags_array != NULL);                                                        \
+//         JSL_DEBUG_ASSERT(iterator->generational_id == iterator->hashmap->generational_id);                                      \
+//                                                                                                                                 \
+//         JSL_HASHMAP_ITEM_TYPE_NAME(name)* result = NULL;                                                                        \
+//                                                                                                                                 \
+//         for (; iterator->current_slot_index < iterator->hashmap->slots_array_length; iterator->current_slot_index++)            \
+//         {                                                                                                                       \
+//             int64_t is_set_flags_index = JSL_GET_SET_FLAG_INDEX(iterator->current_slot_index);                                  \
+//             int32_t current_is_set_flags_bit = iterator->current_slot_index - (is_set_flags_index * 32);                        \
+//             uint32_t bitflag = JSL_MAKE_BITFLAG(current_is_set_flags_bit);                                                      \
+//                                                                                                                                 \
+//             if (JSL_IS_BITFLAG_SET(                                                                                              \
+//                 iterator->hashmap->is_set_flags_array[is_set_flags_index], bitflag                                              \
+//             ))                                                                                                                  \
+//             {                                                                                                                   \
+//                 result = &iterator->hashmap->slots_array[iterator->current_slot_index];                                         \
+//                 ++iterator->current_slot_index;                                                                                 \
+//                 break;                                                                                                          \
+//             }                                                                                                                   \
+//         }                                                                                                                       \
+//                                                                                                                                 \
+//         return result;                                                                                                          \
+//     }
 
 // NOTE:
 // This isn't the cleanest or best way to do this sort of thing, but it's quick
@@ -636,11 +789,11 @@ JSLFatPtr write_hash_map_header(
 
     JSLFatPtr writer = buffer_allocation;
 
-    jsl_fatptr_format_buffer(&writer, hash_map_header_docstring, hash_map_name, key_type_name, value_type_name);
+    jsl_fatptr_format(&arena, hash_map_header_docstring, hash_map_name, key_type_name, value_type_name);
 
-    jsl_fatptr_format_buffer(&writer, "#pragma once\n\n");
-    jsl_fatptr_format_buffer(&writer, "#include <stdint.h>\n");
-    jsl_fatptr_format_buffer(&writer, "#include \"jacks_hash_map.h\"\n\n");
+    jsl_fatptr_format(&arena, JSL_FATPTR_LITERAL("#pragma once\n\n"));
+    jsl_fatptr_format(&arena, JSL_FATPTR_LITERAL("#include <stdint.h>\n"));
+    jsl_fatptr_format(&arena, JSL_FATPTR_LITERAL("#include \"jacks_hash_map.h\"\n\n"));
 
     CHECK_LENGTH_AND_EXPAND()
 
@@ -649,7 +802,7 @@ JSLFatPtr write_hash_map_header(
 
     for (int32_t i = 0; i < include_header_count; ++i)
     {
-        jsl_fatptr_format_buffer(&writer, "#include \"%s\"\n", va_arg(args, char*));
+        jsl_fatptr_format_buffer(&writer, JSL_FATPTR_LITERAL("#include \"%s\"\n"), va_arg(args, char*));
         CHECK_LENGTH_AND_EXPAND()
     }
 
