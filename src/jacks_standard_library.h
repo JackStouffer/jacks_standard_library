@@ -42,35 +42,35 @@
  * 
  * ## What's Included
  * 
+ *      * Really common macros
+ *          * min, max
+ *          * bitflag checks
  *      * A buffer/slice type called a fat pointer
  *          * used everywhere
  *          * standardizes that pointers should carry their length
- *          * vastly simplifies writing functions like file reading]
+ *          * vastly simplifies functions like file reading
  *      * Common string and buffer utilities for fat pointers
  *          * things like fat pointer memcmp, substring search, etc.
  *      * An arena allocator
  *          * a.k.a a monotonic, region, or bump allocator
- *          * Easy to create, use, reset-able, allocators
+ *          * They are easy to create, use, reset-able, allocators
  *          * Great for things with known lifetimes (which is 99% of the things you allocate)
  *      * A snprintf replacement
  *          * writes directly into a fat pointer buffer
  *          * Removes all compiler specific weirdness
- *      * Type safe containers
- *          * Unlike a lot of C containers, these are built with macros. Each container
- *            instance generates code with your value types rather than using void* plus
- *            length everywhere
+ *      * A string builder container
+ *      * Type safe, generated containers
+ *          * Unlike a lot of C containers, these are built with before compile code
+ *            generation. Each container instance generates code with your value types
+ *            rather than using `void*` plus length everywhere
  *          * Built with arenas in mind
  *          * dynamic array
  *          * hash map
  *          * hash set
- *      * Really common macros
- *          * min, max
- *          * bitflag checks
  * 
  * ## What's Not Included
  * 
  *      * There's no scanf alternative
- *      * Anything with UTF-16. Just use UTF-8
  *      * Threading. Just use pthreads or win api calls
  *      * Atomics. This is really platform specific and you should just use intrinsics
  *      * Date/time utilities
@@ -79,6 +79,22 @@
  * This library is slow for ARM as I haven't gotten around to writing the NEON
  * versions of the SIMD code yet. glibc will be significantly faster for comparable
  * operations.
+ * 
+ * ## File Utilities
+ * 
+ * JSL includes a couple of functions or simple, cross platform file I/O. 
+ * 
+ * These are specifically called file utils because they are intended for scripts or
+ * getting things going at the start of the project. In serious code, you would use
+ * I/O more tailored to your specific use case, e.g. asyncio, atomic file operations,
+ * custom package formats, etc.
+ * 
+ * These are separated out from the main code since they require the standard
+ * library at link time, as they use OS level calls. Unfortunately, Linux is the only
+ * OS that has a robust syscall API, so accessing the OS on other systems is only
+ * valid through their runtime libraries.
+ * 
+ * You can include these functions by using `#define JSL_INCLUDE_FILE_UTILS`. 
  * 
  * ## What's Supported
  * 
@@ -122,22 +138,6 @@
  * 
  * `JSL_INCLUDE_HASH_MAP` - Include the hash map macros. See the `HASHMAPS` section
  * for documentation.
- * 
- * ## File Utilities
- * 
- * JSL includes a couple of functions or simple, cross platform file I/O. 
- * 
- * These are specifically called file utils because they are intended for scripts or
- * getting things going at the start of the project. In serious code, you would use
- * I/O more tailored to your specific use case, e.g. asyncio, atomic file operations,
- * custom package formats, etc.
- * 
- * These are separated out from the main code since they require the standard
- * library at link time, as they use OS level calls. Unfortunately, Linux is the only
- * OS that has a robust syscall API, so accessing the OS on other systems is only
- * valid through their runtime libraries.
- * 
- * You can include these functions by using ` #define JSL_INCLUDE_FILE_UTILS`. 
  * 
  * ## Unicode
  * 
@@ -497,6 +497,49 @@ typedef struct JSLArena
                 .end = (uint8_t *)(buf) + sizeof(buf) }
 
 /**
+ * A string builder is a container for building large strings. It's specialized for
+ * situations where many different smaller operations result in small strings being
+ * coalesed into a final result, specifically using an arena as its allocator.
+ * 
+ * While this is called string builder, the underlying data store is just bytes, so
+ * any binary data which is built in chunks can use the string builder.
+ *
+ * A string builder is different from a normal dynamic array in two ways. One, it
+ * has specific operations for writing string data in both fat pointer form but also
+ * as a `snprintf` like operation. Two, the resulting string data is not stored as a
+ * contigious range of memory, but as a series of chunks which is given to the user
+ * as an iterator when the string is finished. 
+ *
+ * This is due to the nature of arena allocations. If you're using an arena for a
+ * life time in your program, then the most common case is 
+ *
+ * 1. You do some operations, these operations themselves allocate
+ * 2. You add generate a string from the operations
+ * 3. The string is concatenated into some buffer
+ * 4. Repeat
+ *
+ * A dynamically sized array which grows would mean throwing away the old memory when
+ * the array resizes. A separate arena that's used purely for the array would work, but
+ * with the string builder allows for less lifetimes to track.
+ * 
+ * By default, each chunk is 256 bytes and is aligned to a 32 byte address. These are
+ * tuneable parameters that you can set during init. The custom alignment helps if you
+ * want to use SIMD code on the consuming code.
+ * 
+ * Functions:
+ *      * TODO
+ */
+typedef struct JSLStringBuilder
+{
+    JSLArena* arena;
+    struct JSLStringBuilderChunk* head;
+    struct JSLStringBuilderChunk* tail;
+    int32_t alignment;
+    int32_t chunk_size;
+} JSLStringBuilder;
+
+
+/**
  * Constructor utility function to make a fat pointer out of a pointer and a length.
  * Useful in cases where you can't use C's struct init syntax, like as a parameter
  * to a function.
@@ -756,6 +799,21 @@ JSL_DEF JSLFatPtr jsl_arena_cstr_to_fatptr(JSLArena* arena, char* str);
  * @note Use `jsl_arena_cstr_to_fatptr` to copy a c string into a fatptr.
  */
 JSL_DEF JSLFatPtr jsl_fatptr_duplicate(JSLArena* arena, JSLFatPtr str);
+
+// TODO, docs
+bool jsl_string_builder_init(JSLStringBuilder* builder, JSLArena* arena);
+
+// TODO, docs
+bool jsl_string_builder_init2(JSLStringBuilder* builder, JSLArena* arena, int32_t chunk_size, int32_t alignment);
+
+// TODO, docs
+bool jsl_string_builder_insert_char(JSLStringBuilder* builder, char c);
+
+// TODO, docs
+bool jsl_string_builder_insert_uint8_t(JSLStringBuilder* builder, uint8_t c);
+
+// TODO, docs
+bool jsl_string_builder_insert_fatptr(JSLStringBuilder* builder, JSLFatPtr data);
 
 #ifndef JSL_FORMAT_MIN_BUFFER
     #define JSL_FORMAT_MIN_BUFFER 512 // how many characters per callback
@@ -1766,6 +1824,153 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
             *result = ret;
         
         return i;
+    }
+
+    struct JSLStringBuilderChunk
+    {
+        JSLFatPtr buffer;
+        JSLFatPtr writer;
+        struct JSLStringBuilderChunk* next;
+    };
+
+    static bool jsl__string_builder_add_chunk(JSLStringBuilder* builder)
+    {
+        struct JSLStringBuilderChunk* chunk = JSL_ARENA_TYPED_ALLOCATE(
+            struct JSLStringBuilderChunk,
+            builder->arena
+        );
+        chunk->next = NULL;
+        chunk->buffer = jsl_arena_allocate_aligned(
+            builder->arena, builder->chunk_size,
+            builder->alignment,
+            false
+        );
+
+        if (chunk->buffer.data != NULL)
+        {
+            chunk->writer = chunk->buffer;
+
+            if (builder->head == NULL)
+                builder->head = chunk;
+            
+            if (builder->tail == NULL)
+            {
+                builder->tail = chunk;
+            }
+            else
+            {
+                builder->tail->next = chunk;
+                builder->tail = chunk;
+            }
+            return true;
+        }
+        else
+        {
+            builder->tail = NULL;
+            return false;
+        }
+    }
+
+    bool jsl_string_builder_init(JSLStringBuilder* builder, JSLArena* arena)
+    {
+        return jsl_string_builder_init2(
+            builder,
+            arena,
+            256,
+            32
+        );
+    }
+
+    bool jsl_string_builder_init2(
+        JSLStringBuilder* builder,
+        JSLArena* arena,
+        int32_t chunk_size,
+        int32_t alignment
+    )
+    {
+        JSL_MEMSET(builder, 0, sizeof(JSLStringBuilder));
+
+        builder->arena = arena;
+        builder->chunk_size = chunk_size;
+        builder->alignment = alignment;
+        bool res = jsl__string_builder_add_chunk(builder);
+        return res;
+    }
+
+    bool jsl_string_builder_insert_char(JSLStringBuilder* builder, char c)
+    {
+        bool res = false;
+
+        bool needs_alloc = false;
+        if (builder->tail->writer.length > 0)
+        {
+            builder->tail->writer.data[0] = c;
+            JSL_FATPTR_ADVANCE(builder->tail->writer, 1);
+            res = true;
+        }
+        else
+        {
+            needs_alloc = true;
+        }
+
+        bool has_new_chunk = false;
+        if (needs_alloc)
+        {
+            has_new_chunk = jsl__string_builder_add_chunk(builder)
+        }
+
+        if (has_new_chunk)
+        {
+            builder->tail->writer.data[0] = (uint8_t) c;
+            JSL_FATPTR_ADVANCE(builder->tail->writer, 1);
+            res = true;
+        }
+
+        return res;
+    }
+
+    bool jsl_string_builder_insert_uint8_t(JSLStringBuilder* builder, uint8_t c)
+    {
+        bool res = false;
+
+        bool needs_alloc = false;
+        if (builder->tail->writer.length > 0)
+        {
+            builder->tail->writer.data[0] = c;
+            JSL_FATPTR_ADVANCE(builder->tail->writer, 1);
+            res = true;
+        }
+        else
+        {
+            needs_alloc = true;
+        }
+
+        bool has_new_chunk = false;
+        if (needs_alloc)
+        {
+            has_new_chunk = jsl__string_builder_add_chunk(builder)
+        }
+
+        if (has_new_chunk)
+        {
+            builder->tail->writer.data[0] = c;
+            JSL_FATPTR_ADVANCE(builder->tail->writer, 1);
+            res = true;
+        }
+
+        return res;
+    }
+
+    bool jsl_string_builder_insert_fatptr(JSLStringBuilder* builder, JSLFatPtr data)
+    {
+        bool res = false;
+
+        while (data.length > 0)
+        {
+            
+        }
+
+        return res;
     }
 
     void jsl_arena_init(JSLArena* arena, void* memory, int64_t length)
