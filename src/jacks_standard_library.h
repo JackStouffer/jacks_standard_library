@@ -191,6 +191,8 @@ extern "C" {
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdalign.h>
+
 #if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L
     #include <stdbool.h>
 #endif
@@ -222,8 +224,22 @@ extern "C" {
     #define ASAN_UNPOISON_MEMORY_REGION(ptr, len)
 #endif
 
-#ifndef JSL_DEFAULT_ALLOCATION_ALIGNMENT
-    #define JSL_DEFAULT_ALLOCATION_ALIGNMENT 16
+#if defined(__GNUC__) || defined(__clang__)
+    #if defined(__SANITIZE_ADDRESS__) && __SANITIZE_ADDRESS__
+        #define JSL_ASAN_OFF __attribute__((__no_sanitize_address__))
+    #endif
+#endif
+
+#ifndef JSL_ASAN_OFF
+    #define JSL_ASAN_OFF
+#endif
+
+#if defined(__GNUC__) || defined(__clang__)
+    #define JSL_NO_INLINE __attribute__((noinline))
+#endif
+
+#ifndef JSL_NO_INLINE
+    #define JSL_NO_INLINE
 #endif
 
 /**
@@ -237,6 +253,10 @@ extern "C" {
 
 #ifndef JSL_DEF
     #define JSL_DEF /* extern by default */
+#endif
+
+#ifndef JSL_DEFAULT_ALLOCATION_ALIGNMENT
+    #define JSL_DEFAULT_ALLOCATION_ALIGNMENT 16
 #endif
 
 #ifndef JSL_WARN_UNUSED
@@ -538,6 +558,11 @@ typedef struct JSLStringBuilder
     int32_t chunk_size;
 } JSLStringBuilder;
 
+typedef struct JSLStringBuilderIterator
+{
+    struct JSLStringBuilderChunk* current;
+} JSLStringBuilderIterator;
+
 
 /**
  * Constructor utility function to make a fat pointer out of a pointer and a length.
@@ -815,6 +840,15 @@ bool jsl_string_builder_insert_uint8_t(JSLStringBuilder* builder, uint8_t c);
 // TODO, docs
 bool jsl_string_builder_insert_fatptr(JSLStringBuilder* builder, JSLFatPtr data);
 
+// TODO, docs
+bool jsl_string_builder_format(JSLStringBuilder* builder, JSLFatPtr fmt, ...);
+
+// TODO, docs
+void jsl_string_builder_iterator_init(JSLStringBuilder* builder, JSLStringBuilderIterator* iterator);
+
+// TODO, docs
+JSLFatPtr jsl_string_builder_iterator_next(JSLStringBuilderIterator* iterator);
+
 #ifndef JSL_FORMAT_MIN_BUFFER
     #define JSL_FORMAT_MIN_BUFFER 512 // how many characters per callback
 #endif
@@ -870,7 +904,7 @@ typedef uint8_t* JSL_FORMAT_CALLBACK(uint8_t* buf, void *user, int64_t len);
  * you're using this function to print multiple gigabytes at a time, break it
  * into chunks.
  */
-JSL_DEF JSLFatPtr jsl_fatptr_format(JSLArena* arena, JSLFatPtr fmt, ...);
+JSL_DEF JSLFatPtr jsl_format(JSLArena* arena, JSLFatPtr fmt, ...);
 
 /**
  * TODO: docs
@@ -878,7 +912,7 @@ JSL_DEF JSLFatPtr jsl_fatptr_format(JSLArena* arena, JSLFatPtr fmt, ...);
  * the remaining unwritten portion of the memory. I.E. if all the memory
  * was written to, then `buffer.length == 0`.
  */
-JSL_DEF int64_t jsl_fatptr_format_buffer(
+JSL_DEF int64_t jsl_format_buffer(
     JSLFatPtr* buffer,
     JSLFatPtr fmt,
     ...
@@ -886,9 +920,9 @@ JSL_DEF int64_t jsl_fatptr_format_buffer(
 
 /**
  * TODO: docs
- * See docs for jsl_fatptr_format.
+ * See docs for jsl_format.
  */
-JSL_DEF int64_t jsl_fatptr_format_valist(
+JSL_DEF int64_t jsl_format_valist(
     JSLFatPtr* buffer,
     JSLFatPtr fmt,
     va_list va
@@ -902,7 +936,7 @@ JSL_DEF int64_t jsl_fatptr_format_valist(
  * 
  * You return the next buffer to use or 0 to stop converting
  */
-JSL_DEF int64_t jsl_fatptr_format_callback(
+JSL_DEF int64_t jsl_format_callback(
    JSL_FORMAT_CALLBACK* callback,
    void* user,
    uint8_t* buf,
@@ -914,7 +948,7 @@ JSL_DEF int64_t jsl_fatptr_format_callback(
  * Set the comma and period characters to use for the current thread.
  */
 // TODO: incomplete!
-JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
+JSL_DEF void jsl_format_set_separators(char comma, char period);
 
 #ifdef JSL_INCLUDE_FILE_UTILS
 
@@ -1866,7 +1900,6 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
         }
         else
         {
-            builder->tail = NULL;
             return false;
         }
     }
@@ -1888,17 +1921,25 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
         int32_t alignment
     )
     {
-        JSL_MEMSET(builder, 0, sizeof(JSLStringBuilder));
+        bool res = false;
 
-        builder->arena = arena;
-        builder->chunk_size = chunk_size;
-        builder->alignment = alignment;
-        bool res = jsl__string_builder_add_chunk(builder);
+        if (builder != NULL && arena != NULL && chunk_size > 0 && alignment > 0)
+        {
+            JSL_MEMSET(builder, 0, sizeof(JSLStringBuilder));
+            builder->arena = arena;
+            builder->chunk_size = chunk_size;
+            builder->alignment = alignment;
+            res = jsl__string_builder_add_chunk(builder);
+        }
+
         return res;
     }
 
     bool jsl_string_builder_insert_char(JSLStringBuilder* builder, char c)
     {
+        if (builder->head == NULL || builder->tail == NULL)
+            return false;
+
         bool res = false;
 
         bool needs_alloc = false;
@@ -1916,7 +1957,7 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
         bool has_new_chunk = false;
         if (needs_alloc)
         {
-            has_new_chunk = jsl__string_builder_add_chunk(builder)
+            has_new_chunk = jsl__string_builder_add_chunk(builder);
         }
 
         if (has_new_chunk)
@@ -1931,6 +1972,9 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
 
     bool jsl_string_builder_insert_uint8_t(JSLStringBuilder* builder, uint8_t c)
     {
+        if (builder->head == NULL || builder->tail == NULL)
+            return false;
+
         bool res = false;
 
         bool needs_alloc = false;
@@ -1948,7 +1992,7 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
         bool has_new_chunk = false;
         if (needs_alloc)
         {
-            has_new_chunk = jsl__string_builder_add_chunk(builder)
+            has_new_chunk = jsl__string_builder_add_chunk(builder);
         }
 
         if (has_new_chunk)
@@ -1963,14 +2007,95 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
 
     bool jsl_string_builder_insert_fatptr(JSLStringBuilder* builder, JSLFatPtr data)
     {
-        bool res = false;
+        if (builder->head == NULL || builder->tail == NULL)
+            return false;
+
+        bool res = true;
 
         while (data.length > 0)
         {
-            
+            if (builder->tail->writer.length == 0)
+            {
+                res = jsl__string_builder_add_chunk(builder);
+                if (!res)
+                    break;
+            }
+
+            int64_t bytes_written = jsl_fatptr_memory_copy(&builder->tail->writer, data);
+            JSL_FATPTR_ADVANCE(data, bytes_written);
         }
 
         return res;
+    }
+
+
+    void jsl_string_builder_iterator_init(JSLStringBuilder* builder, JSLStringBuilderIterator* iterator)
+    {
+        iterator->current = builder->head;
+    }
+
+    JSLFatPtr jsl_string_builder_iterator_next(JSLStringBuilderIterator* iterator)
+    {
+        struct JSLStringBuilderChunk* current = iterator->current;
+        if (current == NULL || current->buffer.data == NULL)
+        {
+            return jsl_fatptr_init(0, 0);
+        }
+
+        iterator->current = current->next;
+        return jsl_fatptr_auto_slice(current->buffer, current->writer);
+    }
+
+    struct JSL__StringBuilderContext
+    {
+        JSLStringBuilder* builder;
+        bool failure_flag;
+        alignas(32) uint8_t buffer[JSL_FORMAT_MIN_BUFFER];
+    };
+
+    static uint8_t* format_string_builder_callback(uint8_t *buf, void *user, int64_t len)
+    {
+        struct JSL__StringBuilderContext* context = (struct JSL__StringBuilderContext*) user;
+
+        if (context->builder->head == NULL || context->builder->tail == NULL)
+            return NULL;
+
+        bool res = jsl_string_builder_insert_fatptr(context->builder, jsl_fatptr_init(buf, len));
+
+        if (res)
+        {
+            return context->buffer;
+        }
+        else
+        {
+            context->failure_flag = true;
+            return NULL;
+        }
+    }
+
+    JSL_ASAN_OFF bool jsl_string_builder_format(JSLStringBuilder* builder, JSLFatPtr fmt, ...)
+    {
+        if (builder->head == NULL || builder->tail == NULL)
+            return false;
+
+        va_list va;
+        va_start(va, fmt);
+
+        struct JSL__StringBuilderContext context;
+        context.builder = builder;
+        context.failure_flag = false;
+
+        jsl_format_callback(
+            format_string_builder_callback,
+            &context,
+            context.buffer,
+            fmt,
+            va
+        );
+
+        va_end(va);
+
+        return !context.failure_flag;
     }
 
     void jsl_arena_init(JSLArena* arena, void* memory, int64_t length)
@@ -2126,24 +2251,6 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
     static int32_t stbsp__real_to_parts(int64_t *bits, int32_t *expo, double value);
     #define STBSP__SPECIAL 0x7000
 
-    #if defined(__GNUC__) || defined(__clang__)
-        #if defined(__SANITIZE_ADDRESS__) && __SANITIZE_ADDRESS__
-            #define JSL_ASAN_OFF __attribute__((__no_sanitize_address__))
-        #endif
-    #endif
-
-    #ifndef JSL_ASAN_OFF
-        #define JSL_ASAN_OFF
-    #endif
-
-    #if defined(__GNUC__) || defined(__clang__)
-        #define JSL_NO_INLINE __attribute__((noinline))
-    #endif
-
-    #ifndef JSL_NO_INLINE
-        #define JSL_NO_INLINE
-    #endif
-
     static char stbsp__period = '.';
     static char stbsp__comma = ',';
     static struct
@@ -2159,7 +2266,7 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
         "75767778798081828384858687888990919293949596979899"
     };
 
-    JSL_ASAN_OFF void jsl_fatptr_format_set_separators(char pcomma, char pperiod)
+    JSL_ASAN_OFF void jsl_format_set_separators(char pcomma, char pperiod)
     {
         stbsp__period = pperiod;
         stbsp__comma = pcomma;
@@ -2277,7 +2384,7 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
         return (uint32_t)(source_ptr - string);
     }
 
-    JSL_ASAN_OFF JSL_NO_INLINE int64_t jsl_fatptr_format_callback(
+    JSL_ASAN_OFF JSL_NO_INLINE int64_t jsl_format_callback(
         JSL_FORMAT_CALLBACK* callback,
         void* user,
         uint8_t* buffer,
@@ -3390,16 +3497,9 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
         {
             if (buf != context->buffer.data)
             {
-                uint8_t* s;
-                uint8_t* se;
-                uint8_t* d = context->buffer.data;
-                s = buf;
-                se = buf + len;
-                do
-                {
-                    *d++ = *s++;
-                } while (s < se);
+                JSL_MEMCPY(context->buffer.data, buf, len);
             }
+
             context->buffer.data += len;
             context->buffer.length -= len;
         }
@@ -3421,7 +3521,7 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
         return context->tmp; // go direct into buffer if you can
     }
 
-    JSL_ASAN_OFF int64_t jsl_fatptr_format_valist(JSLFatPtr* buffer, JSLFatPtr fmt, va_list va )
+    JSL_ASAN_OFF int64_t jsl_format_valist(JSLFatPtr* buffer, JSLFatPtr fmt, va_list va )
     {
         stbsp__context context;
         context.length = 0;
@@ -3431,7 +3531,7 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
             context.buffer.data = NULL;
             context.buffer.length = 0;
 
-            jsl_fatptr_format_callback(
+            jsl_format_callback(
                 stbsp__count_clamp_callback,
                 &context,
                 context.tmp,
@@ -3443,7 +3543,7 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
         {
             context.buffer = *buffer;
 
-            jsl_fatptr_format_callback(
+            jsl_format_callback(
                 stbsp__clamp_callback,
                 &context,
                 stbsp__clamp_callback(0, &context, 0),
@@ -3496,7 +3596,7 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
         return context->buffer;
     }
 
-    JSL_ASAN_OFF JSLFatPtr jsl_fatptr_format(JSLArena* arena, JSLFatPtr fmt, ...)
+    JSL_ASAN_OFF JSLFatPtr jsl_format(JSLArena* arena, JSLFatPtr fmt, ...)
     {
         va_list va;
         va_start(va, fmt);
@@ -3507,7 +3607,7 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
         context.current_allocation.length = 0;
         context.cursor = NULL;
 
-        jsl_fatptr_format_callback(
+        jsl_format_callback(
             format_arena_callback,
             &context,
             context.buffer,
@@ -3528,13 +3628,13 @@ JSL_DEF void jsl_fatptr_format_set_separators(char comma, char period);
         return ret;
     }
 
-    JSL_ASAN_OFF int64_t jsl_fatptr_format_buffer(JSLFatPtr* buffer, JSLFatPtr fmt, ...)
+    JSL_ASAN_OFF int64_t jsl_format_buffer(JSLFatPtr* buffer, JSLFatPtr fmt, ...)
     {
         int64_t result;
         va_list va;
         va_start(va, fmt);
 
-        result = jsl_fatptr_format_valist(buffer, fmt, va);
+        result = jsl_format_valist(buffer, fmt, va);
         va_end(va);
 
         return result;

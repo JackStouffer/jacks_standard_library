@@ -41,7 +41,7 @@ SOFTWARE.
 {                                                                                   \
     JSLFatPtr writer = buffer;                                                      \
     JSLFatPtr fmt_str = jsl_fatptr_from_cstr(v1);                                   \
-    int64_t ret = jsl_fatptr_format_buffer(&writer, fmt_str, v2, v3, v4, v5, v6, v7, v8, v9);   \
+    int64_t ret = jsl_format_buffer(&writer, fmt_str, v2, v3, v4, v5, v6, v7, v8, v9);   \
     CHECK_END(str);                                                                 \
 }
 
@@ -49,7 +49,7 @@ SOFTWARE.
 {                                                                                   \
     JSLFatPtr writer = buffer;                                                      \
     JSLFatPtr fmt_str = jsl_fatptr_from_cstr(v1);                                   \
-    int64_t ret = jsl_fatptr_format_buffer(&writer, fmt_str, v2, v3, v4, v5, v6, v7, v8);       \
+    int64_t ret = jsl_format_buffer(&writer, fmt_str, v2, v3, v4, v5, v6, v7, v8);       \
     CHECK_END(str);                                                                 \
 }
 
@@ -57,7 +57,7 @@ SOFTWARE.
 {                                                                                   \
     JSLFatPtr writer = buffer;                                                      \
     JSLFatPtr fmt_str = jsl_fatptr_from_cstr(v1);                                   \
-    int64_t ret = jsl_fatptr_format_buffer(&writer, fmt_str, v2, v3, v4, v5, v6, v7);    \
+    int64_t ret = jsl_format_buffer(&writer, fmt_str, v2, v3, v4, v5, v6, v7);    \
     CHECK_END(str);                                                                 \
 }
 
@@ -65,7 +65,7 @@ SOFTWARE.
 {                                                                                   \
     JSLFatPtr writer = buffer;                                                      \
     JSLFatPtr fmt_str = jsl_fatptr_from_cstr(v1);                                   \
-    int64_t ret = jsl_fatptr_format_buffer(&writer, fmt_str, v2, v3, v4, v5, v6);        \
+    int64_t ret = jsl_format_buffer(&writer, fmt_str, v2, v3, v4, v5, v6);        \
     CHECK_END(str);                                                                 \
 }
 
@@ -73,7 +73,7 @@ SOFTWARE.
 {                                                                                   \
     JSLFatPtr writer = buffer;                                                      \
     JSLFatPtr fmt_str = jsl_fatptr_from_cstr(v1);                                   \
-    int64_t ret = jsl_fatptr_format_buffer(&writer, fmt_str, v2, v3, v4, v5);            \
+    int64_t ret = jsl_format_buffer(&writer, fmt_str, v2, v3, v4, v5);            \
     CHECK_END(str);                                                                 \
 }
 
@@ -81,7 +81,7 @@ SOFTWARE.
 {                                                                                   \
     JSLFatPtr writer = buffer;                                                      \
     JSLFatPtr fmt_str = jsl_fatptr_from_cstr(v1);                                   \
-    int64_t ret = jsl_fatptr_format_buffer(&writer, fmt_str, v2, v3, v4);                \
+    int64_t ret = jsl_format_buffer(&writer, fmt_str, v2, v3, v4);                \
     CHECK_END(str);                                                                 \
 }
 
@@ -89,7 +89,7 @@ SOFTWARE.
 {                                                                                   \
     JSLFatPtr writer = buffer;                                                      \
     JSLFatPtr fmt_str = jsl_fatptr_from_cstr(v1);                                   \
-    int64_t ret = jsl_fatptr_format_buffer(&writer, fmt_str, v2, v3);                    \
+    int64_t ret = jsl_format_buffer(&writer, fmt_str, v2, v3);                    \
     CHECK_END(str);                                                                 \
 }
 
@@ -97,7 +97,7 @@ SOFTWARE.
 {                                                                                   \
     JSLFatPtr writer = buffer;                                                      \
     JSLFatPtr fmt_str = jsl_fatptr_from_cstr(v1);                                   \
-    int64_t ret = jsl_fatptr_format_buffer(&writer, fmt_str, v2);                        \
+    int64_t ret = jsl_format_buffer(&writer, fmt_str, v2);                        \
     CHECK_END(str);                                                                 \
 }
 
@@ -105,7 +105,7 @@ SOFTWARE.
 {                                                                                   \
     JSLFatPtr writer = buffer;                                                      \
     JSLFatPtr fmt_str = jsl_fatptr_from_cstr(v1);                                   \
-    int64_t ret = jsl_fatptr_format_buffer(&writer, fmt_str);                            \
+    int64_t ret = jsl_format_buffer(&writer, fmt_str);                            \
     CHECK_END(str);                                                                 \
 }
 
@@ -236,7 +236,7 @@ void test_separators()
     uint8_t _buf[1024];
     JSLFatPtr buffer = jsl_fatptr_init(_buf, 1024);
 
-    jsl_fatptr_format_set_separators(' ', ',');
+    jsl_format_set_separators(' ', ',');
     CHECK2("12 345,678900", "%'f", 12345.6789);
 }
 
