@@ -1,106 +1,7 @@
 /**
  * # Jack's Standard Library
  * 
- * A collection of types and functions designed to replace usage of the
- * C Standard Library.
- *
- * ## Use
- * 
- * Include the header like normally in each source file:
- * 
- * ```c
- * #include "jacks_standard_library.h"
- * ```
- * 
- * Then, in ONE AND ONLY ONE file, do this:
- * 
- * ```c
- * #define JSL_IMPLEMENTATION
- * #include "jacks_standard_library.h"
- * ```
- * 
- * This should probably be in the "main" file for your program, but it doesn't have to be.
- * 
- * This library does not depend on the C standard library to be available at link
- * time. However, it does require the "compile time" headers `stddef.h`, `stdint.h`,
- * and `stdbool.h` (if using < C23). You'll also have to define the replacement functions
- * for the C standard library functions like `assert` and `memcmp`. See the
- * "Preprocessor Switches" section for more information.
- * 
- * ## Why
- * 
- * Much of the C Standard Library is outdated, very unsafe, or poorly designed. 
- * Some bad design decisions include
- * 
- *      * Null terminated strings
- *      * A single global heap, which is called silently, and you're expected to remember to call free
- *      * An object based file interface based around seeking with tiny reads and writes
- *      * Errors get special treatment
- * 
- * And unfortunately it was decided as part of the language that arrays decay to
- * pointers, and there's no way to stop it.
- * 
- * ## What's Included
- * 
- *      * Really common macros
- *          * min, max
- *          * bitflag checks
- *      * A buffer/slice type called a fat pointer
- *          * used everywhere
- *          * standardizes that pointers should carry their length
- *          * vastly simplifies functions like file reading
- *      * Common string and buffer utilities for fat pointers
- *          * things like fat pointer memcmp, substring search, etc.
- *      * An arena allocator
- *          * a.k.a a monotonic, region, or bump allocator
- *          * They are easy to create, use, reset-able, allocators
- *          * Great for things with known lifetimes (which is 99% of the things you allocate)
- *      * A snprintf replacement
- *          * writes directly into a fat pointer buffer
- *          * Removes all compiler specific weirdness
- *      * A string builder container
- *      * Type safe, generated containers
- *          * Unlike a lot of C containers, these are built with before compile code
- *            generation. Each container instance generates code with your value types
- *            rather than using `void*` plus length everywhere
- *          * Built with arenas in mind
- *          * dynamic array
- *          * hash map
- *          * hash set
- * 
- * ## What's Not Included
- * 
- *      * There's no scanf alternative
- *      * Threading. Just use pthreads or win api calls
- *      * Atomics. This is really platform specific and you should just use intrinsics
- *      * Date/time utilities
- *      * Random numbers
- * 
- * This library is slow for ARM as I haven't gotten around to writing the NEON
- * versions of the SIMD code yet. glibc will be significantly faster for comparable
- * operations.
- * 
- * ## File Utilities
- * 
- * JSL includes a couple of functions or simple, cross platform file I/O. 
- * 
- * These are specifically called file utils because they are intended for scripts or
- * getting things going at the start of the project. In serious code, you would use
- * I/O more tailored to your specific use case, e.g. asyncio, atomic file operations,
- * custom package formats, etc.
- * 
- * These are separated out from the main code since they require the standard
- * library at link time, as they use OS level calls. Unfortunately, Linux is the only
- * OS that has a robust syscall API, so accessing the OS on other systems is only
- * valid through their runtime libraries.
- * 
- * You can include these functions by using `#define JSL_INCLUDE_FILE_UTILS`. 
- * 
- * ## What's Supported
- * 
- * Official support for Windows, macOS, and Linux with MSVC, GCC, and clang.
- * 
- * This might work on other POSIX systems, but I have not tested it.
+ * See the README.md for an intro
  * 
  * ## Preprocessor Switches
  * 
@@ -138,25 +39,7 @@
  * 
  * `JSL_INCLUDE_HASH_MAP` - Include the hash map macros. See the `HASHMAPS` section
  * for documentation.
- * 
- * ## Unicode
- * 
- * You should have a basic knowledge of Unicode semantics before using this library.
- * For example, this library provides length based comparison functions like
- * `jsl_fatptr_memory_compare`. This function provides byte by byte comparison; if
- * you know enough about Unicode, you should know why this is error prone for
- * determining two string's equality.
- * 
- * If you don't, you should learn the following terms:
  *
- *      * Code unit
- *      * Code point
- *      * Grapheme
- *      * How those three things are completely different from each other
- *      * Normalization
- * 
- * That would be the bare minimum needed to not shoot yourself in the foot.
- * 
  * ## License
  * 
  * Copyright (c) 2025 Jack Stouffer
@@ -467,8 +350,14 @@ typedef struct JSLFatPtr
 #define JSL_FATPTR_LITERAL(s) \
     ((JSLFatPtr){ .data = (uint8_t*)(s), .length = (int64_t)(sizeof("" s "") - 1) })
 
+// TODO: docs
 #define JSL_FATPTR_ADVANCE(fatptr, n) \
     fatptr.data += n; fatptr.length -= n;
+
+// TODO: docs
+#define JSL_FATPTR_FROM_STACK(buf) \
+    (JSLFatPtr){ .data = (uint8_t *)(buf), \
+                .length = (int64_t)(sizeof(buf)) }
 
 /**
  * TODO: docs
@@ -1237,7 +1126,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         if (cstr == NULL || string.data == NULL)
             return false;
 
-        size_t cstr_length = JSL_STRLEN(cstr);
+        int64_t cstr_length = (int64_t) JSL_STRLEN(cstr);
 
         if (string.length != cstr_length)
             return false;
@@ -1684,7 +1573,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         if (arena == NULL || str == NULL)
             return ret;
 
-        size_t length = JSL_STRLEN(str);
+        int64_t length = (int64_t) JSL_STRLEN(str);
         if (length == 0)
             return ret;
 

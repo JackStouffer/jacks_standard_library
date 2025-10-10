@@ -35,7 +35,7 @@
 
 #include "minctest.h"
 
-void test_jsl_fatptr_from_cstr()
+void test_jsl_fatptr_from_cstr(void)
 {
     char* c_str = "This is a test string!";
     size_t length = strlen(c_str);
@@ -47,7 +47,7 @@ void test_jsl_fatptr_from_cstr()
     lok(memcmp(c_str, str.data, str.length) == 0);
 }
 
-void test_jsl_fatptr_cstr_memory_copy()
+void test_jsl_fatptr_cstr_memory_copy(void)
 {
     JSLFatPtr buffer = jsl_fatptr_init(malloc(1024), 1024);
     lok((int64_t) buffer.length == (int64_t) 1024);
@@ -64,7 +64,7 @@ void test_jsl_fatptr_cstr_memory_copy()
     lok(memcmp(str, buffer.data, length) == 0);
 }
 
-void test_jsl_fatptr_load_file_contents()
+void test_jsl_fatptr_load_file_contents(void)
 {
     char* path = "./tests/example.txt";
     char stack_buffer[4*1024];
@@ -96,7 +96,7 @@ void test_jsl_fatptr_load_file_contents()
     lok(memcmp(stack_buffer, contents.data, file_size) == 0);
 }
 
-void test_jsl_fatptr_load_file_contents_buffer()
+void test_jsl_fatptr_load_file_contents_buffer(void)
 {
     char* path = "./tests/example.txt";
     char stack_buffer[4*1024];
@@ -126,7 +126,7 @@ void test_jsl_fatptr_load_file_contents_buffer()
     lok(memcmp(stack_buffer, buffer.data, file_size) == 0);
 }
 
-void test_jsl_fatptr_memory_compare()
+void test_jsl_fatptr_memory_compare(void)
 {
     JSLFatPtr buffer1 = jsl_fatptr_init(malloc(13), 13);
     JSLFatPtr buffer2 = jsl_fatptr_init(malloc(13), 13);
@@ -149,7 +149,7 @@ void test_jsl_fatptr_memory_compare()
     lok(!jsl_fatptr_memory_compare(buffer1, buffer4));
 }
 
-void test_jsl_fatptr_slice()
+void test_jsl_fatptr_slice(void)
 {
     JSLFatPtr buffer1 = jsl_fatptr_init(malloc(13), 13);
 
@@ -180,7 +180,7 @@ void test_jsl_fatptr_slice()
     }
 }
 
-void test_jsl_fatptr_substring_search()
+void test_jsl_fatptr_substring_search(void)
 {
     {
         JSLFatPtr string = jsl_fatptr_from_cstr("");
@@ -288,7 +288,7 @@ void test_jsl_fatptr_substring_search()
     }
 }
 
-void test_jsl_fatptr_index_of()
+void test_jsl_fatptr_index_of(void)
 {
     JSLFatPtr buffer1 = jsl_fatptr_from_cstr("");
     int64_t res1 = jsl_fatptr_index_of(buffer1, '3');
@@ -323,7 +323,7 @@ void test_jsl_fatptr_index_of()
     lok(res8 == 117);
 }
 
-void test_jsl_fatptr_index_of_reverse()
+void test_jsl_fatptr_index_of_reverse(void)
 {
     JSLFatPtr buffer1 = jsl_fatptr_from_cstr("");
     int64_t res1 = jsl_fatptr_index_of_reverse(buffer1, '3');
@@ -358,7 +358,7 @@ void test_jsl_fatptr_index_of_reverse()
     lok(res8 == 150);
 }
 
-void test_jsl_fatptr_get_file_extension()
+void test_jsl_fatptr_get_file_extension(void)
 {
     JSLFatPtr buffer1 = jsl_fatptr_from_cstr("");
     JSLFatPtr res1 = jsl_fatptr_get_file_extension(buffer1);
@@ -385,7 +385,7 @@ void test_jsl_fatptr_get_file_extension()
     lok(jsl_fatptr_cstr_compare(res6, "css"));
 }
 
-void test_jsl_fatptr_to_lowercase_ascii()
+void test_jsl_fatptr_to_lowercase_ascii(void)
 {
     JSLArena arena;
     jsl_arena_init(&arena, malloc(1024), 1024);
@@ -433,7 +433,7 @@ void test_jsl_fatptr_to_lowercase_ascii()
     jsl_arena_reset(&arena);
 }
 
-void test_jsl_fatptr_to_int32()
+void test_jsl_fatptr_to_int32(void)
 {
     int32_t result;
 
@@ -478,7 +478,7 @@ void test_jsl_fatptr_to_int32()
     lok(result == 488);
 }
 
-void test_jsl_fatptr_starts_with()
+void test_jsl_fatptr_starts_with(void)
 {
     JSLFatPtr buffer1 = jsl_fatptr_from_cstr("Hello, World!");
     JSLFatPtr prefix1 = jsl_fatptr_from_cstr("Hello, World!");
@@ -509,7 +509,7 @@ void test_jsl_fatptr_starts_with()
     lok(jsl_fatptr_starts_with(buffer7, prefix7) == false);
 }
 
-void test_jsl_fatptr_ends_with()
+void test_jsl_fatptr_ends_with(void)
 {
     JSLFatPtr buffer1 = jsl_fatptr_from_cstr("Hello, World!");
     JSLFatPtr postfix1 = jsl_fatptr_from_cstr("Hello, World!");
@@ -544,7 +544,7 @@ void test_jsl_fatptr_ends_with()
     lok(jsl_fatptr_ends_with(buffer8, postfix8) == true);
 }
 
-void test_jsl_fatptr_compare_ascii_insensitive()
+void test_jsl_fatptr_compare_ascii_insensitive(void)
 {
     {
         JSLFatPtr buffer1 = {
@@ -621,7 +621,7 @@ void test_jsl_fatptr_compare_ascii_insensitive()
     }
 }
 
-int main()
+int main(void)
 {
     lrun("Test jsl_fatptr_from_cstr", test_jsl_fatptr_from_cstr);
     lrun("Test jsl_fatptr_cstr_memory_copy", test_jsl_fatptr_cstr_memory_copy);

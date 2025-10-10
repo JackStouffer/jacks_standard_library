@@ -22,6 +22,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+#define _CRT_SECURE_NO_WARNINGS
+
 #include <assert.h>
 #include <math.h>
 #include <stddef.h>
@@ -110,7 +112,7 @@ SOFTWARE.
 }
 
 
-void test_integers()
+void test_integers(void)
 {
     uint8_t _buf[1024];
     JSLFatPtr buffer = jsl_fatptr_init(_buf, 1024);
@@ -134,7 +136,7 @@ void test_integers()
     CHECK2("9888777666", "%llu", 9888777666llu);
 }
 
-void test_floating_point()
+void test_floating_point(void)
 {
     uint8_t _buf[1024];
     JSLFatPtr buffer = jsl_fatptr_init(_buf, 1024);
@@ -173,7 +175,7 @@ void test_floating_point()
     CHECK2("N", "%.1g", NAN);
 }
 
-void test_n()
+void test_n(void)
 {
     uint8_t _buf[1024];
     JSLFatPtr buffer = jsl_fatptr_init(_buf, 1024);
@@ -183,7 +185,7 @@ void test_n()
     assert(n == 4);
 }
 
-void test_hex_floats()
+void test_hex_floats(void)
 {
     uint8_t _buf[1024];
     JSLFatPtr buffer = jsl_fatptr_init(_buf, 1024);
@@ -195,7 +197,7 @@ void test_hex_floats()
     CHECK2("-0x1.AB0P-5", "%.3A", -0x1.abp-5);
 }
 
-void test_pointer()
+void test_pointer(void)
 {
     uint8_t _buf[1024];
     JSLFatPtr buffer = jsl_fatptr_init(_buf, 1024);
@@ -203,7 +205,7 @@ void test_pointer()
     CHECK2("0000000000000000", "%p", (void*) NULL);
 }
 
-void test_quote_modifier()
+void test_quote_modifier(void)
 {
     uint8_t _buf[1024];
     JSLFatPtr buffer = jsl_fatptr_init(_buf, 1024);
@@ -217,7 +219,7 @@ void test_quote_modifier()
     CHECK2("000,001,200,000", "%'015d", 1200000);
 }
 
-void test_nonstandard()
+void test_nonstandard(void)
 {
     uint8_t _buf[1024];
     JSLFatPtr buffer = jsl_fatptr_init(_buf, 1024);
@@ -231,7 +233,7 @@ void test_nonstandard()
     CHECK3("2.42 Mi 2.4 M", "%$$.2d %$$$d", 2536000, 2536000);
 }
 
-void test_separators()
+void test_separators(void)
 {
     uint8_t _buf[1024];
     JSLFatPtr buffer = jsl_fatptr_init(_buf, 1024);
@@ -241,7 +243,7 @@ void test_separators()
 }
 
 
-int main()
+int main(void)
 {
     lrun("Test format ints", test_integers);
     lrun("Test format floating point", test_floating_point);

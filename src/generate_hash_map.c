@@ -556,24 +556,6 @@ JSLFatPtr iterator_next_function_signature = JSL_FATPTR_LITERAL("/**\n"
 //         return result;                                                                                                          \
 //     }
 
-// NOTE:
-// This isn't the cleanest or best way to do this sort of thing, but it's quick
-// and this is a tooling file so it's fine.
-#define CHECK_LENGTH_AND_EXPAND()                           \
-    if (writer.length < JSL_KILOBYTES(2))                   \
-    {                                                       \
-        JSLFatPtr expanded = jsl_arena_reallocate(          \
-            arena,                                          \
-            buffer_allocation,                              \
-            buffer_allocation.length + JSL_KILOBYTES(32)    \
-        );                                                  \
-        assert(expanded.data != NULL);                      \
-        assert(expanded.length >= JSL_KILOBYTES(32));       \
-        assert(buffer_allocation.data == expanded.data);    \
-        buffer_allocation = expanded;                       \
-        writer.length += JSL_KILOBYTES(32);                 \
-    }
-
 /**
  * Generates the header file data for your hash map. This file includes all the typedefs
  * and function signatures for this hash map.
@@ -625,57 +607,45 @@ JSLFatPtr iterator_next_function_signature = JSL_FATPTR_LITERAL("/**\n"
  * printf("%.*s", (int)header.length, (char*)header.data);
  * @endcode
  */
-JSLFatPtr write_hash_map_header(
-    JSLArena* arena,
-    const char* hash_map_name,
-    const char* function_prefix,
-    const char* key_type_name,
-    const char* value_type_name,
-    const char* hash_function_name,
+void write_hash_map_header(
+    JSLStringBuilder* builder,
+    JSLFatPtr hash_map_name,
+    JSLFatPtr function_prefix,
+    JSLFatPtr key_type_name,
+    JSLFatPtr value_type_name,
+    JSLFatPtr hash_function_name,
     int32_t include_header_count,
     ...
 )
 {
-    JSLFatPtr buffer_allocation = jsl_arena_allocate(arena, JSL_KILOBYTES(16), true);
+    jsl_string_builder_format(builder, hash_map_header_docstring, hash_map_name, key_type_name, value_type_name);
 
-    JSLFatPtr writer = buffer_allocation;
-
-    jsl_fatptr_format(&arena, hash_map_header_docstring, hash_map_name, key_type_name, value_type_name);
-
-    jsl_fatptr_format(&arena, JSL_FATPTR_LITERAL("#pragma once\n\n"));
-    jsl_fatptr_format(&arena, JSL_FATPTR_LITERAL("#include <stdint.h>\n"));
-    jsl_fatptr_format(&arena, JSL_FATPTR_LITERAL("#include \"jacks_hash_map.h\"\n\n"));
-
-    CHECK_LENGTH_AND_EXPAND()
+    jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#pragma once\n\n"));
+    jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include <stdint.h>\n"));
+    jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include \"jacks_hash_map.h\"\n\n"));
 
     va_list args;
     va_start(args, include_header_count);
 
     for (int32_t i = 0; i < include_header_count; ++i)
     {
-        jsl_fatptr_format_buffer(&writer, JSL_FATPTR_LITERAL("#include \"%s\"\n"), va_arg(args, char*));
-        CHECK_LENGTH_AND_EXPAND()
+        jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include \"%s\"\n"), va_arg(args, char*));
     }
 
     va_end(args);
     
-    jsl_fatptr_format_buffer(&writer, map_type_typedef, key_type_name, value_type_name, hash_map_name, key_type_name, value_type_name, hash_map_name);
-    CHECK_LENGTH_AND_EXPAND()
+    jsl_string_builder_format(builder, map_type_typedef, key_type_name, value_type_name, hash_map_name, key_type_name, value_type_name, hash_map_name);
 
-    jsl_fatptr_format_buffer(&writer, init_function_signature, function_prefix, hash_map_name, hash_map_name);
-    CHECK_LENGTH_AND_EXPAND()
+    jsl_string_builder_format(builder, init_function_signature, function_prefix, hash_map_name, hash_map_name);
 
-    jsl_fatptr_format_buffer(&writer, insert_function_signature, function_prefix, hash_map_name, key_type_name, value_type_name);
-    CHECK_LENGTH_AND_EXPAND()
+    jsl_string_builder_format(builder, insert_function_signature, function_prefix, hash_map_name, key_type_name, value_type_name);
 
-    jsl_fatptr_format_buffer(&writer, get_function_signature, value_type_name, function_prefix, hash_map_name, key_type_name);
-    CHECK_LENGTH_AND_EXPAND()
+    jsl_string_builder_format(builder, get_function_signature, value_type_name, function_prefix, hash_map_name, key_type_name);
 
-    jsl_fatptr_format_buffer(&writer, delete_function_signature, function_prefix, hash_map_name, key_type_name);
-    CHECK_LENGTH_AND_EXPAND()
+    jsl_string_builder_format(builder, delete_function_signature, function_prefix, hash_map_name, key_type_name);
 
-    jsl_fatptr_format_buffer(
-        &writer,
+    jsl_string_builder_format(
+        builder,
         iterator_start_function_signature,
         key_type_name,
         value_type_name,
@@ -687,10 +657,9 @@ JSLFatPtr write_hash_map_header(
         hash_map_name,
         hash_map_name
     );
-    CHECK_LENGTH_AND_EXPAND()
 
-    jsl_fatptr_format_buffer(
-        &writer,
+    jsl_string_builder_format(
+        builder,
         iterator_next_function_signature,
         key_type_name,
         value_type_name,
@@ -702,102 +671,144 @@ JSLFatPtr write_hash_map_header(
         key_type_name,
         value_type_name
     );
-    CHECK_LENGTH_AND_EXPAND()
-
-    JSLFatPtr result = jsl_fatptr_auto_slice(buffer_allocation, writer);
-    return result;
 }
 
 
 int32_t main(int32_t argc, char** argv)
 {
-    char* name = NULL;
-    char* function_prefix = NULL;
-    char* key_type = NULL;
-    char* value_type = NULL;
+    JSLFatPtr name = {0};
+    JSLFatPtr function_prefix = {0};
+    JSLFatPtr key_type = {0};
+    JSLFatPtr value_type = {0};
+    JSLFatPtr hash_function_name = {0};
     
     // Parse command line arguments
-    for (int i = 1; i < argc; i++) {
+    for (int i = 1; i < argc; i++)
+    {
         char* arg = argv[i];
         
-        // Check for --name
-        if (strncmp(arg, "--name=", 7) == 0) {
-            name = arg + 7;
-        } else if (strcmp(arg, "--name") == 0) {
-            if (i + 1 < argc) {
-                name = argv[++i];
-            } else {
+        if (strncmp(arg, "--name=", 7) == 0)
+        {
+            name = jsl_fatptr_from_cstr(arg + 7);
+        }
+        else if (strcmp(arg, "--name") == 0)
+        {
+            if (i + 1 < argc)
+            {
+                name = jsl_fatptr_from_cstr(argv[++i]);
+            }
+            else
+            {
                 fprintf(stderr, "Error: --name requires a value\n");
                 return 1;
             }
         }
         // Check for --function_prefix
-        else if (strncmp(arg, "--function_prefix=", 18) == 0) {
-            function_prefix = arg + 18;
-        } else if (strcmp(arg, "--function_prefix") == 0) {
+        else if (strncmp(arg, "--function_prefix=", 18) == 0)
+        {
+            function_prefix = jsl_fatptr_from_cstr(arg + 18);
+        }
+        else if (strcmp(arg, "--function_prefix") == 0)
+        {
             if (i + 1 < argc) {
-                function_prefix = argv[++i];
+                function_prefix = jsl_fatptr_from_cstr(argv[++i]);
             } else {
                 fprintf(stderr, "Error: --function_prefix requires a value\n");
                 return 1;
             }
         }
         // Check for --key_type
-        else if (strncmp(arg, "--key_type=", 11) == 0) {
-            key_type = arg + 11;
-        } else if (strcmp(arg, "--key_type") == 0) {
-            if (i + 1 < argc) {
-                key_type = argv[++i];
-            } else {
+        else if (strncmp(arg, "--key_type=", 11) == 0)
+        {
+            key_type = jsl_fatptr_from_cstr(arg + 11);
+        }
+        else if (strcmp(arg, "--key_type") == 0)
+        {
+            if (i + 1 < argc)
+            {
+                key_type = jsl_fatptr_from_cstr(argv[++i]);
+            }
+            else
+            {
                 fprintf(stderr, "Error: --key_type requires a value\n");
                 return 1;
             }
         }
         // Check for --value_type
-        else if (strncmp(arg, "--value_type=", 13) == 0) {
-            value_type = arg + 13;
-        } else if (strcmp(arg, "--value_type") == 0) {
-            if (i + 1 < argc) {
-                value_type = argv[++i];
-            } else {
+        else if (strncmp(arg, "--value_type=", 13) == 0)
+        {
+            value_type = jsl_fatptr_from_cstr(arg + 13);
+        }
+        else if (strcmp(arg, "--value_type") == 0)
+        {
+            if (i + 1 < argc)
+            {
+                value_type = jsl_fatptr_from_cstr(argv[++i]);
+            }
+            else
+            {
                 fprintf(stderr, "Error: --value_type requires a value\n");
                 return 1;
             }
         }
         // Unknown argument
-        else {
+        else
+        {
             fprintf(stderr, "Error: Unknown argument: %s\n", arg);
             return 1;
         }
     }
     
     // Check that all required parameters are provided
-    if (name == NULL) {
+    if (name.data == NULL)
+    {
         fprintf(stderr, "Error: --name is required\n");
         return 1;
     }
-    if (function_prefix == NULL) {
+    if (function_prefix.data == NULL)
+    {
         fprintf(stderr, "Error: --function_prefix is required\n");
         return 1;
     }
-    if (key_type == NULL) {
+    if (key_type.data == NULL)
+    {
         fprintf(stderr, "Error: --key_type is required\n");
         return 1;
     }
-    if (value_type == NULL) {
+    if (value_type.data == NULL)
+    {
         fprintf(stderr, "Error: --value_type is required\n");
         return 1;
     }
     
-    JSLArena memory;
-    jsl_arena_init(&memory, malloc(JSL_MEGABYTES(2)), JSL_MEGABYTES(2));
+    JSLArena arena;
+    jsl_arena_init(&arena, malloc(JSL_MEGABYTES(8)), JSL_MEGABYTES(8));
     
-    JSLFatPtr buffer = jsl_arena_allocate(&memory, JSL_MEGABYTES(1), false);
-    JSLFatPtr writer = buffer;
+    JSLStringBuilder builder;
+    jsl_string_builder_init2(&builder, &arena, 512, 32);
 
-    JSLFatPtr header = write_hash_map_header(&memory, name, function_prefix, key_type, value_type, NULL, 0);
+    write_hash_map_header(
+        &builder,
+        name,
+        function_prefix, 
+        key_type,
+        value_type,
+        hash_function_name,
+        0
+    );
 
-    printf("%.*s", (int32_t) header.length, (char*) header.data);
+    JSLStringBuilderIterator iterator;
+    jsl_string_builder_iterator_init(&builder, &iterator);
+
+    while (true)
+    {
+        JSLFatPtr slice = jsl_string_builder_iterator_next(&iterator);
+        if (slice.data == NULL)
+            break;
+
+        printf("%.*s", (int32_t) slice.length, (char*) slice.data);
+    }
+
 
     return 0;
 }
