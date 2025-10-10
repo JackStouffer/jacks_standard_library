@@ -117,7 +117,7 @@
 JSLFatPtr hash_map_header_docstring = JSL_FATPTR_LITERAL("/**\n"
 " * AUTO GENERATED FILE\n"
 " *\n"
-" * This file contains the header for a hash map %s which maps `%s` keys to `%s` values.\n"
+" * This file contains the header for a hash map %y which maps `%y` keys to `%y` values.\n"
 " *\n"
 " * This file was auto generated from the hash map generation utility that's part of the \"Jack's Standard Library\" project.\n"
 " * The utility generates a header file and a C file for a type safe, open addressed, hash map.\n"
@@ -143,22 +143,22 @@ JSLFatPtr hash_map_header_docstring = JSL_FATPTR_LITERAL("/**\n"
 " */\n\n");
 
 JSLFatPtr map_type_typedef = JSL_FATPTR_LITERAL("/**\n"
-    " * A hash map which maps `%s` keys to `%s` values.\n"
+    " * A hash map which maps `%y` keys to `%y` values.\n"
     " *\n"
     " * This hash map uses open addressing with linear probing. However, it never grows.\n"
     " * When initalized with the init function, all the memory this hash map will have\n"
     " * is allocated right away.\n"
     " */\n"
-    "typedef struct %s {\n"
-    "    %s* keys_array;\n"
-    "    %s* items_array;\n"
+    "typedef struct %y {\n"
+    "    %y* keys_array;\n"
+    "    %y* items_array;\n"
     "    int64_t slots_array_length;\n"
     "    uint32_t* is_set_flags_array;\n"
     "    int64_t is_set_flags_array_length;\n"
     "    int64_t item_count;\n"
     "    uint16_t generational_id;\n"
     "    uint8_t flags;\n"
-    "} %s;\n"
+    "} %y;\n"
     "\n");
 
 /// @brief param 1 is the hash map type name, param 2 is the function prefix, param 3 is the hash map type name
@@ -178,7 +178,7 @@ JSLFatPtr init_function_signature = JSL_FATPTR_LITERAL("/**\n"
     " * @param seed Seed value for the hash function to protect against hash flooding attacks\n"
     " * @param max_item_count The maximum amount of items this hash map can hold\n"
     " */\n"
-    "void %s_init(%s* hash_map, JSLArena* arena, int64_t max_item_count, uint64_t seed);\n\n");
+    "void %y_init(%y* hash_map, JSLArena* arena, int64_t max_item_count, uint64_t seed);\n\n");
 
 /// @brief param 1 is the hash map type name, param 2 is the key type, param 3 is the value type
 JSLFatPtr insert_function_signature = JSL_FATPTR_LITERAL("/**\n"
@@ -191,7 +191,7 @@ JSLFatPtr insert_function_signature = JSL_FATPTR_LITERAL("/**\n"
     " * @param value Value to store\n"
     " * @returns A bool representing success or failure of insertion. Insertion can fail if memory cannot be allocated.\n"
     " */\n"
-    "bool %s_insert(%s* hash_map, %s key, %s value);\n\n");
+    "bool %y_insert(%y* hash_map, %y key, %y value);\n\n");
 
 JSLFatPtr get_function_signature = JSL_FATPTR_LITERAL("/**\n"
     " * Get a value from the hash map if it exists. If it does not NULL is returned\n"
@@ -205,12 +205,12 @@ JSLFatPtr get_function_signature = JSL_FATPTR_LITERAL("/**\n"
     " * @param value Value to store\n"
     " * @returns The pointer to the value in the hash map, or null.\n"
     " */\n"
-    "%s* %s_get(%s* hash_map, %s key);\n\n");
+    "%y* %y_get(%y* hash_map, %y key);\n\n");
 
 JSLFatPtr delete_function_signature = JSL_FATPTR_LITERAL("/**\n"
     " * Remove a key/value pair from the hash map if it exists. If it does not false is returned\n"
     " */\n"
-    "bool %s_delete(%s* hashmap, %s key);\n\n");
+    "bool %y_delete(%y* hashmap, %y key);\n\n");
 
 JSLFatPtr iterator_start_function_signature = JSL_FATPTR_LITERAL("/**\n"
     " * Create a new iterator over this hash map.\n"
@@ -223,33 +223,33 @@ JSLFatPtr iterator_start_function_signature = JSL_FATPTR_LITERAL("/**\n"
     " *\n"
     " * Example usage:\n"
     " * @code\n"
-    " * %s key;\n"
-    " * %s value;\n"
-    " * %sIterator iterator;\n"
-    " * %s_iterator_start(hash_map);\n"
-    " * while (%s_iterator_next(&iterator, &key, &value))\n"
+    " * %y key;\n"
+    " * %y value;\n"
+    " * %yIterator iterator;\n"
+    " * %y_iterator_start(hash_map);\n"
+    " * while (%y_iterator_next(&iterator, &key, &value))\n"
     " * {\n"
     " *     ...\n"
     " * }\n"
     " * @endcode\n"
     " */\n"
-    "void %s_iterator_start(%s* hashmap, %sIterator* iterator);\n\n");
+    "void %y_iterator_start(%y* hashmap, %yIterator* iterator);\n\n");
 
 JSLFatPtr iterator_next_function_signature = JSL_FATPTR_LITERAL("/**\n"
     " * Iterate over the hash map. If a key/value was found then true is returned.\n"
     " *\n"
     " * Example usage:\n"
     " * @code\n"
-    " * %s key;\n"
-    " * %s value;\n"
-    " * %s iterator = %s_iterator_start(hash_map);\n"
-    " * while (%s_iterator_next(&iterator, &key, &value))\n"
+    " * %y key;\n"
+    " * %y value;\n"
+    " * %y iterator = %y_iterator_start(hash_map);\n"
+    " * while (%y_iterator_next(&iterator, &key, &value))\n"
     " * {\n"
     " *     ...\n"
     " * }\n"
     " * @endcode\n"
     " */\n"
-    "bool %s_iterator_next(%sIterator* iterator, %s key, %s value);\n\n");
+    "bool %y_iterator_next(%yIterator* iterator, %y key, %y value);\n\n");
 
 // #define JSL_HASHMAP_DECLARE(name, function_prefix, key_type, value_type)                                                            \
 //         JSL_HASHMAP_TYPES(name, key_type, value_type)                                                                               \
@@ -636,7 +636,7 @@ void write_hash_map_header(
     
     jsl_string_builder_format(builder, map_type_typedef, key_type_name, value_type_name, hash_map_name, key_type_name, value_type_name, hash_map_name);
 
-    jsl_string_builder_format(builder, init_function_signature, function_prefix, hash_map_name, hash_map_name);
+    jsl_string_builder_format(builder, init_function_signature, function_prefix, hash_map_name);
 
     jsl_string_builder_format(builder, insert_function_signature, function_prefix, hash_map_name, key_type_name, value_type_name);
 

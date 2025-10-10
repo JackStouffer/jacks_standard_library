@@ -2636,6 +2636,62 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     // copy the string in
                     goto L_STRING_COPY;
 
+                case 'y':
+                {
+                    if ((formatting_flags != 0) || (field_width != 0) || (precision != -1))
+                    {
+                        (void) va_arg(va, JSLFatPtr);
+                        JSL_ASSERT((formatting_flags == 0) && (field_width == 0) && (precision == -1));
+                        string = num + STBSP__NUMSZ - 1;
+                        *string = f.data[0];
+                        l = 1;
+                        field_width = 0;
+                        formatting_flags = 0;
+                        lead[0] = 0;
+                        tail[0] = 0;
+                        precision = 0;
+                        decimal_precision = 0;
+                        comma_spacing = 0;
+                        goto L_STRING_COPY;
+                    }
+
+                    JSLFatPtr fat_string = va_arg(va, JSLFatPtr);
+                    if (fat_string.length < 0)
+                    {
+                        JSL_ASSERT(fat_string.length >= 0);
+                        fat_string.length = 0;
+                    }
+
+                    if (fat_string.length == 0 || fat_string.data == NULL)
+                    {
+                        if ((fat_string.length != 0) && (fat_string.data == NULL))
+                            JSL_ASSERT(fat_string.data != NULL);
+
+                        string = num + STBSP__NUMSZ - 1;
+                        l = 0;
+                    }
+                    else
+                    {
+                        if (fat_string.length > (int64_t)INT32_MAX)
+                        {
+                            JSL_ASSERT(fat_string.length <= (int64_t)INT32_MAX);
+                            fat_string.length = (int64_t)INT32_MAX;
+                        }
+
+                        string = (char *)fat_string.data;
+                        l = (uint32_t)fat_string.length;
+                    }
+
+                    field_width = 0;
+                    formatting_flags = 0;
+                    lead[0] = 0;
+                    tail[0] = 0;
+                    precision = 0;
+                    decimal_precision = 0;
+                    comma_spacing = 0;
+                    goto L_STRING_COPY;
+                }
+
                 case 'c': // char
                     // get the character
                     string = num + STBSP__NUMSZ - 1;

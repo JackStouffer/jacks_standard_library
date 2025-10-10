@@ -205,6 +205,27 @@ void test_pointer(void)
     CHECK2("0000000000000000", "%p", (void*) NULL);
 }
 
+void test_fatptr_format(void)
+{
+    uint8_t _buf[1024];
+    JSLFatPtr buffer = jsl_fatptr_init(_buf, 1024);
+
+    uint8_t hello_data[] = "hello";
+    JSLFatPtr hello = jsl_fatptr_init(hello_data, 5);
+    CHECK2("hello", "%y", hello);
+
+    uint8_t world_data[] = "world";
+    JSLFatPtr world = jsl_fatptr_init(world_data, 5);
+    CHECK2("begin-world", "begin-%y", world);
+
+    JSLFatPtr empty = jsl_fatptr_init(NULL, 0);
+    CHECK2("edge", "ed%yge", empty);
+
+    uint8_t beta_data[] = "beta";
+    JSLFatPtr beta = jsl_fatptr_init(beta_data, 4);
+    CHECK3("hello-beta", "%y-%y", hello, beta);
+}
+
 void test_quote_modifier(void)
 {
     uint8_t _buf[1024];
@@ -250,6 +271,7 @@ int main(void)
     lrun("Test format length capture", test_n);
     lrun("Test format hex floats", test_hex_floats);
     lrun("Test format pointer", test_pointer);
+    lrun("Test format fat pointer", test_fatptr_format);
     lrun("Test format quote modifier", test_quote_modifier);
     lrun("Test format non-standard", test_nonstandard);
     lrun("Test format separators", test_separators);
