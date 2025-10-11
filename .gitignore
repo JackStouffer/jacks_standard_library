@@ -11,3 +11,5 @@
 *.i
 bin/
 *.dSYM
+run_tests
+*.old

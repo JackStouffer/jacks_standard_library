@@ -2,6 +2,23 @@
 
 These are general notes on design decisions.
 
+## Why Write This Library?
+
+Much of the C Standard Library is outdated, very unsafe, or poorly designed. 
+Some bad design decisions include
+
+* Null terminated strings
+* A single global heap, which is called silently, and you're expected to remember to call free
+* An object based file interface based around seeking with tiny reads and writes
+* Errors get special treatment
+* As part of the language that arrays decay to pointers, and there's no way to stop it.
+  This means a lot of functions don't have a way to pass 
+
+Also, I started working on WebAssembly projects without emscripten. The 
+
+I kept writing the same set of utilities across my different projects, so I
+put them into a single repo.
+
 ## Why do you use signed 64 bit ints for sizes and not `size_t`?
 
 First of all **no one** is creating contiguous allocations larger than `2^63 - 1`
@@ -29,10 +46,7 @@ struct {
 };
 ```
 
-Also, `uint8_t` is important because it helps when using UTF-8. `char`, being
-signed, cannot hold the full range of valid UTF-8 code units.
-
-Null-terminated strings are obsolete, inefficient, and constantly frustrating.
+Also, `uint8_t` is important because it helps be more clear when using UTF-8.
 
 ### Writing
 
@@ -85,12 +99,12 @@ int64_t load_file(JSLFatPtr* writer, char* filename)
 JSLFatPtr memory = jsl_arena_allocate(arena, 1024 * 1024, false);
 JSLFatPtr writer = memory;
 
-int64_t file_size = load_file(&writer, "file.txt");
+int64_t bytes_read = load_file(&writer, "file.txt");
 JSLFatPtr file_contents = jsl_fatptr_auto_slice(memory, writer);
 ```
 
 By using a fat pointer here, we're able to very easily constrain the write to the
-buffer by `read` to just the space we have available.
+buffer by `read`-ing to just the space we have available.
 
 After the function call the writer now points to the empty space remaining in
 the original allocation. This makes it really easy to use multiple functions
@@ -316,10 +330,24 @@ perfectly valid strategy.
 
 ### Breaking Out of the Constructor/Destructor Mindset
 
-It seems like it should be more complicated but it really doesn't have to be.
+It seems like it should be more complicated but it really doesn't have to be. The main
+thing experienced programers will be horrified by is the lack of careful deconstruction
+of the types in the arena when we simply wipe out the memory.
 
-Programmers have been trained with the RAII or OOP style that every single type
-needs 
+The big problem with RAII is it hides implementation details. This is claimed as
+a selling point, but hiding the details is actually how your program becomes hard to 
+understand and unwieldy to manage. This concept is explained really well by [John
+Carmack in an email he sent out here](http://number-none.com/blow/blog/programming/2014/09/26/carmack-on-inlined-code.html).
+The basic jist is that program complexity can be vastly reduced by moving as state 
+changing code to a single location, ideally one long function, as possible.
+
+
+Programmers have been trained with the RAII or OOP style that constructors and
+destructors are the norm. But I've found that 
+
+ that every single type
+needs to be only initializable in a valid state. In fact there's many times, even
+in RAII style, where  
 
 ### Concretely Defining The Problem Space
 

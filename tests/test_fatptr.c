@@ -54,7 +54,7 @@ void test_jsl_fatptr_cstr_memory_copy(void)
 
     JSLFatPtr writer = buffer;
     char* str = "This is a test string!";
-    size_t length = strlen(str);
+    int64_t length = (int64_t) strlen(str);
     jsl_fatptr_cstr_memory_copy(&writer, str, false);
 
     lok(writer.data == buffer.data + length);
@@ -64,7 +64,7 @@ void test_jsl_fatptr_cstr_memory_copy(void)
     lok(memcmp(str, buffer.data, length) == 0);
 }
 
-void test_jsl_fatptr_load_file_contents(void)
+void test_jsl_load_file_contents(void)
 {
     char* path = "./tests/example.txt";
     char stack_buffer[4*1024];
@@ -85,7 +85,7 @@ void test_jsl_fatptr_load_file_contents(void)
     jsl_arena_init(&arena, malloc(4*1024), 4*1024);
 
     JSLFatPtr contents;
-    JSLLoadFileResultEnum res = jsl_fatptr_load_file_contents(
+    JSLLoadFileResultEnum res = jsl_load_file_contents(
         &arena,
         JSL_FATPTR_LITERAL("./tests/example.txt"),
         &contents,
@@ -96,7 +96,7 @@ void test_jsl_fatptr_load_file_contents(void)
     lok(memcmp(stack_buffer, contents.data, file_size) == 0);
 }
 
-void test_jsl_fatptr_load_file_contents_buffer(void)
+void test_jsl_load_file_contents_buffer(void)
 {
     char* path = "./tests/example.txt";
     char stack_buffer[4*1024];
@@ -116,7 +116,7 @@ void test_jsl_fatptr_load_file_contents_buffer(void)
     JSLFatPtr buffer = jsl_fatptr_init(malloc(4*1024), 4*1024);
     JSLFatPtr writer = buffer;
 
-    JSLLoadFileResultEnum res = jsl_fatptr_load_file_contents_buffer(
+    JSLLoadFileResultEnum res = jsl_load_file_contents_buffer(
         &writer,
         JSL_FATPTR_LITERAL("./tests/example.txt"),
         NULL
@@ -636,8 +636,8 @@ int main(void)
     lrun("Test jsl_fatptr_ends_with", test_jsl_fatptr_ends_with);
     lrun("Test jsl_fatptr_compare_ascii_insensitive", test_jsl_fatptr_compare_ascii_insensitive);
 
-    lrun("Test jsl_fatptr_load_file_contents", test_jsl_fatptr_load_file_contents);
-    lrun("Test jsl_fatptr_load_file_contents_buffer", test_jsl_fatptr_load_file_contents_buffer);
+    lrun("Test jsl_fatptr_load_file_contents", test_jsl_load_file_contents);
+    lrun("Test jsl_fatptr_load_file_contents_buffer", test_jsl_load_file_contents_buffer);
 
     lresults();
     return lfails != 0;

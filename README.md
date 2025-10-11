@@ -3,7 +3,7 @@
 A collection of types and functions designed to replace usage of the
 C Standard Library.
 
-## Use
+## Usage
 
 Include the header like normally in each source file:
 
@@ -26,18 +26,42 @@ and `stdbool.h` (if using < C23). You'll also have to define the replacement fun
 for the C standard library functions like `assert` and `memcmp`. See the
 "Preprocessor Switches" section for more information.
 
+## Testing
+
+This file runs the test suite using a meta-program style of build system.
+
+Each test file is compiled and run four times. On POSIX systems it's once
+with gcc unoptimized and with address sanitizer, once with gcc full optimization
+and native CPU code gen, and then the same thing again with clang. On
+Windows it's done with MSVC and clang.
+
+This may seem excessive but I've caught bugs with this before.
+
+## Running
+
+The program needs a one time bootstrap from your chosen C compiler.
+
+On POSIX
+
+```
+cc -o run_test_suite ./tests/bin/run_test_suite.c 
+```
+
+On Windows
+
+```
+cl /Fe"run_test_suite.exe" tests\\bin\\run_test_suite.c 
+```
+
+Then run your executable. Every time afterwards when you run the test
+program it will check if there have been changes to the test file. If
+there have been it will rebuild itself using the program you used to
+build it in the first place. if there have been changes to the test
+file, so no need to 
+
 ## Why
 
-Much of the C Standard Library is outdated, very unsafe, or poorly designed. 
-Some bad design decisions include
-
-* Null terminated strings
-* A single global heap, which is called silently, and you're expected to remember to call free
-* An object based file interface based around seeking with tiny reads and writes
-* Errors get special treatment
-
-And unfortunately it was decided as part of the language that arrays decay to
-pointers, and there's no way to stop it.
+See the DESIGN.md file for more info.
 
 ## What's Included
 
@@ -45,27 +69,28 @@ pointers, and there's no way to stop it.
    min, max
    bitflag checks
 * A buffer/slice type called a fat pointer
-   used everywhere
-   standardizes that pointers should carry their length
-   vastly simplifies functions like file reading
+   * used everywhere
+   * standardizes that pointers should carry their length
+   * vastly simplifies functions like file reading
 * Common string and buffer utilities for fat pointers
-   things like fat pointer memcmp, substring search, etc.
+   * things like fat pointer memcmp, memcpy, substring search, etc.
 * An arena allocator
-   a.k.a a monotonic, region, or bump allocator
-   They are easy to create, use, reset-able, allocators
-   Great for things with known lifetimes (which is 99% of the things you allocate)
+   * a.k.a a monotonic, region, or bump allocator
+   * They are easy to create, use, reset-able, allocators
+   * Great for things with known lifetimes (which is 99% of the things you allocate)
+   * See the DESIGN.md file more information
 * A snprintf replacement
-   writes directly into a fat pointer buffer
-   Removes all compiler specific weirdness
+   * writes directly into a fat pointer buffer
+   * Removes all compiler specific weirdness
 * A string builder container
 * Type safe, generated containers
-   Unlike a lot of C containers, these are built with before compile code
-       generation. Each container instance generates code with your value types
-       rather than using `void*` plus length everywhere
-   Built with arenas in mind
-   dynamic array
-   hash map
-   hash set
+   * Unlike a lot of C containers, these are built with "before compile" code generation.
+     Each container instance generates code with your value types rather than using `void*`
+     plus length everywhere
+   * Built with arenas in mind
+   * dynamic array
+   * hash map
+   * hash set
 
 ## What's Not Included
 
@@ -118,3 +143,4 @@ If you don't, you should learn the following terms:
 * Normalization
 
 That would be the bare minimum needed to not shoot yourself in the foot.
+
