@@ -20,7 +20,9 @@
  * `JSL_ASSERT` - Assertion function definition. By default this will use `assert.h`.
  * If you wish to override it, it must be a function which takes three parameters, a int
  * conditional, a char* of the filename, and an int line number. You can also provide an
- * empty function if you just want to turn off asserts altogether.
+ * empty function if you just want to turn off asserts altogether; this is not
+ * recommended. The small speed boost you get is from avoiding a branch is generally not
+ * worth the loss of correctness.
  * 
  * `JSL_MEMCPY` - Controls memcpy calls in the library. By default this will include
  * `string.h` and use `memcpy`.
@@ -2324,6 +2326,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     {
         static char hex[] = "0123456789abcdefxp";
         static char hexu[] = "0123456789ABCDEFXP";
+        static JSLFatPtr err_string = JSL_FATPTR_LITERAL("(ERROR)");
         uint8_t* buffer_cursor;
         JSLFatPtr f;
         int32_t tlen = 0;
@@ -2331,7 +2334,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         buffer_cursor = buffer;
         f = fmt;
 
-        #if defined(__AVX2__) && (defined(__x86_64__) || defined(_M_X64))
+        #if defined(__AVX2__)
             __m256i percent_wide = _mm256_set1_epi8('%');
             __m256i zero_wide = _mm256_setzero_si256();
             __m256i vector_of_indexes = _mm256_set_epi8(
@@ -2662,13 +2665,20 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                 char const* source_ptr;
 
                 case 's':
-                    // get the string
                     string = va_arg(va, char *);
-                    if (string == 0)
-                        string = (char *)"null";
-                    // get the length, limited to desired precision
-                    // always limit to ~0u chars since our counts are 32b
-                    l = (precision >= 0) ? stbsp__strlen_limited(string, precision) : JSL_STRLEN(string);
+
+                    if (JSL__UNLIKELY(string == NULL))
+                    {
+                        string = (char*) err_string.data;
+                        l = (uint32_t) err_string.length;
+                    }
+                    else
+                    {
+                        // get the length, limited to desired precision
+                        // always limit to ~0u chars since our counts are 32b
+                        l = (precision >= 0) ? stbsp__strlen_limited(string, precision) : JSL_STRLEN(string);
+                    }
+
                     lead[0] = 0;
                     tail[0] = 0;
                     precision = 0;
@@ -2679,48 +2689,22 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
                 case 'y':
                 {
-                    if ((formatting_flags != 0) || (field_width != 0) || (precision != -1))
-                    {
-                        (void) va_arg(va, JSLFatPtr);
-                        JSL_ASSERT((formatting_flags == 0) && (field_width == 0) && (precision == -1));
-                        string = num + STBSP__NUMSZ - 1;
-                        *string = f.data[0];
-                        l = 1;
-                        field_width = 0;
-                        formatting_flags = 0;
-                        lead[0] = 0;
-                        tail[0] = 0;
-                        precision = 0;
-                        decimal_precision = 0;
-                        comma_spacing = 0;
-                        goto L_STRING_COPY;
-                    }
-
                     JSLFatPtr fat_string = va_arg(va, JSLFatPtr);
-                    if (fat_string.length < 0)
-                    {
-                        JSL_ASSERT(fat_string.length >= 0);
-                        fat_string.length = 0;
-                    }
 
-                    if (fat_string.length == 0 || fat_string.data == NULL)
+                    if (JSL__UNLIKELY(formatting_flags != 0
+                        || field_width != 0
+                        || precision != -1
+                        || fat_string.data == NULL
+                        || fat_string.length < 0
+                        || fat_string.length > UINT32_MAX))
                     {
-                        if ((fat_string.length != 0) && (fat_string.data == NULL))
-                            JSL_ASSERT(fat_string.data != NULL);
-
-                        string = num + STBSP__NUMSZ - 1;
-                        l = 0;
+                        string = (char*) err_string.data;
+                        l = (uint32_t) err_string.length;
                     }
                     else
                     {
-                        if (fat_string.length > (int64_t)INT32_MAX)
-                        {
-                            JSL_ASSERT(fat_string.length <= (int64_t)INT32_MAX);
-                            fat_string.length = (int64_t)INT32_MAX;
-                        }
-
-                        string = (char *)fat_string.data;
-                        l = (uint32_t)fat_string.length;
+                        string = (char*) fat_string.data;
+                        l = (uint32_t) fat_string.length;
                     }
 
                     field_width = 0;
@@ -3361,8 +3345,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                         int32_t i;
                         stbsp__cb_buf_clamp(i, n);
 
-                        n -= i;
                         JSL_MEMCPY(buffer_cursor, string, i);
+
+                        n -= i;
                         buffer_cursor += i;
                         string += i;
 

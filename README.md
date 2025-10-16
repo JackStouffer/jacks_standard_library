@@ -126,7 +126,19 @@ Official support for Windows, macOS, and Linux with MSVC, GCC, and clang.
 
 This might work on other POSIX systems, but I have not tested it.
 
-## Unicode
+## Caveats 
+
+### Notes on Safety
+
+In 99% of cases you shouldn't turn off assertions by using the `NDEBUG` macro
+or by defining an empty `JSL_ASSERT` function. 
+
+This library uses assertions for things like `NULL` checks and Automatic Bounds
+Checking (ABC). These checks prevent your program from entering an invalid state
+which may corrupt user data, leak memory, or allow buffer overflow attacks. If
+you have good 
+
+### Unicode
 
 You should have a basic knowledge of Unicode semantics before using this library.
 For example, this library provides length based comparison functions like
@@ -143,4 +155,3 @@ If you don't, you should learn the following terms:
 * Normalization
 
 That would be the bare minimum needed to not shoot yourself in the foot.
-

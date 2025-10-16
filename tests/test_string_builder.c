@@ -288,7 +288,7 @@ void test_jsl_string_builder_format_success(void)
 
 void test_jsl_string_builder_format_needs_multiple_chunks(void)
 {
-    uint8_t arena_buffer[128];
+    uint8_t arena_buffer[256];
     JSLArena arena = JSL_ARENA_FROM_STACK(arena_buffer);
     JSLStringBuilder builder;
     bool ok = jsl_string_builder_init2(&builder, &arena, 16, 8);

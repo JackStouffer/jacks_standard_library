@@ -219,7 +219,7 @@ void test_fatptr_format(void)
     CHECK2("begin-world", "begin-%y", world);
 
     JSLFatPtr empty = jsl_fatptr_init(NULL, 0);
-    CHECK2("edge", "ed%yge", empty);
+    CHECK2("ed(ERROR)ge", "ed%yge", empty);
 
     uint8_t beta_data[] = "beta";
     JSLFatPtr beta = jsl_fatptr_init(beta_data, 4);
@@ -245,7 +245,7 @@ void test_nonstandard(void)
     uint8_t _buf[1024];
     JSLFatPtr buffer = jsl_fatptr_init(_buf, 1024);
 
-    CHECK2("null", "%s", (char*) NULL);
+    CHECK2("(ERROR)", "%s", (char*) NULL);
     CHECK2("123,4abc:", "%'x:", 0x1234ABC);
     CHECK2("100000000", "%b", 256);
     CHECK3("0b10 0B11", "%#b %#B", 2, 3);
