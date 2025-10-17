@@ -1,4 +1,7 @@
-/*
+/**
+
+Derivation of the test suite originally found in stb_printf.
+
 MIT License
 
 Copyright (c) 2017 Sean Barrett
@@ -22,16 +25,33 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
+#if defined(__linux__)
+    #ifndef _GNU_SOURCE
+        #define _GNU_SOURCE
+    #endif
+#endif
+
 #define _CRT_SECURE_NO_WARNINGS
 
 #include <assert.h>
 #include <math.h>
+#include <errno.h>
 #include <stddef.h>
 #include <string.h>
 #include <stdint.h>
 
+#if defined(__linux__)
+    #include <sys/types.h>
+#endif
+
+#if defined(__unix__) || defined(__APPLE__) || defined(__linux__)
+    #include <signal.h>
+    #include <unistd.h>
+#endif
+
 #include "minctest.h"
 
+#define JSL_INCLUDE_FILE_UTILS
 #define JSL_IMPLEMENTATION
 #include "../src/jacks_standard_library.h"
 
@@ -264,6 +284,193 @@ void test_separators(void)
 }
 
 
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+static int jsl__funopen_write_fail(void* cookie, const char* buf, int len)
+{
+    (void)cookie;
+    (void)buf;
+    (void)len;
+    errno = EIO;
+    return -1;
+}
+
+static int jsl__funopen_close(void* cookie)
+{
+    (void)cookie;
+    return 0;
+}
+#endif
+
+#if defined(__linux__)
+static ssize_t jsl__cookie_write_fail(void* cookie, const char* buf, size_t len)
+{
+    (void)cookie;
+    (void)buf;
+    (void)len;
+    errno = EIO;
+    return -1;
+}
+
+static int jsl__cookie_close(void* cookie)
+{
+    (void)cookie;
+    return 0;
+}
+#endif
+
+static FILE* jsl__open_failing_stream(void)
+{
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+    return funopen(NULL, NULL, jsl__funopen_write_fail, NULL, jsl__funopen_close);
+#elif defined(__linux__)
+    cookie_io_functions_t functions = {
+        .read = NULL,
+        .write = jsl__cookie_write_fail,
+        .seek = NULL,
+        .close = jsl__cookie_close
+    };
+    return fopencookie(NULL, "w", functions);
+#else
+    return NULL;
+#endif
+}
+
+
+void test_jsl_format_file_formats_and_writes_output(void)
+{
+    FILE* file = tmpfile();
+    lok(file != NULL);
+    if (file == NULL)
+        return;
+
+    bool res = jsl_format_file(
+        file,
+        JSL_FATPTR_LITERAL("Hello %s %d"),
+        "World",
+        42
+    );
+    lok(res == true);
+
+    lok(fflush(file) == 0);
+    lok(fseek(file, 0, SEEK_SET) == 0);
+
+    char buffer[64] = {0};
+    size_t read = fread(buffer, 1, sizeof(buffer), file);
+    const char* expected = "Hello World 42";
+    lok(read == strlen(expected));
+    lok(memcmp(buffer, expected, read) == 0);
+
+    fclose(file);
+}
+
+void test_jsl_format_file_accepts_empty_format(void)
+{
+    FILE* file = tmpfile();
+    lok(file != NULL);
+    if (file == NULL)
+        return;
+
+    bool res = jsl_format_file(file, JSL_FATPTR_LITERAL(""));
+    lok(res == true);
+
+    lok(fflush(file) == 0);
+    lok(fseek(file, 0, SEEK_END) == 0);
+    long size = ftell(file);
+    lok(size == 0);
+
+    fclose(file);
+}
+
+void test_jsl_format_file_null_out_parameter(void)
+{
+    bool res = jsl_format_file(NULL, JSL_FATPTR_LITERAL("Hello"));
+    lok(!res);
+}
+
+void test_jsl_format_file_null_format_pointer(void)
+{
+    JSLFatPtr fmt = {
+        .data = NULL,
+        .length = 5
+    };
+
+    bool res = jsl_format_file(stdout, fmt);
+    lok(!res);
+}
+
+void test_jsl_format_file_negative_length(void)
+{
+    JSLFatPtr fmt = {
+        .data = (uint8_t*)"Hello",
+        .length = -1
+    };
+
+    bool res = jsl_format_file(stdout, fmt);
+    lok(!res);
+}
+
+void test_jsl_format_file_write_failure(void)
+{
+#if defined(__unix__) || defined(__APPLE__) || defined(__linux__)
+    int pipe_fds[2];
+    if (pipe(pipe_fds) == 0)
+    {
+        close(pipe_fds[0]);
+
+        FILE* writer = fdopen(pipe_fds[1], "w");
+        lok(writer != NULL);
+        if (writer != NULL)
+        {
+            lok(setvbuf(writer, NULL, _IONBF, 0) == 0);
+            void (*previous_handler)(int) = signal(SIGPIPE, SIG_IGN);
+            bool res = jsl_format_file(writer, JSL_FATPTR_LITERAL("Hello"));
+            lok(!res);
+            fclose(writer);
+            if (previous_handler == SIG_ERR)
+            {
+                signal(SIGPIPE, SIG_DFL);
+            }
+            else
+            {
+                signal(SIGPIPE, previous_handler);
+            }
+            return;
+        }
+
+        close(pipe_fds[1]);
+    }
+#endif
+
+    FILE* file = jsl__open_failing_stream();
+
+    if (file != NULL)
+    {
+        bool res = jsl_format_file(file, JSL_FATPTR_LITERAL("Hello"));
+        lok(!res);
+        fclose(file);
+        return;
+    }
+
+    char* path = "./tests/tmp_format_file_failure.txt";
+    FILE* setup = fopen(path, "wb");
+    if (setup != NULL)
+        fclose(setup);
+
+    FILE* read_only = fopen(path, "rb");
+    lok(read_only != NULL);
+    if (read_only == NULL)
+    {
+        remove(path);
+        return;
+    }
+
+    bool res = jsl_format_file(read_only, JSL_FATPTR_LITERAL("Hello"));
+    lok(!res);
+
+    fclose(read_only);
+    remove(path);
+}
+
 int main(void)
 {
     lrun("Test format ints", test_integers);
@@ -275,6 +482,13 @@ int main(void)
     lrun("Test format quote modifier", test_quote_modifier);
     lrun("Test format non-standard", test_nonstandard);
     lrun("Test format separators", test_separators);
+
+    lrun("Test jsl_format_file formats and writes output", test_jsl_format_file_formats_and_writes_output);
+    lrun("Test jsl_format_file accepts empty format", test_jsl_format_file_accepts_empty_format);
+    lrun("Test jsl_format_file null out parameter", test_jsl_format_file_null_out_parameter);
+    lrun("Test jsl_format_file null format pointer", test_jsl_format_file_null_format_pointer);
+    lrun("Test jsl_format_file negative length", test_jsl_format_file_negative_length);
+    lrun("Test jsl_format_file write failure", test_jsl_format_file_write_failure);
 
     lresults();
     return lfails != 0;

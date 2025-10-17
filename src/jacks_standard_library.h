@@ -4401,7 +4401,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     {
         struct JSL__FormatOutContext* context = (struct JSL__FormatOutContext*) user;
 
-        size_t written = fwrite(buf, sizeof(uint8_t), len, context->out);
+        int64_t written = (int64_t) fwrite(buf, sizeof(uint8_t), len, context->out);
         if (written == len)
         {
             return context->buffer;

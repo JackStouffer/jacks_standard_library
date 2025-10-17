@@ -5,13 +5,14 @@ C Standard Library.
 
 ## Usage
 
-Include the header like normally in each source file:
+1. Copy the `jacks_standard_library.h` file into your repo
+2. Include the header like normally in each source file:
 
 ```c
 #include "jacks_standard_library.h"
 ```
 
-Then, in ONE AND ONLY ONE file, do this:
+3. Then, in ONE AND ONLY ONE file, do this:
 
 ```c
 #define JSL_IMPLEMENTATION
@@ -20,30 +21,19 @@ Then, in ONE AND ONLY ONE file, do this:
 
 This should probably be in the "main" file for your program, but it doesn't have to be.
 
-This library does not depend on the C standard library to be available at link
-time. However, it does require the "compile time" headers `stddef.h`, `stdint.h`,
-and `stdbool.h` (if using < C23). You'll also have to define the replacement functions
-for the C standard library functions like `assert` and `memcmp`. See the
-"Preprocessor Switches" section for more information.
+One note is that this library does not depend on the C standard library to be available
+at link time if you don't want to use it. However, it does require the "compile time"
+headers `stddef.h`, `stdint.h`, and `stdbool.h` (if using < C23). You'll also have to
+define the replacement functions for the C standard library functions like `assert` and
+`memcmp`. See the "Preprocessor Switches" section for more information.
 
 ## Testing
 
-This file runs the test suite using a meta-program style of build system.
-
-Each test file is compiled and run four times. On POSIX systems it's once
-with gcc unoptimized and with address sanitizer, once with gcc full optimization
-and native CPU code gen, and then the same thing again with clang. On
-Windows it's done with MSVC and clang.
-
-This may seem excessive but I've caught bugs with this before.
-
-## Running
-
-The program needs a one time bootstrap from your chosen C compiler.
+This file runs the test suite using a meta-program style of build system. Then bootstrap the executable once.
 
 On POSIX
 
-```
+```bash
 cc -o run_test_suite ./tests/bin/run_test_suite.c 
 ```
 
@@ -59,16 +49,25 @@ there have been it will rebuild itself using the program you used to
 build it in the first place. if there have been changes to the test
 file, so no need to 
 
+### Structure
+
+Each test file is compiled and run four times. On POSIX systems it's once
+with gcc unoptimized and with address sanitizer, once with gcc full optimization
+and native CPU code gen, and then the same thing again with clang. On
+Windows it's done with MSVC and clang.
+
+This may seem excessive but I've caught bugs with this before.
+
 ## Why
 
 See the DESIGN.md file for more info.
 
 ## What's Included
 
-* Really common macros
+* Common macros
    min, max
    bitflag checks
-* A buffer/slice type called a fat pointer
+* A buffer type called a fat pointer
    * used everywhere
    * standardizes that pointers should carry their length
    * vastly simplifies functions like file reading
@@ -80,9 +79,9 @@ See the DESIGN.md file for more info.
    * Great for things with known lifetimes (which is 99% of the things you allocate)
    * See the DESIGN.md file more information
 * A snprintf replacement
-   * writes directly into a fat pointer buffer
+   * works directly with fat pointers
    * Removes all compiler specific weirdness
-* A string builder container
+* A string builder container type
 * Type safe, generated containers
    * Unlike a lot of C containers, these are built with "before compile" code generation.
      Each container instance generates code with your value types rather than using `void*`
@@ -94,9 +93,9 @@ See the DESIGN.md file for more info.
 
 ## What's Not Included
 
-* There's no scanf alternative
-* Threading. Just use pthreads or win api calls
-* Atomics. This is really platform specific and you should just use intrinsics
+* A scanf alternative for fat pointers
+* Threading
+* Atomic operations
 * Date/time utilities
 * Random numbers
 
