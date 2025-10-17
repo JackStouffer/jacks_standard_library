@@ -122,9 +122,10 @@ You can include these functions by using `#define JSL_INCLUDE_FILE_UTILS`.
 
 ## What's Supported
 
-Official support for Windows, macOS, and Linux with MSVC, GCC, and clang.
+Official support is for Windows, macOS, and Linux with MSVC, GCC, and clang.
 
-This might work on other POSIX systems, but I have not tested it.
+This might work on other POSIX systems with other C compilers, but I have not tested
+it. ARM in big endian mode is not supported.
 
 ## Caveats 
 

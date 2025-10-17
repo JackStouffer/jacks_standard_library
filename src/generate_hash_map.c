@@ -31,6 +31,7 @@
 
 #include <stdalign.h>
 
+#define JSL_INCLUDE_FILE_UTILS
 #define JSL_IMPLEMENTATION
 #include "jacks_standard_library.h"
 
@@ -556,6 +557,20 @@ JSLFatPtr iterator_next_function_signature = JSL_FATPTR_LITERAL("/**\n"
 //         return result;                                                                                                          \
 //     }
 
+static bool cstring_compare(const char* c1, const char* c2)
+{
+    bool res = false;
+    size_t c1_len = strlen(c1);
+    size_t c2_len = strlen(c2);
+
+    if (c1_len == c2_len)
+    {
+        res = memcmp(c1, c2, c1_len) == 0;
+    }
+
+    return res;
+}
+
 /**
  * Generates the header file data for your hash map. This file includes all the typedefs
  * and function signatures for this hash map.
@@ -673,9 +688,30 @@ void write_hash_map_header(
     );
 }
 
+#ifdef INCLUDE_MAIN
+
+JSLFatPtr help_message = JSL_FATPTR_LITERAL(
+    "OVERVIEW:\n\n"
+    "Hash map C code generation utility\n\n"
+    "This program generates both a C source and header file for a hash map with the given\n"
+    "key and value types. More documentation is included in the source file.\n\n"
+    "USAGE:\n\n"
+    "\tgenerate_hash_map --name TYPE_NAME --function_prefix PREFIX --key_type TYPE --value_type TYPE [--static | --dynamic] [--header | --source]\n\n"
+    "Required arguments:\n"
+    "\t--name\t\t\tThe name to give the hash map container type\n"
+    "\t--function_prefix\tThe prefix on each of the functions for the hash map\n\n"
+    "\t--key_type\t\tThe C type name for the key\n"
+    "\t--value_type\t\tThe C type name for the value\n\n"
+    "Optional arguments:\n"
+    "\t--header\t\tWrite the header file to stdout\n"
+    "\t--source\t\tWrite the source file to stdout\n"
+    "\t--dynamic\t\tGenerate a hash map which grows dynamically\n"
+    "\t--static\t\tGenerate a statically sized hash map\n"
+);
 
 int32_t main(int32_t argc, char** argv)
 {
+    bool show_help = false;
     JSLFatPtr name = {0};
     JSLFatPtr function_prefix = {0};
     JSLFatPtr key_type = {0};
@@ -687,11 +723,15 @@ int32_t main(int32_t argc, char** argv)
     {
         char* arg = argv[i];
         
-        if (strncmp(arg, "--name=", 7) == 0)
+        if (cstring_compare(arg, "-h") || cstring_compare(arg, "--help"))
+        {
+            show_help = true;
+        }
+        else if (cstring_compare(arg, "--name="))
         {
             name = jsl_fatptr_from_cstr(arg + 7);
         }
-        else if (strcmp(arg, "--name") == 0)
+        else if (cstring_compare(arg, "--name"))
         {
             if (i + 1 < argc)
             {
@@ -703,12 +743,11 @@ int32_t main(int32_t argc, char** argv)
                 return 1;
             }
         }
-        // Check for --function_prefix
-        else if (strncmp(arg, "--function_prefix=", 18) == 0)
+        else if (cstring_compare(arg, "--function_prefix="))
         {
             function_prefix = jsl_fatptr_from_cstr(arg + 18);
         }
-        else if (strcmp(arg, "--function_prefix") == 0)
+        else if (cstring_compare(arg, "--function_prefix"))
         {
             if (i + 1 < argc) {
                 function_prefix = jsl_fatptr_from_cstr(argv[++i]);
@@ -717,12 +756,11 @@ int32_t main(int32_t argc, char** argv)
                 return 1;
             }
         }
-        // Check for --key_type
-        else if (strncmp(arg, "--key_type=", 11) == 0)
+        else if (cstring_compare(arg, "--key_type="))
         {
             key_type = jsl_fatptr_from_cstr(arg + 11);
         }
-        else if (strcmp(arg, "--key_type") == 0)
+        else if (cstring_compare(arg, "--key_type"))
         {
             if (i + 1 < argc)
             {
@@ -734,12 +772,11 @@ int32_t main(int32_t argc, char** argv)
                 return 1;
             }
         }
-        // Check for --value_type
-        else if (strncmp(arg, "--value_type=", 13) == 0)
+        else if (cstring_compare(arg, "--value_type="))
         {
             value_type = jsl_fatptr_from_cstr(arg + 13);
         }
-        else if (strcmp(arg, "--value_type") == 0)
+        else if (cstring_compare(arg, "--value_type"))
         {
             if (i + 1 < argc)
             {
@@ -751,7 +788,6 @@ int32_t main(int32_t argc, char** argv)
                 return 1;
             }
         }
-        // Unknown argument
         else
         {
             fprintf(stderr, "Error: Unknown argument: %s\n", arg);
@@ -759,25 +795,30 @@ int32_t main(int32_t argc, char** argv)
         }
     }
     
-    // Check that all required parameters are provided
-    if (name.data == NULL)
+    if (show_help)
     {
-        fprintf(stderr, "Error: --name is required\n");
+        jsl_format_file(stdout, help_message);
+        return 0;
+    }
+    // Check that all required parameters are provided
+    else if (name.data == NULL)
+    {
+        jsl_format_file(stderr, JSL_FATPTR_LITERAL("Error: --name is required\n"));
         return 1;
     }
     if (function_prefix.data == NULL)
     {
-        fprintf(stderr, "Error: --function_prefix is required\n");
+        jsl_format_file(stderr, JSL_FATPTR_LITERAL("Error: --function_prefix is required\n"));
         return 1;
     }
     if (key_type.data == NULL)
     {
-        fprintf(stderr, "Error: --key_type is required\n");
+        jsl_format_file(stderr, JSL_FATPTR_LITERAL("Error: --key_type is required\n"));
         return 1;
     }
     if (value_type.data == NULL)
     {
-        fprintf(stderr, "Error: --value_type is required\n");
+        jsl_format_file(stderr, JSL_FATPTR_LITERAL("Error: --value_type is required\n"));
         return 1;
     }
     
@@ -806,9 +847,11 @@ int32_t main(int32_t argc, char** argv)
         if (slice.data == NULL)
             break;
 
-        printf("%.*s", (int32_t) slice.length, (char*) slice.data);
+        jsl_format_file(stdout, slice);
     }
 
 
     return 0;
 }
+
+#endif // INCLUDE_MAIN

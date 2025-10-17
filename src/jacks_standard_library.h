@@ -868,6 +868,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         #include <fcntl.h>
         #include <limits.h>
         #include <fcntl.h>
+        #include <stdio.h>
         #include <io.h>
         #include <sys\stat.h>
 
@@ -878,6 +879,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         #include <errno.h>
         #include <limits.h>
         #include <fcntl.h>
+        #include <stdio.h>
         #include <unistd.h>
         #include <sys/types.h>
         #include <sys/stat.h>
@@ -952,39 +954,8 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         errno_t* out_errno
     );
 
-    typedef struct {
-        const char *path;   // UTF-8, owned by iterator; valid until next fi_iter_next or destroy
-        JSLFileTypeEnum type;
-        /// @brief root's direct children are depth==1
-        int32_t depth;  
-    } fi_entry;
-
-    typedef struct fi_iter fi_iter;
-
-    /**
-     * Initialize an iterator rooted at `root_utf8`.
-     * - max_depth: -1 for unlimited; 0 yields no children (unless root is a single file)
-     * - follow_symlinks: 0 do not follow; 1 follow (with cycle protection)
-     * Returns 0 on success, -1 on error (check fi_iter_errno/errmsg).
-     */
-    int  fi_iter_init(fi_iter **out, const char *root_utf8, int max_depth, int follow_symlinks);
-
-    /**
-     * Pull the next entry. Returns:
-     *  - 1  -> produced an entry in *out
-     *  - 0  -> iteration is complete
-     *  - -1 -> fatal error (check fi_iter_errno/errmsg)
-     *
-     * The memory behind out->path is owned by the iterator and is overwritten on the next call.
-     */
-    int  fi_iter_next(fi_iter *it, fi_entry *out);
-
-    /** Release all resources. Safe to call on NULL. */
-    void fi_iter_destroy(fi_iter *it);
-
-    /** Optional helpers for diagnostics. */
-    int         fi_iter_errno (const fi_iter *it);
-    const char* fi_iter_errmsg(const fi_iter *it);
+    // TODO, docs
+    JSL_ASAN_OFF JSL_DEF bool jsl_format_file(FILE* out, JSLFatPtr fmt, ...);
 
 #endif // JSL_INCLUDE_FILE_UTILS
 
@@ -1009,8 +980,10 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
  #ifdef JSL_IMPLEMENTATION
 
-    #if defined(__i386__) || defined(__x86_64__) || defined(_M_IX86) || defined(_M_X64)
+    #if defined(__x86_64__) || defined(_M_IX86) || defined(_M_X64)
         #include <immintrin.h>
+    #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
+        #include <arm_neon.h>
     #endif
 
     #ifndef JSL_ASSERT
@@ -1044,6 +1017,33 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     #ifndef JSL_STRLEN
         #include <string.h>
         #define JSL_STRLEN strlen
+    #endif
+
+    #if defined(__ARM_NEON) || defined(__ARM_NEON__)
+        static inline uint32_t jsl__neon_movemask_u8(uint8x16_t input)
+        {
+            const uint8x16_t bit_select = {
+                1, 2, 4, 8, 16, 32, 64, 128,
+                1, 2, 4, 8, 16, 32, 64, 128
+            };
+
+            uint8x16_t shifted = vshrq_n_u8(input, 7);
+
+            uint16x8_t low = vmull_u8(vget_low_u8(shifted), vget_low_u8(bit_select));
+            uint16x8_t high = vmull_u8(vget_high_u8(shifted), vget_high_u8(bit_select));
+
+            uint16x4_t low_sum = vadd_u16(vget_low_u16(low), vget_high_u16(low));
+            low_sum = vpadd_u16(low_sum, low_sum);
+            low_sum = vpadd_u16(low_sum, low_sum);
+            uint32_t lower_mask = vget_lane_u16(low_sum, 0);
+
+            uint16x4_t high_sum = vadd_u16(vget_low_u16(high), vget_high_u16(high));
+            high_sum = vpadd_u16(high_sum, high_sum);
+            high_sum = vpadd_u16(high_sum, high_sum);
+            uint32_t upper_mask = vget_lane_u16(high_sum, 0);
+
+            return lower_mask | (upper_mask << 8);
+        }
     #endif
 
     JSLFatPtr jsl_fatptr_init(uint8_t* ptr, int64_t length)
@@ -2343,6 +2343,12 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                 15, 14, 13, 12, 11, 10, 9, 8,
                 7, 6, 5, 4, 3, 2, 1, 0
             );
+        #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
+            uint8x16_t percent_wide = vdupq_n_u8('%');
+            const uint8x16_t vector_of_indexes = {
+                0, 1, 2, 3, 4, 5, 6, 7,
+                8, 9, 10, 11, 12, 13, 14, 15
+            };
         #endif
 
         while (f.length > 0)
@@ -2383,9 +2389,15 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
             #if defined(__AVX2__)
 
-                // Get 32 byte aligned address
+                // Get 32 byte aligned address instead of doing unaligned loads
+                // which will give big performance wins to long format strings and
+                // are not that big of a deal to short ones
+                //
+                // performance win comes from not loading across a page boundary,
+                // thus requiring two loads for each load intrinsic
                 while (((uintptr_t) f.data) & 31 && f.length > 0)
                 {
+                    schk1:
                     if (f.data[0] == '%')
                         goto L_PROCESS_PERCENT;
 
@@ -2395,23 +2407,8 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     JSL_FATPTR_ADVANCE(f, 1);
                 }
 
-                // Copy everything up to the next %
-                for (;;)
+                while (f.length > 31)
                 {
-                    // SAFETY CONCERN:
-                    // This is safe because when reading 32 bytes from a 32 byte aligned pointer
-                    // it's impossible to read past the current page boundary into unmapped
-                    // memory. While technically this is a buffer overflow, as we're reading
-                    // memory that isn't "ours", I don't think it's possible that this is a
-                    // security hole. I can't think of a way that info past the buffer could
-                    // possibly leak out of this function.
-
-                    // Get up to 32-byte alignment so that we can safely read past the
-                    // end of the given format string using an aligned read.
-
-                    if (f.length < 1)
-                        goto L_END_FORMAT;
-
                     const __m256i* source_wide = (const __m256i*) f.data;
                     __m256i* wide_dest = (__m256i*) buffer_cursor;
 
@@ -2452,6 +2449,61 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                         goto L_PROCESS_PERCENT;
                     }
                 }
+
+                if (f.length == 0)
+                    goto L_END_FORMAT;
+                else
+                    goto schk1;
+
+            #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
+                
+                // NEON cannot rely on safe over-reads from aligned pointers.
+                while (f.length > 15)
+                {
+                    uint8x16_t data = vld1q_u8(f.data);
+                    uint8x16_t percent_mask = vceqq_u8(data, percent_wide);
+                    uint32_t mask = jsl__neon_movemask_u8(percent_mask);
+
+                    if (mask == 0)
+                    {
+                        stbsp__chk_cb_buf(16);
+                        vst1q_u8(buffer_cursor, data);
+                        JSL_FATPTR_ADVANCE(f, 16);
+                        buffer_cursor += 16;
+                    }
+                    else
+                    {
+                        int special_pos = __builtin_ctz(mask);
+                        if (special_pos > 0)
+                        {
+                            stbsp__chk_cb_buf(special_pos);
+                            uint8x16_t mask_for_partial_store = vcgtq_u8(
+                                vdupq_n_u8((uint8_t) special_pos),
+                                vector_of_indexes
+                            );
+                            uint8x16_t partial_data = vandq_u8(data, mask_for_partial_store);
+                            vst1q_u8(buffer_cursor, partial_data);
+                        }
+
+                        JSL_FATPTR_ADVANCE(f, special_pos);
+                        buffer_cursor += special_pos;
+
+                        goto L_PROCESS_PERCENT;
+                    }
+                }
+
+                while (f.length > 0)
+                {
+                    if (f.data[0] == '%')
+                        goto L_PROCESS_PERCENT;
+
+                    stbsp__chk_cb_buf(1);
+                    *buffer_cursor = f.data[0];
+                    ++buffer_cursor;
+                    JSL_FATPTR_ADVANCE(f, 1);
+                }
+
+                goto L_END_FORMAT;
 
             #else
                 
@@ -4136,7 +4188,6 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         return res;
     }
 
-
     JSLLoadFileResultEnum jsl_load_file_contents_buffer(
         JSLFatPtr* buffer,
         JSLFatPtr path,
@@ -4339,618 +4390,53 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         return res;
     }
 
-    // #if defined(_WIN32)
-
-    //     // --- UTF-8 <-> UTF-16 helpers ---
-
-    //     static wchar_t* utf8_to_wide(const char *s) {
-    //         int n = MultiByteToWideChar(CP_UTF8, 0, s, -1, NULL, 0);
-    //         if (n <= 0) return NULL;
-    //         wchar_t *w = (wchar_t*)malloc((size_t)n * sizeof(wchar_t));
-    //         if (!w) return NULL;
-    //         if (MultiByteToWideChar(CP_UTF8, 0, s, -1, w, n) <= 0) { free(w); return NULL; }
-    //         return w;
-    //     }
-
-    //     static char* wide_to_utf8(const wchar_t *w) {
-    //         int n = WideCharToMultiByte(CP_UTF8, 0, w, -1, NULL, 0, NULL, NULL);
-    //         if (n <= 0) return NULL;
-    //         char *s = (char*)malloc((size_t)n);
-    //         if (!s) return NULL;
-    //         if (WideCharToMultiByte(CP_UTF8, 0, w, -1, s, n, NULL, NULL) <= 0) { free(s); return NULL; }
-    //         return s;
-    //     }
-
-    //     // Add \\?\ prefix for long path handling.
-    //     static wchar_t* add_long_prefix(const wchar_t *wpath) {
-    //         // UNC path: \\server\share -> \\?\UNC\server\share
-    //         if (wcsncmp(wpath, L"\\\\?\\", 4) == 0) {
-    //             return _wcsdup(wpath);
-    //         }
-    //         if (wcsncmp(wpath, L"\\\\", 2) == 0) {
-    //             size_t len = wcslen(wpath);
-    //             const wchar_t *rest = wpath + 2;
-    //             size_t n = 4 + 4 + len - 2 + 1; // \\?\ + UNC\ + rest + NUL
-    //             wchar_t *out = (wchar_t*)malloc(n * sizeof(wchar_t));
-    //             if (!out) return NULL;
-    //             wcscpy(out, L"\\\\?\\UNC\\");
-    //             wcscat(out, rest);
-    //             return out;
-    //         }
-    //         // Drive path
-    //         size_t len = wcslen(wpath);
-    //         size_t n = 4 + len + 1; // \\?\ + path + NUL
-    //         wchar_t *out = (wchar_t*) malloc(n * sizeof(wchar_t));
-    //         if (!out) return NULL;
-    //         wcscpy(out, L"\\\\?\\");
-    //         wcscat(out, wpath);
-    //         return out;
-    //     }
-
-    //     typedef struct {
-    //         char   *path_utf8;     // directory path (UTF-8) for user output
-    //         wchar_t *wpattern;     // L"<dir>\\*" for enumeration
-    //         HANDLE  hFind;
-    //         WIN32_FIND_DATAW wfd;
-    //         int     started;
-    //         int     depth;
-    //     } DirFrameW;
-
-    //     typedef struct {
-    //         DWORD vol;
-    //         DWORD idx_hi;
-    //         DWORD idx_lo;
-    //     } WinVisitedKey;
-
-    // #else // if def win32
-
-    //     typedef struct {
-    //         char *path;   // directory path (UTF-8)
-    //         DIR  *dirp;
-    //         int   depth;
-    //     } DirFrameP;
-
-    //     typedef struct {
-    //         dev_t dev;
-    //         ino_t ino;
-    //     } PosixVisitedKey;
-
-    // #endif 
-
-    // struct fi_iter {
-    //     // config
-    //     int max_depth;         // -1 unlimited
-    //     int follow_symlinks;   // bool
-    //     int done;
-
-    //     // error state
-    //     int  err;
-    //     char errmsg[256];
-
-    //     // output + scratch
-    //     fi_strbuf ret_path;
-    //     fi_strbuf join_buf;
-    //     fi_entry  out_entry;
-
-    //     // root handling
-    //     char *root_utf8;
-    //     int   root_single_file_pending;
-    //     fi_type root_type;
-
-    //     // stack of open directory enumerators
-    //     #if defined(_WIN32)
-    //         DirFrameW *stack;
-    //     #else
-    //         DirFrameP *stack;
-    //     #endif
-
-    //     int stack_sz;
-    //     int stack_cap;
-
-    //     // visited directories set (for symlink following + cycle prevention)
-    //     #if defined(_WIN32)
-    //         WinVisitedKey *visited;
-    //     #else
-    //         PosixVisitedKey *visited;
-    //     #endif
-
-    //     int visited_sz;
-    //     int visited_cap;
-    // };
-
-    
-    // static void set_err(struct fi_iter *it, int err, const char *msg) {
-    //     it->err = err;
-    //     if (msg) {
-    //         strncpy(it->errmsg, msg, sizeof(it->errmsg)-1);
-    //         it->errmsg[sizeof(it->errmsg)-1] = '\0';
-    //     } else {
-    //         it->errmsg[0] = '\0';
-    //     }
-    // }
-
-    // int fi_iter_errno(const fi_iter *it) { return it ? it->err : EINVAL; }
-    // const char* fi_iter_errmsg(const fi_iter *it) { return it ? it->errmsg : "invalid iterator"; }
-
-    // static int ensure_stack_cap(struct fi_iter *it, int need) {
-    //     if (need <= it->stack_cap) return 0;
-    //     int newcap = it->stack_cap ? it->stack_cap*2 : 8;
-    //     if (newcap < need) newcap = need;
-    // #if defined(_WIN32)
-    //     DirFrameW *p = (DirFrameW*)realloc(it->stack, (size_t)newcap * sizeof(*it->stack));
-    // #else
-    //     DirFrameP *p = (DirFrameP*)realloc(it->stack, (size_t)newcap * sizeof(*it->stack));
-    // #endif
-    //     if (!p) { set_err(it, ENOMEM, "out of memory growing stack"); return -1; }
-    //     it->stack = p;
-    //     it->stack_cap = newcap;
-    //     return 0;
-    // }
-
-    // static int visited_contains_add_posix(struct fi_iter *it, dev_t dev, ino_t ino) {
-    // #if defined(_WIN32)
-    //     (void)dev; (void)ino;
-    //     return 0;
-    // #else
-    //     for (int i=0;i<it->visited_sz;i++) {
-    //         if (it->visited[i].dev == dev && it->visited[i].ino == ino) return 1;
-    //     }
-    //     if (it->visited_sz == it->visited_cap) {
-    //         int nc = it->visited_cap ? it->visited_cap*2 : 64;
-    //         PosixVisitedKey *p = (PosixVisitedKey*)realloc(it->visited, (size_t)nc * sizeof(*it->visited));
-    //         if (!p) { set_err(it, ENOMEM, "out of memory growing visited set"); return -1; }
-    //         it->visited = p; it->visited_cap = nc;
-    //     }
-    //     it->visited[it->visited_sz].dev = dev;
-    //     it->visited[it->visited_sz].ino = ino;
-    //     it->visited_sz++;
-    //     return 0;
-    // #endif
-    // }
-
-    // #if defined(_WIN32)
-    //     static int visited_contains_add_win(struct fi_iter *it, DWORD vol, DWORD hi, DWORD lo) {
-    //         for (int i=0;i<it->visited_sz;i++) {
-    //             if (it->visited[i].vol == vol &&
-    //                 it->visited[i].idx_hi == hi &&
-    //                 it->visited[i].idx_lo == lo) return 1;
-    //         }
-    //         if (it->visited_sz == it->visited_cap) {
-    //             int nc = it->visited_cap ? it->visited_cap*2 : 64;
-    //             WinVisitedKey *p = (WinVisitedKey*)realloc(it->visited, (size_t)nc * sizeof(*it->visited));
-    //             if (!p) { set_err(it, ENOMEM, "out of memory growing visited set"); return -1; }
-    //             it->visited = p; it->visited_cap = nc;
-    //         }
-    //         it->visited[it->visited_sz].vol = vol;
-    //         it->visited[it->visited_sz].idx_hi = hi;
-    //         it->visited[it->visited_sz].idx_lo = lo;
-    //         it->visited_sz++;
-    //         return 0;
-    //     }
-    // #endif
-
-    // // --- platform-specific mapping ---
-
-    // #if !defined(_WIN32)
-
-    //     static fi_type mode_to_type(mode_t m)
-    //     {
-    //         if (S_ISREG(m))  return FI_TYPE_REG;
-    //         if (S_ISDIR(m))  return FI_TYPE_DIR;
-    //         if (S_ISLNK(m))  return FI_TYPE_SYMLINK;
-    //         #ifdef S_ISBLK
-    //             if (S_ISBLK(m))  return FI_TYPE_BLOCK;
-    //         #endif
-    //         #ifdef S_ISCHR
-    //             if (S_ISCHR(m))  return FI_TYPE_CHAR;
-    //         #endif
-    //         #ifdef S_ISFIFO
-    //             if (S_ISFIFO(m)) return FI_TYPE_FIFO;
-    //         #endif
-    //         #ifdef S_ISSOCK
-    //             if (S_ISSOCK(m)) return FI_TYPE_SOCKET;
-    //         #endif
-    //             return FI_TYPE_UNKNOWN;
-    //     }
-
-    //     static int push_dir_posix(struct fi_iter *it, const char *path, int depth, dev_t dev, ino_t ino) {
-    //         if (it->max_depth >= 0 && depth >= it->max_depth) return 0; // do not descend
-    //         // cycle check
-    //         int seen = visited_contains_add_posix(it, dev, ino);
-    //         if (seen < 0) return -1;
-    //         if (seen == 1) return 0; // already visited
-
-    //         DIR *d = opendir(path);
-    //         if (!d) {
-    //             // non-fatal: can't open, skip descending
-    //             return 0;
-    //         }
-    //         if (ensure_stack_cap(it, it->stack_sz+1) < 0) { closedir(d); return -1; }
-    //         DirFrameP *fr = &it->stack[it->stack_sz++];
-    //         fr->path = strdup(path);
-    //         fr->dirp = d;
-    //         fr->depth = depth;
-    //         if (!fr->path) { closedir(d); it->stack_sz--; set_err(it, ENOMEM, "out of memory"); return -1; }
-    //         return 0;
-    //     }
-
-    //     static int init_root_posix(struct fi_iter *it) {
-    //         struct stat st;
-    //         // We need lstat first to know if root is a symlink.
-    //         if (lstat(it->root_utf8, &st) != 0) {
-    //             set_err(it, errno, "lstat(root) failed");
-    //             return -1;
-    //         }
-    //         fi_type t = mode_to_type(st.st_mode);
-
-    //         if (t == FI_TYPE_DIR) {
-    //             it->root_single_file_pending = 0;
-    //             // Add root to visited and push it
-    //             if (push_dir_posix(it, it->root_utf8, 0, st.st_dev, st.st_ino) < 0) return -1;
-    //             return 0;
-    //         }
-
-    //         if (t == FI_TYPE_SYMLINK && it->follow_symlinks) {
-    //             struct stat st2;
-    //             if (stat(it->root_utf8, &st2) == 0 && S_ISDIR(st2.st_mode)) {
-    //                 it->root_single_file_pending = 0;
-    //                 if (push_dir_posix(it, it->root_utf8, 0, st2.st_dev, st2.st_ino) < 0) return -1;
-    //                 return 0;
-    //             }
-    //         }
-
-    //         // Otherwise we will just yield the root itself once.
-    //         it->root_single_file_pending = 1;
-    //         it->root_type = t;
-    //         return 0;
-    //     }
-
-    // #else  // _WIN32
-
-    //     static fi_type win_attrib_to_type(DWORD attr, DWORD reparse_tag /*best-effort*/) {
-    //         if (attr & FILE_ATTRIBUTE_REPARSE_POINT) {
-    //             // Treat any reparse point as "symlink" from the iterating perspective.
-    //             (void)reparse_tag;
-    //             return FI_TYPE_SYMLINK;
-    //         }
-    //         if (attr & FILE_ATTRIBUTE_DIRECTORY) return FI_TYPE_DIR;
-    //         return FI_TYPE_REG;
-    //     }
-
-    //     static int push_dir_win(struct fi_iter *it, const char *utf8_path, int depth) {
-    //         if (it->max_depth >= 0 && depth >= it->max_depth) return 0;
-
-    //         // Open a handle to read file ID for cycle prevention.
-    //         wchar_t *wdir = utf8_to_wide(utf8_path);
-    //         if (!wdir) return 0; // out of memory -> treat as non-fatal skip
-    //         wchar_t *wdirp = add_long_prefix(wdir);
-    //         free(wdir);
-
-    //         HANDLE h = CreateFileW(
-    //             wdirp, 0,
-    //             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE,
-    //             NULL, OPEN_EXISTING,
-    //             FILE_FLAG_BACKUP_SEMANTICS, NULL);
-
-    //         DWORD vol = 0, hi = 0, lo = 0;
-    //         if (h != INVALID_HANDLE_VALUE) {
-    //             BY_HANDLE_FILE_INFORMATION i;
-    //             if (GetFileInformationByHandle(h, &i)) {
-    //                 vol = i.dwVolumeSerialNumber;
-    //                 hi  = i.nFileIndexHigh;
-    //                 lo  = i.nFileIndexLow;
-    //             }
-    //         }
-    //         if (h != INVALID_HANDLE_VALUE) CloseHandle(h);
-
-    //         // cycle check
-    //         if (vol || hi || lo) {
-    //             int seen = visited_contains_add_win(it, vol, hi, lo);
-    //             if (seen < 0) { free(wdirp); return -1; }
-    //             if (seen == 1) { free(wdirp); return 0; }
-    //         }
-
-    //         // Prepare pattern "<dir>\*"
-    //         size_t wdlen = wcslen(wdirp);
-    //         int need_sep = (wdlen > 0 && (wdirp[wdlen-1] == L'\\' || wdirp[wdlen-1] == L'/')) ? 0 : 1;
-    //         size_t n = wdlen + (need_sep?1:0) + 2 + 1; // + "\*" + NUL
-    //         wchar_t *pattern = (wchar_t*)malloc(n * sizeof(wchar_t));
-    //         if (!pattern) { free(wdirp); set_err(it, ENOMEM, "out of memory"); return -1; }
-    //         wcscpy(pattern, wdirp);
-    //         if (need_sep) wcscat(pattern, L"\\");
-    //         wcscat(pattern, L"*");
-    //         free(wdirp);
-
-    //         if (ensure_stack_cap(it, it->stack_sz+1) < 0) { free(pattern); return -1; }
-    //         DirFrameW *fr = &it->stack[it->stack_sz++];
-    //         fr->path_utf8 = _strdup(utf8_path);
-    //         fr->wpattern  = pattern;
-    //         fr->hFind     = INVALID_HANDLE_VALUE;
-    //         fr->started   = 0;
-    //         fr->depth     = depth;
-    //         if (!fr->path_utf8) { free(pattern); it->stack_sz--; set_err(it, ENOMEM, "out of memory"); return -1; }
-    //         return 0;
-    //     }
-
-    //     static int init_root_win(struct fi_iter *it) {
-    //         wchar_t *wroot = utf8_to_wide(it->root_utf8);
-    //         if (!wroot) { set_err(it, ENOMEM, "utf8->wide failed"); return -1; }
-    //         wchar_t *wrootp = add_long_prefix(wroot);
-    //         free(wroot);
-
-    //         DWORD attr = GetFileAttributesW(wrootp);
-    //         if (attr == INVALID_FILE_ATTRIBUTES) {
-    //             free(wrootp);
-    //             set_err(it, (int)GetLastError(), "GetFileAttributesW failed");
-    //             return -1;
-    //         }
-
-    //         fi_type t = win_attrib_to_type(attr, 0);
-    //         if ((t == FI_TYPE_DIR) ||
-    //             (t == FI_TYPE_SYMLINK && it->follow_symlinks && (attr & FILE_ATTRIBUTE_DIRECTORY))) {
-    //             it->root_single_file_pending = 0;
-    //             // Push root directory for enumeration.
-    //             free(wrootp);
-    //             if (push_dir_win(it, it->root_utf8, 0) < 0) return -1;
-    //             return 0;
-    //         }
-
-    //         it->root_single_file_pending = 1;
-    //         it->root_type = t;
-    //         free(wrootp);
-    //         return 0;
-    //     }
-
-    // #endif
-
-    // // --- Public API impl ---
-
-    // int fi_iter_init(fi_iter **out, const char *root_utf8, int max_depth, int follow_symlinks) {
-    //     if (!out || !root_utf8) return -1;
-    //     fi_iter *it = (fi_iter*)calloc(1, sizeof(*it));
-    //     if (!it) return -1;
-
-    //     it->max_depth = max_depth;
-    //     it->follow_symlinks = follow_symlinks ? 1 : 0;
-    //     it->root_utf8 = strdup(root_utf8);
-    //     it->err = 0;
-    //     it->errmsg[0] = '\0';
-    //     if (!it->root_utf8) { fi_iter_destroy(it); return -1; }
-
-    //     #if !defined(_WIN32)
-    //         if (init_root_posix(it) < 0) { fi_iter_destroy(it); return -1; }
-    //     #else
-    //         if (init_root_win(it) < 0) { fi_iter_destroy(it); return -1; }
-    //     #endif
-
-    //     *out = it;
-    //     return 0;
-    // }
-
-    // static int emit_entry(struct fi_iter *it, const char *path_utf8, fi_type type, int depth, fi_entry *out) {
-    //     if (fi_strbuf_set(&it->ret_path, path_utf8) < 0) { set_err(it, ENOMEM, "out of memory"); return -1; }
-    //     it->out_entry.path  = it->ret_path.buf;
-    //     it->out_entry.type  = type;
-    //     it->out_entry.depth = depth;
-    //     *out = it->out_entry;
-    //     return 1;
-    // }
-
-    // #if !defined(_WIN32)
-
-    //     static int maybe_descend_posix(struct fi_iter *it, const char *full, fi_type type) {
-    //         if (type != FI_TYPE_DIR && !(type == FI_TYPE_SYMLINK && it->follow_symlinks))
-    //             return 0;
-
-    //         int depth_parent = it->stack[it->stack_sz-1].depth;
-    //         int next_depth = depth_parent + 1;
-
-    //         if (it->max_depth >= 0 && next_depth > it->max_depth) return 0;
-
-    //         struct stat st;
-    //         dev_t dev = 0;
-    //         ino_t ino = 0;
-
-    //         if (type == FI_TYPE_DIR) {
-    //             if (lstat(full, &st) == 0) { dev = st.st_dev; ino = st.st_ino; }
-    //         } else if (type == FI_TYPE_SYMLINK && it->follow_symlinks) {
-    //             if (stat(full, &st) == 0 && S_ISDIR(st.st_mode)) { dev = st.st_dev; ino = st.st_ino; }
-    //             else return 0; // target not a dir or stat failed: do not descend
-    //         } else {
-    //             return 0;
-    //         }
-
-    //         if (dev || ino) return push_dir_posix(it, full, next_depth, dev, ino);
-    //         return 0;
-    //     }
-
-    //     int fi_iter_next(fi_iter *it, fi_entry *out) {
-    //         if (!it || !out) return -1;
-    //         if (it->done) return 0;
-
-    //         // Single-file case (root not treated as traversable directory)
-    //         if (it->root_single_file_pending) {
-    //             it->root_single_file_pending = 0;
-    //             it->done = 1;
-    //             return emit_entry(it, it->root_utf8, it->root_type, 0, out);
-    //         }
-
-    //         while (it->stack_sz > 0) {
-    //             DirFrameP *fr = &it->stack[it->stack_sz-1];
-    //             errno = 0;
-    //             struct dirent *de = readdir(fr->dirp);
-    //             if (!de) {
-    //                 // End or error: pop
-    //                 closedir(fr->dirp);
-    //                 free(fr->path);
-    //                 it->stack_sz--;
-    //                 continue;
-    //             }
-    //             const char *name = de->d_name;
-    //             if (is_dot_or_dotdot_utf8(name)) continue;
-
-    //             if (path_join_utf8(&it->join_buf, fr->path, name, 0) < 0) { set_err(it, ENOMEM, "out of memory"); return -1; }
-    //             const char *full = it->join_buf.buf;
-
-    //             fi_type type = FI_TYPE_UNKNOWN;
-    //             // Try d_type first, but it may be DT_UNKNOWN; then lstat.
-    //     #ifdef DT_DIR
-    //             if (de->d_type != DT_UNKNOWN) {
-    //                 switch (de->d_type) {
-    //                     case DT_REG: type = FI_TYPE_REG; break;
-    //                     case DT_DIR: type = FI_TYPE_DIR; break;
-    //     #ifdef DT_LNK
-    //                     case DT_LNK: type = FI_TYPE_SYMLINK; break;
-    //     #endif
-    //     #ifdef DT_BLK
-    //                     case DT_BLK: type = FI_TYPE_BLOCK; break;
-    //     #endif
-    //     #ifdef DT_CHR
-    //                     case DT_CHR: type = FI_TYPE_CHAR; break;
-    //     #endif
-    //     #ifdef DT_FIFO
-    //                     case DT_FIFO: type = FI_TYPE_FIFO; break;
-    //     #endif
-    //     #ifdef DT_SOCK
-    //                     case DT_SOCK: type = FI_TYPE_SOCKET; break;
-    //     #endif
-    //                     default: type = FI_TYPE_UNKNOWN; break;
-    //                 }
-    //             }
-    //     #endif
-    //             if (type == FI_TYPE_UNKNOWN) {
-    //                 struct stat st;
-    //                 if (lstat(full, &st) == 0) {
-    //                     type = mode_to_type(st.st_mode);
-    //                 } else {
-    //                     // Unstatable file: still emit as unknown.
-    //                     type = FI_TYPE_UNKNOWN;
-    //                 }
-    //             }
-
-    //             int depth = fr->depth + 1;
-
-    //             // Possibly push directory for DFS before emitting (preorder traversal)
-    //             if (maybe_descend_posix(it, full, type) < 0) return -1;
-
-    //             return emit_entry(it, full, type, depth, out);
-    //         }
-
-    //         it->done = 1;
-    //         return 0;
-    //     }
-
-    // #else  // _WIN32
-
-    //     static int frame_next_w(DirFrameW *fr) {
-    //         if (!fr->started) {
-    //             fr->hFind = FindFirstFileW(fr->wpattern, &fr->wfd);
-    //             fr->started = 1;
-    //             if (fr->hFind == INVALID_HANDLE_VALUE) return 0;
-    //             return 1;
-    //         } else {
-    //             if (!FindNextFileW(fr->hFind, &fr->wfd)) return 0;
-    //             return 1;
-    //         }
-    //     }
-
-    //     static void frame_close_w(DirFrameW *fr) {
-    //         if (fr->hFind != INVALID_HANDLE_VALUE) {
-    //             FindClose(fr->hFind);
-    //             fr->hFind = INVALID_HANDLE_VALUE;
-    //         }
-    //     }
-
-    //     static int maybe_descend_win(struct fi_iter *it, const char *child_utf8, const WIN32_FIND_DATAW *wfd, int parent_depth) {
-    //         // Only descend into directories. For symlinked directories, DIRECTORY + REPARSE_POINT are both set.
-    //         if (!(wfd->dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY)) return 0;
-    //         int next_depth = parent_depth + 1;
-    //         if (it->max_depth >= 0 && next_depth > it->max_depth) return 0;
-
-    //         // If it's a reparse point (symlink/junction) and not following, skip.
-    //         if ((wfd->dwFileAttributes & FILE_ATTRIBUTE_REPARSE_POINT) && !it->follow_symlinks)
-    //             return 0;
-
-    //         return push_dir_win(it, child_utf8, next_depth);
-    //     }
-
-    //     int fi_iter_next(fi_iter *it, fi_entry *out) {
-    //         if (!it || !out) return -1;
-    //         if (it->done) return 0;
-
-    //         if (it->root_single_file_pending) {
-    //             it->root_single_file_pending = 0;
-    //             it->done = 1;
-    //             return emit_entry(it, it->root_utf8, it->root_type, 0, out);
-    //         }
-
-    //         while (it->stack_sz > 0) {
-    //             DirFrameW *fr = &it->stack[it->stack_sz-1];
-
-    //             int have = frame_next_w(fr);
-    //             if (!have) {
-    //                 frame_close_w(fr);
-    //                 free(fr->wpattern);
-    //                 free(fr->path_utf8);
-    //                 it->stack_sz--;
-    //                 continue;
-    //             }
-
-    //             // Convert filename to UTF-8
-    //             if (wcscmp(fr->wfd.cFileName, L".") == 0 || wcscmp(fr->wfd.cFileName, L"..") == 0) {
-    //                 continue;
-    //             }
-    //             char *name_utf8 = wide_to_utf8(fr->wfd.cFileName);
-    //             if (!name_utf8) { set_err(it, ENOMEM, "wide->utf8 failed"); return -1; }
-
-    //             // Build full path in UTF-8
-    //             if (path_join_utf8(&it->join_buf, fr->path_utf8, name_utf8, 1) < 0) { free(name_utf8); set_err(it, ENOMEM, "out of memory"); return -1; }
-    //             const char *full = it->join_buf.buf;
-    //             int depth = fr->depth + 1;
-
-    //             DWORD tag = fr->wfd.dwReserved0; // reparse tag (best-effort)
-    //             fi_type type = win_attrib_to_type(fr->wfd.dwFileAttributes, tag);
-
-    //             // Maybe descend (DFS) before emitting
-    //             if (maybe_descend_win(it, full, &fr->wfd, fr->depth) < 0) { free(name_utf8); return -1; }
-
-    //             int rc = emit_entry(it, full, type, depth, out);
-    //             free(name_utf8);
-    //             return rc;
-    //         }
-
-    //         it->done = 1;
-    //         return 0;
-    //     }
-
-    // #endif
-
-    // void fi_iter_destroy(fi_iter *it) 
-    // {
-    //     if (!it) return;
-
-    //     #if !defined(_WIN32)
-    //         for (int i=0;i<it->stack_sz;i++) {
-    //             if (it->stack[i].dirp) closedir(it->stack[i].dirp);
-    //             free(it->stack[i].path);
-    //         }
-    //         free(it->stack);
-    //         free(it->visited);
-    //     #else
-    //         for (int i=0;i<it->stack_sz;i++) {
-    //             frame_close_w(&it->stack[i]);
-    //             free(it->stack[i].wpattern);
-    //             free(it->stack[i].path_utf8);
-    //         }
-    //         free(it->stack);
-    //         free(it->visited);
-    //     #endif
-
-    //     free(it->root_utf8);
-    //     free(it->ret_path.buf);
-    //     free(it->join_buf.buf);
-    //     free(it);
-    // }
+    struct JSL__FormatOutContext
+    {
+        FILE* out;
+        bool failure_flag;
+        alignas(32) uint8_t buffer[JSL_FORMAT_MIN_BUFFER];
+    };
+
+    static uint8_t* format_out_callback(uint8_t *buf, void *user, int64_t len)
+    {
+        struct JSL__FormatOutContext* context = (struct JSL__FormatOutContext*) user;
+
+        size_t written = fwrite(buf, sizeof(uint8_t), len, context->out);
+        if (written == len)
+        {
+            return context->buffer;
+        }
+        else
+        {
+            context->failure_flag = true;
+            return NULL;
+        }
+    }
+
+    JSL_ASAN_OFF bool jsl_format_file(FILE* out, JSLFatPtr fmt, ...)
+    {
+        if (out == NULL || fmt.data == NULL || fmt.length < 0)
+            return false;
+
+        va_list va;
+        va_start(va, fmt);
+
+        struct JSL__FormatOutContext context;
+        context.out = out;
+        context.failure_flag = false;
+
+        jsl_format_callback(
+            format_out_callback,
+            &context,
+            context.buffer,
+            fmt,
+            va
+        );
+
+        va_end(va);
+
+        return !context.failure_flag;
+    }
 
     #endif // JSL_INCLUDE_FILE_UTILS
 
