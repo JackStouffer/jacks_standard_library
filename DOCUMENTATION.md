@@ -2,9 +2,8 @@
 
 ## Macros
 
+- [`JSL_INCLUDE_FILE_UTILS`](#macro-jsl_include_file_utils)
 - [`JACKS_STANDARD_LIBRARY`](#macro-jacks_standard_library)
-- [`JSL_ASAN_OFF`](#macro-jsl_asan_off)
-- [`JSL_NO_INLINE`](#macro-jsl_no_inline)
 - [`JSL_DEF`](#macro-jsl_def)
 - [`JSL_DEFAULT_ALLOCATION_ALIGNMENT`](#macro-jsl_default_allocation_alignment)
 - [`JSL_WARN_UNUSED`](#macro-jsl_warn_unused)
@@ -39,6 +38,12 @@
 - [Struct `JSLStringBuilderIterator`](#type-struct-jslstringbuilderiterator)
 - [Typedef `JSLStringBuilderIterator`](#type-typedef-jslstringbuilderiterator)
 - [Typedef `JSL_FORMAT_CALLBACK`](#type-typedef-jsl_format_callback)
+- [Enum `JSLLoadFileResultEnum`](#type-enum-jslloadfileresultenum)
+- [Typedef `JSLLoadFileResultEnum`](#type-typedef-jslloadfileresultenum)
+- [Enum `JSLWriteFileResultEnum`](#type-enum-jslwritefileresultenum)
+- [Typedef `JSLWriteFileResultEnum`](#type-typedef-jslwritefileresultenum)
+- [Enum `JSLFileTypeEnum`](#type-enum-jslfiletypeenum)
+- [Typedef `JSLFileTypeEnum`](#type-typedef-jslfiletypeenum)
 
 ## Functions
 
@@ -87,6 +92,10 @@
 - [`jsl_format_valist`](#function-jsl_format_valist)
 - [`jsl_format_callback`](#function-jsl_format_callback)
 - [`jsl_format_set_separators`](#function-jsl_format_set_separators)
+- [`jsl_load_file_contents`](#function-jsl_load_file_contents)
+- [`jsl_load_file_contents_buffer`](#function-jsl_load_file_contents_buffer)
+- [`jsl_write_file_contents`](#function-jsl_write_file_contents)
+- [`jsl_format_file`](#function-jsl_format_file)
 
 ## File: src/jacks_standard_library.h
 
@@ -154,6 +163,15 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
 WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+<a id="macro-jsl_include_file_utils"></a>
+### Macro: `JSL_INCLUDE_FILE_UTILS`
+
+```c
+#define JSL_INCLUDE_FILE_UTILS JSL_INCLUDE_FILE_UTILS 1
+```
+
+---
+
 <a id="macro-jacks_standard_library"></a>
 ### Macro: `JACKS_STANDARD_LIBRARY`
 
@@ -163,30 +181,6 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 
 *Defined at*: `src/jacks_standard_library.h:70`
-
----
-
-<a id="macro-jsl_asan_off"></a>
-### Macro: `JSL_ASAN_OFF`
-
-```c
-#define JSL_ASAN_OFF JSL_ASAN_OFF
-```
-
-
-*Defined at*: `src/jacks_standard_library.h:119`
-
----
-
-<a id="macro-jsl_no_inline"></a>
-### Macro: `JSL_NO_INLINE`
-
-```c
-#define JSL_NO_INLINE JSL_NO_INLINE __attribute__ ( ( noinline))
-```
-
-
-*Defined at*: `src/jacks_standard_library.h:123`
 
 ---
 
@@ -1701,6 +1695,146 @@ void jsl_format_set_separators(char, char);
 
 
 *Defined at*: `src/jacks_standard_library.h:932`
+
+---
+
+<a id="type-enum-jslloadfileresultenum"></a>
+### Enum: `JSLLoadFileResultEnum`
+
+- `JSL_FILE_LOAD_BAD_PARAMETERS = 0`
+- `JSL_FILE_LOAD_SUCCESS = 1`
+- `JSL_FILE_LOAD_COULD_NOT_OPEN = 2`
+- `JSL_FILE_LOAD_COULD_NOT_GET_FILE_SIZE = 3`
+- `JSL_FILE_LOAD_COULD_NOT_GET_MEMORY = 4`
+- `JSL_FILE_LOAD_READ_FAILED = 5`
+- `JSL_FILE_LOAD_CLOSE_FAILED = 6`
+- `JSL_FILE_LOAD_ERROR_UNKNOWN = 7`
+- `JSL_FILE_LOAD_ENUM_COUNT = 8`
+
+
+*Defined at*: `src/jacks_standard_library.h:962`
+
+---
+
+<a id="type-typedef-jslloadfileresultenum"></a>
+### Typedef: `JSLLoadFileResultEnum`
+
+```c
+typedef enum JSLLoadFileResultEnum JSLLoadFileResultEnum;
+```
+
+
+*Defined at*: `src/jacks_standard_library.h:975`
+
+---
+
+<a id="type-enum-jslwritefileresultenum"></a>
+### Enum: `JSLWriteFileResultEnum`
+
+- `JSL_FILE_WRITE_BAD_PARAMETERS = 0`
+- `JSL_FILE_WRITE_SUCCESS = 1`
+- `JSL_FILE_WRITE_COULD_NOT_OPEN = 2`
+- `JSL_FILE_WRITE_COULD_NOT_WRITE = 3`
+- `JSL_FILE_WRITE_COULD_NOT_CLOSE = 4`
+- `JSL_FILE_WRITE_ENUM_COUNT = 5`
+
+
+*Defined at*: `src/jacks_standard_library.h:977`
+
+---
+
+<a id="type-typedef-jslwritefileresultenum"></a>
+### Typedef: `JSLWriteFileResultEnum`
+
+```c
+typedef enum JSLWriteFileResultEnum JSLWriteFileResultEnum;
+```
+
+
+*Defined at*: `src/jacks_standard_library.h:987`
+
+---
+
+<a id="type-enum-jslfiletypeenum"></a>
+### Enum: `JSLFileTypeEnum`
+
+- `JSL_FILE_TYPE_UNKNOWN = 0`
+- `JSL_FILE_TYPE_REG = 1`
+- `JSL_FILE_TYPE_DIR = 2`
+- `JSL_FILE_TYPE_SYMLINK = 3`
+- `JSL_FILE_TYPE_BLOCK = 4`
+- `JSL_FILE_TYPE_CHAR = 5`
+- `JSL_FILE_TYPE_FIFO = 6`
+- `JSL_FILE_TYPE_SOCKET = 7`
+- `JSL_FILE_TYPE_COUNT = 8`
+
+
+*Defined at*: `src/jacks_standard_library.h:989`
+
+---
+
+<a id="type-typedef-jslfiletypeenum"></a>
+### Typedef: `JSLFileTypeEnum`
+
+```c
+typedef enum JSLFileTypeEnum JSLFileTypeEnum;
+```
+
+
+*Defined at*: `src/jacks_standard_library.h:1000`
+
+---
+
+<a id="function-jsl_load_file_contents"></a>
+### Function: `jsl_load_file_contents`
+
+Load the contents of the file at `path` into a newly allocated buffer
+from the given arena. The buffer will be the exact size of the file contents.
+
+If the arena does not have enough space,
+
+```c
+JSLLoadFileResultEnum jsl_load_file_contents(JSLArena *, JSLFatPtr, JSLFatPtr *, int *);
+```
+
+
+*Defined at*: `src/jacks_standard_library.h:1008`
+
+---
+
+<a id="function-jsl_load_file_contents_buffer"></a>
+### Function: `jsl_load_file_contents_buffer`
+
+```c
+JSLLoadFileResultEnum jsl_load_file_contents_buffer(JSLFatPtr *, JSLFatPtr, int *);
+```
+
+
+*Defined at*: `src/jacks_standard_library.h:1016`
+
+---
+
+<a id="function-jsl_write_file_contents"></a>
+### Function: `jsl_write_file_contents`
+
+```c
+JSLWriteFileResultEnum jsl_write_file_contents(JSLFatPtr, JSLFatPtr, int *, int *);
+```
+
+
+*Defined at*: `src/jacks_standard_library.h:1023`
+
+---
+
+<a id="function-jsl_format_file"></a>
+### Function: `jsl_format_file`
+
+```c
+int jsl_format_file(int *, JSLFatPtr, ...);
+```
+
+
+*Defined at*: `src/jacks_standard_library.h:1031`
 
 ---
 
