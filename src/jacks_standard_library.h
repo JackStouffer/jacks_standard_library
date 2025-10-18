@@ -218,20 +218,64 @@ extern "C" {
  */
 #define JSL_SET_BITFLAG(flags, flag) *flags |= flag
 
-// TODO: Docs
+/**
+ * Clears a bit flag from a value pointed to by `flags` by zeroing the bits set in `flag`.
+ *
+ * Example:
+ *
+ * ```
+ * uint32_t permissions = FLAG_READ | FLAG_WRITE;
+ * JSL_UNSET_BITFLAG(&permissions, FLAG_WRITE);
+ * // `permissions` now only has FLAG_READ set.
+ * ```
+ */
 #define JSL_UNSET_BITFLAG(flags, flag) *flags &= ~(flag)
 
-// TODO: Docs
+/**
+ * Returns non-zero when every bit in `flag` is also set within `flags`.
+ *
+ * Example:
+ *
+ * ```
+ * uint32_t permissions = FLAG_READ | FLAG_WRITE;
+ * if (JSL_IS_BITFLAG_SET(permissions, FLAG_READ)) {
+ *     // FLAG_READ is present
+ * }
+ * ```
+ */
 #define JSL_IS_BITFLAG_SET(flags, flag) ((flags & flag) == flag)
 
-// TODO: Docs
+/**
+ * Returns non-zero when none of the bits in `flag` are set within `flags`.
+ *
+ * Example:
+ *
+ * ```
+ * uint32_t permissions = FLAG_READ;
+ * if (JSL_IS_BITFLAG_NOT_SET(permissions, FLAG_WRITE)) {
+ *     // FLAG_WRITE is not present
+ * }
+ * ```
+ */
 #define JSL_IS_BITFLAG_NOT_SET(flags, flag) ((flags & flag) == 0)
 
-// TODO: Docs
+/**
+ * Generates a bit flag with a single bit set at the given zero-based position.
+ *
+ * Example:
+ *
+ * ```
+ * enum PermissionFlags {
+ *     FLAG_READ = JSL_MAKE_BITFLAG(0),
+ *     FLAG_WRITE = JSL_MAKE_BITFLAG(1),
+ * };
+ * uint32_t permissions = FLAG_READ | FLAG_WRITE;
+ * ```
+ */
 #define JSL_MAKE_BITFLAG(position) 1U << position
 
 /**
- * Macro to simply mark a value as representing bytes. Does nothing with the value.
+ * Macro to simply mark a value as representing a size in bytes. Does nothing with the value.
  */
 #define JSL_BYTES(x) x
 
@@ -352,11 +396,28 @@ typedef struct JSLFatPtr
 #define JSL_FATPTR_LITERAL(s) \
     ((JSLFatPtr){ .data = (uint8_t*)(s), .length = (int64_t)(sizeof("" s "") - 1) })
 
-// TODO: docs
+/**
+ * Advances a fat pointer forward by `n`.
+ *
+ * @note This macro does no bounds checking and is intentionally tiny so it can
+ *       live in hot loops without adding overhead.
+ */
 #define JSL_FATPTR_ADVANCE(fatptr, n) \
     fatptr.data += n; fatptr.length -= n;
 
-// TODO: docs
+/**
+ * Creates a `JSLFatPtr` view over a stack-allocated buffer.
+ *
+ * The buffer must be a real array (not a pointer) so the macro can use
+ * `sizeof` to determine its capacity at compile time.
+ *
+ * Example:
+ * 
+ * ```c
+ * uint8_t buffer[JSL_KILOBYTES(4)];
+ * JSLFatPtr ptr = JSL_FATPTR_FROM_STACK(buffer);
+ * ```
+ */
 #define JSL_FATPTR_FROM_STACK(buf) \
     (JSLFatPtr){ .data = (uint8_t *)(buf), \
                 .length = (int64_t)(sizeof(buf)) }
@@ -449,6 +510,7 @@ typedef struct JSLStringBuilder
     int32_t chunk_size;
 } JSLStringBuilder;
 
+// TODO: docs
 typedef struct JSLStringBuilderIterator
 {
     struct JSLStringBuilderChunk* current;
@@ -503,7 +565,7 @@ JSL_DEF JSLFatPtr jsl_fatptr_auto_slice(JSLFatPtr original_fatptr, JSLFatPtr wri
  * It simply sets the data pointer to `str` and the length value to the result of
  * `JSL_STRLEN`.
  *
- * @param str = the str to create the fat ptr from
+ * @param str the str to create the fat ptr from
  * @return A fat ptr
  */
 JSL_DEF JSLFatPtr jsl_fatptr_from_cstr(char* str);
@@ -537,8 +599,7 @@ JSL_DEF int64_t jsl_fatptr_memory_copy(JSLFatPtr* destination, JSLFatPtr source)
  * `destination` is modified to point to the remaining data in the buffer. I.E.
  * if the entire buffer was used then `destination->length` will be `0`.
  *
- * Returns:
- *      Number of bytes written or `-1` if `string` or the fat pointer was null.
+ * @returns Number of bytes written or `-1` if `string` or the fat pointer was null.
  */
 JSL_DEF int64_t jsl_fatptr_cstr_memory_copy(
     JSLFatPtr* destination,
@@ -546,11 +607,23 @@ JSL_DEF int64_t jsl_fatptr_cstr_memory_copy(
     bool include_null_terminator
 );
 
-// TODO, docs. Remember to mention Unicode normalization. Mention difference between code units and graphemes in UTF
+/**
+ * Searches `string` for the byte sequence in `substring` and returns the index of the first
+ * match or `-1` when no match exists. Both fat pointers must reference valid data.
+ *
+ * @note The comparison operates on raw code units. In UTF encodings, multiple code units can
+ * form a single grapheme cluster, so the index does not necessarily map to user-perceived
+ * characters. No Unicode normalization is performed; normalize inputs first if combining mark
+ * equivalence is required.
+ *
+ * @param string the string to search in
+ * @param substring the substring to search for
+ * @returns Index of the first occurrence.
+ */
 JSL_DEF int64_t jsl_fatptr_substring_search(JSLFatPtr string, JSLFatPtr substring);
 
 // TODO, docs. Remember to mention Unicode normalization. Mention difference between code units and graphemes in UTF
-JSL_DEF int64_t jsl_fatptr_index_of(JSLFatPtr str, uint8_t item);
+JSL_DEF int64_t jsl_fatptr_index_of(JSLFatPtr data, uint8_t item);
 
 // TODO, docs. Remember to mention Unicode normalization. Mention difference between code units and graphemes in UTF
 JSL_DEF int64_t jsl_fatptr_count(JSLFatPtr str, uint8_t item);

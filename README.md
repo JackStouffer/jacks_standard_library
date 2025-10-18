@@ -1,3 +1,5 @@
+not finished yet
+
 # Jack's Standard Library
 
 A collection of types and functions designed to replace usage of the
