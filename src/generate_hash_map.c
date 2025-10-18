@@ -35,6 +35,7 @@
 #define JSL_IMPLEMENTATION
 #include "jacks_standard_library.h"
 
+#include "generate_hash_map.h"
 
 /**
  * TODO: Documentation: talk about

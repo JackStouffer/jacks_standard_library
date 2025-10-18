@@ -4,8 +4,8 @@ These are general notes on design decisions.
 
 ## Why Write This Library?
 
-Much of the C Standard Library is outdated, very unsafe, or poorly designed. 
-Some bad design decisions include
+Much of the C Standard Library is outdated, unsafe, or poorly designed. Some bad design
+decisions include:
 
 * Null terminated strings
 * A single global heap, which is called silently, and you're expected to remember to call free
@@ -14,10 +14,13 @@ Some bad design decisions include
 * As part of the language that arrays decay to pointers, and there's no way to stop it.
   This means a lot of functions don't have a way to pass 
 
-Also, I started working on WebAssembly projects without emscripten. The 
+So I kept writing the same set of utilities across my different projects which avoided these
+pitfalls. I decided put them into a single repo.
 
-I kept writing the same set of utilities across my different projects, so I
-put them into a single repo.
+Also, I started working on WebAssembly (WASM) projects without emscripten, just using clang
+directly. There are C stdlib implementations for WASM but they are very bloated when you
+can't use the majority of their functionality in a sandboxed environment. This library
+provides all of the functionality I need in a base utility layer.
 
 ## Why do you use signed 64 bit ints for sizes and not `size_t`?
 

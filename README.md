@@ -22,6 +22,8 @@ C Standard Library.
 ```
 
 This should probably be in the "main" file for your program, but it doesn't have to be.
+You can also define an empty `.c` file with this as the only thing in it if that would
+more easily integrate into your build.
 
 One note is that this library does not depend on the C standard library to be available
 at link time if you don't want to use it. However, it does require the "compile time"
