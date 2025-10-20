@@ -1,8 +1,16 @@
 /**
  * # Jack's Standard Library
  * 
- * See the README.md for an intro
+ * A collection of utilities which are designed to replace much of the C standard
+ * library.
  * 
+ * See README.md for a detailed intro.
+ * 
+ * See DESIGN.md for background on the design decisions.
+ * 
+ * See DOCUMENTATION.md for a single markdown file containing all of the docstrings
+ * from this file. It's more nicely formatted and contains hyperlinks.
+ *
  * ## Preprocessor Switches
  * 
  * `JSL_DEBUG` - turns on some debugging features, like overwriting stale memory with
@@ -25,22 +33,19 @@
  * worth the loss of correctness.
  * 
  * `JSL_MEMCPY` - Controls memcpy calls in the library. By default this will include
- * `string.h` and use `memcpy`.
+ * `string.h` and be an alias to C's `memcpy`.
  * 
  * `JSL_MEMCMP` - Controls memcmp calls in the library. By default this will include
- * `string.h` and use `memcmp`.
+ * `string.h` and be an alias to C's `memcmp`.
  * 
  * `JSL_MEMSET` - Controls memset calls in the library. By default this will include
- * `string.h` and use `memset`.
+ * `string.h` and be an alias to C's `memset`.
  * 
  * `JSL_DEFAULT_ALLOCATION_ALIGNMENT` - Sets the alignment of allocations that aren't
  * explicitly set. Defaults to 16 bytes.
  * 
  * `JSL_INCLUDE_FILE_UTILS` - Include the file loading and writing utilities. These
  * require linking the standard library.
- * 
- * `JSL_INCLUDE_HASH_MAP` - Include the hash map macros. See the `HASHMAPS` section
- * for documentation.
  *
  * ## License
  * 
@@ -119,14 +124,6 @@ extern "C" {
     #define JSL_ASAN_OFF
 #endif
 
-#if defined(__GNUC__) || defined(__clang__)
-    #define JSL_NO_INLINE __attribute__((noinline))
-#endif
-
-#ifndef JSL_NO_INLINE
-    #define JSL_NO_INLINE
-#endif
-
 /**
  * 
  * 
@@ -137,16 +134,30 @@ extern "C" {
 
 
 #ifndef JSL_DEF
+    /**
+     * Allows you to override linkage/visibility (e.g., __declspec) for all of
+     * the functions defined by this library. By default this is empty.
+     */
     #define JSL_DEF /* extern by default */
 #endif
 
 #ifndef JSL_DEFAULT_ALLOCATION_ALIGNMENT
+    /**
+     * Sets the alignment of allocations that aren't explicitly set. Defaults to 16 bytes.
+     */
     #define JSL_DEFAULT_ALLOCATION_ALIGNMENT 16
 #endif
 
 #ifndef JSL_WARN_UNUSED
 
     #if defined(__clang__) ||  defined(__GNUC__)
+        /**
+         * This controls the function attribute which tells the compiler to
+         * issue a warning if the return value of the function is not stored in a variable, or if
+         * that variable is never read. This is auto defined for clang and gcc; there's no
+         * C11 compatible implementation for MSVC. If you want to turn this off, just define it as
+         * empty string.
+         */
         #define JSL_WARN_UNUSED __attribute__((warn_unused_result))
     #else
         #define JSL_WARN_UNUSED
@@ -423,7 +434,26 @@ typedef struct JSLFatPtr
                 .length = (int64_t)(sizeof(buf)) }
 
 /**
- * TODO: docs
+ * A bump allocator. Designed for situations in your program when you know a
+ * definite lifetime and a good upper bound on how much memory that lifetime will
+ * need.
+ * 
+ * See the DESIGN.md file for detailed notes on arena implementation, their uses,
+ * and when they shouldn't be used.
+ * 
+ * Functions and Macros:
+ * 
+ * * jsl_arena_init
+ * * jsl_arena_init2
+ * * jsl_arena_allocate
+ * * jsl_arena_allocate_aligned
+ * * jsl_arena_reallocate
+ * * jsl_arena_reallocate_aligned
+ * * jsl_arena_reset
+ * * jsl_arena_save_restore_point
+ * * jsl_arena_load_restore_point
+ * * JSL_ARENA_TYPED_ALLOCATE
+ * * JSL_ARENA_FROM_STACK
  *
  * @note The arena API is not thread safe. Arena memory is assumed to live in a
  * single thread. If you want to share an arena between threads you need to lock.
@@ -453,7 +483,7 @@ typedef struct JSLArena
  * ```
  * void some_func(void)
  * {
- *      uint8_t buffer[16 * 1024]; // yes this breaks the standard but it's supported everywhere that matters
+ *      uint8_t buffer[16 * 1024];
  *      JSLArena stack_arena = JSL_ARENA_FROM_STACK(buffer);
  * 
  *      IntToStrMap map = int_to_str_ctor(&arena);
@@ -471,7 +501,7 @@ typedef struct JSLArena
 /**
  * A string builder is a container for building large strings. It's specialized for
  * situations where many different smaller operations result in small strings being
- * coalesed into a final result, specifically using an arena as its allocator.
+ * coalesced into a final result, specifically using an arena as its allocator.
  * 
  * While this is called string builder, the underlying data store is just bytes, so
  * any binary data which is built in chunks can use the string builder.
@@ -479,7 +509,7 @@ typedef struct JSLArena
  * A string builder is different from a normal dynamic array in two ways. One, it
  * has specific operations for writing string data in both fat pointer form but also
  * as a `snprintf` like operation. Two, the resulting string data is not stored as a
- * contigious range of memory, but as a series of chunks which is given to the user
+ * contiguous range of memory, but as a series of chunks which is given to the user
  * as an iterator when the string is finished. 
  *
  * This is due to the nature of arena allocations. If you're using an arena for a
@@ -499,7 +529,13 @@ typedef struct JSLArena
  * want to use SIMD code on the consuming code.
  * 
  * Functions:
- *      * TODO
+ * 
+ * * jsl_string_builder_init
+ * * jsl_string_builder_init2
+ * * jsl_string_builder_insert_char
+ * * jsl_string_builder_insert_uint8_t
+ * * jsl_string_builder_insert_fatptr
+ * * jsl_string_builder_format
  */
 typedef struct JSLStringBuilder
 {
@@ -510,7 +546,17 @@ typedef struct JSLStringBuilder
     int32_t chunk_size;
 } JSLStringBuilder;
 
-// TODO: docs
+/**
+ * The iterator type for a JSLStringBuilder instance. This keeps track of
+ * where the iterator is over the course of calling the next function. 
+ * 
+ * @warning It is not valid to modify a string builder while iterating over it. 
+ * 
+ * Functions:
+ * 
+ * * jsl_string_builder_iterator_init
+ * * jsl_string_builder_iterator_next
+ */
 typedef struct JSLStringBuilderIterator
 {
     struct JSLStringBuilderChunk* current;
@@ -532,21 +578,34 @@ JSL_DEF JSLFatPtr jsl_fatptr_init(uint8_t* ptr, int64_t length);
  */
 JSL_DEF JSLFatPtr jsl_fatptr_slice(JSLFatPtr fatptr, int64_t start, int64_t end);
 
-// TODO, docs: better explanation, example. 
 /**
  * Utility function to get the total amount of bytes written to the original
- * fat pointer when compared to a writer fat pointer.
+ * fat pointer when compared to a writer fat pointer. See jsl_fatptr_auto_slice
+ * to get a slice of the written portion.
  * 
  * This function checks for NULL and checks that `writer_fatptr` points to data
  * in `original_fatptr`. If either of these checks fail, then `-1` is returned.
+ * 
+ * ```
+ * JSLFatPtr original = jsl_arena_allocate(arena, 128 * 1024 * 1024);
+ * JSLFatPtr writer = original;
+ * jsl_write_file_contents(&writer, "file_one.txt");
+ * jsl_write_file_contents(&writer, "file_two.txt");
+ * int64_t write_len = jsl_fatptr_total_write_length(original, writer);
+ * ```
+ * 
+ * @param original_fatptr The pointer to the originally allocated buffer
+ * @param writer_fatptr The pointer that has been advanced during writing operations
+ * @returns The amount of data which has been written, or -1 if there was an issue
  */
 JSL_DEF int64_t jsl_fatptr_total_write_length(JSLFatPtr original_fatptr, JSLFatPtr writer_fatptr);
 
 /**
  * Returns the slice in `original_fatptr` that represents the written to portion, given
- * the size and pointer in `writer_fatptr`.
- * 
- * @note 
+ * the size and pointer in `writer_fatptr`. If either parameter has a NULL data
+ * field, has a negative length, or if the writer does not point to a portion
+ * of the original allocation, this function will return a fat pointer with a 
+ * `NULL` data pointer.
  * 
  * Example:
  * 
@@ -557,13 +616,18 @@ JSL_DEF int64_t jsl_fatptr_total_write_length(JSLFatPtr original_fatptr, JSLFatP
  * jsl_write_file_contents(&writer, "file_two.txt");
  * JSLFatPtr portion_with_file_data = jsl_fatptr_auto_slice(original, writer);
  * ```
+ *
+ * @param original_fatptr The pointer to the originally allocated buffer
+ * @param writer_fatptr The pointer that has been advanced during writing operations
+ * @returns A new fat pointer pointing to the written portion of the original buffer.
+ * It will be `NULL` if there was an issue.
  */
 JSL_DEF JSLFatPtr jsl_fatptr_auto_slice(JSLFatPtr original_fatptr, JSLFatPtr writer_fatptr);
 
 /**
  * Build a fat pointer from a null terminated string. **DOES NOT** copy the data.
  * It simply sets the data pointer to `str` and the length value to the result of
- * `JSL_STRLEN`.
+ * JSL_STRLEN.
  *
  * @param str the str to create the fat ptr from
  * @return A fat ptr
@@ -594,7 +658,7 @@ JSL_DEF int64_t jsl_fatptr_memory_copy(JSLFatPtr* destination, JSLFatPtr source)
  * pointers.
  * 
  * If `cstring` is not a valid null terminated string then this function's behavior
- * is undefined, as it uses `JSL_STRLEN`.
+ * is undefined, as it uses JSL_STRLEN.
  *
  * `destination` is modified to point to the remaining data in the buffer. I.E.
  * if the entire buffer was used then `destination->length` will be `0`.
@@ -622,25 +686,105 @@ JSL_DEF int64_t jsl_fatptr_cstr_memory_copy(
  */
 JSL_DEF int64_t jsl_fatptr_substring_search(JSLFatPtr string, JSLFatPtr substring);
 
-// TODO, docs. Remember to mention Unicode normalization. Mention difference between code units and graphemes in UTF
+/**
+ * Locate the first byte equal to `item` in a fat pointer.
+ *
+ * @param data Fat pointer to inspect.
+ * @param item Byte value to search for.
+ * @returns index of the first match, or -1 if none is found.
+ */
 JSL_DEF int64_t jsl_fatptr_index_of(JSLFatPtr data, uint8_t item);
 
-// TODO, docs. Remember to mention Unicode normalization. Mention difference between code units and graphemes in UTF
+/**
+ * Count the number of occurrences of `item` within a fat pointer.
+ *
+ * @param str Fat pointer to scan.
+ * @param item Byte value to count.
+ * @returns Total number of matches, or 0 when the sequence is empty.
+ */
 JSL_DEF int64_t jsl_fatptr_count(JSLFatPtr str, uint8_t item);
 
-// TODO, docs. Remember to mention Unicode normalization. Mention difference between code units and graphemes in UTF
+/**
+ * Locate the final occurrence of `character` within a fat pointer.
+ *
+ * @param str Fat pointer to inspect.
+ * @param character Byte value to search for.
+ * @returns index of the last match, or -1 when no match exists.
+ */
 JSL_DEF int64_t jsl_fatptr_index_of_reverse(JSLFatPtr str, uint8_t character);
 
-// TODO, docs. Remember to mention Unicode normalization. Mention difference between code units and graphemes in UTF
+/**
+ * Check whether `str` begins with the bytes stored in `prefix`.
+ *
+ * Returns `false` when either fat pointer is null or when `prefix` exceeds `str` in length.
+ * Comparison is bytewise; no Unicode normalization is performed. An empty `prefix` yields
+ * `true`.
+ *
+ * @param str Candidate string to test.
+ * @param prefix Sequence that must appear at the start of `str`.
+ * @returns `true` if `str` starts with `prefix`, otherwise `false`.
+ */
 JSL_DEF bool jsl_fatptr_starts_with(JSLFatPtr str, JSLFatPtr prefix);
 
-// TODO, docs. Remember to mention Unicode normalization. Mention difference between code units and graphemes in UTF
+/**
+ * Check whether `str` ends with the bytes stored in `postfix`.
+ *
+ * Returns `false` when either fat pointer is null or when `postfix` exceeds `str` in length.
+ * Comparison is bytewise; no Unicode normalization is performed.
+ *
+ * @param str Candidate string to test.
+ * @param postfix Sequence that must appear at the end of `str`.
+ * @returns `true` if `str` ends with `postfix`, otherwise `false`.
+ */
 JSL_DEF bool jsl_fatptr_ends_with(JSLFatPtr str, JSLFatPtr postfix);
 
-// TODO, docs. Remember to mention Unicode normalization. Mention difference between code units and graphemes in UTF 
+/**
+ * Get the file name from a filepath.
+ * 
+ * Returns a view over the final path component that follows the last `/` byte in `filename`.
+ * The resulting fat pointer aliases the original buffer; the data is neither copied nor
+ * reallocated. If no `/` byte is present, or the suffix after the final `/` is fewer than two
+ * code units (for example, a trailing `/` or a single-character basename), the original fat
+ * pointer is returned unchanged.
+ *
+ * Like the other string utilities in this module, the search operates on raw code units. When
+ * working with UTF encodings, code units do not necessarily correspond to grapheme clusters.
+ * Normalize the input first if grapheme-aware behavior or Unicode canonical equivalence is
+ * required.
+ *
+ * @param filename Fat pointer referencing the path or filename to inspect.
+ * @returns Fat pointer referencing the basename or, in the fallback cases described above, the
+ * original input pointer.
+ *
+ * @code
+ * JSLFatPtr path = jsl_fatptr_from_cstr("/tmp/example.txt");
+ * JSLFatPtr base = jsl_fatptr_basename(path); // "example.txt"
+ * @endcode
+ */
 JSL_DEF JSLFatPtr jsl_fatptr_basename(JSLFatPtr filename);
 
-// TODO, docs. Remember to mention Unicode normalization. Mention difference between code units and graphemes in UTF
+/**
+ * Get the file extension from a file name or file path.
+ * 
+ * Returns a view over the substring that follows the final `.` in `filename`.
+ * The returned fat pointer reuses the original buffer; no allocations or copies
+ * are performed. If `filename` does not contain a `.` byte, the result has a
+ * `NULL` data pointer and a length of `0`.
+ *
+ * Like the other string utilities, the search operates on raw code units.
+ * Paths encoded with multi-byte Unicode sequences are treated as opaque bytes,
+ * and no normalization is performed. Normalize beforehand when grapheme-aware
+ * behavior is required.
+ *
+ * @param filename Fat pointer referencing the path or filename to inspect.
+ * @returns Fat pointer to the extension (excluding the dot) or an empty fat pointer
+ * when no extension exists.
+ *
+ * @code
+ * JSLFatPtr path = jsl_fatptr_from_cstr("archive.tar.gz");
+ * JSLFatPtr ext = jsl_fatptr_get_file_extension(path); // "gz"
+ * @endcode
+ */
 JSL_DEF JSLFatPtr jsl_fatptr_get_file_extension(JSLFatPtr filename);
 
 
@@ -654,7 +798,7 @@ JSL_DEF JSLFatPtr jsl_fatptr_get_file_extension(JSLFatPtr filename);
  * top of the file about Unicode normalization.
  *
  * @warning This function should not be used in cryptographic contexts, like comparing
- * two password hashes. This function is vulnreble to timing attacks since it bails out
+ * two password hashes. This function is vulnerable to timing attacks since it bails out
  * at the first inequality.
  *
  * @returns true if equal, false otherwise. 
@@ -701,16 +845,65 @@ JSL_DEF void jsl_fatptr_to_lowercase_ascii(JSLFatPtr str);
  */
 JSL_DEF int32_t jsl_fatptr_to_int32(JSLFatPtr str, int32_t* result);
 
-// TODO, docs
+/**
+ * Initialize an arena with the supplied buffer.
+ *
+ * @param arena Arena instance to initialize; must not be null.
+ * @param memory Pointer to the beginning of the backing storage.
+ * @param length Size of the backing storage in bytes.
+ */
 JSL_DEF void jsl_arena_init(JSLArena* arena, void* memory, int64_t length);
-// TODO, docs
+
+/**
+ * Initialize an arena using a fat pointer as the backing buffer.
+ *
+ * This is a convenience overload for cases where the backing memory and its
+ * length are already packaged in a `JSLFatPtr`.
+ *
+ * @param arena Arena to initialize; must not be null.
+ * @param memory Backing storage for the arena; `memory.data` must not be null.
+ */
 JSL_DEF void jsl_arena_init2(JSLArena* arena, JSLFatPtr memory);
-// TODO, docs
+
+/**
+ * Allocate a block of memory from the arena using the default alignment.
+ *
+ * The returned fat pointer contains a null data pointer if the arena does not
+ * have enough capacity. When `zeroed` is true, the allocated bytes are
+ * zero-initialized.
+ *
+ * @param arena Arena to allocate from; must not be null.
+ * @param bytes Number of bytes to reserve.
+ * @param zeroed When true, zero-initialize the allocation.
+ * @return Fat pointer describing the allocation or `{0}` on failure.
+ */
 JSL_DEF JSLFatPtr jsl_arena_allocate(JSLArena* arena, int64_t bytes, bool zeroed);
-// TODO, docs
+
+/**
+ * Allocate a block of memory from the arena with the provided alignment.
+ *
+ * @param arena Arena to allocate from; must not be null.
+ * @param bytes Number of bytes to reserve.
+ * @param alignment Desired alignment in bytes; must be a positive power of two.
+ * @param zeroed When true, zero-initialize the allocation.
+ * @return Fat pointer describing the allocation or `{0}` on failure.
+ */
 JSL_DEF JSLFatPtr jsl_arena_allocate_aligned(JSLArena* arena, int64_t bytes, int32_t alignment, bool zeroed);
 
-// TODO, docs
+/**
+ * Macro to make it easier to allocate an instance of `T` within an arena.
+ *
+ * @param T Type to allocate.
+ * @param arena Arena to allocate from; must be initialized.
+ * @return Pointer to the allocated object or `NULL` on failure.
+ *
+ * @code
+ * struct MyStruct { uint64_t the_data; };
+ * uint8_t buffer[1024];
+ * JSLArena path = JSL_ARENA_FROM_STACK(buffer);
+ * struct MyStruct* thing = JSL_ARENA_TYPED_ALLOCATE(struct MyStruct, arena);
+ * @endcode
+ */
 #define JSL_ARENA_TYPED_ALLOCATE(T, arena) (T*) jsl_arena_allocate(arena, sizeof(T), false).data
 
 /**
@@ -749,9 +942,14 @@ JSL_DEF JSLFatPtr jsl_arena_reallocate_aligned(
 JSL_DEF void jsl_arena_reset(JSLArena* arena);
 
 /**
- * The functions `jsl_arena_save_restore_point` and `jsl_arena_load_restore_point`
+ * The functions jsl_arena_save_restore_point and jsl_arena_load_restore_point
  * help you make temporary allocations inside an existing arena. You can think of
- * it as an "arena inside an arena"
+ * it as an "arena inside an arena". Basically the save function marks the current
+ * state of the arena and the load function sets the saved state to the given arena,
+ * wiping out any allocations which happened in the interim.
+ * 
+ * This is very useful when you need memory from the arena but only for a specific
+ * function.
  *
  * For example, say you have an existing one megabyte arena that has used 128 kilobytes
  * of space. You then call a function with this arena which needs a string to make an
@@ -766,12 +964,30 @@ JSL_DEF void jsl_arena_reset(JSLArena* arena);
 JSL_DEF uint8_t* jsl_arena_save_restore_point(JSLArena* arena);
 
 /**
- * See the docs for `jsl_arena_load_restore_point`.
+ * The functions jsl_arena_save_restore_point and jsl_arena_load_restore_point
+ * help you make temporary allocations inside an existing arena. You can think of
+ * it as an "arena inside an arena". Basically the save function marks the current
+ * state of the arena and the load function sets the saved state to the given arena,
+ * wiping out any allocations which happened in the interim.
+ * 
+ * This is very useful when you need memory from the arena but only for a specific
+ * function.
+ *
+ * For example, say you have an existing one megabyte arena that has used 128 kilobytes
+ * of space. You then call a function with this arena which needs a string to make an
+ * operating system call, but that string is no longer needed after the function returns.
+ * You can "save" and "load" a restore point at the start and end of the function
+ * (respectively) and when the function returns, the arena will still only have 128
+ * kilobytes used.
+ *
+ * In debug mode, jsl_arena_load_restore_point function will set all of the memory
+ * that was allocated to `0xfeeefeee` to help detect use after free bugs.
  */
 JSL_DEF void jsl_arena_load_restore_point(JSLArena* arena, uint8_t* restore_point);
 
 /**
- * Allocate and copy the contents of a fat pointer with a null terminator.
+ * Allocate a new buffer from the arena and copy the contents of a fat pointer with
+ * a null terminator.
  */
 JSL_DEF char* jsl_arena_fatptr_to_cstr(JSLArena* arena, JSLFatPtr str);
 
@@ -789,34 +1005,139 @@ JSL_DEF JSLFatPtr jsl_arena_cstr_to_fatptr(JSLArena* arena, char* str);
  */
 JSL_DEF JSLFatPtr jsl_fatptr_duplicate(JSLArena* arena, JSLFatPtr str);
 
-// TODO, docs
+/**
+ * Initialize a JSLStringBuilder using the default settings. See the JSLStringBuilder
+ * for more information on the container. A chunk is allocated right away and if that
+ * fails this returns false.
+ *
+ * @param builder The builder instance to initialize; must not be NULL.
+ * @param arena The arena that backs all allocations made by the builder; must not be NULL.
+ * @return `true` if the builder was initialized successfully, otherwise `false`.
+ */
 bool jsl_string_builder_init(JSLStringBuilder* builder, JSLArena* arena);
 
-// TODO, docs
+/**
+ * Initialize a JSLStringBuilder with a custom chunk size and chunk allocation alignment.
+ * See the JSLStringBuilder for more information on the container. A chunk is allocated
+ * right away and if that fails this returns false.
+ *
+ * @param builder The builder instance to initialize; must not be NULL.
+ * @param arena The arena that backs all allocations made by the builder; must not be NULL.
+ * @param chunk_size The number of bytes that are allocated each time the container needs to grow
+ * @param alignment The allocation alignment of the chunks of data
+ * @returns `true` if the builder was initialized successfully, otherwise `false`.
+ */
 bool jsl_string_builder_init2(JSLStringBuilder* builder, JSLArena* arena, int32_t chunk_size, int32_t alignment);
 
-// TODO, docs
+/**
+ * Append a char value to the end of the string builder without interpretation. Each append
+ * may result in an allocation if there's no more space. If that allocation fails then this
+ * function returns false.
+ *
+ * @param builder The string builder to append to; must be initialized.
+ * @param c The byte to append.
+ * @returns `true` if the byte was inserted successfully, otherwise `false`.
+ */
 bool jsl_string_builder_insert_char(JSLStringBuilder* builder, char c);
 
-// TODO, docs
+/**
+ * Append a single raw byte to the end of the string builder without interpretation. 
+ * The value is written as-is, so it can be used for arbitrary binary data, including
+ * zero bytes. Each append may result in an allocation if there's no more space. If
+ * that allocation fails then this function returns false.
+ *
+ * @param builder The string builder to append to; must be initialized.
+ * @param c The byte to append.
+ * @returns `true` if the byte was inserted successfully, otherwise `false`.
+ */
 bool jsl_string_builder_insert_uint8_t(JSLStringBuilder* builder, uint8_t c);
 
-// TODO, docs
+/**
+ * Append the contents of a fat pointer. Additional chunks are allocated as needed
+ * while copying so if any of the allocations fail this returns false.
+ *
+ * @param builder The string builder to append to; must be initialized.
+ * @param data A fat pointer describing the bytes to copy; its length may be zero.
+ * @returns `true` if the data was appended successfully, otherwise `false`.
+ */
 bool jsl_string_builder_insert_fatptr(JSLStringBuilder* builder, JSLFatPtr data);
 
-// TODO, docs
+/**
+ * Format a string using the jsl_format logic and write the result directly into
+ * the string builder.
+ *
+ * @param builder The string builder that receives the formatted output; must be initialized.
+ * @param fmt A fat pointer describing the format string.
+ * @param ... Variadic arguments consumed by the formatter.
+ * @returns `true` if formatting succeeded and the formatted bytes were appended, otherwise `false`.
+ */
 bool jsl_string_builder_format(JSLStringBuilder* builder, JSLFatPtr fmt, ...);
 
-// TODO, docs
+/**
+ * Initialize an iterator instance so it will traverse the given string builder
+ * from the begining. It's easiest to just put an empty iterator on the stack
+ * and then call this function.
+ * 
+ * ```
+ * JSLStringBuilder builder = ...;
+ * 
+ * JSLStringBuilderIterator iter;
+ * jsl_string_builder_iterator_init(&builder, &iter);
+ * ```
+ *
+ * @param builder    The string builder whose data will be traversed.
+ * @param iterator   The iterator instance to initialize.
+ */
 void jsl_string_builder_iterator_init(JSLStringBuilder* builder, JSLStringBuilderIterator* iterator);
 
-// TODO, docs
+/**
+ * Get the next chunk of data a string builder iterator. The chunk will
+ * have a `NULL` data pointer when iteration is over.
+ * 
+ * This example program prints all the data in a string builder to stdout:
+ * 
+ * ```
+ * #include <stdio.h>
+ * 
+ * JSLStringBuilder builder = ...;
+ * 
+ * JSLStringBuilderIterator iter;
+ * jsl_string_builder_iterator_init(&builder, &iter);
+ * 
+ * while (true)
+ * {
+ *      JSLFatPtr str = jsl_string_builder_iterator_next(&iter);
+ * 
+ *      if (str.data == NULL)
+ *          break;
+ *      
+ *      jsl_format_out(stdout, str);
+ * }
+ * ```
+ *
+ * @param iterator   The iterator instance
+ * @returns The next chunk of data from the string builder
+ */
 JSLFatPtr jsl_string_builder_iterator_next(JSLStringBuilderIterator* iterator);
 
 #ifndef JSL_FORMAT_MIN_BUFFER
     #define JSL_FORMAT_MIN_BUFFER 512 // how many characters per callback
 #endif
 
+/**
+ * Function signature for receiving formatted output from `jsl_format_callback`.
+ *
+ * The formatter hands over `len` bytes starting at `buf` each time the internal
+ * buffer fills up or is flushed. The callback should consume those bytes (copy,
+ * write, etc.) and then return a pointer to the buffer that should be used for
+ * subsequent writes. Returning `NULL` signals an error or early termination,
+ * causing `jsl_format_callback` to stop producing output.
+ *
+ * @param buf   Pointer to `len` bytes of freshly formatted data.
+ * @param user  Opaque pointer that was supplied to `jsl_format_callback`.
+ * @param len   Number of valid bytes in `buf`.
+ * @return Pointer to the buffer that will receive the next chunk, or `NULL` to stop.
+ */
 typedef uint8_t* JSL_FORMAT_CALLBACK(uint8_t* buf, void *user, int64_t len);
 
 /**
@@ -1012,14 +1333,39 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         errno_t* out_errno
     );
 
-    // TODO, docs
+    /**
+     * Load the contents of the file at `path` into an existing fat pointer buffer.
+     *
+     * Copies up to `buffer->length` bytes into `buffer->data` and advances the fat
+     * pointer by the amount read so the caller can continue writing into the same
+     * backing storage. Returns a `JSLLoadFileResultEnum` describing the outcome and
+     * optionally stores the system `errno` in `out_errno` on failure.
+     * 
+     * @param buffer buffer to write to
+     * @param path The file system path
+     * @param out_errno A pointer which will be written to with the errno on failure
+     * @returns An enum which represents the result
+     */
     JSL_WARN_UNUSED JSL_DEF JSLLoadFileResultEnum jsl_load_file_contents_buffer(
         JSLFatPtr* buffer,
         JSLFatPtr path,
         errno_t* out_errno
     );
 
-    // TODO, docs
+    /**
+     * Write the bytes in `contents` to the file located at `path`.
+     *
+     * Opens or creates the destination file and attempts to write the entire
+     * contents buffer. Returns a `JSLWriteFileResultEnum` describing the
+     * outcome, stores the number of bytes written in `bytes_written` when
+     * provided, and optionally writes the failing `errno` into `out_errno`.
+     *
+     * @param contents Data to be written to disk
+     * @param path File system path to write to
+     * @param bytes_written Optional pointer that receives the bytes written on success
+     * @param out_errno Optional pointer that receives the system errno on failure
+     * @returns A result enum describing the write outcome
+     */
     JSL_WARN_UNUSED JSL_DEF JSLWriteFileResultEnum jsl_write_file_contents(
         JSLFatPtr contents,
         JSLFatPtr path,
@@ -1027,7 +1373,19 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         errno_t* out_errno
     );
 
-    // TODO, docs
+    /**
+     * Format a string using the JSL formatter and write the result to a `FILE*`,
+     * most often this will be `stdout`.
+     *
+     * Streams that reject writes (for example, read-only streams or closed
+     * pipes) cause the function to return `false`. Passing a `NULL` file handle,
+     * a `NULL` format pointer, or a negative format length also causes failure.
+     *
+     * @param out Destination stream
+     * @param fmt Format string
+     * @param ... Format args
+     * @returns `true` when formatting and writing succeeds, otherwise `false`
+     */
     JSL_ASAN_OFF JSL_DEF bool jsl_format_file(FILE* out, JSLFatPtr fmt, ...);
 
 #endif // JSL_INCLUDE_FILE_UTILS
@@ -2389,7 +2747,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         return (uint32_t)(source_ptr - string);
     }
 
-    JSL_ASAN_OFF JSL_NO_INLINE int64_t jsl_format_callback(
+    JSL_ASAN_OFF int64_t jsl_format_callback(
         JSL_FORMAT_CALLBACK* callback,
         void* user,
         uint8_t* buffer,
