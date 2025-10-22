@@ -30,6 +30,10 @@
  * build it in the first place. if there have been changes to the test
  * file, so no need to 
  */
+
+#define NOB_IMPLEMENTATION
+#include "nob.h"
+
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
@@ -37,9 +41,6 @@
 
 #define JSL_IMPLEMENTATION
 #include "../src/jacks_standard_library.h"
-
-#define NOB_IMPLEMENTATION
-#include "nob.h"
 
 char* test_file_paths[] = {
     "tests/test_fatptr.c",
@@ -70,7 +71,8 @@ int main(int argc, char **argv)
 
             #if defined(_WIN32)
                 strncat(exe_name, ".exe", 4);
-                char exe_run_command[128] = exe_name;
+                char exe_run_command[128] = {0};
+                strncat(exe_run_command, exe_name, strlen(exe_name));
             #else
                 strncat(exe_name, ".out", 4);
                 char exe_run_command[128] = "./";
@@ -104,7 +106,8 @@ int main(int argc, char **argv)
 
             #if defined(_WIN32)
                 strncat(exe_name, ".exe", 4);
-                char exe_run_command[128] = exe_name;
+                char exe_run_command[128] = {0};
+                strncat(exe_run_command, exe_name, strlen(exe_name));
             #else
                 strncat(exe_name, ".out", 4);
                 char exe_run_command[128] = "./";
@@ -134,7 +137,7 @@ int main(int argc, char **argv)
         #if defined(_WIN32)
 
             {
-                char exe_name[128] = "tests/bin/debug_msvc_";
+                char exe_name[128] = "/Fetests\\bin\\debug_msvc_";
 
                 strncat(exe_name, test_file_name, strlen(test_file_name));
                 strncat(exe_name, ".exe", 4);
@@ -149,8 +152,8 @@ int main(int argc, char **argv)
                     "/Zi",
                     "/W4",
                     "/WX",
-                    "-fsanitize=address",
-                    "-o", exe_name,
+                    "/std:c11",
+                    exe_name,
                     test_file_path
                 );
                 if (!nob_cmd_run(&gcc_debug_compile_command)) return 1;
@@ -161,7 +164,7 @@ int main(int argc, char **argv)
             }
 
             {
-                char exe_name[128] = "tests/bin/debug_gcc_";
+                char exe_name[128] = "/Fetests\\bin\\opt_msvc_";
 
                 strncat(exe_name, test_file_name, strlen(test_file_name));
                 strncat(exe_name, ".exe", 4);
@@ -169,14 +172,14 @@ int main(int argc, char **argv)
                 Nob_Cmd gcc_optimized_compile_command = {0};
                 nob_cmd_append(
                     &gcc_optimized_compile_command,
-                    "gcc",
-                    "-O3",
-                    "-march=native",
-                    "-std=c11",
-                    "-Wall",
-                    "-Wextra",
-                    "-pedantic",
-                    "-o", exe_name,
+                    "cl.exe",
+                    "/nologo",
+                    "/TC",
+                    "/O2",
+                    "/W4",
+                    "/WX",
+                    "/std:c11",
+                    exe_name,
                     test_file_path
                 );
                 if (!nob_cmd_run(&gcc_optimized_compile_command)) return 1;
@@ -216,7 +219,7 @@ int main(int argc, char **argv)
             }
 
             {
-                char exe_name[128] = "tests/bin/debug_gcc_";
+                char exe_name[128] = "tests/bin/opt_gcc_";
 
                 strncat(exe_name, test_file_name, strlen(test_file_name));
                 strncat(exe_name, ".out", 4);

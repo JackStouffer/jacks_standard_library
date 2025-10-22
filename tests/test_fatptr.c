@@ -66,8 +66,13 @@ void test_jsl_fatptr_cstr_memory_copy(void)
 
 void test_jsl_load_file_contents(void)
 {
-    char* path = "./tests/example.txt";
-    char stack_buffer[4*1024];
+    #if defined(_WIN32)
+        char* path = "tests\\example.txt";
+    #else
+        char* path = "./tests/example.txt";
+    #endif
+
+    char stack_buffer[4*1024] = {0};
     int64_t file_size;
 
     // Load the comparison using libc
@@ -87,13 +92,15 @@ void test_jsl_load_file_contents(void)
     JSLFatPtr contents;
     JSLLoadFileResultEnum res = jsl_load_file_contents(
         &arena,
-        JSL_FATPTR_LITERAL("./tests/example.txt"),
+        jsl_fatptr_from_cstr(path),
         &contents,
         NULL
     );
 
     lok(res == JSL_FILE_LOAD_SUCCESS);
-    lok(memcmp(stack_buffer, contents.data, file_size) == 0);
+    // printf("stack_buffer %s\n", stack_buffer);
+    // jsl_format_file(stdout, JSL_FATPTR_LITERAL("%y\n"), contents);
+    lmemcmp(stack_buffer, contents.data, file_size);
 }
 
 void test_jsl_load_file_contents_buffer(void)

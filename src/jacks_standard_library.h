@@ -81,7 +81,6 @@ extern "C" {
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdalign.h>
 
 #if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L
     #include <stdbool.h>
@@ -1111,7 +1110,7 @@ void jsl_string_builder_iterator_init(JSLStringBuilder* builder, JSLStringBuilde
  *      if (str.data == NULL)
  *          break;
  *      
- *      jsl_format_out(stdout, str);
+ *      jsl_format_file(stdout, str);
  * }
  * ```
  *
@@ -2411,9 +2410,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     struct JSL__StringBuilderContext
     {
+        uint8_t buffer[JSL_FORMAT_MIN_BUFFER];
         JSLStringBuilder* builder;
         bool failure_flag;
-        alignas(32) uint8_t buffer[JSL_FORMAT_MIN_BUFFER];
     };
 
     static uint8_t* format_string_builder_callback(uint8_t *buf, void *user, int64_t len)
@@ -2850,7 +2849,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     if (mask == 0)
                     {
                         // No special characters found, store entire block
-                        _mm256_storeu_si256(wide_dest, data);
+                        _mm256_store_si256(wide_dest, data);
                         JSL_FATPTR_ADVANCE(f, 32);
                         buffer_cursor += 32;
                     }
@@ -4522,7 +4521,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         if (got_path)
         {
             #if defined(JSL_WIN32)
-                file_descriptor = _open(path_buffer, 0);
+                file_descriptor = _open(path_buffer, _O_BINARY);
             #elif defined(JSL_POSIX)
                 file_descriptor = open(path_buffer, 0);
             #else
@@ -4649,7 +4648,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         if (got_path)
         {
             #if defined(JSL_WIN32)
-                file_descriptor = _open(path_buffer, 0);
+                file_descriptor = _open(path_buffer, _O_BINARY);
             #elif defined(JSL_POSIX)
                 file_descriptor = open(path_buffer, 0);
             #else
@@ -4808,7 +4807,11 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         int32_t close_res = -1;
         if (opened_file)
         {
-            close_res = close(file_descriptor);
+            #if defined(JSL_WIN32)
+                close_res = _close(file_descriptor);
+            #elif defined(JSL_POSIX)
+                close_res = close(file_descriptor);
+            #endif
 
             if (close_res < 0)
             {
@@ -4823,9 +4826,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     struct JSL__FormatOutContext
     {
+        uint8_t buffer[JSL_FORMAT_MIN_BUFFER];
         FILE* out;
         bool failure_flag;
-        alignas(32) uint8_t buffer[JSL_FORMAT_MIN_BUFFER];
     };
 
     static uint8_t* format_out_callback(uint8_t *buf, void *user, int64_t len)

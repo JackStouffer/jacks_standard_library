@@ -133,5 +133,24 @@ static size_t lfails = 0;
 #define lsequal(a, b)\
     lequal_base(strcmp(a, b) == 0, a, b, "%s")
 
+#define lmemcmp(buf_a, buf_b, buf_len) do {\
+    ++ltests;\
+    const unsigned char *const _lm_a = (const unsigned char *)(buf_a);\
+    const unsigned char *const _lm_b = (const unsigned char *)(buf_b);\
+    const size_t _lm_len = (buf_len);\
+    size_t _lm_i;\
+    for (_lm_i = 0; _lm_i < _lm_len; ++_lm_i) {\
+        const unsigned char _lm_va = _lm_a[_lm_i];\
+        const unsigned char _lm_vb = _lm_b[_lm_i];\
+        if (_lm_va != _lm_vb) {\
+            ++lfails;\
+            printf("%s:%d buffers differ at byte %zu/%zu (0x%02X '%c' != 0x%02X '%c')\n",\
+                   __FILE__, __LINE__, _lm_i, _lm_len,\
+                   (unsigned)_lm_va, (_lm_va >= 32 && _lm_va <= 126) ? _lm_va : '.',\
+                   (unsigned)_lm_vb, (_lm_vb >= 32 && _lm_vb <= 126) ? _lm_vb : '.');\
+            break;\
+        }\
+    }\
+} while (0)
 
 #endif /*__MINCTEST_H__*/
