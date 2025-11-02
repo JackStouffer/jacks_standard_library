@@ -268,7 +268,7 @@ void test_jsl_fatptr_substring_search(void)
 
     {
         JSLFatPtr string = jsl_fatptr_from_cstr("This is a very long string that is going to trigger SIMD code, as it's longer than a single AVX2 register when using 8-bit values, which we are since we're using ASCII/UTF-8.");
-        JSLFatPtr substring = jsl_fatptr_from_cstr("ASCII");
+        JSLFatPtr substring = jsl_fatptr_from_cstr("ASCII/UTF-8");
         int64_t res = jsl_fatptr_substring_search(string, substring);
         lok(res == 162);
     }

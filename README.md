@@ -95,19 +95,7 @@ See the DESIGN.md file for more info.
    * hash map
    * hash set
 
-## What's Not Included
-
-* A scanf alternative for fat pointers
-* Threading
-* Atomic operations
-* Date/time utilities
-* Random numbers
-
-This library is slow for ARM as I haven't gotten around to writing the NEON
-versions of the SIMD code yet. glibc will be significantly faster for comparable
-operations.
-
-## File Utilities
+### File Utilities
 
 JSL includes a couple of functions or simple, cross platform file I/O. 
 
@@ -123,14 +111,36 @@ valid through their runtime libraries.
 
 You can include these functions by using `#define JSL_INCLUDE_FILE_UTILS`. 
 
+## What's Not Included
+
+* A scanf alternative for fat pointers
+* Sorting
+* Threading
+* Atomic operations
+* Date/time utilities
+* Random numbers
+
+This is not to say these things will never be added in the future. But everything
+in the above list (other than date/time) is pretty situation or platform
+dependent. One size fits all solutions are not appropriate for things like
+atomics or threading.
+
 ## What's Supported
 
 Official support is for Windows, macOS, and Linux with MSVC, GCC, and clang.
 
-This might work on other POSIX systems with other C compilers, but I have not tested
-it. ARM in big endian mode is not supported.
+64 bit little endian executables only.
 
-## Caveats 
+This might work on other POSIX systems with other C compilers, but I have not tested
+it.
+
+## Caveats
+
+### ARM
+
+This library is slow for ARM as I haven't gotten around to writing the NEON
+versions of the SIMD code for many of the functions. glibc will be significantly
+faster for comparable operations.
 
 ### Notes on Safety
 

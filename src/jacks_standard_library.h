@@ -10,6 +10,10 @@
  * 
  * See DOCUMENTATION.md for a single markdown file containing all of the docstrings
  * from this file. It's more nicely formatted and contains hyperlinks.
+ * 
+ * The convention of this library is that all symbols prefixed with either `jsl__`
+ * or `JSL__` (with two underscores) are meant to be private to this library. They
+ * are not a stable part of the API.
  *
  * ## Preprocessor Switches
  * 
@@ -84,6 +88,22 @@ extern "C" {
 
 #if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L
     #include <stdbool.h>
+#endif
+
+#ifndef JSL_DEBUG
+    #ifndef JSL__FORCE_INLINE
+
+        #if defined(_MSC_VER)
+            #define JSL__FORCE_INLINE __forceinline
+        #elif defined(__clang__) || defined(__GNUC__)
+            #define JSL__FORCE_INLINE inline __attribute__((__always_inline__))
+        #else
+            #define JSL__FORCE_INLINE
+        #endif
+
+    #endif
+#else
+    #define JSL__FORCE_INLINE
 #endif
 
 #ifndef JSL__LIKELY
@@ -672,7 +692,22 @@ JSL_DEF int64_t jsl_fatptr_cstr_memory_copy(
 
 /**
  * Searches `string` for the byte sequence in `substring` and returns the index of the first
- * match or `-1` when no match exists. Both fat pointers must reference valid data.
+ * match or `-1` when no match exists. This is roughly equivalent to C's `strstr` for
+ * fat pointers.
+ * 
+ * This function is optimized with SIMD specific implementations when SIMD code generation
+ * is enabled during compilation. When SIMD is not enabled, this function falls back to a
+ * combination of BNDM and Sunday algorithms (based on substring size). These algorithms
+ * are `O(n*m)` in the worst case which is generally text that is very pattern heavy and
+ * contains a lot of repeated text. In the general case performance is closer to `O(n/m)`.
+ *
+ * In cases where any of the following are true you will want to use a different search
+ * function: 
+ * 
+ *  * Your string is very long, e.g. hundreds of megabytes or more
+ *  * Your string is full of small repeating patterns
+ *  * Your substring is more than a couple of kilobytes
+ *  * You want to search multiple different substrings on the same string
  *
  * @note The comparison operates on raw code units. In UTF encodings, multiple code units can
  * form a single grapheme cluster, so the index does not necessarily map to user-perceived
@@ -686,7 +721,13 @@ JSL_DEF int64_t jsl_fatptr_cstr_memory_copy(
 JSL_DEF int64_t jsl_fatptr_substring_search(JSLFatPtr string, JSLFatPtr substring);
 
 /**
- * Locate the first byte equal to `item` in a fat pointer.
+ * Locate the first byte equal to `item` in a fat pointer. This is roughly equivalent to C's
+ * `strchr` function for fat pointers.
+ *
+ * @note The comparison operates on raw code units. In UTF encodings, multiple code units can
+ * form a single grapheme cluster, so the index does not necessarily map to user-perceived
+ * characters. No Unicode normalization is performed; normalize inputs first if combining mark
+ * equivalence is required.
  *
  * @param data Fat pointer to inspect.
  * @param item Byte value to search for.
@@ -697,6 +738,11 @@ JSL_DEF int64_t jsl_fatptr_index_of(JSLFatPtr data, uint8_t item);
 /**
  * Count the number of occurrences of `item` within a fat pointer.
  *
+ * @note The comparison operates on raw code units. In UTF encodings, multiple code units can
+ * form a single grapheme cluster, so the index does not necessarily map to user-perceived
+ * characters. No Unicode normalization is performed; normalize inputs first if combining mark
+ * equivalence is required.
+ *
  * @param str Fat pointer to scan.
  * @param item Byte value to count.
  * @returns Total number of matches, or 0 when the sequence is empty.
@@ -705,6 +751,11 @@ JSL_DEF int64_t jsl_fatptr_count(JSLFatPtr str, uint8_t item);
 
 /**
  * Locate the final occurrence of `character` within a fat pointer.
+ * 
+ * @note The comparison operates on raw code units. In UTF encodings, multiple code units can
+ * form a single grapheme cluster, so the index does not necessarily map to user-perceived
+ * characters. No Unicode normalization is performed; normalize inputs first if combining mark
+ * equivalence is required.
  *
  * @param str Fat pointer to inspect.
  * @param character Byte value to search for.
@@ -716,8 +767,12 @@ JSL_DEF int64_t jsl_fatptr_index_of_reverse(JSLFatPtr str, uint8_t character);
  * Check whether `str` begins with the bytes stored in `prefix`.
  *
  * Returns `false` when either fat pointer is null or when `prefix` exceeds `str` in length.
- * Comparison is bytewise; no Unicode normalization is performed. An empty `prefix` yields
- * `true`.
+ * An empty `prefix` yields `true`.
+ *
+ * @note The comparison operates on raw code units. In UTF encodings, multiple code units can
+ * form a single grapheme cluster, so the index does not necessarily map to user-perceived
+ * characters. No Unicode normalization is performed; normalize inputs first if combining mark
+ * equivalence is required.
  *
  * @param str Candidate string to test.
  * @param prefix Sequence that must appear at the start of `str`.
@@ -729,7 +784,11 @@ JSL_DEF bool jsl_fatptr_starts_with(JSLFatPtr str, JSLFatPtr prefix);
  * Check whether `str` ends with the bytes stored in `postfix`.
  *
  * Returns `false` when either fat pointer is null or when `postfix` exceeds `str` in length.
- * Comparison is bytewise; no Unicode normalization is performed.
+ *
+ * @note The comparison operates on raw code units. In UTF encodings, multiple code units can
+ * form a single grapheme cluster, so the index does not necessarily map to user-perceived
+ * characters. No Unicode normalization is performed; normalize inputs first if combining mark
+ * equivalence is required.
  *
  * @param str Candidate string to test.
  * @param postfix Sequence that must appear at the end of `str`.
@@ -756,7 +815,7 @@ JSL_DEF bool jsl_fatptr_ends_with(JSLFatPtr str, JSLFatPtr postfix);
  * original input pointer.
  *
  * @code
- * JSLFatPtr path = jsl_fatptr_from_cstr("/tmp/example.txt");
+ * JSLFatPtr path = JSL_FATPTR_LITERAL("/tmp/example.txt");
  * JSLFatPtr base = jsl_fatptr_basename(path); // "example.txt"
  * @endcode
  */
@@ -780,7 +839,7 @@ JSL_DEF JSLFatPtr jsl_fatptr_basename(JSLFatPtr filename);
  * when no extension exists.
  *
  * @code
- * JSLFatPtr path = jsl_fatptr_from_cstr("archive.tar.gz");
+ * JSLFatPtr path = JSL_FATPTR_LITERAL("archive.tar.gz");
  * JSLFatPtr ext = jsl_fatptr_get_file_extension(path); // "gz"
  * @endcode
  */
@@ -840,6 +899,8 @@ JSL_DEF void jsl_fatptr_to_lowercase_ascii(JSLFatPtr str);
  * not check for overflows or underflows. `result` is not written to if
  * there were no successfully parsed bytes.
  * 
+ * @param str a string with an int representation at the start
+ * @param result out parameter where the parsing result will be stored
  * @return The number of bytes that were successfully read from the string 
  */
 JSL_DEF int32_t jsl_fatptr_to_int32(JSLFatPtr str, int32_t* result);
@@ -898,8 +959,6 @@ JSL_DEF JSLFatPtr jsl_arena_allocate_aligned(JSLArena* arena, int64_t bytes, int
  *
  * @code
  * struct MyStruct { uint64_t the_data; };
- * uint8_t buffer[1024];
- * JSLArena path = JSL_ARENA_FROM_STACK(buffer);
  * struct MyStruct* thing = JSL_ARENA_TYPED_ALLOCATE(struct MyStruct, arena);
  * @endcode
  */
@@ -907,10 +966,7 @@ JSL_DEF JSLFatPtr jsl_arena_allocate_aligned(JSLArena* arena, int64_t bytes, int
 
 /**
  * Resize the allocation if it was the last allocation, otherwise, allocate a new
- * chunk of memory.
- *
- * In debug mode, this function will set `original_allocation->data` to null to
- * help detect stale pointer bugs.
+ * chunk of memory and copy the old allocation's contents.
  */
 JSL_DEF JSLFatPtr jsl_arena_reallocate(
     JSLArena* arena,
@@ -920,10 +976,7 @@ JSL_DEF JSLFatPtr jsl_arena_reallocate(
 
 /**
  * Resize the allocation if it was the last allocation, otherwise, allocate a new
- * chunk of memory.
- *
- * In debug mode, this function will set `original_allocation->data` to null to
- * help detect stale pointer bugs. 
+ * chunk of memory and copy the old allocation's contents.
  */
 JSL_DEF JSLFatPtr jsl_arena_reallocate_aligned(
     JSLArena* arena,
@@ -1610,83 +1663,488 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         return JSL_MEMCMP(string.data, cstr, cstr_length) == 0;
     }
 
-    static inline void kmp_build_partial_match_table(JSLFatPtr substring, int64_t* partial_match_table)
-    {
-        int64_t length = 0; // Length of the previous longest prefix suffix
-        int64_t i = 1;
+    #ifdef __AVX2__
 
-        partial_match_table[0] = 0;
-
-        while (i < substring.length)
+        static JSL__FORCE_INLINE avx2_substring_anysize(JSLFatPtr string, JSLFatPtr substring)
         {
-            if (substring.data[i] == substring.data[length])
+            /**
+             * From http://0x80.pl/notesen/2016-11-28-simd-strfind.html
+             * 
+             * Copyright (c) 2008-2016, Wojciech Muła
+             * All rights reserved.
+             * 
+             * Redistribution and use in source and binary forms, with or without
+             * modification, are permitted provided that the following conditions are
+             * met:
+             * 
+             * 1. Redistributions of source code must retain the above copyright
+             * notice, this list of conditions and the following disclaimer.
+             * 
+             * 2. Redistributions in binary form must reproduce the above copyright
+             * notice, this list of conditions and the following disclaimer in the
+             * documentation and/or other materials provided with the distribution.
+             * 
+             * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+             * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+             * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+             * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+             * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+             * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+             * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+             * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+             * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+             * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+             * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+            */
+
+            int64_t i = 0;
+            int64_t length_remaining = string.length;
+
+            __m256i first = _mm256_set1_epi8(substring.data[0]);
+            __m256i last  = _mm256_set1_epi8(substring.data[substring.length - 1]);
+
+            while (length_remaining > 63)
             {
-                ++length;
-                partial_match_table[i] = length;
-                ++i;
+                __m256i block_first1 = _mm256_loadu_si256((const __m256i*)(string.data + i));
+                __m256i block_last1  = _mm256_loadu_si256((const __m256i*)(string.data + i + k - 1));
+
+                __m256i block_first2 = _mm256_loadu_si256((const __m256i*)(string.data + i + 32));
+                __m256i block_last2  = _mm256_loadu_si256((const __m256i*)(string.data + i + k - 1 + 32));
+
+                __m256i eq_first1 = _mm256_cmpeq_epi8(first, block_first1);
+                __m256i eq_last1  = _mm256_cmpeq_epi8(last, block_last1);
+
+                __m256i eq_first2 = _mm256_cmpeq_epi8(first, block_first2);
+                __m256i eq_last2  = _mm256_cmpeq_epi8(last, block_last2);
+
+                uint32_t mask1 = _mm256_movemask_epi8(_mm256_and_si256(eq_first1, eq_last1));
+                uint32_t mask2 = _mm256_movemask_epi8(_mm256_and_si256(eq_first2, eq_last2));
+                uint64_t mask = mask1 | ((uint64_t) mask2 << 32);
+
+                while (mask != 0)
+                {
+                    int32_t bit_position = __builtin_ctz11(mask);
+
+                    if (JSL_MEMCMP(string.data + i + bit_position + 1, substring.data + 1, substring.length - 2) == 0)
+                    {
+                        return i + bit_position;
+                    }
+
+                    // clear the least significant bit set
+                    mask &= (mask - 1);
+                }
+
+                i += 64;
+                length_remaining -= 64;
+            }
+
+            if (substring.length < 63)
+            {
+                for (int64_t pos = i; pos <= string.length; ++pos)
+                {
+                    if (string.data[pos] == substring.data[0] &&
+                        string.data[pos + substring.length - 1] == substring.data[substring.length - 1])
+                    {
+                        if (substring.length <= 2)
+                            return pos;
+                        if (JSL_MEMCMP(string.data + pos + 1,
+                                    substring.data + 1,
+                                    substring.length - 2) == 0)
+                            return pos;
+                    }
+                }
+            }
+            else if (substring.length == 63)
+            {
+                return JSL_MEMCMP(string.data + i, substring.data, substring.length) == 0;
+            }
+
+            return -1;
+        }
+
+        static JSL__FORCE_INLINE int64_t avx2_strstr_eq(JSLFatPtr string, JSLFatPtr substring)
+        {
+            /**
+             * From http://0x80.pl/notesen/2016-11-28-simd-strfind.html
+             * 
+             * Copyright (c) 2008-2016, Wojciech Muła
+             * All rights reserved.
+             * 
+             * Redistribution and use in source and binary forms, with or without
+             * modification, are permitted provided that the following conditions are
+             * met:
+             * 
+             * 1. Redistributions of source code must retain the above copyright
+             * notice, this list of conditions and the following disclaimer.
+             * 
+             * 2. Redistributions in binary form must reproduce the above copyright
+             * notice, this list of conditions and the following disclaimer in the
+             * documentation and/or other materials provided with the distribution.
+             * 
+             * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+             * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+             * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+             * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+             * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+             * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+             * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+             * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+             * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+             * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+             * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+            */
+
+            int64_t i = 0;
+            int64_t length_remaining = string.length;
+
+            __m256i broadcasted[2];
+            broadcasted[0] = _mm256_set1_epi8(needle[0]);
+            broadcasted[1] = _mm256_set1_epi8(needle[1]);
+
+            __m256i curr = _mm256_loadu_si256((__m256i*) string.data);
+
+            while (length_remaining > 31)
+            {
+                const __m256i next = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(s + i + 32));
+
+                __m256i eq = _mm256_cmpeq_epi8(curr, broadcasted[0]);
+
+                // AVX2 palignr works on 128-bit lanes, thus some extra work is needed
+                //
+                // curr = [a, b] (2 x 128 bit)
+                // next = [c, d]
+                // substring = [palignr(b, a, i), palignr(c, b, i)]
+                __m256i next1;
+                next1 = _mm256_inserti128_si256(next1, _mm256_extracti128_si256(curr, 1), 0); // b
+                next1 = _mm256_inserti128_si256(next1, _mm256_extracti128_si256(next, 0), 1); // c
+
+                const __m256i substring2 = _mm256_alignr_epi8(next1, curr, 1);
+                eq = _mm256_and_si256(eq, _mm256_cmpeq_epi8(substring2, broadcasted[1]));
+
+                curr = next;
+
+                const uint32_t mask = _mm256_movemask_epi8(eq);
+                if (mask != 0)
+                {
+                    return i + __builtin_ffs(mask);
+                }
+
+                i += 32;
+                length_remaining -= 32;
+            }
+
+            if (substring.length < 31)
+            {
+                for (int64_t pos = i; pos <= string.length; ++pos)
+                {
+                    if (string.data[pos] == substring.data[0] &&
+                        string.data[pos + substring.length - 1] == substring.data[substring.length - 1])
+                    {
+                        if (substring.length <= 2)
+                            return pos;
+                        if (JSL_MEMCMP(string.data + pos + 1,
+                                    substring.data + 1,
+                                    substring.length - 2) == 0)
+                            return pos;
+                    }
+                }
+            }
+            else if (substring.length == 31)
+            {
+                return JSL_MEMCMP(string.data + i, substring.data, substring.length) == 0;
+            }
+
+            return -1;
+        }
+
+        template <size_t k, typename MEMCMP>
+        size_t FORCE_INLINE avx2_strstr_memcmp(const char* s, size_t n, const char* needle, MEMCMP memcmp_fun)
+        {
+            const __m256i first = _mm256_set1_epi8(needle[0]);
+            const __m256i last  = _mm256_set1_epi8(needle[k - 1]);
+
+            for (size_t i = 0; i < n; i += 32) {
+
+                const __m256i block_first = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(s + i));
+                const __m256i block_last  = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(s + i + k - 1));
+
+                const __m256i eq_first = _mm256_cmpeq_epi8(first, block_first);
+                const __m256i eq_last  = _mm256_cmpeq_epi8(last, block_last);
+
+                uint32_t mask = _mm256_movemask_epi8(_mm256_and_si256(eq_first, eq_last));
+
+                while (mask != 0) {
+
+                    const auto bitpos = bits::get_first_bit_set(mask);
+
+                    if (memcmp_fun(s + i + bitpos + 1, needle + 1)) {
+                        return i + bitpos;
+                    }
+
+                    mask = bits::clear_leftmost_set(mask);
+                }
+            }
+
+            return std::string::npos;
+        }
+
+
+        static inline jsl__avx2_substring_search(JSLFatPtr string, JSLFatPtr substring)
+        {
+            /**
+             * From http://0x80.pl/notesen/2016-11-28-simd-strfind.html
+             * 
+             * Copyright (c) 2008-2016, Wojciech Muła
+             * All rights reserved.
+             * 
+             * Redistribution and use in source and binary forms, with or without
+             * modification, are permitted provided that the following conditions are
+             * met:
+             * 
+             * 1. Redistributions of source code must retain the above copyright
+             * notice, this list of conditions and the following disclaimer.
+             * 
+             * 2. Redistributions in binary form must reproduce the above copyright
+             * notice, this list of conditions and the following disclaimer in the
+             * documentation and/or other materials provided with the distribution.
+             * 
+             * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+             * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+             * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+             * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+             * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+             * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+             * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+             * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+             * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+             * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+             * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+            */
+
+            switch (substring.length)
+            {
+                case 1: {
+                    return jsl_fatptr_index_of(string, substring.data[0]);
+                }
+
+                case 2: {
+                    result = avx2_strstr_eq<2>(s, n, needle);
+                    break;
+                }
+
+                case 3: {
+                    result = avx2_strstr_memcmp<3>(s, n, needle, memcmp1);
+                    break;
+                }
+
+                case 4: {
+                    result = avx2_strstr_memcmp<4>(s, n, needle, memcmp2);
+                    break;
+                }
+
+                case 5: {
+                    // Note: use memcmp4 rather memcmp3, as the last character
+                    //       of needle is already proven to be equal
+                    result = avx2_strstr_memcmp<5>(s, n, needle, memcmp4);
+                    break;
+                }
+
+                case 6: {
+                    result = avx2_strstr_memcmp<6>(s, n, needle, memcmp4);
+                    break;
+                }
+
+                case 7: {
+                    result = avx2_strstr_memcmp<7>(s, n, needle, memcmp5);
+                    break;
+                }
+
+                case 8: {
+                    result = avx2_strstr_memcmp<8>(s, n, needle, memcmp6);
+                    break;
+                }
+
+                case 9: {
+                    // Note: use memcmp8 rather memcmp7 for the same reason as above.
+                    result = avx2_strstr_memcmp<9>(s, n, needle, memcmp8);
+                    break;
+                }
+
+                case 10: {
+                    result = avx2_strstr_memcmp<10>(s, n, needle, memcmp8);
+                    break;
+                }
+
+                case 11: {
+                    result = avx2_strstr_memcmp<11>(s, n, needle, memcmp9);
+                    break;
+                }
+
+                case 12: {
+                    result = avx2_strstr_memcmp<12>(s, n, needle, memcmp10);
+                    break;
+                }
+
+                default: {
+                    result = avx2_substring_anysize(string, substring);
+                    break;
+                }
+            }
+
+            return result;
+        }
+    
+    #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
+
+
+
+    #else
+
+        static JSL__FORCE_INLINE int64_t jsl__two_char_search(JSLFatPtr string, JSLFatPtr substring)
+        {
+            uint8_t b0 = substring.data[0];
+            uint8_t b1 = substring.data[1];
+
+            for (int64_t i = 0; i + 1 < string.length; ++i)
+            {
+                if (string.data[i] == b0 && string.data[i + 1] == b1)
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        static JSL__FORCE_INLINE int64_t jsl__bndm_search(JSLFatPtr string, JSLFatPtr substring)
+        {
+            uint64_t masks[256] = {0};
+
+            // Map rightmost pattern byte to bit 0 (LSB), leftmost to bit m-1
+            for (int64_t i = 0; i < substring.length; ++i)
+            {
+                // Shift is in [0..63], safe since substring.length <= 64
+                uint32_t bit = (uint32_t) (substring.length - 1 - i);
+                masks[substring.data[i]] |= (1ULL << bit);
+            }
+
+            // Bitmask of the lowest m bits set to 1; careful with m==64
+            uint64_t full = (substring.length == 64) ? ~0ULL : ((1ULL << substring.length) - 1ULL);
+
+            int64_t pos = 0;
+            int64_t last_start = string.length - substring.length;
+
+            while (pos <= last_start)
+            {
+                uint64_t D = full;
+                // how many chars left to verify in this window
+                int64_t j = substring.length;
+                // shift distance if mismatch
+                int64_t last = substring.length;
+
+                // Backward scan the window using masks
+                while (D != 0)
+                {
+                    uint8_t ch = string.data[pos + j - 1];
+                    D &= masks[ch];
+                    if (D != 0)
+                    {
+                        if (j == 1)
+                        {
+                            return pos;
+                        }
+
+                        --j;
+                        /* If LSB is set, we matched a prefix => potential shorter shift */
+                        if (D & 1ULL)
+                        {
+                            last = j;
+                        }
+                    }
+                    /* Advance the simulated NFA: shift left one, keep to m bits */
+                    D <<= 1;
+                    if (substring.length < 64)
+                        D &= full; /* for m==64, &full is a no-op */
+                }
+
+                pos += last;
+            }
+
+            return -1;
+        }
+
+        /* Sunday / Quick Search for m > 64 */
+        static JSL__FORCE_INLINE int64_t jsl__sunday_search(JSLFatPtr string, JSLFatPtr substring)
+        {
+            // Shift table with default m+1 for all 256 bytes
+            int64_t shift[256];
+            for (int64_t i = 0; i < 256; ++i)
+            {
+                shift[i] = substring.length + 1;
+            }
+
+            // Rightmost occurrence determines shift
+            for (int64_t i = 0; i < substring.length; ++i)
+            {
+                shift[substring.data[i]] = substring.length - i;
+            }
+
+            int64_t pos = 0;
+            while (pos + substring.length <= string.length) 
+            {
+                if (JSL_MEMCMP(string.data + pos, substring.data, substring.length) == 0)
+                {
+                    return pos;
+                }
+                
+                int64_t next = pos + substring.length;
+                if (next < string.length)
+                {
+                    pos += shift[string.data[next]];
+                }
+                else
+                {
+                    break;
+                }
+            }
+
+            return -1;
+        }
+
+        static JSL__FORCE_INLINE int64_t jsl__substring_search(JSLFatPtr string, JSLFatPtr substring)
+        {
+            if (substring.length == 2)
+            {
+                return jsl__two_char_search(string, substring);
+            }
+            else if (substring.length <= 64)
+            {
+                return jsl__bndm_search(string, substring);
             }
             else
             {
-                if (length != 0)
-                {
-                    length = partial_match_table[length - 1];
-                }
-                else
-                {
-                    partial_match_table[i] = 0;
-                    ++i;
-                }
-            }
-        }
-    }
-
-    // Knuth-Morris-Pratt substring search
-    // Chose KMP over Boyer-Moore because we're only using this function in cases with
-    // small strings and so the preprocessing time of BM isn't worth it
-    static int64_t kmp_search(JSLFatPtr string, JSLFatPtr substring)
-    {
-        int64_t partial_match_table[substring.length]; // C VLA
-
-        kmp_build_partial_match_table(substring, partial_match_table);
-
-        int64_t i = 0; // index for string
-        int64_t j = 0; // index for substring
-
-        while (i < string.length)
-        {
-            if (substring.data[j] == string.data[i]) 
-            {
-                ++i;
-                ++j;
-            }
-
-            if (j == substring.length)
-            {
-                return i - j;
-            }
-            else if (i < string.length && substring.data[j] != string.data[i])
-            {
-                if (j != 0)
-                    j = partial_match_table[j - 1];
-                else
-                    i++;
+                return jsl__sunday_search(string, substring);
             }
         }
 
-        return -1;
-    }
+
+    #endif
 
     int64_t jsl_fatptr_substring_search(JSLFatPtr string, JSLFatPtr substring)
     {
-        if (
+        if (JSL__UNLIKELY(
             string.data == NULL
             || string.length < 1
             || substring.data == NULL
             || substring.length < 1
             || substring.length > string.length
-        )
+        ))
         {
             return -1;
+        }
+        else if (substring.length == 1)
+        {
+            return jsl_fatptr_index_of(string, substring.data[0]);
         }
         else if (string.length == substring.length)
         {
@@ -1695,63 +2153,12 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             else
                 return -1;
         }
-        else if (string.length < substring.length + 32)
-        {
-            return kmp_search(string, substring);
-        }
         else
         {
-
             #ifdef __AVX2__
-                // From http://0x80.pl/articles/simd-strfind.html
-
-                __m256i first = _mm256_set1_epi8(substring.data[0]);
-                __m256i last  = _mm256_set1_epi8(substring.data[substring.length - 1]);
-
-                int64_t i = 0;
-                int64_t length_remaining = string.length;
-                int64_t stopping_point = substring.length + 32;
-
-                // TODO, speed: Technically it's possible to read past the end of the end of the
-                // "string" buffer safely if you first align the read to a 8-byte boundary.
-                // However it seems like this is not possible to ensure if the function may inline
-                // and since we're using LTO this would be a big pain to ensure.
-                // Also we'd need to turn off address sanitizer for this function.
-
-                while (length_remaining >= stopping_point)
-                {
-                    __m256i block_first = _mm256_loadu_si256((__m256i*) (string.data + i));
-                    __m256i block_last  = _mm256_loadu_si256((__m256i*) (string.data + i + substring.length - 1));
-
-                    __m256i eq_first = _mm256_cmpeq_epi8(first, block_first);
-                    __m256i eq_last  = _mm256_cmpeq_epi8(last, block_last);
-
-                    uint32_t mask = _mm256_movemask_epi8(_mm256_and_si256(eq_first, eq_last));
-
-                    while (mask != 0)
-                    {
-                        int32_t bit_position = __builtin_ctz(mask);
-
-                        if (JSL_MEMCMP(string.data + i + bit_position + 1, substring.data + 1, substring.length - 2) == 0)
-                        {
-                            return i + bit_position;
-                        }
-
-                        // clear the least significant bit set
-                        mask &= (mask - 1);
-                    }
-
-                    i += 32;
-                    length_remaining -= 32;
-                }
-
-                JSLFatPtr data_for_kmp = { .data = string.data + i, .length = string.length - i };
-                int64_t kmp_res = kmp_search(data_for_kmp, substring);
-                return kmp_res == -1 ? -1 : kmp_res + i;
+                return jsl__avx2_substring_search(string, substring);
             #else
-                // NOTE: very slow, just here to get ARM to compile
-
-                return kmp_search(string, substring);
+                return jsl__substring_search(string, substring);
             #endif
         }
     }
