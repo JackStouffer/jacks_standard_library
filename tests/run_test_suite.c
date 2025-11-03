@@ -85,6 +85,7 @@ int main(int argc, char **argv)
                 "clang",
                 "-O0",
                 "-g",
+                "-DJSL_DEBUG",
                 "-fsanitize=address",
                 "-std=c11",
                 "-Wall",
@@ -147,6 +148,7 @@ int main(int argc, char **argv)
                     &gcc_debug_compile_command,
                     "cl.exe",
                     "/nologo",
+                    "/DJSL_DEBUG",
                     "/TC",
                     "/Od",
                     "/Zi",
@@ -158,9 +160,9 @@ int main(int argc, char **argv)
                 );
                 if (!nob_cmd_run(&gcc_debug_compile_command)) return 1;
 
-                Nob_Cmd gcc_debug_run_command = {0};
-                nob_cmd_append(&gcc_debug_run_command, "./tests/bin/debug_gcc");
-                if (!nob_cmd_run(&gcc_debug_run_command)) return 1;
+                Nob_Cmd msvc_debug_run_command = {0};
+                nob_cmd_append(&msvc_debug_run_command, exe_name);
+                if (!nob_cmd_run(&msvc_debug_run_command)) return 1;
             }
 
             {
@@ -184,9 +186,9 @@ int main(int argc, char **argv)
                 );
                 if (!nob_cmd_run(&gcc_optimized_compile_command)) return 1;
 
-                Nob_Cmd gcc_optimized_run_command = {0};
-                nob_cmd_append(&gcc_optimized_run_command, "./tests/bin/opt_gcc");
-                if (!nob_cmd_run(&gcc_optimized_run_command)) return 1;
+                Nob_Cmd msvc_optimized_run_command = {0};
+                nob_cmd_append(&msvc_optimized_run_command, exe_name);
+                if (!nob_cmd_run(&msvc_optimized_run_command)) return 1;
             }
 
         #elif defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
