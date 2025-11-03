@@ -1665,7 +1665,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     #ifdef __AVX2__
 
-        static JSL__FORCE_INLINE avx2_substring_anysize(JSLFatPtr string, JSLFatPtr substring)
+        static JSL__FORCE_INLINE int64_t avx2_substring_anysize(JSLFatPtr string, JSLFatPtr substring)
         {
             /**
              * From http://0x80.pl/notesen/2016-11-28-simd-strfind.html
@@ -1706,10 +1706,10 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             while (length_remaining > 63)
             {
                 __m256i block_first1 = _mm256_loadu_si256((const __m256i*)(string.data + i));
-                __m256i block_last1  = _mm256_loadu_si256((const __m256i*)(string.data + i + k - 1));
+                __m256i block_last1  = _mm256_loadu_si256((const __m256i*)(string.data + i + substring.length - 1));
 
                 __m256i block_first2 = _mm256_loadu_si256((const __m256i*)(string.data + i + 32));
-                __m256i block_last2  = _mm256_loadu_si256((const __m256i*)(string.data + i + k - 1 + 32));
+                __m256i block_last2  = _mm256_loadu_si256((const __m256i*)(string.data + i + substring.length - 1 + 32));
 
                 __m256i eq_first1 = _mm256_cmpeq_epi8(first, block_first1);
                 __m256i eq_last1  = _mm256_cmpeq_epi8(last, block_last1);
@@ -1723,7 +1723,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
                 while (mask != 0)
                 {
-                    int32_t bit_position = __builtin_ctz11(mask);
+                    int32_t bit_position = __builtin_ctzll(mask);
 
                     if (JSL_MEMCMP(string.data + i + bit_position + 1, substring.data + 1, substring.length - 2) == 0)
                     {
@@ -2020,16 +2020,16 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         {
             uint64_t masks[256] = {0};
 
-            // Map rightmost pattern byte to bit 0 (LSB), leftmost to bit m-1
+            // Map rightmost pattern byte to bit 0 (LSB), leftmost to bit m-1          
             for (int64_t i = 0; i < substring.length; ++i)
             {
-                // Shift is in [0..63], safe since substring.length <= 64
-                uint32_t bit = (uint32_t) (substring.length - 1 - i);
-                masks[substring.data[i]] |= (1ULL << bit);
+                uint32_t bit = (uint32_t)(substring.length - 1 - i);
+                masks[(uint8_t) substring.data[i]] |= (1ULL << bit);
             }
 
             // Bitmask of the lowest m bits set to 1; careful with m==64
             uint64_t full = (substring.length == 64) ? ~0ULL : ((1ULL << substring.length) - 1ULL);
+            uint64_t MSB  = (substring.length == 64) ? (1ULL << 63) : (1ULL << (substring.length - 1));
 
             int64_t pos = 0;
             int64_t last_start = string.length - substring.length;
@@ -2055,11 +2055,8 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                         }
 
                         --j;
-                        /* If LSB is set, we matched a prefix => potential shorter shift */
-                        if (D & 1ULL)
-                        {
-                            last = j;
-                        }
+                        // If MSB set, a prefix of the pattern is aligned -> shorter shift
+                        if (D & MSB) last = j;
                     }
                     /* Advance the simulated NFA: shift left one, keep to m bits */
                     D <<= 1;

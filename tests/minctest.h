@@ -123,6 +123,11 @@ static size_t lfails = 0;
     lequal_base((a) == (b), a, b, "%d")
 
 
+/* Assert two int64 are equal. */
+#define l_long_long_equal(a, b)\
+    lequal_base((a) == (b), a, b, "%lld")
+
+
 /* Assert two floats are equal (Within LTEST_FLOAT_TOLERANCE). */
 #define lfequal(a, b)\
     lequal_base(fabs((double)(a)-(double)(b)) <= LTEST_FLOAT_TOLERANCE\
