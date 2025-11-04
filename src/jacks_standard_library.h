@@ -1798,14 +1798,14 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             int64_t length_remaining = string.length;
 
             __m256i broadcasted[2];
-            broadcasted[0] = _mm256_set1_epi8(needle[0]);
-            broadcasted[1] = _mm256_set1_epi8(needle[1]);
+            broadcasted[0] = _mm256_set1_epi8(substring.data[0]);
+            broadcasted[1] = _mm256_set1_epi8(substring.data[1]);
 
             __m256i curr = _mm256_loadu_si256((__m256i*) string.data);
 
             while (length_remaining > 31)
             {
-                const __m256i next = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(s + i + 32));
+                const __m256i next = _mm256_loadu_si256((__m256i*) (string.data + i + 32));
 
                 __m256i eq = _mm256_cmpeq_epi8(curr, broadcasted[0]);
 
@@ -1814,7 +1814,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                 // curr = [a, b] (2 x 128 bit)
                 // next = [c, d]
                 // substring = [palignr(b, a, i), palignr(c, b, i)]
-                __m256i next1;
+                __m256i next1 = _mm256_undefined_si256();
                 next1 = _mm256_inserti128_si256(next1, _mm256_extracti128_si256(curr, 1), 0); // b
                 next1 = _mm256_inserti128_si256(next1, _mm256_extracti128_si256(next, 0), 1); // c
 
@@ -1857,39 +1857,86 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             return -1;
         }
 
-        template <size_t k, typename MEMCMP>
-        size_t FORCE_INLINE avx2_strstr_memcmp(const char* s, size_t n, const char* needle, MEMCMP memcmp_fun)
-        {
-            const __m256i first = _mm256_set1_epi8(needle[0]);
-            const __m256i last  = _mm256_set1_epi8(needle[k - 1]);
-
-            for (size_t i = 0; i < n; i += 32) {
-
-                const __m256i block_first = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(s + i));
-                const __m256i block_last  = _mm256_loadu_si256(reinterpret_cast<const __m256i*>(s + i + k - 1));
-
-                const __m256i eq_first = _mm256_cmpeq_epi8(first, block_first);
-                const __m256i eq_last  = _mm256_cmpeq_epi8(last, block_last);
-
-                uint32_t mask = _mm256_movemask_epi8(_mm256_and_si256(eq_first, eq_last));
-
-                while (mask != 0) {
-
-                    const auto bitpos = bits::get_first_bit_set(mask);
-
-                    if (memcmp_fun(s + i + bitpos + 1, needle + 1)) {
-                        return i + bitpos;
-                    }
-
-                    mask = bits::clear_leftmost_set(mask);
-                }
+        /**
+         * From http://0x80.pl/notesen/2016-11-28-simd-strfind.html
+         * 
+         * Copyright (c) 2008-2016, Wojciech Muła
+         * All rights reserved.
+         * 
+         * Redistribution and use in source and binary forms, with or without
+         * modification, are permitted provided that the following conditions are
+         * met:
+         * 
+         * 1. Redistributions of source code must retain the above copyright
+         * notice, this list of conditions and the following disclaimer.
+         * 
+         * 2. Redistributions in binary form must reproduce the above copyright
+         * notice, this list of conditions and the following disclaimer in the
+         * documentation and/or other materials provided with the distribution.
+         * 
+         * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+         * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+         * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+         * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+         * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+         * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+         * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+         * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+         * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+         * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+         * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+        */
+        #define JSL__AVX2_STRSTR_MEMCMP_IMPL(SUBSTRING_LENGTH, MEMCMP_LENGTH) \
+            static JSL__FORCE_INLINE int64_t avx2_strstr_memcmp##SUBSTRING_LENGTH(    \
+                JSLFatPtr string, JSLFatPtr substring    \
+            )    \
+            {    \
+                __m256i first = _mm256_set1_epi8(substring.data[0]);    \
+                __m256i last  = _mm256_set1_epi8(substring.data[SUBSTRING_LENGTH - 1]);     \
+                                                                                            \
+                for (int64_t i = 0; i < string.length; i += 32)                                  \
+                {                                                                               \
+                    __m256i block_first = _mm256_loadu_si256((__m256i*) (string.data + i));     \
+                    __m256i block_last  = _mm256_loadu_si256(                                   \
+                        (__m256i*) (string.data + i + SUBSTRING_LENGTH - 1)                     \
+                    );    \
+                                                                                                                \
+                    __m256i eq_first = _mm256_cmpeq_epi8(first, block_first);    \
+                    __m256i eq_last  = _mm256_cmpeq_epi8(last, block_last);    \
+                                                                                                \
+                    uint32_t mask = _mm256_movemask_epi8(_mm256_and_si256(eq_first, eq_last));    \
+                                                                                                \
+                    while (mask != 0)    \
+                    {    \
+                        uint32_t bitpos = __builtin_ctz(mask);    \
+                                                                                                \
+                        if (JSL_MEMCMP(string.data + i + bitpos + 1, substring.data + 1, MEMCMP_LENGTH))    \
+                        {    \
+                            return i + bitpos;    \
+                        }    \
+                        mask = mask & (mask - 1);    \
+                    }    \
+                }    \
+                                                                                                \
+                return -1;    \
             }
 
-            return std::string::npos;
-        }
+        JSL__AVX2_STRSTR_MEMCMP_IMPL(3, 1)
+        JSL__AVX2_STRSTR_MEMCMP_IMPL(4, 2)
+        // Note: use memcmp4 rather memcmp3, as the last character
+        //       of needle is already proven to be equal
+        JSL__AVX2_STRSTR_MEMCMP_IMPL(5, 4)
+        JSL__AVX2_STRSTR_MEMCMP_IMPL(6, 4)
+        JSL__AVX2_STRSTR_MEMCMP_IMPL(7, 5)
+        JSL__AVX2_STRSTR_MEMCMP_IMPL(8, 6)
+        // Note: use memcmp8 rather memcmp7 for the same reason as above.
+        JSL__AVX2_STRSTR_MEMCMP_IMPL(9, 8)
+        JSL__AVX2_STRSTR_MEMCMP_IMPL(10, 8)
+        JSL__AVX2_STRSTR_MEMCMP_IMPL(11, 9)
+        JSL__AVX2_STRSTR_MEMCMP_IMPL(12, 10)
+        
 
-
-        static inline jsl__avx2_substring_search(JSLFatPtr string, JSLFatPtr substring)
+        static inline int64_t jsl__avx2_substring_search(JSLFatPtr string, JSLFatPtr substring)
         {
             /**
              * From http://0x80.pl/notesen/2016-11-28-simd-strfind.html
@@ -1928,70 +1975,53 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                 }
 
                 case 2: {
-                    result = avx2_strstr_eq<2>(s, n, needle);
-                    break;
+                    return avx2_strstr_eq(string, substring);
                 }
 
                 case 3: {
-                    result = avx2_strstr_memcmp<3>(s, n, needle, memcmp1);
-                    break;
+                    return avx2_strstr_memcmp3(string, substring);
                 }
 
                 case 4: {
-                    result = avx2_strstr_memcmp<4>(s, n, needle, memcmp2);
-                    break;
+                    return avx2_strstr_memcmp4(string, substring);
                 }
 
                 case 5: {
-                    // Note: use memcmp4 rather memcmp3, as the last character
-                    //       of needle is already proven to be equal
-                    result = avx2_strstr_memcmp<5>(s, n, needle, memcmp4);
-                    break;
+                    return avx2_strstr_memcmp5(string, substring);
                 }
 
                 case 6: {
-                    result = avx2_strstr_memcmp<6>(s, n, needle, memcmp4);
-                    break;
+                    return avx2_strstr_memcmp6(string, substring);
                 }
 
                 case 7: {
-                    result = avx2_strstr_memcmp<7>(s, n, needle, memcmp5);
-                    break;
+                    return avx2_strstr_memcmp7(string, substring);
                 }
 
                 case 8: {
-                    result = avx2_strstr_memcmp<8>(s, n, needle, memcmp6);
-                    break;
+                    return avx2_strstr_memcmp8(string, substring);
                 }
 
                 case 9: {
-                    // Note: use memcmp8 rather memcmp7 for the same reason as above.
-                    result = avx2_strstr_memcmp<9>(s, n, needle, memcmp8);
-                    break;
+                    return avx2_strstr_memcmp9(string, substring);
                 }
 
                 case 10: {
-                    result = avx2_strstr_memcmp<10>(s, n, needle, memcmp8);
-                    break;
+                    return avx2_strstr_memcmp10(string, substring);
                 }
 
                 case 11: {
-                    result = avx2_strstr_memcmp<11>(s, n, needle, memcmp9);
-                    break;
+                    return avx2_strstr_memcmp11(string, substring);
                 }
 
                 case 12: {
-                    result = avx2_strstr_memcmp<12>(s, n, needle, memcmp10);
-                    break;
+                    return avx2_strstr_memcmp12(string, substring);
                 }
 
                 default: {
-                    result = avx2_substring_anysize(string, substring);
-                    break;
+                    return avx2_substring_anysize(string, substring);
                 }
             }
-
-            return result;
         }
     
     #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
@@ -2153,7 +2183,10 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         else
         {
             #ifdef __AVX2__
-                return jsl__avx2_substring_search(string, substring);
+                if (string.length >= 32)
+                    return jsl__avx2_substring_search(string, substring);
+                else
+                    return jsl__substring_search(string, substring);
             #else
                 return jsl__substring_search(string, substring);
             #endif
@@ -2164,20 +2197,6 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     {
         if (string.data == NULL || string.length < 1)
         {
-            return -1;
-        }
-        else if (string.length < 32)
-        {
-            int64_t i = 0;
-
-            while (i < string.length)
-            {
-                if (string.data[i] == item)
-                    return i;
-
-                ++i;
-            }
-
             return -1;
         }
         else
