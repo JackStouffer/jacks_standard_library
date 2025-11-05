@@ -1665,7 +1665,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     #ifdef __AVX2__
 
-        static JSL__FORCE_INLINE int64_t avx2_substring_anysize(JSLFatPtr string, JSLFatPtr substring)
+        static JSL__FORCE_INLINE int64_t jsl__avx2_substring_search(JSLFatPtr string, JSLFatPtr substring)
         {
             /**
              * From http://0x80.pl/notesen/2016-11-28-simd-strfind.html
@@ -1698,18 +1698,19 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             */
 
             int64_t i = 0;
-            int64_t length_remaining = string.length;
+            int64_t substring_end_index = substring.length - 1;
 
             __m256i first = _mm256_set1_epi8(substring.data[0]);
-            __m256i last  = _mm256_set1_epi8(substring.data[substring.length - 1]);
+            __m256i last  = _mm256_set1_epi8(substring.data[substring_end_index]);
 
-            while (length_remaining > 63)
+            int64_t stopping_point = string.length - substring_end_index - 64;
+            for (; i <= stopping_point; i += 64)
             {
-                __m256i block_first1 = _mm256_loadu_si256((const __m256i*)(string.data + i));
-                __m256i block_last1  = _mm256_loadu_si256((const __m256i*)(string.data + i + substring.length - 1));
+                __m256i block_first1 = _mm256_loadu_si256((__m256i*) (string.data + i));
+                __m256i block_last1  = _mm256_loadu_si256((__m256i*) (string.data + i + substring_end_index));
 
-                __m256i block_first2 = _mm256_loadu_si256((const __m256i*)(string.data + i + 32));
-                __m256i block_last2  = _mm256_loadu_si256((const __m256i*)(string.data + i + substring.length - 1 + 32));
+                __m256i block_first2 = _mm256_loadu_si256((__m256i*) (string.data + i + 32));
+                __m256i block_last2  = _mm256_loadu_si256((__m256i*) (string.data + i + substring_end_index + 32));
 
                 __m256i eq_first1 = _mm256_cmpeq_epi8(first, block_first1);
                 __m256i eq_last1  = _mm256_cmpeq_epi8(last, block_last1);
@@ -1733,429 +1734,155 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     // clear the least significant bit set
                     mask &= (mask - 1);
                 }
-
-                i += 64;
-                length_remaining -= 64;
             }
 
-            if (substring.length < 63)
+            stopping_point = string.length - substring.length;
+            for (; i <= stopping_point; ++i)
             {
-                for (int64_t pos = i; pos <= string.length; ++pos)
+                if (string.data[i] == substring.data[0] &&
+                    string.data[i + substring_end_index] == substring.data[substring_end_index])
                 {
-                    if (string.data[pos] == substring.data[0] &&
-                        string.data[pos + substring.length - 1] == substring.data[substring.length - 1])
-                    {
-                        if (substring.length <= 2)
-                            return pos;
-                        if (JSL_MEMCMP(string.data + pos + 1,
-                                    substring.data + 1,
-                                    substring.length - 2) == 0)
-                            return pos;
-                    }
+                    if (substring.length <= 2)
+                        return i;
+                    if (JSL_MEMCMP(string.data + i + 1,
+                                substring.data + 1,
+                                substring.length - 2) == 0)
+                        return i;
                 }
-            }
-            else if (substring.length == 63)
-            {
-                return JSL_MEMCMP(string.data + i, substring.data, substring.length) == 0;
             }
 
             return -1;
         }
 
-        static JSL__FORCE_INLINE int64_t avx2_strstr_eq(JSLFatPtr string, JSLFatPtr substring)
-        {
-            /**
-             * From http://0x80.pl/notesen/2016-11-28-simd-strfind.html
-             * 
-             * Copyright (c) 2008-2016, Wojciech Muła
-             * All rights reserved.
-             * 
-             * Redistribution and use in source and binary forms, with or without
-             * modification, are permitted provided that the following conditions are
-             * met:
-             * 
-             * 1. Redistributions of source code must retain the above copyright
-             * notice, this list of conditions and the following disclaimer.
-             * 
-             * 2. Redistributions in binary form must reproduce the above copyright
-             * notice, this list of conditions and the following disclaimer in the
-             * documentation and/or other materials provided with the distribution.
-             * 
-             * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
-             * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
-             * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
-             * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-             * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-             * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
-             * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-             * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-             * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-             * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-             * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-            */
-
-            int64_t i = 0;
-            int64_t length_remaining = string.length;
-
-            __m256i broadcasted[2];
-            broadcasted[0] = _mm256_set1_epi8(substring.data[0]);
-            broadcasted[1] = _mm256_set1_epi8(substring.data[1]);
-
-            __m256i curr = _mm256_loadu_si256((__m256i*) string.data);
-
-            while (length_remaining > 31)
-            {
-                const __m256i next = _mm256_loadu_si256((__m256i*) (string.data + i + 32));
-
-                __m256i eq = _mm256_cmpeq_epi8(curr, broadcasted[0]);
-
-                // AVX2 palignr works on 128-bit lanes, thus some extra work is needed
-                //
-                // curr = [a, b] (2 x 128 bit)
-                // next = [c, d]
-                // substring = [palignr(b, a, i), palignr(c, b, i)]
-                __m256i next1 = _mm256_undefined_si256();
-                next1 = _mm256_inserti128_si256(next1, _mm256_extracti128_si256(curr, 1), 0); // b
-                next1 = _mm256_inserti128_si256(next1, _mm256_extracti128_si256(next, 0), 1); // c
-
-                const __m256i substring2 = _mm256_alignr_epi8(next1, curr, 1);
-                eq = _mm256_and_si256(eq, _mm256_cmpeq_epi8(substring2, broadcasted[1]));
-
-                curr = next;
-
-                const uint32_t mask = _mm256_movemask_epi8(eq);
-                if (mask != 0)
-                {
-                    return i + __builtin_ffs(mask);
-                }
-
-                i += 32;
-                length_remaining -= 32;
-            }
-
-            if (substring.length < 31)
-            {
-                for (int64_t pos = i; pos <= string.length; ++pos)
-                {
-                    if (string.data[pos] == substring.data[0] &&
-                        string.data[pos + substring.length - 1] == substring.data[substring.length - 1])
-                    {
-                        if (substring.length <= 2)
-                            return pos;
-                        if (JSL_MEMCMP(string.data + pos + 1,
-                                    substring.data + 1,
-                                    substring.length - 2) == 0)
-                            return pos;
-                    }
-                }
-            }
-            else if (substring.length == 31)
-            {
-                return JSL_MEMCMP(string.data + i, substring.data, substring.length) == 0;
-            }
-
-            return -1;
-        }
-
-        /**
-         * From http://0x80.pl/notesen/2016-11-28-simd-strfind.html
-         * 
-         * Copyright (c) 2008-2016, Wojciech Muła
-         * All rights reserved.
-         * 
-         * Redistribution and use in source and binary forms, with or without
-         * modification, are permitted provided that the following conditions are
-         * met:
-         * 
-         * 1. Redistributions of source code must retain the above copyright
-         * notice, this list of conditions and the following disclaimer.
-         * 
-         * 2. Redistributions in binary form must reproduce the above copyright
-         * notice, this list of conditions and the following disclaimer in the
-         * documentation and/or other materials provided with the distribution.
-         * 
-         * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
-         * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
-         * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
-         * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-         * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-         * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
-         * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-         * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-         * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-         * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-         * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-        */
-        #define JSL__AVX2_STRSTR_MEMCMP_IMPL(SUBSTRING_LENGTH, MEMCMP_LENGTH) \
-            static JSL__FORCE_INLINE int64_t avx2_strstr_memcmp##SUBSTRING_LENGTH(    \
-                JSLFatPtr string, JSLFatPtr substring    \
-            )    \
-            {    \
-                __m256i first = _mm256_set1_epi8(substring.data[0]);    \
-                __m256i last  = _mm256_set1_epi8(substring.data[SUBSTRING_LENGTH - 1]);     \
-                                                                                            \
-                for (int64_t i = 0; i < string.length; i += 32)                                  \
-                {                                                                               \
-                    __m256i block_first = _mm256_loadu_si256((__m256i*) (string.data + i));     \
-                    __m256i block_last  = _mm256_loadu_si256(                                   \
-                        (__m256i*) (string.data + i + SUBSTRING_LENGTH - 1)                     \
-                    );    \
-                                                                                                                \
-                    __m256i eq_first = _mm256_cmpeq_epi8(first, block_first);    \
-                    __m256i eq_last  = _mm256_cmpeq_epi8(last, block_last);    \
-                                                                                                \
-                    uint32_t mask = _mm256_movemask_epi8(_mm256_and_si256(eq_first, eq_last));    \
-                                                                                                \
-                    while (mask != 0)    \
-                    {    \
-                        uint32_t bitpos = __builtin_ctz(mask);    \
-                                                                                                \
-                        if (JSL_MEMCMP(string.data + i + bitpos + 1, substring.data + 1, MEMCMP_LENGTH))    \
-                        {    \
-                            return i + bitpos;    \
-                        }    \
-                        mask = mask & (mask - 1);    \
-                    }    \
-                }    \
-                                                                                                \
-                return -1;    \
-            }
-
-        JSL__AVX2_STRSTR_MEMCMP_IMPL(3, 1)
-        JSL__AVX2_STRSTR_MEMCMP_IMPL(4, 2)
-        // Note: use memcmp4 rather memcmp3, as the last character
-        //       of needle is already proven to be equal
-        JSL__AVX2_STRSTR_MEMCMP_IMPL(5, 4)
-        JSL__AVX2_STRSTR_MEMCMP_IMPL(6, 4)
-        JSL__AVX2_STRSTR_MEMCMP_IMPL(7, 5)
-        JSL__AVX2_STRSTR_MEMCMP_IMPL(8, 6)
-        // Note: use memcmp8 rather memcmp7 for the same reason as above.
-        JSL__AVX2_STRSTR_MEMCMP_IMPL(9, 8)
-        JSL__AVX2_STRSTR_MEMCMP_IMPL(10, 8)
-        JSL__AVX2_STRSTR_MEMCMP_IMPL(11, 9)
-        JSL__AVX2_STRSTR_MEMCMP_IMPL(12, 10)
-        
-
-        static inline int64_t jsl__avx2_substring_search(JSLFatPtr string, JSLFatPtr substring)
-        {
-            /**
-             * From http://0x80.pl/notesen/2016-11-28-simd-strfind.html
-             * 
-             * Copyright (c) 2008-2016, Wojciech Muła
-             * All rights reserved.
-             * 
-             * Redistribution and use in source and binary forms, with or without
-             * modification, are permitted provided that the following conditions are
-             * met:
-             * 
-             * 1. Redistributions of source code must retain the above copyright
-             * notice, this list of conditions and the following disclaimer.
-             * 
-             * 2. Redistributions in binary form must reproduce the above copyright
-             * notice, this list of conditions and the following disclaimer in the
-             * documentation and/or other materials provided with the distribution.
-             * 
-             * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
-             * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
-             * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
-             * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-             * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-             * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
-             * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-             * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-             * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-             * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-             * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-            */
-
-            switch (substring.length)
-            {
-                case 1: {
-                    return jsl_fatptr_index_of(string, substring.data[0]);
-                }
-
-                case 2: {
-                    return avx2_strstr_eq(string, substring);
-                }
-
-                case 3: {
-                    return avx2_strstr_memcmp3(string, substring);
-                }
-
-                case 4: {
-                    return avx2_strstr_memcmp4(string, substring);
-                }
-
-                case 5: {
-                    return avx2_strstr_memcmp5(string, substring);
-                }
-
-                case 6: {
-                    return avx2_strstr_memcmp6(string, substring);
-                }
-
-                case 7: {
-                    return avx2_strstr_memcmp7(string, substring);
-                }
-
-                case 8: {
-                    return avx2_strstr_memcmp8(string, substring);
-                }
-
-                case 9: {
-                    return avx2_strstr_memcmp9(string, substring);
-                }
-
-                case 10: {
-                    return avx2_strstr_memcmp10(string, substring);
-                }
-
-                case 11: {
-                    return avx2_strstr_memcmp11(string, substring);
-                }
-
-                case 12: {
-                    return avx2_strstr_memcmp12(string, substring);
-                }
-
-                default: {
-                    return avx2_substring_anysize(string, substring);
-                }
-            }
-        }
-    
     #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
 
 
+    #endif
 
-    #else
+    static JSL__FORCE_INLINE int64_t jsl__two_char_search(JSLFatPtr string, JSLFatPtr substring)
+    {
+        uint8_t b0 = substring.data[0];
+        uint8_t b1 = substring.data[1];
 
-        static JSL__FORCE_INLINE int64_t jsl__two_char_search(JSLFatPtr string, JSLFatPtr substring)
+        for (int64_t i = 0; i + 1 < string.length; ++i)
         {
-            uint8_t b0 = substring.data[0];
-            uint8_t b1 = substring.data[1];
-
-            for (int64_t i = 0; i + 1 < string.length; ++i)
+            if (string.data[i] == b0 && string.data[i + 1] == b1)
             {
-                if (string.data[i] == b0 && string.data[i + 1] == b1)
-                {
-                    return i;
-                }
+                return i;
             }
-
-            return -1;
         }
 
-        static JSL__FORCE_INLINE int64_t jsl__bndm_search(JSLFatPtr string, JSLFatPtr substring)
+        return -1;
+    }
+
+    static JSL__FORCE_INLINE int64_t jsl__bndm_search(JSLFatPtr string, JSLFatPtr substring)
+    {
+        uint64_t masks[256] = {0};
+
+        // Map rightmost pattern byte to bit 0 (LSB), leftmost to bit m-1          
+        for (int64_t i = 0; i < substring.length; ++i)
         {
-            uint64_t masks[256] = {0};
+            uint32_t bit = (uint32_t)(substring.length - 1 - i);
+            masks[(uint8_t) substring.data[i]] |= (1ULL << bit);
+        }
 
-            // Map rightmost pattern byte to bit 0 (LSB), leftmost to bit m-1          
-            for (int64_t i = 0; i < substring.length; ++i)
+        // Bitmask of the lowest m bits set to 1; careful with m==64
+        uint64_t full = (substring.length == 64) ? ~0ULL : ((1ULL << substring.length) - 1ULL);
+        uint64_t MSB  = (substring.length == 64) ? (1ULL << 63) : (1ULL << (substring.length - 1));
+
+        int64_t pos = 0;
+        int64_t last_start = string.length - substring.length;
+
+        while (pos <= last_start)
+        {
+            uint64_t D = full;
+            // how many chars left to verify in this window
+            int64_t j = substring.length;
+            // shift distance if mismatch
+            int64_t last = substring.length;
+
+            // Backward scan the window using masks
+            while (D != 0)
             {
-                uint32_t bit = (uint32_t)(substring.length - 1 - i);
-                masks[(uint8_t) substring.data[i]] |= (1ULL << bit);
-            }
-
-            // Bitmask of the lowest m bits set to 1; careful with m==64
-            uint64_t full = (substring.length == 64) ? ~0ULL : ((1ULL << substring.length) - 1ULL);
-            uint64_t MSB  = (substring.length == 64) ? (1ULL << 63) : (1ULL << (substring.length - 1));
-
-            int64_t pos = 0;
-            int64_t last_start = string.length - substring.length;
-
-            while (pos <= last_start)
-            {
-                uint64_t D = full;
-                // how many chars left to verify in this window
-                int64_t j = substring.length;
-                // shift distance if mismatch
-                int64_t last = substring.length;
-
-                // Backward scan the window using masks
-                while (D != 0)
+                uint8_t ch = string.data[pos + j - 1];
+                D &= masks[ch];
+                if (D != 0)
                 {
-                    uint8_t ch = string.data[pos + j - 1];
-                    D &= masks[ch];
-                    if (D != 0)
+                    if (j == 1)
                     {
-                        if (j == 1)
-                        {
-                            return pos;
-                        }
-
-                        --j;
-                        // If MSB set, a prefix of the pattern is aligned -> shorter shift
-                        if (D & MSB) last = j;
+                        return pos;
                     }
-                    /* Advance the simulated NFA: shift left one, keep to m bits */
-                    D <<= 1;
-                    if (substring.length < 64)
-                        D &= full; /* for m==64, &full is a no-op */
-                }
 
-                pos += last;
+                    --j;
+                    // If MSB set, a prefix of the pattern is aligned -> shorter shift
+                    if (D & MSB) last = j;
+                }
+                /* Advance the simulated NFA: shift left one, keep to m bits */
+                D <<= 1;
+                if (substring.length < 64)
+                    D &= full; /* for m==64, &full is a no-op */
             }
 
-            return -1;
+            pos += last;
         }
 
-        /* Sunday / Quick Search for m > 64 */
-        static JSL__FORCE_INLINE int64_t jsl__sunday_search(JSLFatPtr string, JSLFatPtr substring)
+        return -1;
+    }
+
+    /* Sunday / Quick Search for m > 64 */
+    static JSL__FORCE_INLINE int64_t jsl__sunday_search(JSLFatPtr string, JSLFatPtr substring)
+    {
+        // Shift table with default m+1 for all 256 bytes
+        int64_t shift[256];
+        for (int64_t i = 0; i < 256; ++i)
         {
-            // Shift table with default m+1 for all 256 bytes
-            int64_t shift[256];
-            for (int64_t i = 0; i < 256; ++i)
-            {
-                shift[i] = substring.length + 1;
-            }
-
-            // Rightmost occurrence determines shift
-            for (int64_t i = 0; i < substring.length; ++i)
-            {
-                shift[substring.data[i]] = substring.length - i;
-            }
-
-            int64_t pos = 0;
-            while (pos + substring.length <= string.length) 
-            {
-                if (JSL_MEMCMP(string.data + pos, substring.data, substring.length) == 0)
-                {
-                    return pos;
-                }
-                
-                int64_t next = pos + substring.length;
-                if (next < string.length)
-                {
-                    pos += shift[string.data[next]];
-                }
-                else
-                {
-                    break;
-                }
-            }
-
-            return -1;
+            shift[i] = substring.length + 1;
         }
 
-        static JSL__FORCE_INLINE int64_t jsl__substring_search(JSLFatPtr string, JSLFatPtr substring)
+        // Rightmost occurrence determines shift
+        for (int64_t i = 0; i < substring.length; ++i)
         {
-            if (substring.length == 2)
+            shift[substring.data[i]] = substring.length - i;
+        }
+
+        int64_t pos = 0;
+        while (pos + substring.length <= string.length) 
+        {
+            if (JSL_MEMCMP(string.data + pos, substring.data, substring.length) == 0)
             {
-                return jsl__two_char_search(string, substring);
+                return pos;
             }
-            else if (substring.length <= 64)
+            
+            int64_t next = pos + substring.length;
+            if (next < string.length)
             {
-                return jsl__bndm_search(string, substring);
+                pos += shift[string.data[next]];
             }
             else
             {
-                return jsl__sunday_search(string, substring);
+                break;
             }
         }
 
+        return -1;
+    }
 
-    #endif
+    static JSL__FORCE_INLINE int64_t jsl__substring_search(JSLFatPtr string, JSLFatPtr substring)
+    {
+        if (substring.length == 2)
+        {
+            return jsl__two_char_search(string, substring);
+        }
+        else if (substring.length <= 64)
+        {
+            return jsl__bndm_search(string, substring);
+        }
+        else
+        {
+            return jsl__sunday_search(string, substring);
+        }
+    }
+
 
     int64_t jsl_fatptr_substring_search(JSLFatPtr string, JSLFatPtr substring)
     {
@@ -2183,7 +1910,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         else
         {
             #ifdef __AVX2__
-                if (string.length >= 32)
+                if (string.length >= 64)
                     return jsl__avx2_substring_search(string, substring);
                 else
                     return jsl__substring_search(string, substring);
@@ -2610,7 +2337,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
         bool negative = false;
         int32_t ret = 0;
-        int64_t i = 0;
+        int32_t i = 0;
 
         if (str.data[0] == '-')
         {
@@ -2931,12 +2658,16 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             res.data = aligned_current;
             res.length = bytes;
 
-            #if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
-                // Add 8 to leave "guard" zones between allocations
-                arena->current = potential_end + 8;
-                ASAN_UNPOISON_MEMORY_REGION(res.data, res.length);
-            #else
+            #ifdef _MSC_VER
                 arena->current = potential_end;
+            #else
+                #if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
+                    // Add 8 to leave "guard" zones between allocations
+                    arena->current = potential_end + 8;
+                    ASAN_UNPOISON_MEMORY_REGION(res.data, res.length);
+                #else
+                    arena->current = potential_end;
+                #endif
             #endif
 
             if (zeroed)
@@ -3179,7 +2910,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     {
         static char hex[] = "0123456789abcdefxp";
         static char hexu[] = "0123456789ABCDEFXP";
-        static JSLFatPtr err_string = JSL_FATPTR_LITERAL("(ERROR)");
+        static JSLFatPtr err_string = { (uint8_t*) "(ERROR)", (int64_t)(sizeof("(ERROR)") - 1) };
         uint8_t* buffer_cursor;
         JSLFatPtr f;
         int32_t tlen = 0;
@@ -3581,7 +3312,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     {
                         // get the length, limited to desired precision
                         // always limit to ~0u chars since our counts are 32b
-                        l = (precision >= 0) ? stbsp__strlen_limited(string, precision) : JSL_STRLEN(string);
+                        l = (precision >= 0) ? stbsp__strlen_limited(string, precision) : (uint32_t) JSL_STRLEN(string);
                     }
 
                     lead[0] = 0;
@@ -4987,9 +4718,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         if (got_memory)
         {
             #if defined(JSL_WIN32)
-                read_res = _read(file_descriptor, allocation.data, file_size);
+                read_res = (int64_t) _read(file_descriptor, allocation.data, (unsigned int) file_size);
             #elif defined(JSL_POSIX)
-                read_res = read(file_descriptor, allocation.data, file_size);
+                read_res = (int64_t) read(file_descriptor, allocation.data, file_size);
             #else
                 #error "Unsupported platform"
             #endif
@@ -5102,9 +4833,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             int64_t read_size = JSL_MIN(file_size, buffer->length);
 
             #if defined(JSL_WIN32)
-                read_res = _read(file_descriptor, buffer->data, read_size);
+                read_res = (int64_t) _read(file_descriptor, buffer->data, (unsigned int) read_size);
             #elif defined(JSL_POSIX)
-                read_res = read(file_descriptor, buffer->data, read_size);
+                read_res = (int64_t) read(file_descriptor, buffer->data, read_size);
             #else
                 #error "Unsupported platform"
             #endif
@@ -5184,9 +4915,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         if (got_path)
         {
             #if defined(JSL_WIN32)
-                int32_t file_descriptor = _open(path_buffer, _O_CREAT, _S_IREAD | _S_IWRITE);
+                file_descriptor = _open(path_buffer, _O_CREAT, _S_IREAD | _S_IWRITE);
             #elif defined(JSL_POSIX)
-                int32_t file_descriptor = open(path_buffer, O_CREAT, S_IRUSR | S_IWUSR);
+                file_descriptor = open(path_buffer, O_CREAT, S_IRUSR | S_IWUSR);
             #endif
     
             opened_file = file_descriptor > -1;
@@ -5199,7 +4930,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                 write_res = _write(
                     file_descriptor,
                     contents.data,
-                    (size_t) contents.length
+                    (unsigned int) contents.length
                 );
             #elif defined(JSL_POSIX)
                 write_res = write(

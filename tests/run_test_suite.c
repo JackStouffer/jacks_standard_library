@@ -84,8 +84,9 @@ int main(int argc, char **argv)
                 &clang_debug_compile_command,
                 "clang",
                 "-O0",
-                "-march=native",
-                "-g3",
+                "-glldb",
+                "-fno-omit-frame-pointer",
+                "-fno-optimize-sibling-calls",
                 "-DJSL_DEBUG",
                 "-fsanitize=address",
                 "-std=c11",
@@ -140,10 +141,17 @@ int main(int argc, char **argv)
         #if defined(_WIN32)
 
             {
-                char exe_name[128] = "/Fetests\\bin\\debug_msvc_";
+                char exe_output_param[128] = "/Fe";
+                char exe_name[128] = "tests\\bin\\opt_msvc_";
+                char obj_output_param[128] = "/Fo";
+                char obj_name[128] = "tests\\bin\\opt_msvc_debug_";
 
                 strncat(exe_name, test_file_name, strlen(test_file_name));
                 strncat(exe_name, ".exe", 4);
+                strncat(exe_output_param, exe_name, strlen(exe_name));
+                strncat(obj_name, test_file_name, strlen(test_file_name));
+                strncat(obj_name, ".obj", 4);
+                strncat(obj_output_param, obj_name, strlen(obj_name));
 
                 Nob_Cmd gcc_debug_compile_command = {0};
                 nob_cmd_append(
@@ -157,7 +165,8 @@ int main(int argc, char **argv)
                     "/W4",
                     "/WX",
                     "/std:c11",
-                    exe_name,
+                    exe_output_param,
+                    obj_output_param,
                     test_file_path
                 );
                 if (!nob_cmd_run(&gcc_debug_compile_command)) return 1;
@@ -168,10 +177,17 @@ int main(int argc, char **argv)
             }
 
             {
-                char exe_name[128] = "/Fetests\\bin\\opt_msvc_";
+                char exe_output_param[128] = "/Fe";
+                char exe_name[128] = "tests\\bin\\opt_msvc_";
+                char obj_output_param[128] = "/Fo";
+                char obj_name[128] = "tests\\bin\\opt_msvc_release_";
 
                 strncat(exe_name, test_file_name, strlen(test_file_name));
                 strncat(exe_name, ".exe", 4);
+                strncat(exe_output_param, exe_name, strlen(exe_name));
+                strncat(obj_name, test_file_name, strlen(test_file_name));
+                strncat(obj_name, ".obj", 4);
+                strncat(obj_output_param, obj_name, strlen(obj_name));
 
                 Nob_Cmd gcc_optimized_compile_command = {0};
                 nob_cmd_append(
@@ -183,7 +199,8 @@ int main(int argc, char **argv)
                     "/W4",
                     "/WX",
                     "/std:c11",
-                    exe_name,
+                    exe_output_param,
+                    obj_output_param,
                     test_file_path
                 );
                 if (!nob_cmd_run(&gcc_optimized_compile_command)) return 1;

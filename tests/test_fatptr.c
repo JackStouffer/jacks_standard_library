@@ -325,31 +325,31 @@ void test_jsl_fatptr_substring_search(void)
     {
         JSLFatPtr substring = JSL_FATPTR_LITERAL("i");
         int64_t res = jsl_fatptr_substring_search(long_str, substring);
-        l_long_long_equal(res, 0LL);
+        l_long_long_equal(res, 6LL);
     }
 
     {
         JSLFatPtr substring = JSL_FATPTR_LITERAL("at");
         int64_t res = jsl_fatptr_substring_search(long_str, substring);
-        l_long_long_equal(res, 0LL);
+        l_long_long_equal(res, 122LL);
     }
 
     {
         JSLFatPtr substring = JSL_FATPTR_LITERAL("Sed");
         int64_t res = jsl_fatptr_substring_search(long_str, substring);
-        l_long_long_equal(res, 0LL);
+        l_long_long_equal(res, 1171LL);
     }
 
     {
         JSLFatPtr substring = JSL_FATPTR_LITERAL("elit");
         int64_t res = jsl_fatptr_substring_search(long_str, substring);
-        l_long_long_equal(res, 0LL);
+        l_long_long_equal(res, 51LL);
     }
 
     {
         JSLFatPtr substring = JSL_FATPTR_LITERAL("vitae");
         int64_t res = jsl_fatptr_substring_search(long_str, substring);
-        l_long_long_equal(res, 0LL);
+        l_long_long_equal(res, 263LL);
     }
 
     {
