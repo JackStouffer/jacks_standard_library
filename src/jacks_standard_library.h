@@ -2560,9 +2560,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     struct JSL__StringBuilderContext
     {
-        uint8_t buffer[JSL_FORMAT_MIN_BUFFER];
         JSLStringBuilder* builder;
         bool failure_flag;
+        uint8_t buffer[JSL_FORMAT_MIN_BUFFER];
     };
 
     static uint8_t* format_string_builder_callback(uint8_t *buf, void *user, int64_t len)
@@ -2999,13 +2999,10 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     }
                     else
                     {
-                        // Handle the characters up to the special character
-                        int special_pos = __builtin_ffs(mask) - 1;
-                        if (special_pos > 0)
-                        {
-                            stbsp__chk_cb_buf(special_pos);
-                            JSL_MEMCPY(buffer_cursor, f.data, special_pos);
-                        }
+                        int special_pos = __builtin_ctz(mask);
+                        stbsp__chk_cb_buf(special_pos);
+
+                        JSL_MEMCPY(buffer_cursor, f.data, special_pos);
                         JSL_FATPTR_ADVANCE(f, special_pos);
                         buffer_cursor += special_pos;
 
@@ -3036,11 +3033,8 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     else
                     {
                         int special_pos = __builtin_ctz(mask);
-                        if (special_pos > 0)
-                        {
-                            stbsp__chk_cb_buf(special_pos);
-                            JSL_MEMCPY(buffer_cursor, f.data, special_pos);
-                        }
+                        stbsp__chk_cb_buf(special_pos);
+                        JSL_MEMCPY(buffer_cursor, f.data, special_pos);
 
                         JSL_FATPTR_ADVANCE(f, special_pos);
                         buffer_cursor += special_pos;
@@ -4137,7 +4131,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         return context.length;
     }
 
-    struct JSLArenaContext
+    struct JSL__ArenaContext
     {
         JSLArena* arena;
         JSLFatPtr current_allocation;
@@ -4147,7 +4141,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     static uint8_t* format_arena_callback(uint8_t *buf, void *user, int64_t len)
     {
-        struct JSLArenaContext* context = (struct JSLArenaContext*) user;
+        struct JSL__ArenaContext* context = (struct JSL__ArenaContext*) user;
 
         // First call
         if (context->cursor == NULL)
@@ -4181,7 +4175,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         va_list va;
         va_start(va, fmt);
 
-        struct JSLArenaContext context;
+        struct JSL__ArenaContext context;
         context.arena = arena;
         context.current_allocation.data = NULL;
         context.current_allocation.length = 0;
@@ -4953,9 +4947,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     struct JSL__FormatOutContext
     {
-        uint8_t buffer[JSL_FORMAT_MIN_BUFFER];
         FILE* out;
         bool failure_flag;
+        uint8_t buffer[JSL_FORMAT_MIN_BUFFER];
     };
 
     static uint8_t* format_out_callback(uint8_t *buf, void *user, int64_t len)

@@ -4,7 +4,14 @@
 
 #include "jacks_standard_library.h"
 
+typedef enum {
+    IMPL_ERROR,
+    IMPL_STATIC,
+    IMPL_DYNAMIC
+} HashMapImplementation;
+
 void write_hash_map_header(
+    HashMapImplementation impl,
     JSLStringBuilder* builder,
     JSLFatPtr hash_map_name,
     JSLFatPtr function_prefix,
@@ -16,6 +23,7 @@ void write_hash_map_header(
 );
 
 void write_hash_map_source(
+    HashMapImplementation impl,
     JSLStringBuilder* builder,
     JSLFatPtr hash_map_name,
     JSLFatPtr function_prefix,
