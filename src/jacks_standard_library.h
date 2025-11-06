@@ -1382,7 +1382,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         JSLArena* arena,
         JSLFatPtr path,
         JSLFatPtr* out_contents,
-        errno_t* out_errno
+        int32_t* out_errno
     );
 
     /**
@@ -1401,7 +1401,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     JSL_WARN_UNUSED JSL_DEF JSLLoadFileResultEnum jsl_load_file_contents_buffer(
         JSLFatPtr* buffer,
         JSLFatPtr path,
-        errno_t* out_errno
+        int32_t* out_errno
     );
 
     /**
@@ -1422,7 +1422,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         JSLFatPtr contents,
         JSLFatPtr path,
         int64_t* bytes_written,
-        errno_t* out_errno
+        int32_t* out_errno
     );
 
     /**
@@ -4613,7 +4613,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         JSLArena* arena,
         JSLFatPtr path,
         JSLFatPtr* out_contents,
-        errno_t* out_errno
+        int32_t* out_errno
     )
     {
         JSLLoadFileResultEnum res = JSL_FILE_LOAD_BAD_PARAMETERS;
@@ -4742,7 +4742,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     JSLLoadFileResultEnum jsl_load_file_contents_buffer(
         JSLFatPtr* buffer,
         JSLFatPtr path,
-        errno_t* out_errno
+        int32_t* out_errno
     )
     {
         char path_buffer[FILENAME_MAX + 1];
@@ -4860,7 +4860,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         JSLFatPtr contents,
         JSLFatPtr path,
         int64_t* out_bytes_written,
-        errno_t* out_errno
+        int32_t* out_errno
     )
     {
         char path_buffer[FILENAME_MAX + 1];

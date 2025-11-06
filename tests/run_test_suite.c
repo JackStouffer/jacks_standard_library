@@ -236,8 +236,11 @@ int main(int argc, char **argv)
                 );
                 if (!nob_cmd_run(&gcc_debug_compile_command)) return 1;
 
+                char run_command[128] = "./";
+                strncat(run_command, exe_name, strlen(exe_name));
+
                 Nob_Cmd gcc_debug_run_command = {0};
-                nob_cmd_append(&gcc_debug_run_command, "./tests/bin/debug_gcc");
+                nob_cmd_append(&gcc_debug_run_command, run_command);
                 if (!nob_cmd_run(&gcc_debug_run_command)) return 1;
             }
 
@@ -262,8 +265,11 @@ int main(int argc, char **argv)
                 );
                 if (!nob_cmd_run(&gcc_optimized_compile_command)) return 1;
 
+                char run_command[128] = "./";
+                strncat(run_command, exe_name, strlen(exe_name));
+
                 Nob_Cmd gcc_optimized_run_command = {0};
-                nob_cmd_append(&gcc_optimized_run_command, "./tests/bin/opt_gcc");
+                nob_cmd_append(&gcc_optimized_run_command, run_command);
                 if (!nob_cmd_run(&gcc_optimized_run_command)) return 1;
             }
         
