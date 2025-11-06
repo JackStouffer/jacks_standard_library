@@ -282,271 +282,277 @@ JSLFatPtr static_init_function_code = JSL_FATPTR_LITERAL(""
 "    ).data;\n"
 "}\n");
 
-static bool function_prefix##_expand(JSL_HASHMAP_TYPE_NAME(name)* hashmap)
-{
-    JSL_DEBUG_ASSERT(hashmap != NULL);
-    JSL_DEBUG_ASSERT(hashmap->arena != NULL);
-    JSL_DEBUG_ASSERT(hashmap->slots_array != NULL);
-    JSL_DEBUG_ASSERT(hashmap->is_set_flags_array != NULL);
+JSLFatPtr static_hash_function_code = JSL_FATPTR_LITERAL(""
+"static inline JSL_HASHMAP_FIND_RES_TYPE_NAME(name) function_prefix##_hash_and_find_slot(\n"
+"    JSL_HASHMAP_TYPE_NAME(name)* hashmap,\n"
+"    key_type key,\n"
+"    bool is_insert\n"
+")\n"
+"{\n"
+"    JSL_HASHMAP_FIND_RES_TYPE_NAME(name) return_value;\n"
+"    return_value.slot = NULL;\n"
+"\n"
+"    uint64_t hash = jss__wyhash(&key, sizeof(key_type), jss__hash_seed, jss__wyhash_secret);\n"
+"\n"
+"    int64_t total_checked = 0;\n"
+"    /* Since our slot array length is always a pow 2, we can avoid a modulo  */\n"
+"    int64_t slot_index = (int64_t) (hash & (hashmap->slots_array_length - 1));\n"
+"    return_value.is_set_array_index = (int64_t) JSL_GET_SET_FLAG_INDEX(slot_index);\n"
+"    /* Manual remainder here too  */\n"
+"    return_value.is_set_array_bit = slot_index - (return_value.is_set_array_index * 32);\n"
+"\n"
+"    for (;;)\n"
+"    {\n"
+"        uint32_t bit_flag = JSL_MAKE_BITFLAG(return_value.is_set_array_bit);\n"
+"        uint32_t is_slot_set = JSL_IS_BITFLAG_SET(\n"
+"            hashmap->is_set_flags_array[return_value.is_set_array_index],\n"
+"            bit_flag\n"
+"        );\n"
+"\n"
+"        if (is_slot_set == 0 && is_insert)\n"
+"        {\n"
+"            return_value.slot = &hashmap->slots_array[slot_index];\n"
+"            return_value.is_update = false;\n"
+"            break;\n"
+"        }\n"
+"        /* Updating value */\n"
+"        else if (is_slot_set == 1)\n"
+"        {\n"
+"            int32_t memcmp_res = memcmp(\n"
+"                &hashmap->slots_array[slot_index].key,\n"
+"                &key,\n"
+"                sizeof(key_type)\n"
+"            );\n"
+"            if (memcmp_res == 0)\n"
+"            {\n"
+"                return_value.slot = &hashmap->slots_array[slot_index];\n"
+"                return_value.is_update = true;\n"
+"                break;\n"
+"            }\n"
+"        }\n"
+"\n"
+"        /* Collision. Move to the next spot with linear probing  */\n"
+"\n"
+"        ++total_checked;\n"
+"        ++return_value.is_set_array_bit;\n"
+"        ++slot_index;\n"
+"\n"
+"        /* We can't expand and the hashmap is completely full  */\n"
+"        if (total_checked == hashmap->slots_array_length)\n"
+"        {\n"
+"            break;\n"
+"        }\n"
+"\n"
+"        if (return_value.is_set_array_bit == 32)\n"
+"        {\n"
+"            ++return_value.is_set_array_index;\n"
+"            return_value.is_set_array_bit = 0;\n"
+"        }\n"
+"\n"
+"        /* Loop all the way back around */\n"
+"        if (slot_index == hashmap->slots_array_length)\n"
+"        {\n"
+"            slot_index = 0;\n"
+"            return_value.is_set_array_bit = 0;\n"
+"            return_value.is_set_array_index = 0;\n"
+"        }\n"
+"    }\n"
+"\n"
+"    return return_value;\n"
+"}\n");
 
-    bool success;
+JSLFatPtr static_insert_function_code = JSL_FATPTR_LITERAL(""
+"bool function_prefix##_insert(JSL_HASHMAP_TYPE_NAME(name)* hashmap, key_type key, value_type value)\n"
+"{\n"
+"    JSL_HASHMAP_CHECK_EMPTY(false)\n"
+"    bool insert_success = false;\n"
+"\n"
+"    if (JSL_IS_BITFLAG_NOT_SET(hashmap->flags, JSL__HASHMAP_CANT_EXPAND)\n"
+"        && jss__hashmap_should_expand(hashmap->slots_array_length, hashmap->item_count + 1))\n"
+"    {\n"
+"        bool expand_res = function_prefix##_expand(hashmap);\n"
+"        if (!expand_res)\n"
+"        {\n"
+"            JSL_SET_BITFLAG(&hashmap->flags, JSL__HASHMAP_CANT_EXPAND);\n"
+"        }\n"
+"    }\n"
+"\n"
+"    JSL_HASHMAP_FIND_RES_TYPE_NAME(name) find_res = function_prefix##_hash_and_find_slot(\n"
+"        hashmap,\n"
+"        key,\n"
+"        true\n"
+"    );\n"
+"    if (find_res.slot != NULL)\n"
+"    {\n"
+"        if (find_res.is_update)\n"
+"        {\n"
+"            find_res.slot->value = value;\n"
+"            insert_success = true;\n"
+"        }\n"
+"        else\n"
+"        {\n"
+"            find_res.slot->key = key;\n"
+"            find_res.slot->value = value;\n"
+"            uint32_t bit_flag = JSL_MAKE_BITFLAG(find_res.is_set_array_bit);\n"
+"            JSL_SET_BITFLAG(\n"
+"                &hashmap->is_set_flags_array[find_res.is_set_array_index],\n"
+"                bit_flag\n"
+"            );\n"
+"            ++hashmap->item_count;\n"
+"            insert_success = true;\n"
+"        }\n"
+"\n"
+"        ++hashmap->generational_id;\n"
+"    }\n"
+"\n"
+"    return insert_success;\n"
+"}\n");
 
-    JSL_HASHMAP_ITEM_TYPE_NAME(name)* old_slots_array = hashmap->slots_array;
-    int64_t old_slots_array_length = hashmap->slots_array_length;
+JSLFatPtr static_get_function_code = JSL_FATPTR_LITERAL(""
+"value_type* function_prefix##_get(JSL_HASHMAP_TYPE_NAME(name)* hashmap, key_type key)\n"
+"{\n"
+"    JSL_HASHMAP_CHECK_EMPTY(NULL)\n"
+"    value_type* res = NULL;\n"
+"\n"
+"    JSL_HASHMAP_FIND_RES_TYPE_NAME(name) find_res = function_prefix##_hash_and_find_slot(hashmap, key, false);\n"
+"    if (find_res.slot != NULL && find_res.is_update)\n"
+"    {\n"
+"        res = &find_res.slot->value;\n"
+"    }\n"
+"\n"
+"    return res;\n"
+"}\n");
 
-    uint32_t* old_is_set_flags_array = hashmap->is_set_flags_array;
-    int64_t old_is_set_flags_array_length = hashmap->is_set_flags_array_length;
+JSLFatPtr static_delete_function_code = JSL_FATPTR_LITERAL(""
+"bool function_prefix##_delete(JSL_HASHMAP_TYPE_NAME(name)* hashmap, key_type key)\n"
+"{\n"
+"    JSL_HASHMAP_CHECK_EMPTY(false)\n"
+"    bool success = false;\n"
+"    JSL_HASHMAP_FIND_RES_TYPE_NAME(name) find_res = function_prefix##_hash_and_find_slot(hashmap, key, false);\n"
+"\n"
+"    if (find_res.slot != NULL && find_res.is_update)\n"
+"    {\n"
+"        uint32_t bit_flag = JSL_MAKE_BITFLAG(find_res.is_set_array_bit);\n"
+"        JSL_UNSET_BITFLAG(\n"
+"            &hashmap->is_set_flags_array[find_res.is_set_array_index],\n"
+"            bit_flag\n"
+"        );\n"
+"        --hashmap->item_count;\n"
+"        success = true;\n"
+"    }\n"
+"\n"
+"    return success;\n"
+"}\n");
 
-    int64_t new_slots_array_length = jss__hashmap_expand_size(old_slots_array_length);
-    JSL_HASHMAP_ITEM_TYPE_NAME(name)* new_slots_array = (JSL_HASHMAP_ITEM_TYPE_NAME(name)*) jss_arena_allocate(
-        hashmap->arena, sizeof(JSL_HASHMAP_ITEM_TYPE_NAME(name)) * new_slots_array_length, false
-    ).data;
+JSLFatPtr static_iterator_start_function_code = JSL_FATPTR_LITERAL(""
+"JSL_HASHMAP_ITERATOR_TYPE_NAME(name) function_prefix##_iterator_start(JSL_HASHMAP_TYPE_NAME(name)* hashmap)\n"
+"{\n"
+"    JSL_DEBUG_ASSERT(hashmap != NULL);\n"
+"    JSL_DEBUG_ASSERT(hashmap->arena != NULL);\n"
+"    JSL_DEBUG_ASSERT(hashmap->slots_array != NULL);\n"
+"    JSL_DEBUG_ASSERT(hashmap->is_set_flags_array != NULL);\n"
+"\n"
+"    JSL_HASHMAP_ITERATOR_TYPE_NAME(name) iterator = {\n"
+"        .hashmap = hashmap,\n"
+"        .current_slot_index = 0\n"
+"    };\n"
+"\n"
+"    iterator.generational_id = hashmap->generational_id;\n"
+"\n"
+"    return iterator;\n"
+"}\n");
 
-    int64_t new_is_set_flags_array_length = new_slots_array_length >> 5L;
-    uint32_t* new_is_set_flags_array = (uint32_t*) jss_arena_allocate(
-        hashmap->arena, sizeof(uint32_t) * new_is_set_flags_array_length, true
-    ).data;
+JSLFatPtr static_iterator_next_function_code = JSL_FATPTR_LITERAL(""
+"JSL_HASHMAP_ITEM_TYPE_NAME(name)* function_prefix##_iterator_next(JSL_HASHMAP_ITERATOR_TYPE_NAME(name)* iterator)\n"
+"{\n"
+"    JSL_DEBUG_ASSERT(iterator != NULL);\n"
+"    JSL_DEBUG_ASSERT(iterator->hashmap != NULL);\n"
+"    JSL_DEBUG_ASSERT(iterator->hashmap->slots_array != NULL);\n"
+"    JSL_DEBUG_ASSERT(iterator->hashmap->is_set_flags_array != NULL);\n"
+"    JSL_DEBUG_ASSERT(iterator->generational_id == iterator->hashmap->generational_id);\n"
+"\n"
+"    JSL_HASHMAP_ITEM_TYPE_NAME(name)* result = NULL;\n"
+"\n"
+"    for (; iterator->current_slot_index < iterator->hashmap->slots_array_length; iterator->current_slot_index++)\n"
+"    {\n"
+"        int64_t is_set_flags_index = JSL_GET_SET_FLAG_INDEX(iterator->current_slot_index);\n"
+"        int32_t current_is_set_flags_bit = iterator->current_slot_index - (is_set_flags_index * 32);\n"
+"        uint32_t bitflag = JSL_MAKE_BITFLAG(current_is_set_flags_bit);\n"
+"\n"
+"        if (JSL_IS_BITFLAG_SET(\n"
+"            iterator->hashmap->is_set_flags_array[is_set_flags_index], bitflag\n"
+"        ))\n"
+"        {\n"
+"            result = &iterator->hashmap->slots_array[iterator->current_slot_index];\n"
+"            ++iterator->current_slot_index;\n"
+"            break;\n"
+"        }\n"
+"    }\n"
+"\n"
+"    return result;\n"
+"}\n");
 
-    if (new_slots_array != NULL && new_is_set_flags_array != NULL)
-    {
-        hashmap->item_count = 0;
-        hashmap->slots_array = new_slots_array;
-        hashmap->slots_array_length = new_slots_array_length;
-        hashmap->is_set_flags_array = new_is_set_flags_array;
-        hashmap->is_set_flags_array_length = new_is_set_flags_array_length;
-
-        int64_t slot_index = 0;
-        for (
-            int64_t is_set_flags_index = 0;
-            is_set_flags_index < old_is_set_flags_array_length;
-            is_set_flags_index++
-        )
-        {
-            for (uint32_t current_bit = 0; current_bit < 32; current_bit++)
-            {
-                uint32_t bitflag = JSL_MAKE_BITFLAG(current_bit);
-                if (JSL_IS_BITFLAG_SET(old_is_set_flags_array[is_set_flags_index], bitflag))
-                {
-                    function_prefix##_insert(hashmap, old_slots_array[slot_index].key, old_slots_array[slot_index].value);
-                }
-                ++slot_index;
-            }
-        }
-
-        success = true;
-    }
-    else
-    {
-        success = false;
-    }
-
-    return success;
-}
-
-
-static inline JSL_HASHMAP_FIND_RES_TYPE_NAME(name) function_prefix##_hash_and_find_slot(
-    JSL_HASHMAP_TYPE_NAME(name)* hashmap,
-    key_type key,
-    bool is_insert
-)
-{
-    JSL_HASHMAP_FIND_RES_TYPE_NAME(name) return_value;
-    return_value.slot = NULL;
-
-    uint64_t hash = jss__wyhash(&key, sizeof(key_type), jss__hash_seed, jss__wyhash_secret);
-
-    int64_t total_checked = 0;
-    /* Since our slot array length is always a pow 2, we can avoid a modulo  */
-    int64_t slot_index = (int64_t) (hash & (hashmap->slots_array_length - 1));
-    return_value.is_set_array_index = (int64_t) JSL_GET_SET_FLAG_INDEX(slot_index);
-    /* Manual remainder here too  */
-    return_value.is_set_array_bit = slot_index - (return_value.is_set_array_index * 32);
-
-    for (;;)
-    {
-        uint32_t bit_flag = JSL_MAKE_BITFLAG(return_value.is_set_array_bit);
-        uint32_t is_slot_set = JSL_IS_BITFLAG_SET(
-            hashmap->is_set_flags_array[return_value.is_set_array_index],
-            bit_flag
-        );
-
-        if (is_slot_set == 0 && is_insert)
-        {
-            return_value.slot = &hashmap->slots_array[slot_index];
-            return_value.is_update = false;
-            break;
-        }
-        /* Updating value */
-        else if (is_slot_set == 1)
-        {
-            int32_t memcmp_res = memcmp(
-                &hashmap->slots_array[slot_index].key,
-                &key,
-                sizeof(key_type)
-            );
-            if (memcmp_res == 0)
-            {
-                return_value.slot = &hashmap->slots_array[slot_index];
-                return_value.is_update = true;
-                break;
-            }
-        }
-
-        /* Collision. Move to the next spot with linear probing  */
-
-        ++total_checked;
-        ++return_value.is_set_array_bit;
-        ++slot_index;
-
-        /* We can't expand and the hashmap is completely full  */
-        if (total_checked == hashmap->slots_array_length)
-        {
-            break;
-        }
-
-        if (return_value.is_set_array_bit == 32)
-        {
-            ++return_value.is_set_array_index;
-            return_value.is_set_array_bit = 0;
-        }
-
-        /* Loop all the way back around */
-        if (slot_index == hashmap->slots_array_length)
-        {
-            slot_index = 0;
-            return_value.is_set_array_bit = 0;
-            return_value.is_set_array_index = 0;
-        }
-    }
-
-    return return_value;
-}
-
-bool function_prefix##_insert(JSL_HASHMAP_TYPE_NAME(name)* hashmap, key_type key, value_type value)
-{
-    JSL_HASHMAP_CHECK_EMPTY(false)
-    bool insert_success = false;
-
-    if (JSL_IS_BITFLAG_NOT_SET(hashmap->flags, JSL__HASHMAP_CANT_EXPAND)
-        && jss__hashmap_should_expand(hashmap->slots_array_length, hashmap->item_count + 1))
-    {
-        bool expand_res = function_prefix##_expand(hashmap);
-        if (!expand_res)
-        {
-            JSL_SET_BITFLAG(&hashmap->flags, JSL__HASHMAP_CANT_EXPAND);
-        }
-    }
-
-    JSL_HASHMAP_FIND_RES_TYPE_NAME(name) find_res = function_prefix##_hash_and_find_slot(
-        hashmap,
-        key,
-        true
-    );
-    if (find_res.slot != NULL)
-    {
-        if (find_res.is_update)
-        {
-            find_res.slot->value = value;
-            insert_success = true;
-        }
-        else
-        {
-            find_res.slot->key = key;
-            find_res.slot->value = value;
-            uint32_t bit_flag = JSL_MAKE_BITFLAG(find_res.is_set_array_bit);
-            JSL_SET_BITFLAG(
-                &hashmap->is_set_flags_array[find_res.is_set_array_index],
-                bit_flag
-            );
-            ++hashmap->item_count;
-            insert_success = true;
-        }
-
-        ++hashmap->generational_id;
-    }
-
-    return insert_success;
-}
-
-value_type* function_prefix##_get(JSL_HASHMAP_TYPE_NAME(name)* hashmap, key_type key)
-{
-    JSL_HASHMAP_CHECK_EMPTY(NULL)
-    value_type* res = NULL;
-
-    JSL_HASHMAP_FIND_RES_TYPE_NAME(name) find_res = function_prefix##_hash_and_find_slot(hashmap, key, false);
-    if (find_res.slot != NULL && find_res.is_update)
-    {
-        res = &find_res.slot->value;
-    }
-
-    return res;
-}
-
-bool function_prefix##_delete(JSL_HASHMAP_TYPE_NAME(name)* hashmap, key_type key)
-{
-    JSL_HASHMAP_CHECK_EMPTY(false)
-    bool success = false;
-    JSL_HASHMAP_FIND_RES_TYPE_NAME(name) find_res = function_prefix##_hash_and_find_slot(hashmap, key, false);
-
-    if (find_res.slot != NULL && find_res.is_update)
-    {
-        uint32_t bit_flag = JSL_MAKE_BITFLAG(find_res.is_set_array_bit);
-        JSL_UNSET_BITFLAG(
-            &hashmap->is_set_flags_array[find_res.is_set_array_index],
-            bit_flag
-        );
-        --hashmap->item_count;
-        success = true;
-    }
-
-    return success;
-}
-
-JSL_HASHMAP_ITERATOR_TYPE_NAME(name) function_prefix##_iterator_start(JSL_HASHMAP_TYPE_NAME(name)* hashmap)
-{
-    JSL_DEBUG_ASSERT(hashmap != NULL);
-    JSL_DEBUG_ASSERT(hashmap->arena != NULL);
-    JSL_DEBUG_ASSERT(hashmap->slots_array != NULL);
-    JSL_DEBUG_ASSERT(hashmap->is_set_flags_array != NULL);
-
-    JSL_HASHMAP_ITERATOR_TYPE_NAME(name) iterator = {
-        .hashmap = hashmap,
-        .current_slot_index = 0
-    };
-
-    iterator.generational_id = hashmap->generational_id;
-
-    return iterator;
-}
-
-JSL_HASHMAP_ITEM_TYPE_NAME(name)* function_prefix##_iterator_next(JSL_HASHMAP_ITERATOR_TYPE_NAME(name)* iterator)
-{
-    JSL_DEBUG_ASSERT(iterator != NULL);
-    JSL_DEBUG_ASSERT(iterator->hashmap != NULL);
-    JSL_DEBUG_ASSERT(iterator->hashmap->slots_array != NULL);
-    JSL_DEBUG_ASSERT(iterator->hashmap->is_set_flags_array != NULL);
-    JSL_DEBUG_ASSERT(iterator->generational_id == iterator->hashmap->generational_id);
-
-    JSL_HASHMAP_ITEM_TYPE_NAME(name)* result = NULL;
-
-    for (; iterator->current_slot_index < iterator->hashmap->slots_array_length; iterator->current_slot_index++)
-    {
-        int64_t is_set_flags_index = JSL_GET_SET_FLAG_INDEX(iterator->current_slot_index);
-        int32_t current_is_set_flags_bit = iterator->current_slot_index - (is_set_flags_index * 32);
-        uint32_t bitflag = JSL_MAKE_BITFLAG(current_is_set_flags_bit);
-
-        if (JSL_IS_BITFLAG_SET(
-            iterator->hashmap->is_set_flags_array[is_set_flags_index], bitflag
-        ))
-        {
-            result = &iterator->hashmap->slots_array[iterator->current_slot_index];
-            ++iterator->current_slot_index;
-            break;
-        }
-    }
-
-    return result;
-}
+JSLFatPtr dynamic_expand_function_code = JSL_FATPTR_LITERAL(""
+"static bool function_prefix##_expand(JSL_HASHMAP_TYPE_NAME(name)* hashmap)\n"
+"{\n"
+"    JSL_DEBUG_ASSERT(hashmap != NULL);\n"
+"    JSL_DEBUG_ASSERT(hashmap->arena != NULL);\n"
+"    JSL_DEBUG_ASSERT(hashmap->slots_array != NULL);\n"
+"    JSL_DEBUG_ASSERT(hashmap->is_set_flags_array != NULL);\n"
+"\n"
+"    bool success;\n"
+"\n"
+"    JSL_HASHMAP_ITEM_TYPE_NAME(name)* old_slots_array = hashmap->slots_array;\n"
+"    int64_t old_slots_array_length = hashmap->slots_array_length;\n"
+"\n"
+"    uint32_t* old_is_set_flags_array = hashmap->is_set_flags_array;\n"
+"    int64_t old_is_set_flags_array_length = hashmap->is_set_flags_array_length;\n"
+"\n"
+"    int64_t new_slots_array_length = jss__hashmap_expand_size(old_slots_array_length);\n"
+"    JSL_HASHMAP_ITEM_TYPE_NAME(name)* new_slots_array = (JSL_HASHMAP_ITEM_TYPE_NAME(name)*) jss_arena_allocate(\n"
+"        hashmap->arena, sizeof(JSL_HASHMAP_ITEM_TYPE_NAME(name)) * new_slots_array_length, false\n"
+"    ).data;\n"
+"\n"
+"    int64_t new_is_set_flags_array_length = new_slots_array_length >> 5L;\n"
+"    uint32_t* new_is_set_flags_array = (uint32_t*) jss_arena_allocate(\n"
+"        hashmap->arena, sizeof(uint32_t) * new_is_set_flags_array_length, true\n"
+"    ).data;\n"
+"\n"
+"    if (new_slots_array != NULL && new_is_set_flags_array != NULL)\n"
+"    {\n"
+"        hashmap->item_count = 0;\n"
+"        hashmap->slots_array = new_slots_array;\n"
+"        hashmap->slots_array_length = new_slots_array_length;\n"
+"        hashmap->is_set_flags_array = new_is_set_flags_array;\n"
+"        hashmap->is_set_flags_array_length = new_is_set_flags_array_length;\n"
+"\n"
+"        int64_t slot_index = 0;\n"
+"        for (\n"
+"            int64_t is_set_flags_index = 0;\n"
+"            is_set_flags_index < old_is_set_flags_array_length;\n"
+"            is_set_flags_index++\n"
+"        )\n"
+"        {\n"
+"            for (uint32_t current_bit = 0; current_bit < 32; current_bit++)\n"
+"            {\n"
+"                uint32_t bitflag = JSL_MAKE_BITFLAG(current_bit);\n"
+"                if (JSL_IS_BITFLAG_SET(old_is_set_flags_array[is_set_flags_index], bitflag))\n"
+"                {\n"
+"                    function_prefix##_insert(hashmap, old_slots_array[slot_index].key, old_slots_array[slot_index].value);\n"
+"                }\n"
+"                ++slot_index;\n"
+"            }\n"
+"        }\n"
+"\n"
+"        success = true;\n"
+"    }\n"
+"    else\n"
+"    {\n"
+"        success = false;\n"
+"    }\n"
+"\n"
+"    return success;\n"
+"}\n");
 
 static bool cstring_compare(const char* c1, const char* c2)
 {
@@ -624,7 +630,7 @@ void write_hash_map_header(
     ...
 )
 {
-    jsl_string_builder_format(builder, hash_map_header_docstring, hash_map_name, key_type_name, value_type_name);
+    jsl_string_builder_format(builder, static_hash_map_header_docstring, hash_map_name, key_type_name, value_type_name);
 
     jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#pragma once\n\n"));
     jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include <stdint.h>\n"));
@@ -646,7 +652,14 @@ void write_hash_map_header(
 
     jsl_string_builder_format(builder, static_insert_function_signature, function_prefix, hash_map_name, key_type_name, value_type_name);
 
-    jsl_string_builder_format(builder, static_get_function_signature, value_type_name, function_prefix, hash_map_name, key_type_name);
+    jsl_string_builder_format(
+        builder,
+        static_get_function_signature,
+        value_type_name,
+        function_prefix,
+        hash_map_name,
+        key_type_name
+    );
 
     jsl_string_builder_format(builder, static_delete_function_signature, function_prefix, hash_map_name, key_type_name);
 
@@ -666,7 +679,7 @@ void write_hash_map_header(
 
     jsl_string_builder_format(
         builder,
-        iterator_next_function_signature,
+        static_iterator_next_function_signature,
         key_type_name,
         value_type_name,
         hash_map_name,
