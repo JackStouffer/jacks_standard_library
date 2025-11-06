@@ -2569,7 +2569,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     {
         struct JSL__StringBuilderContext* context = (struct JSL__StringBuilderContext*) user;
 
-        if (context->builder->head == NULL || context->builder->tail == NULL)
+        if (context->builder->head == NULL || context->builder->tail == NULL || len > JSL_FORMAT_MIN_BUFFER)
             return NULL;
 
         bool res = jsl_string_builder_insert_fatptr(context->builder, jsl_fatptr_init(buf, len));
@@ -3003,6 +3003,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     if (mask == 0)
                     {
                         // No special characters found, store entire block
+                        stbsp__chk_cb_buf(32);
                         _mm256_store_si256(wide_dest, data);
                         JSL_FATPTR_ADVANCE(f, 32);
                         buffer_cursor += 32;
@@ -3025,6 +3026,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                                 data,
                                 mask_for_partial_store
                             );
+                            stbsp__chk_cb_buf(special_pos);
                             _mm256_storeu_si256(wide_dest, partial_data);
                         }
                         JSL_FATPTR_ADVANCE(f, special_pos);
@@ -3040,8 +3042,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     goto schk1;
 
             #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
-                
-                // NEON cannot rely on safe over-reads from aligned pointers.
+
                 while (f.length > 15)
                 {
                     uint8x16_t data = vld1q_u8(f.data);
@@ -3090,7 +3091,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                 goto L_END_FORMAT;
 
             #else
-                
+
                 // loop one byte at a time to get up to 4-byte alignment
                 while (((uintptr_t) f.data) & 3 && f.length > 0)
                 {
