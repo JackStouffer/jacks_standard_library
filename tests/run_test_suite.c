@@ -58,6 +58,7 @@ int main(int argc, char **argv)
 {
     NOB_GO_REBUILD_URSELF(argc, argv);
 
+    if (!nob_mkdir_if_not_exists("tests/bin")) return 1;
 
     int32_t test_file_count = sizeof(test_file_paths) / sizeof(char*);
     for (int32_t i = 0; i < test_file_count; i++)
@@ -89,6 +90,7 @@ int main(int argc, char **argv)
                 "-fno-optimize-sibling-calls",
                 "-DJSL_DEBUG",
                 "-fsanitize=address",
+                "-fsanitize=undefined",
                 "-std=c11",
                 "-Wall",
                 "-Wextra",

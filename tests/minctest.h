@@ -125,7 +125,7 @@ static size_t lfails = 0;
 
 
 /* Assert two int64 are equal. */
-#define l_long_long_equal(a, b)\
+#define TEST_INT64_EQUAL(a, b)\
     lequal_base((a) == (b), a, b, "%" PRId64)
 
 
