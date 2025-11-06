@@ -95,7 +95,7 @@ jobs:
 
       - name: Run Test Suite (Windows)
         if: runner.os == 'Windows'
-        run: run_tests.exe
+        run: .\run_tests.exe
 
       - name: Bootstrap Test Suite (POSIX)
         if: runner.os == 'macOS' || runner.os == 'Linux'
