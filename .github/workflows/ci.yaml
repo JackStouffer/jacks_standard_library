@@ -12,37 +12,17 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # --- Windows x64 ---
           - name: windows-msvc
             runs_on: windows-latest
-            compiler: msvc
-          - name: windows-clang
-            runs_on: windows-latest
-            compiler: clang
 
-          # --- macOS ARM (Apple Silicon) ---
-          - name: macos-arm-clang
+          - name: macos-arm
             runs_on: macos-14
-            compiler: clang
-          - name: macos-arm-gcc
-            runs_on: macos-14
-            compiler: gcc
 
-          # --- Linux x86_64 ---
-          - name: linux-x64-gcc
+          - name: linux-x64
             runs_on: ubuntu-latest
-            compiler: gcc
-          - name: linux-x64-clang
-            runs_on: ubuntu-latest
-            compiler: clang
 
-          # --- Linux ARM64 (public repos only) ---
-          - name: linux-arm64-gcc
+          - name: linux-arm64
             runs_on: ubuntu-24.04-arm
-            compiler: gcc
-          - name: linux-arm64-clang
-            runs_on: ubuntu-24.04-arm
-            compiler: clang
 
     steps:
       - name: Checkout
@@ -50,12 +30,12 @@ jobs:
 
       # ---------- Set up compilers ----------
       - name: Set up MSVC (Windows)
-        if: runner.os == 'Windows' && matrix.compiler == 'msvc'
+        if: runner.os == 'Windows'
         uses: TheMrMilchmann/setup-msvc-dev@v3  # sets VS dev cmd env
         with:
           arch: x64
       - name: Select clang (Windows)
-        if: runner.os == 'Windows' && matrix.compiler == 'clang'
+        if: runner.os == 'Windows'
         run: |
           echo "CC=clang-cl" >> $env:GITHUB_ENV
           echo "CXX=clang-cl" >> $env:GITHUB_ENV
@@ -64,30 +44,13 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          if [ "${{ matrix.compiler }}" = "gcc" ]; then
-            sudo apt-get install -y build-essential
-            echo "CC=gcc" >> $GITHUB_ENV
-            echo "CXX=g++" >> $GITHUB_ENV
-          else
-            sudo apt-get install -y clang lld
-            echo "CC=clang" >> $GITHUB_ENV
-            echo "CXX=clang++" >> $GITHUB_ENV
-          fi
+          sudo apt-get install -y build-essential clang lld
 
       - name: Install compilers (macOS)
         if: runner.os == 'macOS'
         run: |
-          if [ "${{ matrix.compiler }}" = "gcc" ]; then
-            brew update
-            brew install gcc
-            # Homebrew gcc has a version suffix, pick the latest:
-            G=$(brew list --versions gcc | awk '{print $2}' | tail -1 | cut -d. -f1)
-            echo "CC=gcc-$G" >> $GITHUB_ENV
-            echo "CXX=g++-$G" >> $GITHUB_ENV
-          else
-            echo "CC=clang" >> $GITHUB_ENV
-            echo "CXX=clang++" >> $GITHUB_ENV
-          fi
+          brew update
+          brew install gcc
 
       - name: Bootstrap Test Suite (Windows)
         if: runner.os == 'Windows'
