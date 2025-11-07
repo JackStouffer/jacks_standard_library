@@ -90,7 +90,6 @@ int main(int argc, char **argv)
                 "-fno-optimize-sibling-calls",
                 "-DJSL_DEBUG",
                 "-fsanitize=address",
-                "-fno-sanitize=leak",
                 "-fsanitize=undefined",
                 "-std=c11",
                 "-Wall",
@@ -232,7 +231,7 @@ int main(int argc, char **argv)
                     "-Wextra",
                     "-pedantic",
                     "-fsanitize=address",
-                    "-fno-sanitize=leak",
+                    
                     "-o", exe_name,
                     test_file_path
                 );
