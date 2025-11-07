@@ -122,7 +122,7 @@ int main(int argc, char **argv)
                 &clang_debug_compile_command,
                 "clang",
                 "-O3",
-                "-g",
+                "-glldb",
                 "-march=native",
                 "-std=c11",
                 "-Wall",

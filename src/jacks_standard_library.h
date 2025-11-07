@@ -90,6 +90,14 @@ extern "C" {
     #include <stdbool.h>
 #endif
 
+#ifndef JSL_VERSION
+    #define JSL_VERSION 0x010000  /* 1.0.0 */
+#else
+    #if JSL_VERSION != 0x010000
+        #error "jacks_standard_library.h version mismatch across includes"
+    #endif
+#endif
+
 #ifndef JSL_DEBUG
     #ifndef JSL__FORCE_INLINE
 
