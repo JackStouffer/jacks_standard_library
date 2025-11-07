@@ -429,11 +429,13 @@ typedef struct JSLFatPtr
 /**
  * Advances a fat pointer forward by `n`.
  *
- * @note This macro does no bounds checking and is intentionally tiny so it can
+ * @note This macro does not bounds check and is intentionally tiny so it can
  *       live in hot loops without adding overhead.
  */
-#define JSL_FATPTR_ADVANCE(fatptr, n) \
-    fatptr.data += n; fatptr.length -= n;
+#define JSL_FATPTR_ADVANCE(fatptr, n) do { \
+    fatptr.data += n; \
+    fatptr.length -= n; \
+} while (0)
 
 /**
  * Creates a `JSLFatPtr` view over a stack-allocated buffer.

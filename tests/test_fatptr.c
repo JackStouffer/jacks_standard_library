@@ -83,7 +83,8 @@ void test_jsl_load_file_contents(void)
         lok(file_size > 0);
         rewind(file);
 
-        fread(stack_buffer, file_size, 1, file);
+        size_t res = fread(stack_buffer, file_size, 1, file);
+        assert(res > 0);
     }
 
     JSLArena arena;
@@ -117,7 +118,8 @@ void test_jsl_load_file_contents_buffer(void)
         lok(file_size > 0);
         rewind(file);
 
-        fread(stack_buffer, file_size, 1, file);
+        size_t res = fread(stack_buffer, file_size, 1, file);
+        assert(res > 0);
     }
 
     JSLFatPtr buffer = jsl_fatptr_init(malloc(4*1024), 4*1024);
