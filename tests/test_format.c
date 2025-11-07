@@ -473,6 +473,12 @@ void test_jsl_format_file_write_failure(void)
 
 int main(void)
 {
+    // Windows programs that crash can lose all of the terminal output.
+    // Set the buffer to zero to auto flush on output.
+    #ifdef _WIN32
+        setvbuf(stdout, NULL, _IONBF, 0);
+    #endif
+
     lrun("Test format ints", test_integers);
     lrun("Test format floating point", test_floating_point);
     lrun("Test format length capture", test_n);

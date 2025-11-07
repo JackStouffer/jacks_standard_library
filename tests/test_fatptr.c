@@ -83,7 +83,8 @@ void test_jsl_load_file_contents(void)
         lok(file_size > 0);
         rewind(file);
 
-        fread(stack_buffer, file_size, 1, file);
+        size_t res = fread(stack_buffer, file_size, 1, file);
+        assert(res > 0);
     }
 
     JSLArena arena;
@@ -117,7 +118,8 @@ void test_jsl_load_file_contents_buffer(void)
         lok(file_size > 0);
         rewind(file);
 
-        fread(stack_buffer, file_size, 1, file);
+        size_t res = fread(stack_buffer, file_size, 1, file);
+        assert(res > 0);
     }
 
     JSLFatPtr buffer = jsl_fatptr_init(malloc(4*1024), 4*1024);
@@ -227,135 +229,135 @@ void test_jsl_fatptr_substring_search(void)
         JSLFatPtr string = JSL_FATPTR_LITERAL("");
         JSLFatPtr substring = JSL_FATPTR_LITERAL("");
         int64_t res = jsl_fatptr_substring_search(string, substring);
-        l_long_long_equal(res, -1LL);
+        TEST_INT64_EQUAL(res, (int64_t) -1);
     }
     
     {
         JSLFatPtr string = JSL_FATPTR_LITERAL("");
         JSLFatPtr substring = JSL_FATPTR_LITERAL("111111");
         int64_t res = jsl_fatptr_substring_search(string, substring);
-        l_long_long_equal(res, -1LL);
+        TEST_INT64_EQUAL(res, (int64_t) -1);
     }
 
     {
         JSLFatPtr string = JSL_FATPTR_LITERAL("111111");
         JSLFatPtr substring = JSL_FATPTR_LITERAL("");
         int64_t res = jsl_fatptr_substring_search(string, substring);
-        l_long_long_equal(res, -1LL);
+        TEST_INT64_EQUAL(res, (int64_t) -1);
     }
 
     {
         JSLFatPtr string = JSL_FATPTR_LITERAL("Hello, World!");
         JSLFatPtr substring = JSL_FATPTR_LITERAL("Longer substring than the original string");
         int64_t res = jsl_fatptr_substring_search(string, substring);
-        l_long_long_equal(res, -1LL);
+        TEST_INT64_EQUAL(res, (int64_t) -1);
     }
 
     {
         JSLFatPtr string = JSL_FATPTR_LITERAL("111111");
         JSLFatPtr substring = JSL_FATPTR_LITERAL("1");
         int64_t res = jsl_fatptr_substring_search(string, substring);
-        l_long_long_equal(res, 0LL);
+        TEST_INT64_EQUAL(res, (int64_t) 0);
     }
 
     {
         JSLFatPtr string = JSL_FATPTR_LITERAL("Hello, World!");
         JSLFatPtr substring = JSL_FATPTR_LITERAL("W");
         int64_t res = jsl_fatptr_substring_search(string, substring);
-        l_long_long_equal(res, 7LL);
+        TEST_INT64_EQUAL(res, (int64_t) 7);
     }
 
     {
         JSLFatPtr string = JSL_FATPTR_LITERAL("Hello, World!");
         JSLFatPtr substring = JSL_FATPTR_LITERAL("World");
         int64_t res = jsl_fatptr_substring_search(string, substring);
-        l_long_long_equal(res, 7LL);
+        TEST_INT64_EQUAL(res, (int64_t) 7);
     }
 
     {
         JSLFatPtr string = JSL_FATPTR_LITERAL("Hello, World!");
         JSLFatPtr substring = JSL_FATPTR_LITERAL("Hello, World!");
         int64_t res = jsl_fatptr_substring_search(string, substring);
-        l_long_long_equal(res, 0LL);
+        TEST_INT64_EQUAL(res, (int64_t) 0);
     }
 
     {
         JSLFatPtr string = JSL_FATPTR_LITERAL("Hello, World!");
         JSLFatPtr substring = JSL_FATPTR_LITERAL("Blorp");
         int64_t res = jsl_fatptr_substring_search(string, substring);
-        l_long_long_equal(res, -1LL);
+        TEST_INT64_EQUAL(res, (int64_t) -1);
     }
 
     {
         JSLFatPtr substring = JSL_FATPTR_LITERAL("8-bit");
         int64_t res = jsl_fatptr_substring_search(medium_str, substring);
-        l_long_long_equal(res, 117LL);
+        TEST_INT64_EQUAL(res, (int64_t) 117);
     }
 
     {
         JSLFatPtr substring = JSL_FATPTR_LITERAL("8-blit");
         int64_t res = jsl_fatptr_substring_search(medium_str, substring);
-        l_long_long_equal(res, -1LL);
+        TEST_INT64_EQUAL(res, (int64_t) -1);
     }
 
     {
         JSLFatPtr substring = JSL_FATPTR_LITERAL("Blorf");
         int64_t res = jsl_fatptr_substring_search(medium_str, substring);
-        l_long_long_equal(res, -1LL);
+        TEST_INT64_EQUAL(res, (int64_t) -1);
     }
 
     {
         JSLFatPtr substring = JSL_FATPTR_LITERAL("ASCII/UTF-8");
         int64_t res = jsl_fatptr_substring_search(medium_str, substring);
-        l_long_long_equal(res, 162LL);
+        TEST_INT64_EQUAL(res, (int64_t) 162);
     }
 
     {
         JSLFatPtr substring = JSL_FATPTR_LITERAL("single AVX2 register when using 8-bit values, which we are since we're using ASCII/UTF-8.");
         int64_t res = jsl_fatptr_substring_search(medium_str, substring);
-        l_long_long_equal(res, 85LL);
+        TEST_INT64_EQUAL(res, (int64_t) 85);
     }
 
     {
         JSLFatPtr substring = JSL_FATPTR_LITERAL("This is a very long string that is going to trigger SIMD code, as it's longer than a single AVX2 register when using 8-bit values, which we are since we're using ASCII/UTF-8.");
         int64_t res = jsl_fatptr_substring_search(medium_str, substring);
-        l_long_long_equal(res, 0LL);
+        TEST_INT64_EQUAL(res, (int64_t) 0);
     }
 
     {
         JSLFatPtr substring = JSL_FATPTR_LITERAL("i");
         int64_t res = jsl_fatptr_substring_search(long_str, substring);
-        l_long_long_equal(res, 6LL);
+        TEST_INT64_EQUAL(res, (int64_t) 6);
     }
 
     {
         JSLFatPtr substring = JSL_FATPTR_LITERAL("at");
         int64_t res = jsl_fatptr_substring_search(long_str, substring);
-        l_long_long_equal(res, 122LL);
+        TEST_INT64_EQUAL(res, (int64_t) 122);
     }
 
     {
         JSLFatPtr substring = JSL_FATPTR_LITERAL("Sed");
         int64_t res = jsl_fatptr_substring_search(long_str, substring);
-        l_long_long_equal(res, 1171LL);
+        TEST_INT64_EQUAL(res, (int64_t) 1171);
     }
 
     {
         JSLFatPtr substring = JSL_FATPTR_LITERAL("elit");
         int64_t res = jsl_fatptr_substring_search(long_str, substring);
-        l_long_long_equal(res, 51LL);
+        TEST_INT64_EQUAL(res, (int64_t) 51);
     }
 
     {
         JSLFatPtr substring = JSL_FATPTR_LITERAL("vitae");
         int64_t res = jsl_fatptr_substring_search(long_str, substring);
-        l_long_long_equal(res, 263LL);
+        TEST_INT64_EQUAL(res, (int64_t) 263);
     }
 
     {
         JSLFatPtr substring = JSL_FATPTR_LITERAL("Lorem");
         int64_t res = jsl_fatptr_substring_search(long_str, substring);
-        l_long_long_equal(res, 0LL);
+        TEST_INT64_EQUAL(res, (int64_t) 0);
     }
 }
 

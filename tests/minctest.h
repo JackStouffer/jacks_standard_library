@@ -63,6 +63,7 @@
 #include <math.h>
 #include <time.h>
 #include <string.h>
+#include <inttypes.h>
 
 
 /* How far apart can floats be before we consider them unequal. */
@@ -124,8 +125,8 @@ static size_t lfails = 0;
 
 
 /* Assert two int64 are equal. */
-#define l_long_long_equal(a, b)\
-    lequal_base((a) == (b), a, b, "%lld")
+#define TEST_INT64_EQUAL(a, b)\
+    lequal_base((a) == (b), a, b, "%" PRId64)
 
 
 /* Assert two floats are equal (Within LTEST_FLOAT_TOLERANCE). */

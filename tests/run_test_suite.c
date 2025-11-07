@@ -58,6 +58,7 @@ int main(int argc, char **argv)
 {
     NOB_GO_REBUILD_URSELF(argc, argv);
 
+    if (!nob_mkdir_if_not_exists("tests/bin")) return 1;
 
     int32_t test_file_count = sizeof(test_file_paths) / sizeof(char*);
     for (int32_t i = 0; i < test_file_count; i++)
@@ -89,6 +90,7 @@ int main(int argc, char **argv)
                 "-fno-optimize-sibling-calls",
                 "-DJSL_DEBUG",
                 "-fsanitize=address",
+                "-fsanitize=undefined",
                 "-std=c11",
                 "-Wall",
                 "-Wextra",
@@ -229,13 +231,17 @@ int main(int argc, char **argv)
                     "-Wextra",
                     "-pedantic",
                     "-fsanitize=address",
+                    
                     "-o", exe_name,
                     test_file_path
                 );
                 if (!nob_cmd_run(&gcc_debug_compile_command)) return 1;
 
+                char run_command[128] = "./";
+                strncat(run_command, exe_name, strlen(exe_name));
+
                 Nob_Cmd gcc_debug_run_command = {0};
-                nob_cmd_append(&gcc_debug_run_command, "./tests/bin/debug_gcc");
+                nob_cmd_append(&gcc_debug_run_command, run_command);
                 if (!nob_cmd_run(&gcc_debug_run_command)) return 1;
             }
 
@@ -260,8 +266,11 @@ int main(int argc, char **argv)
                 );
                 if (!nob_cmd_run(&gcc_optimized_compile_command)) return 1;
 
+                char run_command[128] = "./";
+                strncat(run_command, exe_name, strlen(exe_name));
+
                 Nob_Cmd gcc_optimized_run_command = {0};
-                nob_cmd_append(&gcc_optimized_run_command, "./tests/bin/opt_gcc");
+                nob_cmd_append(&gcc_optimized_run_command, run_command);
                 if (!nob_cmd_run(&gcc_optimized_run_command)) return 1;
             }
         

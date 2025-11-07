@@ -437,11 +437,13 @@ typedef struct JSLFatPtr
 /**
  * Advances a fat pointer forward by `n`.
  *
- * @note This macro does no bounds checking and is intentionally tiny so it can
+ * @note This macro does not bounds check and is intentionally tiny so it can
  *       live in hot loops without adding overhead.
  */
-#define JSL_FATPTR_ADVANCE(fatptr, n) \
-    fatptr.data += n; fatptr.length -= n;
+#define JSL_FATPTR_ADVANCE(fatptr, n) do { \
+    fatptr.data += n; \
+    fatptr.length -= n; \
+} while (0)
 
 /**
  * Creates a `JSLFatPtr` view over a stack-allocated buffer.
@@ -1390,7 +1392,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         JSLArena* arena,
         JSLFatPtr path,
         JSLFatPtr* out_contents,
-        errno_t* out_errno
+        int32_t* out_errno
     );
 
     /**
@@ -1409,7 +1411,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     JSL_WARN_UNUSED JSL_DEF JSLLoadFileResultEnum jsl_load_file_contents_buffer(
         JSLFatPtr* buffer,
         JSLFatPtr path,
-        errno_t* out_errno
+        int32_t* out_errno
     );
 
     /**
@@ -1430,7 +1432,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         JSLFatPtr contents,
         JSLFatPtr path,
         int64_t* bytes_written,
-        errno_t* out_errno
+        int32_t* out_errno
     );
 
     /**
@@ -2568,16 +2570,16 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     struct JSL__StringBuilderContext
     {
-        uint8_t buffer[JSL_FORMAT_MIN_BUFFER];
         JSLStringBuilder* builder;
         bool failure_flag;
+        uint8_t buffer[JSL_FORMAT_MIN_BUFFER];
     };
 
     static uint8_t* format_string_builder_callback(uint8_t *buf, void *user, int64_t len)
     {
         struct JSL__StringBuilderContext* context = (struct JSL__StringBuilderContext*) user;
 
-        if (context->builder->head == NULL || context->builder->tail == NULL)
+        if (context->builder->head == NULL || context->builder->tail == NULL || len > JSL_FORMAT_MIN_BUFFER)
             return NULL;
 
         bool res = jsl_string_builder_insert_fatptr(context->builder, jsl_fatptr_init(buf, len));
@@ -2669,7 +2671,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             #ifdef _MSC_VER
                 arena->current = potential_end;
             #else
-                #if __has_feature(address_sanitizer) || defined(__SANITIZE_ADDRESS__)
+                #if defined(__SANITIZE_ADDRESS__)
                     // Add 8 to leave "guard" zones between allocations
                     arena->current = potential_end + 8;
                     ASAN_UNPOISON_MEMORY_REGION(res.data, res.length);
@@ -2928,19 +2930,8 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
         #if defined(__AVX2__)
             __m256i percent_wide = _mm256_set1_epi8('%');
-            __m256i zero_wide = _mm256_setzero_si256();
-            __m256i vector_of_indexes = _mm256_set_epi8(
-                31, 30, 29, 28, 27, 26, 25, 24,
-                23, 22, 21, 20, 19, 18, 17, 16,
-                15, 14, 13, 12, 11, 10, 9, 8,
-                7, 6, 5, 4, 3, 2, 1, 0
-            );
         #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
             uint8x16_t percent_wide = vdupq_n_u8('%');
-            const uint8x16_t vector_of_indexes = {
-                0, 1, 2, 3, 4, 5, 6, 7,
-                8, 9, 10, 11, 12, 13, 14, 15
-            };
         #endif
 
         while (f.length > 0)
@@ -3011,30 +3002,17 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     if (mask == 0)
                     {
                         // No special characters found, store entire block
+                        stbsp__chk_cb_buf(32);
                         _mm256_store_si256(wide_dest, data);
                         JSL_FATPTR_ADVANCE(f, 32);
                         buffer_cursor += 32;
                     }
                     else
                     {
-                        // Handle the characters up to the special character
-                        int special_pos = __builtin_ffs(mask) - 1;
-                        if (special_pos > 0)
-                        {
-                            // Create a byte-level mask for storing up to special_pos bytes
-                            __m256i mask_for_partial_store = _mm256_cmpgt_epi8(
-                                _mm256_set1_epi8(special_pos),
-                                vector_of_indexes
-                            );
+                        int special_pos = __builtin_ctz(mask);
+                        stbsp__chk_cb_buf(special_pos);
 
-                            // Use _mm256_blendv_epi8 to apply mask and store only up to special_pos
-                            __m256i partial_data = _mm256_blendv_epi8(
-                                zero_wide,
-                                data,
-                                mask_for_partial_store
-                            );
-                            _mm256_storeu_si256(wide_dest, partial_data);
-                        }
+                        JSL_MEMCPY(buffer_cursor, f.data, special_pos);
                         JSL_FATPTR_ADVANCE(f, special_pos);
                         buffer_cursor += special_pos;
 
@@ -3048,8 +3026,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     goto schk1;
 
             #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
-                
-                // NEON cannot rely on safe over-reads from aligned pointers.
+
                 while (f.length > 15)
                 {
                     uint8x16_t data = vld1q_u8(f.data);
@@ -3066,16 +3043,8 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     else
                     {
                         int special_pos = __builtin_ctz(mask);
-                        if (special_pos > 0)
-                        {
-                            stbsp__chk_cb_buf(special_pos);
-                            uint8x16_t mask_for_partial_store = vcgtq_u8(
-                                vdupq_n_u8((uint8_t) special_pos),
-                                vector_of_indexes
-                            );
-                            uint8x16_t partial_data = vandq_u8(data, mask_for_partial_store);
-                            vst1q_u8(buffer_cursor, partial_data);
-                        }
+                        stbsp__chk_cb_buf(special_pos);
+                        JSL_MEMCPY(buffer_cursor, f.data, special_pos);
 
                         JSL_FATPTR_ADVANCE(f, special_pos);
                         buffer_cursor += special_pos;
@@ -3098,7 +3067,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                 goto L_END_FORMAT;
 
             #else
-                
+
                 // loop one byte at a time to get up to 4-byte alignment
                 while (((uintptr_t) f.data) & 3 && f.length > 0)
                 {
@@ -4172,7 +4141,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         return context.length;
     }
 
-    struct JSLArenaContext
+    struct JSL__ArenaContext
     {
         JSLArena* arena;
         JSLFatPtr current_allocation;
@@ -4182,7 +4151,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     static uint8_t* format_arena_callback(uint8_t *buf, void *user, int64_t len)
     {
-        struct JSLArenaContext* context = (struct JSLArenaContext*) user;
+        struct JSL__ArenaContext* context = (struct JSL__ArenaContext*) user;
 
         // First call
         if (context->cursor == NULL)
@@ -4216,7 +4185,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         va_list va;
         va_start(va, fmt);
 
-        struct JSLArenaContext context;
+        struct JSL__ArenaContext context;
         context.arena = arena;
         context.current_allocation.data = NULL;
         context.current_allocation.length = 0;
@@ -4654,7 +4623,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         JSLArena* arena,
         JSLFatPtr path,
         JSLFatPtr* out_contents,
-        errno_t* out_errno
+        int32_t* out_errno
     )
     {
         JSLLoadFileResultEnum res = JSL_FILE_LOAD_BAD_PARAMETERS;
@@ -4783,7 +4752,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     JSLLoadFileResultEnum jsl_load_file_contents_buffer(
         JSLFatPtr* buffer,
         JSLFatPtr path,
-        errno_t* out_errno
+        int32_t* out_errno
     )
     {
         char path_buffer[FILENAME_MAX + 1];
@@ -4901,7 +4870,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         JSLFatPtr contents,
         JSLFatPtr path,
         int64_t* out_bytes_written,
-        errno_t* out_errno
+        int32_t* out_errno
     )
     {
         char path_buffer[FILENAME_MAX + 1];
@@ -4988,9 +4957,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     struct JSL__FormatOutContext
     {
-        uint8_t buffer[JSL_FORMAT_MIN_BUFFER];
         FILE* out;
         bool failure_flag;
+        uint8_t buffer[JSL_FORMAT_MIN_BUFFER];
     };
 
     static uint8_t* format_out_callback(uint8_t *buf, void *user, int64_t len)
