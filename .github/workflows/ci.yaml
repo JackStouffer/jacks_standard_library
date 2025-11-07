@@ -28,7 +28,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # ---------- Set up compilers ----------
       - name: Set up MSVC (Windows)
         if: runner.os == 'Windows'
         uses: TheMrMilchmann/setup-msvc-dev@v3  # sets VS dev cmd env
@@ -58,7 +57,7 @@ jobs:
 
       - name: Run Test Suite (Windows)
         if: runner.os == 'Windows'
-        run: .\run_tests.exe
+        run: lldb.exe -b -o "process handle -p true -s false SIGSEGV" -o run -o "bt all" -- .\run_tests.exe
         env:
           ASAN_OPTIONS: detect_leaks=0
 

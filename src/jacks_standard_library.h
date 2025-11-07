@@ -2663,7 +2663,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             #ifdef _MSC_VER
                 arena->current = potential_end;
             #else
-                #if (defined(__has_feature) && __has_feature(address_sanitizer)) || defined(__SANITIZE_ADDRESS__)
+                #if defined(__SANITIZE_ADDRESS__)
                     // Add 8 to leave "guard" zones between allocations
                     arena->current = potential_end + 8;
                     ASAN_UNPOISON_MEMORY_REGION(res.data, res.length);
