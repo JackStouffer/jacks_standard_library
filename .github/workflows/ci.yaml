@@ -57,7 +57,7 @@ jobs:
 
       - name: Run Test Suite (Windows)
         if: runner.os == 'Windows'
-        run: lldb.exe -b -o "process handle -p true -s false SIGSEGV" -o run -o "bt all" -- .\run_tests.exe
+        run: .\run_tests.exe
         env:
           ASAN_OPTIONS: detect_leaks=0
 

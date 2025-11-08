@@ -136,7 +136,19 @@ int main(int argc, char **argv)
             if (!nob_cmd_run(&clang_debug_compile_command)) return 1;
 
             Nob_Cmd clang_debug_run_command = {0};
-            nob_cmd_append(&clang_debug_run_command, exe_name);
+            nob_cmd_append(&clang_debug_run_command,
+                "lldb.exe",
+                "-b",
+                "-o",
+                "\"process handle -p true -s false SIGSEGV\"",
+                "-o",
+                "run",
+                "-o",
+                "\"bt all\"",
+                "--",
+                ".\run_tests.exe",
+                exe_name
+            );
             if (!nob_cmd_run(&clang_debug_run_command)) return 1;
         }
 
