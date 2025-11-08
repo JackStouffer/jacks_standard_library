@@ -3003,7 +3003,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     {
                         // No special characters found, store entire block
                         stbsp__chk_cb_buf(32);
-                        _mm256_store_si256(wide_dest, data);
+                        _mm256_storeu_si256(wide_dest, data);
                         JSL_FATPTR_ADVANCE(f, 32);
                         buffer_cursor += 32;
                     }

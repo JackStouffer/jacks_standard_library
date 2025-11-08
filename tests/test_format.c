@@ -191,8 +191,10 @@ void test_floating_point(void)
     CHECK3(" 3.7 3.71", "% .3g %.3g", 3.704, 3.706);
     CHECK3("2e-315:1e+308", "%g:%g", 2e-315, 1e+308);
 
-    CHECK4("Inf Inf NaN", "%g %G %f", INFINITY, INFINITY, NAN);
-    CHECK2("N", "%.1g", NAN);
+    const double positive_nan = fabs(NAN);
+
+    CHECK4("Inf Inf NaN", "%g %G %f", INFINITY, INFINITY, positive_nan);
+    CHECK2("N", "%.1g", positive_nan);
 }
 
 void test_n(void)
