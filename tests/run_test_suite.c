@@ -1,4 +1,6 @@
 /**
+ * # Test Suite
+ * 
  * This file runs the test suite using a meta-program style of build system.
  * 
  * Each test file is compiled and run four times. On POSIX systems it's once
@@ -6,7 +8,8 @@
  * and native CPU code gen, and then the same thing again with clang. On
  * Windows it's done with MSVC and clang.
  * 
- * This may seem excessive but I've caught bugs with this before.
+ * This may seem excessive, but I've caught bugs with this before. Especially
+ * with bugs around pointer alignment.
  * 
  * ## Running
  * 
@@ -14,14 +17,14 @@
  * 
  * On POSIX
  * 
- * ```
+ * ```bash
  * cc -o run_test_suite ./tests/bin/run_test_suite.c 
  * ```
  * 
  * On Windows
  * 
  * ```
- * cl /Fe"run_test_suite.exe" tests\\bin\\run_test_suite.c 
+ * cl /Ferun_test_suite.exe tests\bin\run_test_suite.c 
  * ```
  * 
  * Then run your executable. Every time afterwards when you run the test
@@ -42,6 +45,11 @@
 #define JSL_IMPLEMENTATION
 #include "../src/jacks_standard_library.h"
 
+typedef struct HashMapDecl { 
+    char *name, *prefix, *key_type, *value_type, *impl_type;
+    char** headers;
+} HashMapDecl;
+
 char* test_file_paths[] = {
     "tests/test_fatptr.c",
     "tests/test_format.c",
@@ -54,11 +62,22 @@ char* test_file_names[] = {
     "test_string_builder",
 };
 
-int main(int argc, char **argv)
+int32_t main(int32_t argc, char **argv)
 {
     NOB_GO_REBUILD_URSELF(argc, argv);
 
     if (!nob_mkdir_if_not_exists("tests/bin")) return 1;
+    if (!nob_mkdir_if_not_exists("tests/hash_maps")) return 1;
+
+    nob_log(NOB_INFO, "Running unit test suite");
+
+    /**
+     *
+     * 
+     *              UNIT TESTS
+     * 
+     *  
+     */
 
     int32_t test_file_count = sizeof(test_file_paths) / sizeof(char*);
     for (int32_t i = 0; i < test_file_count; i++)
@@ -136,19 +155,7 @@ int main(int argc, char **argv)
             if (!nob_cmd_run(&clang_debug_compile_command)) return 1;
 
             Nob_Cmd clang_debug_run_command = {0};
-            nob_cmd_append(&clang_debug_run_command,
-                "lldb.exe",
-                "-b",
-                "-o",
-                "\"process handle -p true -s false SIGSEGV\"",
-                "-o",
-                "run",
-                "-o",
-                "\"bt all\"",
-                "--",
-                ".\run_tests.exe",
-                exe_name
-            );
+            nob_cmd_append(&clang_debug_run_command, exe_name);
             if (!nob_cmd_run(&clang_debug_run_command)) return 1;
         }
 
@@ -290,6 +297,122 @@ int main(int argc, char **argv)
             #error "Unrecognized platform. Only windows and POSIX platforms are supported."
         #endif
     }
+
+    /**
+     *
+     * 
+     *              HASH MAPS
+     * 
+     *  
+     */
+
+    nob_log(NOB_INFO, "Compiling generate hash map program");
+
+    #if JSL_IS_WIN32
+        char generate_hash_map_exe_name[128] = "tests\\bin\\generate_hash_map.exe";
+        char generate_hash_map_run_exe_command[128] = ".\tests\\bin\\generate_hash_map.exe";
+    #elif JSL_IS_POSIX
+        char generate_hash_map_exe_name[128] = "tests/bin/generate_hash_map";
+        char generate_hash_map_run_exe_command[128] = "./tests/bin/generate_hash_map";
+    #else
+        #error "Unrecognized platform. Only windows and POSIX platforms are supported."
+    #endif
+
+    Nob_Cmd generate_hash_map_compile_command = {0};
+    nob_cmd_append(
+        &generate_hash_map_compile_command,
+        "clang",
+        "-DINCLUDE_MAIN",
+        "-O0",
+        "-glldb",
+        "-std=c11",
+        "-Wall",
+        "-Wextra",
+        "-pedantic",
+        "-o", generate_hash_map_exe_name,
+        "src/generate_hash_map.c"
+    );
+    if (!nob_cmd_run(&generate_hash_map_compile_command)) return 1;
+    
+    HashMapDecl hash_map_declarations[] = {
+        { "IntToIntMap", "int32_to_int32_map", "int32_t", "int32_t", "--static", (char*[]) {"../tests/test_hash_map_types.h", NULL} },
+        { "FloatToFloatMap", "float_to_float_map", "float", "float", "--static", (char*[]) {"../tests/test_hash_map_types.h", NULL} }
+    };
+
+    int32_t hash_map_test_count = sizeof(hash_map_declarations) / sizeof(HashMapDecl);
+
+    nob_log(NOB_INFO, "Generating Hash Map Files");
+
+    for (int32_t i = 0; i < hash_map_test_count; ++i)
+    {
+        HashMapDecl* decl = &hash_map_declarations[i];
+
+        Nob_Cmd write_hash_map_header = {0};
+        nob_cmd_append(
+            &write_hash_map_header,
+            generate_hash_map_run_exe_command,
+            "--name", decl->name,
+            "--function_prefix", decl->prefix,
+            "--key_type", decl->key_type,
+            "--value_type", decl->value_type,
+            decl->impl_type,
+            "--header"
+        );
+
+        for (int32_t header_idx = 0;;++header_idx)
+        {
+            if (decl->headers == NULL)
+                break;
+            if (decl->headers[header_idx] == NULL)
+                break;
+            
+            nob_cmd_append(
+                &write_hash_map_header,
+                "--add-header",
+                decl->headers[header_idx]
+            );
+        }
+
+        char out_path_header[128] = "tests/hash_maps/";
+        strcat(out_path_header, decl->prefix);
+        strcat(out_path_header, ".h");
+
+        if (!nob_cmd_run(&write_hash_map_header, .stdout_path = out_path_header)) return 1;
+
+        Nob_Cmd write_hash_map_source = {0};
+        nob_cmd_append(
+            &write_hash_map_source,
+            generate_hash_map_run_exe_command,
+            "--name", decl->name,
+            "--function_prefix", decl->prefix,
+            "--key_type", decl->key_type,
+            "--value_type", decl->value_type,
+            decl->impl_type,
+            "--source"
+        );
+
+        for (int32_t header_idx = 0;;++header_idx)
+        {
+            if (decl->headers == NULL)
+                break;
+            if (decl->headers[header_idx] == NULL)
+                break;
+            
+            nob_cmd_append(
+                &write_hash_map_source,
+                "--add-header",
+                decl->headers[header_idx]
+            );
+        }
+
+        char out_path_source[128] = "tests/hash_maps/";
+        strcat(out_path_source, decl->prefix);
+        strcat(out_path_source, ".c");
+
+        if (!nob_cmd_run(&write_hash_map_source, .stdout_path = out_path_source)) return 1;
+    }
+
+    nob_log(NOB_INFO, "Running hash map test suite");
     
     return 0;
 }

@@ -143,13 +143,14 @@ extern "C" {
 
 #if defined(__GNUC__) || defined(__clang__)
     #if defined(__SANITIZE_ADDRESS__) && __SANITIZE_ADDRESS__
-        #define JSL_ASAN_OFF __attribute__((__no_sanitize_address__))
+        #define JSL__ASAN_OFF __attribute__((__no_sanitize_address__))
     #endif
 #endif
 
-#ifndef JSL_ASAN_OFF
-    #define JSL_ASAN_OFF
+#ifndef JSL__ASAN_OFF
+    #define JSL__ASAN_OFF
 #endif
+
 
 /**
  * 
@@ -160,12 +161,41 @@ extern "C" {
  */
 
 
+#if defined(_WIN32)
+    
+    #define JSL_IS_WIN32 1
+    #define JSL_IS_POSIX 0
+
+#elif defined(__linux__) || defined(__linux) || \
+    defined(__APPLE__) || defined(__MACH__) || \
+    defined(__FreeBSD__) || defined(__OpenBSD__) || \
+    defined(__NetBSD__) || \
+    defined(__DragonFly__) || \
+    defined(__sun) || defined(sun) || \
+    defined(__hpux) || \
+    defined(_AIX) || \
+    defined(__CYGWIN__)
+
+    #define JSL_IS_WIN32 0
+    #define JSL_IS_POSIX 1
+
+#else
+
+    #define JSL_IS_WIN32 0
+    #define JSL_IS_POSIX 0
+
+#endif
+
+
 #ifndef JSL_DEF
     /**
      * Allows you to override linkage/visibility (e.g., __declspec) for all of
-     * the functions defined by this library. By default this is empty.
+     * the functions defined by this library. By default this is empty, so extern.
+     *
+     * This also allows you to have multiple versions of this library in the same
+     * program (if you need that for whatever reason).
      */
-    #define JSL_DEF /* extern by default */
+    #define JSL_DEF
 #endif
 
 #ifndef JSL_DEFAULT_ALLOCATION_ALIGNMENT
@@ -1316,9 +1346,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
 #ifdef JSL_INCLUDE_FILE_UTILS
 
-    #if defined(_WIN32)
-    
-        #define JSL_WIN32
+    #if JSL_IS_WIN32
 
         #include <errno.h>
         #include <fcntl.h>
@@ -1328,9 +1356,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         #include <io.h>
         #include <sys\stat.h>
 
-    #elif defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
-
-        #define JSL_POSIX
+    #elif JSL_IS_POSIX
 
         #include <errno.h>
         #include <limits.h>
@@ -1448,10 +1474,24 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
      * @param ... Format args
      * @returns `true` when formatting and writing succeeds, otherwise `false`
      */
-    JSL_ASAN_OFF JSL_DEF bool jsl_format_file(FILE* out, JSLFatPtr fmt, ...);
+    JSL__ASAN_OFF JSL_DEF bool jsl_format_file(FILE* out, JSLFatPtr fmt, ...);
 
 #endif // JSL_INCLUDE_FILE_UTILS
 
+
+#ifdef JSL_INCLUDE_SHORT_NAMES
+
+    /**
+     * Short name for jsl_format
+     */
+    #define format jsl_format
+
+    /**
+     * Short name for JSL_FATPTR_LITERAL
+     */
+    #define FP JSL_FATPTR_LITERAL
+
+#endif
 
 #ifdef __cplusplus
 } /* extern "C" */
@@ -2595,7 +2635,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         }
     }
 
-    JSL_ASAN_OFF bool jsl_string_builder_format(JSLStringBuilder* builder, JSLFatPtr fmt, ...)
+    JSL__ASAN_OFF bool jsl_string_builder_format(JSLStringBuilder* builder, JSLFatPtr fmt, ...)
     {
         if (builder->head == NULL || builder->tail == NULL)
             return false;
@@ -2792,7 +2832,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         "75767778798081828384858687888990919293949596979899"
     };
 
-    JSL_ASAN_OFF void jsl_format_set_separators(char pcomma, char pperiod)
+    JSL__ASAN_OFF void jsl_format_set_separators(char pcomma, char pperiod)
     {
         stbsp__period = pperiod;
         stbsp__comma = pcomma;
@@ -2827,7 +2867,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         }
     }
 
-    static JSL_ASAN_OFF uint32_t stbsp__strlen_limited(char const *string, uint32_t limit)
+    static JSL__ASAN_OFF uint32_t stbsp__strlen_limited(char const *string, uint32_t limit)
     {
         char const* source_ptr = string;
         
@@ -2910,7 +2950,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         return (uint32_t)(source_ptr - string);
     }
 
-    JSL_ASAN_OFF int64_t jsl_format_callback(
+    JSL__ASAN_OFF int64_t jsl_format_callback(
         JSL_FORMAT_CALLBACK* callback,
         void* user,
         uint8_t* buffer,
@@ -4105,7 +4145,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         return context->tmp; // go direct into buffer if you can
     }
 
-    JSL_ASAN_OFF int64_t jsl_format_valist(JSLFatPtr* buffer, JSLFatPtr fmt, va_list va )
+    JSL__ASAN_OFF int64_t jsl_format_valist(JSLFatPtr* buffer, JSLFatPtr fmt, va_list va )
     {
         stbsp__context context;
         context.length = 0;
@@ -4180,7 +4220,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         return context->buffer;
     }
 
-    JSL_ASAN_OFF JSLFatPtr jsl_format(JSLArena* arena, JSLFatPtr fmt, ...)
+    JSL__ASAN_OFF JSLFatPtr jsl_format(JSLArena* arena, JSLFatPtr fmt, ...)
     {
         va_list va;
         va_start(va, fmt);
@@ -4212,7 +4252,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         return ret;
     }
 
-    JSL_ASAN_OFF int64_t jsl_format_buffer(JSLFatPtr* buffer, JSLFatPtr fmt, ...)
+    JSL__ASAN_OFF int64_t jsl_format_buffer(JSLFatPtr* buffer, JSLFatPtr fmt, ...)
     {
         int64_t result;
         va_list va;
@@ -4591,7 +4631,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         int64_t result_size = -1;
         bool stat_success = false;
 
-        #if defined(JSL_WIN32)
+        #if JSL_IS_WIN32
             struct _stat64 file_info;
             int stat_result = _fstat64(file_descriptor, &file_info);
             if (stat_result == 0)
@@ -4600,7 +4640,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                 result_size = file_info.st_size;
             }
 
-        #elif defined(JSL_POSIX)
+        #elif JSL_IS_POSIX
             struct stat file_info;
             int stat_result = fstat(file_descriptor, &file_info);
             if (stat_result == 0)
@@ -4651,9 +4691,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         bool opened_file = false;
         if (got_path)
         {
-            #if defined(JSL_WIN32)
+            #if JSL_IS_WIN32
                 file_descriptor = _open(path_buffer, _O_BINARY);
-            #elif defined(JSL_POSIX)
+            #elif JSL_IS_POSIX
                 file_descriptor = open(path_buffer, 0);
             #else
                 #error "Unsupported platform"
@@ -4694,9 +4734,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         bool did_read_data = false;
         if (got_memory)
         {
-            #if defined(JSL_WIN32)
+            #if JSL_IS_WIN32
                 read_res = (int64_t) _read(file_descriptor, allocation.data, (unsigned int) file_size);
-            #elif defined(JSL_POSIX)
+            #elif JSL_IS_POSIX
                 read_res = (int64_t) read(file_descriptor, allocation.data, file_size);
             #else
                 #error "Unsupported platform"
@@ -4724,9 +4764,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         bool did_close = false;
         if (opened_file)
         {
-            #if defined(JSL_WIN32)
+            #if JSL_IS_WIN32
                 int32_t close_res = _close(file_descriptor);
-            #elif defined(JSL_POSIX)
+            #elif JSL_IS_POSIX
                 int32_t close_res = close(file_descriptor);
             #else
                 #error "Unsupported platform"
@@ -4778,9 +4818,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         bool opened_file = false;
         if (got_path)
         {
-            #if defined(JSL_WIN32)
+            #if JSL_IS_WIN32
                 file_descriptor = _open(path_buffer, _O_BINARY);
-            #elif defined(JSL_POSIX)
+            #elif JSL_IS_POSIX
                 file_descriptor = open(path_buffer, 0);
             #else
                 #error "Unsupported platform"
@@ -4809,9 +4849,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         {
             int64_t read_size = JSL_MIN(file_size, buffer->length);
 
-            #if defined(JSL_WIN32)
+            #if JSL_IS_WIN32
                 read_res = (int64_t) _read(file_descriptor, buffer->data, (unsigned int) read_size);
-            #elif defined(JSL_POSIX)
+            #elif JSL_IS_POSIX
                 read_res = (int64_t) read(file_descriptor, buffer->data, read_size);
             #else
                 #error "Unsupported platform"
@@ -4841,9 +4881,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         bool did_close = false;
         if (opened_file)
         {
-            #if defined(JSL_WIN32)
+            #if JSL_IS_WIN32
                 int32_t close_res = _close(file_descriptor);
-            #elif defined(JSL_POSIX)
+            #elif JSL_IS_POSIX
                 int32_t close_res = close(file_descriptor);
             #else
                 #error "Unsupported platform"
@@ -4891,9 +4931,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         bool opened_file = false;
         if (got_path)
         {
-            #if defined(JSL_WIN32)
+            #if JSL_IS_WIN32
                 file_descriptor = _open(path_buffer, _O_CREAT, _S_IREAD | _S_IWRITE);
-            #elif defined(JSL_POSIX)
+            #elif JSL_IS_POSIX
                 file_descriptor = open(path_buffer, O_CREAT, S_IRUSR | S_IWUSR);
             #endif
     
@@ -4903,13 +4943,13 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         int64_t write_res = -1;
         if (opened_file)
         {
-            #if defined(JSL_WIN32)
+            #if JSL_IS_WIN32
                 write_res = _write(
                     file_descriptor,
                     contents.data,
                     (unsigned int) contents.length
                 );
-            #elif defined(JSL_POSIX)
+            #elif JSL_IS_POSIX
                 write_res = write(
                     file_descriptor,
                     contents.data,
@@ -4938,9 +4978,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         int32_t close_res = -1;
         if (opened_file)
         {
-            #if defined(JSL_WIN32)
+            #if JSL_IS_WIN32
                 close_res = _close(file_descriptor);
-            #elif defined(JSL_POSIX)
+            #elif JSL_IS_POSIX
                 close_res = close(file_descriptor);
             #endif
 
@@ -4978,7 +5018,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         }
     }
 
-    JSL_ASAN_OFF bool jsl_format_file(FILE* out, JSLFatPtr fmt, ...)
+    JSL__ASAN_OFF bool jsl_format_file(FILE* out, JSLFatPtr fmt, ...)
     {
         if (out == NULL || fmt.data == NULL || fmt.length < 0)
             return false;

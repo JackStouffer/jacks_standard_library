@@ -32,6 +32,7 @@
 #include <stdalign.h>
 
 #define JSL_INCLUDE_FILE_UTILS
+#define JSL_INCLUDE_SHORT_NAMES
 #define JSL_IMPLEMENTATION
 #include "jacks_standard_library.h"
 
@@ -554,20 +555,6 @@ JSLFatPtr dynamic_expand_function_code = JSL_FATPTR_LITERAL(""
 "    return success;\n"
 "}\n\n");
 
-static bool cstring_compare(const char* c1, const char* c2)
-{
-    bool res = false;
-    size_t c1_len = strlen(c1);
-    size_t c2_len = strlen(c2);
-
-    if (c1_len == c2_len)
-    {
-        res = memcmp(c1, c2, c1_len) == 0;
-    }
-
-    return res;
-}
-
 /**
  * Generates the header file data for your hash map. This file includes all the typedefs
  * and function signatures for this hash map.
@@ -585,39 +572,16 @@ static bool cstring_compare(const char* c1, const char* c2)
  *                      This will be used as the main type name in the generated code.
  * @param function_prefix The prefix for all generated function names (e.g., "string_int_map").
  *                        Functions will be named like: {function_prefix}_init, {function_prefix}_insert, etc.
- * @param key_type_name The C type name for hash map keys (e.g., "const char*", "int", "MyStruct").
+ * @param key_type_name The C type name for hash map keys (e.g., "int", "MyStruct").
  * @param value_type_name The C type name for hash map values (e.g., "int", "MyData*", "float").
  * @param hash_function_name Name of your custom hash function if you have one, NULL otherwise.
  * @param include_header_count Number of additional header files to include in the generated header.
- * @param ... Variable argument list of const char* strings representing additional header
- *            file names to include (e.g., "my_types.h", "custom_structs.h").
- *            Must provide exactly `include_header_count` string arguments.
+ * @param include_header_count Number of additional header files to include in the generated header.
  *
  * @return JSLFatPtr containing the generated header file content
  *
  * @warning Ensure the arena has sufficient space (minimum 512KB recommended) to avoid
  *          allocation failures during header generation.
- *
- * Example usage:
- * @code
- * JSLArena arena;
- * jsl_arena_init(&arena, malloc(JSL_MEGABYTES(1)), JSL_MEGABYTES(1));
- * 
- * JSLFatPtr header = write_hash_map_header(
- *     &arena,
- *     "StringIntMap",           // hash_map_name
- *     "string_int_map",         // function_prefix  
- *     "const char*",            // key_type_name
- *     "int",                    // value_type_name
- *     NULL,                     // hash_function_name (unused)
- *     2,                        // include_header_count
- *     "my_string_utils.h",      // additional include 1
- *     "my_common_types.h"       // additional include 2
- * );
- * 
- * // Write to file or use the generated header content
- * printf("%.*s", (int)header.length, (char*)header.data);
- * @endcode
  */
 void write_hash_map_header(
     HashMapImplementation impl,
@@ -627,25 +591,23 @@ void write_hash_map_header(
     JSLFatPtr key_type_name,
     JSLFatPtr value_type_name,
     JSLFatPtr hash_function_name,
-    int32_t include_header_count,
-    ...
+    JSLFatPtr* hash_function_array,
+    int32_t include_header_count
 )
 {
+    (void) impl;
+    (void) hash_function_name;
+
     jsl_string_builder_format(builder, static_hash_map_header_docstring, hash_map_name, key_type_name, value_type_name);
 
     jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#pragma once\n\n"));
     jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include <stdint.h>\n"));
     jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include \"jacks_hash_map.h\"\n\n"));
 
-    va_list args;
-    va_start(args, include_header_count);
-
     for (int32_t i = 0; i < include_header_count; ++i)
     {
-        jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include \"%s\"\n"), va_arg(args, char*));
+        jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include \"%s\"\n"), hash_function_array[i]);
     }
-
-    va_end(args);
     
     jsl_string_builder_format(builder, static_map_type_typedef, key_type_name, value_type_name, hash_map_name, key_type_name, value_type_name, hash_map_name);
 
@@ -701,24 +663,22 @@ void write_hash_map_source(
     JSLFatPtr key_type_name,
     JSLFatPtr value_type_name,
     JSLFatPtr hash_function_name,
-    int32_t include_header_count,
-    ...
+    JSLFatPtr* hash_function_array,
+    int32_t include_header_count
 )
 {
+    (void) impl;
+    (void) hash_function_name;
+
     jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include <stddef.h>\n"));
     jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include <stdint.h>\n"));
     jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include \"jacks_standard_library.h\"\n"));
     jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include \"jacks_hash_map.h\"\n\n"));
 
-    va_list args;
-    va_start(args, include_header_count);
-
     for (int32_t i = 0; i < include_header_count; ++i)
     {
-        jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include \"%s\"\n"), va_arg(args, char*));
+        jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include \"%s\"\n"), hash_function_array[i]);
     }
-
-    va_end(args);
     
     jsl_string_builder_format(
         builder,
@@ -775,10 +735,10 @@ JSLFatPtr help_message = JSL_FATPTR_LITERAL(
     "This program generates both a C source and header file for a hash map with the given\n"
     "key and value types. More documentation is included in the source file.\n\n"
     "USAGE:\n\n"
-    "\tgenerate_hash_map --name TYPE_NAME --function_prefix PREFIX --key_type TYPE --value_type TYPE [--static | --dynamic] [--header | --source]\n\n"
+    "\tgenerate_hash_map --name TYPE_NAME --function_prefix PREFIX --key_type TYPE --value_type TYPE [--static | --dynamic] [--header | --source] [--add-header=FILE]...\n\n"
     "Required arguments:\n"
     "\t--name\t\t\tThe name to give the hash map container type\n"
-    "\t--function_prefix\tThe prefix on each of the functions for the hash map\n\n"
+    "\t--function_prefix\tThe prefix added to each of the functions for the hash map\n"
     "\t--key_type\t\tThe C type name for the key\n"
     "\t--value_type\t\tThe C type name for the value\n\n"
     "Optional arguments:\n"
@@ -786,6 +746,7 @@ JSLFatPtr help_message = JSL_FATPTR_LITERAL(
     "\t--source\t\tWrite the source file to stdout\n"
     "\t--dynamic\t\tGenerate a hash map which grows dynamically\n"
     "\t--static\t\tGenerate a statically sized hash map\n"
+    "\t--add-header\t\tPath to a C header which will be added with a #include directive at the top of the generated file\n"
 );
 
 int32_t main(int32_t argc, char** argv)
@@ -798,21 +759,24 @@ int32_t main(int32_t argc, char** argv)
     JSLFatPtr value_type = {0};
     JSLFatPtr hash_function_name = {0};
     HashMapImplementation impl = IMPL_ERROR;
+    JSLFatPtr* header_includes = NULL;
+    int32_t header_includes_count = 0;
     
     // Parse command line arguments
     for (int i = 1; i < argc; i++)
     {
-        char* arg = argv[i];
+        JSLFatPtr arg = jsl_fatptr_from_cstr(argv[i]);
         
-        if (cstring_compare(arg, "-h") || cstring_compare(arg, "--help"))
+        if (jsl_fatptr_memory_compare(arg, FP("-h")) || jsl_fatptr_memory_compare(arg, FP("--help")))
         {
             show_help = true;
         }
-        else if (cstring_compare(arg, "--name="))
+        else if (jsl_fatptr_memory_compare(arg, FP("--name=")))
         {
-            name = jsl_fatptr_from_cstr(arg + 7);
+            name = arg;
+            JSL_FATPTR_ADVANCE(name, 7);
         }
-        else if (cstring_compare(arg, "--name"))
+        else if (jsl_fatptr_memory_compare(arg, FP("--name")))
         {
             if (i + 1 < argc)
             {
@@ -824,11 +788,12 @@ int32_t main(int32_t argc, char** argv)
                 return 1;
             }
         }
-        else if (cstring_compare(arg, "--function_prefix="))
+        else if (jsl_fatptr_memory_compare(arg, FP("--function_prefix=")))
         {
-            function_prefix = jsl_fatptr_from_cstr(arg + 18);
+            function_prefix = arg;
+            JSL_FATPTR_ADVANCE(function_prefix, 18);
         }
-        else if (cstring_compare(arg, "--function_prefix"))
+        else if (jsl_fatptr_memory_compare(arg, FP("--function_prefix")))
         {
             if (i + 1 < argc) {
                 function_prefix = jsl_fatptr_from_cstr(argv[++i]);
@@ -837,11 +802,12 @@ int32_t main(int32_t argc, char** argv)
                 return 1;
             }
         }
-        else if (cstring_compare(arg, "--key_type="))
+        else if (jsl_fatptr_memory_compare(arg, FP("--key_type=")))
         {
-            key_type = jsl_fatptr_from_cstr(arg + 11);
+            key_type = arg;
+            JSL_FATPTR_ADVANCE(key_type, 11);
         }
-        else if (cstring_compare(arg, "--key_type"))
+        else if (jsl_fatptr_memory_compare(arg, FP("--key_type")))
         {
             if (i + 1 < argc)
             {
@@ -853,11 +819,12 @@ int32_t main(int32_t argc, char** argv)
                 return 1;
             }
         }
-        else if (cstring_compare(arg, "--value_type="))
+        else if (jsl_fatptr_memory_compare(arg, FP("--value_type=")))
         {
-            value_type = jsl_fatptr_from_cstr(arg + 13);
+            value_type = arg;
+            JSL_FATPTR_ADVANCE(value_type, 13);
         }
-        else if (cstring_compare(arg, "--value_type"))
+        else if (jsl_fatptr_memory_compare(arg, FP("--value_type")))
         {
             if (i + 1 < argc)
             {
@@ -869,25 +836,31 @@ int32_t main(int32_t argc, char** argv)
                 return 1;
             }
         }
-        else if (cstring_compare(arg, "--static"))
+        else if (jsl_fatptr_memory_compare(arg, FP("--static")))
         {
             impl = IMPL_STATIC;
         }
-        else if (cstring_compare(arg, "--dynamic"))
+        else if (jsl_fatptr_memory_compare(arg, FP("--dynamic")))
         {
             impl = IMPL_DYNAMIC;
         }
-        else if (cstring_compare(arg, "--header"))
+        else if (jsl_fatptr_memory_compare(arg, FP("--header")))
         {
             print_header = true;
         }
-        else if (cstring_compare(arg, "--source"))
+        else if (jsl_fatptr_memory_compare(arg, FP("--source")))
         {
             print_header = false;
         }
+        else if (jsl_fatptr_memory_compare(arg, FP("--add-header")))
+        {
+            ++header_includes_count;
+            header_includes = realloc(header_includes, sizeof(JSLFatPtr) * header_includes_count);
+            header_includes[header_includes_count - 1] = jsl_fatptr_from_cstr(argv[++i]);
+        }
         else
         {
-            fprintf(stderr, "Error: Unknown argument: %s\n", arg);
+            jsl_format_file(stderr, FP("Error: Unknown argument: %y\n"), arg);
             return 1;
         }
     }
@@ -943,7 +916,8 @@ int32_t main(int32_t argc, char** argv)
             key_type,
             value_type,
             hash_function_name,
-            0
+            header_includes,
+            header_includes_count
         );
     }
     else 
@@ -956,7 +930,8 @@ int32_t main(int32_t argc, char** argv)
             key_type,
             value_type,
             hash_function_name,
-            0
+            header_includes,
+            header_includes_count
         );
     }
 

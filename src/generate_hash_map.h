@@ -18,8 +18,8 @@ void write_hash_map_header(
     JSLFatPtr key_type_name,
     JSLFatPtr value_type_name,
     JSLFatPtr hash_function_name,
-    int32_t include_header_count,
-    ...
+    JSLFatPtr* hash_function_array,
+    int32_t include_header_count
 );
 
 void write_hash_map_source(
@@ -30,6 +30,6 @@ void write_hash_map_source(
     JSLFatPtr key_type_name,
     JSLFatPtr value_type_name,
     JSLFatPtr hash_function_name,
-    int32_t include_header_count,
-    ...
+    JSLFatPtr* hash_function_array,
+    int32_t include_header_count
 );
