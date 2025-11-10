@@ -36,7 +36,6 @@
 #include "test_hash_map_types.h"
 #include "tests/hash_maps/comp2_to_int_map.h"
 #include "tests/hash_maps/comp3_to_comp2_map.h"
-#include "tests/hash_maps/float_to_float_map.h"
 #include "tests/hash_maps/int32_to_comp1_map.h"
 #include "tests/hash_maps/int32_to_int32_map.h"
 

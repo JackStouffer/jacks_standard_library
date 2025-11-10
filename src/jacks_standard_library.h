@@ -530,7 +530,7 @@ typedef struct JSLFatPtr
  * Advances a fat pointer forward by `n`.
  *
  * @note This macro does not bounds check and is intentionally tiny so it can
- *       live in hot loops without adding overhead.
+ * live in hot loops without adding overhead.
  */
 #define JSL_FATPTR_ADVANCE(fatptr, n) do { \
     fatptr.data += n; \
@@ -549,10 +549,11 @@ typedef struct JSLFatPtr
  * uint8_t buffer[JSL_KILOBYTES(4)];
  * JSLFatPtr ptr = JSL_FATPTR_FROM_STACK(buffer);
  * ```
+ * 
+ * @warning This macro only works for variable initializers and cannot be used as a
+ * normal rvalue.
  */
-#define JSL_FATPTR_FROM_STACK(buf) \
-    (JSLFatPtr){ .data = (uint8_t *)(buf), \
-                .length = (int64_t)(sizeof(buf)) }
+#define JSL_FATPTR_FROM_STACK(buf) { (uint8_t *)(buf), (int64_t)(sizeof(buf)) }
 
 /**
  * A bump allocator. Designed for situations in your program when you know a
@@ -617,12 +618,10 @@ typedef struct JSLArena
  *
  * Fast, cheap, easy automatic memory management!
  * 
- * @warning This macro does not work on MSVC.
+ * @warning This macro only works for variable initializers and cannot be used as a
+ * normal rvalue.
  */
-#define JSL_ARENA_FROM_STACK(buf) \
-    (JSLArena){ .start = (uint8_t *)(buf), \
-                .current = (uint8_t *)(buf), \
-                .end = (uint8_t *)(buf) + sizeof(buf) }
+#define JSL_ARENA_FROM_STACK(buf) { (uint8_t *)(buf), (uint8_t *)(buf), (uint8_t *)(buf) + sizeof(buf) }
 
 /**
  * A string builder is a container for building large strings. It's specialized for

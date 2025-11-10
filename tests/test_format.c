@@ -347,7 +347,7 @@ void test_jsl_format_file_formats_and_writes_output(void)
 
     bool res = jsl_format_file(
         file,
-        JSL_FATPTR_INITIALIZER("Hello %s %d"),
+        JSL_FATPTR_EXPRESSION("Hello %s %d"),
         "World",
         42
     );
@@ -372,7 +372,7 @@ void test_jsl_format_file_accepts_empty_format(void)
     if (file == NULL)
         return;
 
-    bool res = jsl_format_file(file, JSL_FATPTR_INITIALIZER(""));
+    bool res = jsl_format_file(file, JSL_FATPTR_EXPRESSION(""));
     lok(res == true);
 
     lok(fflush(file) == 0);
@@ -385,7 +385,7 @@ void test_jsl_format_file_accepts_empty_format(void)
 
 void test_jsl_format_file_null_out_parameter(void)
 {
-    bool res = jsl_format_file(NULL, JSL_FATPTR_INITIALIZER("Hello"));
+    bool res = jsl_format_file(NULL, JSL_FATPTR_EXPRESSION("Hello"));
     lok(!res);
 }
 
@@ -425,7 +425,7 @@ void test_jsl_format_file_write_failure(void)
         {
             lok(setvbuf(writer, NULL, _IONBF, 0) == 0);
             void (*previous_handler)(int) = signal(SIGPIPE, SIG_IGN);
-            bool res = jsl_format_file(writer, JSL_FATPTR_INITIALIZER("Hello"));
+            bool res = jsl_format_file(writer, JSL_FATPTR_EXPRESSION("Hello"));
             lok(!res);
             fclose(writer);
             if (previous_handler == SIG_ERR)
@@ -447,7 +447,7 @@ void test_jsl_format_file_write_failure(void)
 
     if (file != NULL)
     {
-        bool res = jsl_format_file(file, JSL_FATPTR_INITIALIZER("Hello"));
+        bool res = jsl_format_file(file, JSL_FATPTR_EXPRESSION("Hello"));
         lok(!res);
         fclose(file);
         return;
@@ -466,7 +466,7 @@ void test_jsl_format_file_write_failure(void)
         return;
     }
 
-    bool res = jsl_format_file(read_only, JSL_FATPTR_INITIALIZER("Hello"));
+    bool res = jsl_format_file(read_only, JSL_FATPTR_EXPRESSION("Hello"));
     lok(!res);
 
     fclose(read_only);

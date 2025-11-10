@@ -18,13 +18,13 @@
  * On POSIX
  * 
  * ```bash
- * cc -o run_test_suite ./tests/bin/run_test_suite.c 
+ * cc -o run_test_suite ./tests/run_test_suite.c 
  * ```
  * 
  * On Windows
  * 
  * ```
- * cl /Ferun_test_suite.exe tests\bin\run_test_suite.c 
+ * cl /Ferun_test_suite.exe tests\run_test_suite.c 
  * ```
  * 
  * Then run your executable. Every time afterwards when you run the test
@@ -59,11 +59,17 @@ static UnitTestDecl unit_test_declarations[] = {
     { "test_fatptr", (char*[]) {"tests/test_fatptr.c", NULL} },
     { "test_format", (char*[]) {"tests/test_format.c", NULL} },
     { "test_string_builder", (char*[]) {"tests/test_string_builder.c", NULL} },
-    { "test_hash_map", (char*[]) {
-        "tests/test_hash_map.c",
-        "tests/hash_maps/comp2_to_int_map.c",
-        "tests/hash_maps/comp3_to_comp2_map.c",
-        "tests/hash_maps/int32_to_comp1_map.c" tests/hash_maps/int32_to_comp1_map.h tests/hash_maps/int32_to_int32_map.c tests/hash_maps/int32_to_int32_map.h} }
+    { 
+        "test_hash_map", 
+        (char*[]) {
+            "tests/test_hash_map.c",
+            "tests/hash_maps/comp2_to_int_map.c",
+            "tests/hash_maps/comp3_to_comp2_map.c",
+            "tests/hash_maps/int32_to_comp1_map.c",
+            "tests/hash_maps/int32_to_int32_map.c",
+            NULL
+        }
+    }
 };
 
 static HashMapDecl hash_map_declarations[] = {
@@ -199,24 +205,23 @@ int32_t main(int32_t argc, char **argv)
      *  
      */
 
-    int32_t test_file_count = sizeof(test_file_paths) / sizeof(char*);
-    for (int32_t i = 0; i < test_file_count; i++)
+    int32_t test_count = sizeof(unit_test_declarations) / sizeof(UnitTestDecl);
+    for (int32_t i = 0; i < test_count; i++)
     {
-        char* test_file_path = test_file_paths[i];
-        char* test_file_name = test_file_names[i];
+        UnitTestDecl* unit_test = &unit_test_declarations[i];
 
         {
             char exe_name[256] = "tests/bin/debug_clang_";
-            strncat(exe_name, test_file_name, strlen(test_file_name));
+            strcat(exe_name, unit_test->executable_name);
 
             #if defined(_WIN32)
-                strncat(exe_name, ".exe", 4);
+                strcat(exe_name, ".exe");
                 char exe_run_command[256] = {0};
-                strncat(exe_run_command, exe_name, strlen(exe_name));
+                strcat(exe_run_command, exe_name);
             #else
-                strncat(exe_name, ".out", 4);
+                strcat(exe_name, ".out");
                 char exe_run_command[256] = "./";
-                strncat(exe_run_command, exe_name, strlen(exe_name));
+                strcat(exe_run_command, exe_name);
             #endif
 
             Nob_Cmd clang_debug_compile_command = {0};
@@ -231,12 +236,22 @@ int32_t main(int32_t argc, char **argv)
                 "-fsanitize=address",
                 "-fsanitize=undefined",
                 "-std=c11",
+                "-Isrc/",
                 "-Wall",
                 "-Wextra",
                 "-pedantic",
-                "-o", exe_name,
-                test_file_path
+                "-o", exe_name
             );
+
+            for (int32_t source_file_idx = 0;; ++source_file_idx)
+            {
+                char* source_file = unit_test->files[source_file_idx];
+                if (source_file == NULL)
+                    break;
+                    
+                nob_cmd_append(&clang_debug_compile_command, source_file);
+            }
+
             if (!nob_cmd_run(&clang_debug_compile_command)) return 1;
 
             Nob_Cmd clang_debug_run_command = {0};
@@ -246,40 +261,50 @@ int32_t main(int32_t argc, char **argv)
 
         {
             char exe_name[256] = "tests/bin/opt_clang_";
-            strncat(exe_name, test_file_name, strlen(test_file_name));
+            strcat(exe_name, unit_test->executable_name);
 
             #if defined(_WIN32)
-                strncat(exe_name, ".exe", 4);
+                strcat(exe_name, ".exe");
                 char exe_run_command[256] = {0};
                 strncat(exe_run_command, exe_name, strlen(exe_name));
             #else
-                strncat(exe_name, ".out", 4);
+                strcat(exe_name, ".out");
                 char exe_run_command[256] = "./";
-                strncat(exe_run_command, exe_name, strlen(exe_name));
+                strcat(exe_run_command, exe_name);
             #endif
 
-            Nob_Cmd clang_debug_compile_command = {0};
+            Nob_Cmd clang_optimized_compile_command = {0};
             nob_cmd_append(
-                &clang_debug_compile_command,
+                &clang_optimized_compile_command,
                 "clang",
                 "-O3",
                 "-glldb",
                 "-march=native",
+                "-Isrc/",
                 "-std=c11",
                 "-Wall",
                 "-Wextra",
                 "-pedantic",
-                "-o", exe_name,
-                test_file_path
+                "-o", exe_name
             );
-            if (!nob_cmd_run(&clang_debug_compile_command)) return 1;
 
-            Nob_Cmd clang_debug_run_command = {0};
-            nob_cmd_append(&clang_debug_run_command, exe_name);
-            if (!nob_cmd_run(&clang_debug_run_command)) return 1;
+            for (int32_t source_file_idx = 0;; ++source_file_idx)
+            {
+                char* source_file = unit_test->files[source_file_idx];
+                if (source_file == NULL)
+                    break;
+                    
+                nob_cmd_append(&clang_optimized_compile_command, source_file);
+            }
+
+            if (!nob_cmd_run(&clang_optimized_compile_command)) return 1;
+
+            Nob_Cmd clang_optimized_run_command = {0};
+            nob_cmd_append(&clang_optimized_run_command, exe_name);
+            if (!nob_cmd_run(&clang_optimized_run_command)) return 1;
         }
 
-        #if defined(_WIN32)
+        #if JSL_IS_WIN32
 
             {
                 char exe_output_param[256] = "/Fe";
@@ -287,19 +312,20 @@ int32_t main(int32_t argc, char **argv)
                 char obj_output_param[256] = "/Fo";
                 char obj_name[256] = "tests\\bin\\opt_msvc_debug_";
 
-                strncat(exe_name, test_file_name, strlen(test_file_name));
-                strncat(exe_name, ".exe", 4);
-                strncat(exe_output_param, exe_name, strlen(exe_name));
-                strncat(obj_name, test_file_name, strlen(test_file_name));
-                strncat(obj_name, ".obj", 4);
-                strncat(obj_output_param, obj_name, strlen(obj_name));
+                strcat(exe_name, unit_test->executable_name);
+                strcat(exe_name, ".exe");
+                strcat(exe_output_param, exe_name);
+                strcat(obj_name, unit_test->executable_name);
+                strcat(obj_name, ".obj");
+                strcat(obj_output_param, obj_name);
 
-                Nob_Cmd gcc_debug_compile_command = {0};
+                Nob_Cmd msvc_debug_compile_command = {0};
                 nob_cmd_append(
-                    &gcc_debug_compile_command,
+                    &msvc_debug_compile_command,
                     "cl.exe",
                     "/nologo",
                     "/DJSL_DEBUG",
+                    "/I\"src\\\"",
                     "/TC",
                     "/Od",
                     "/Zi",
@@ -308,9 +334,18 @@ int32_t main(int32_t argc, char **argv)
                     "/std:c11",
                     exe_output_param,
                     obj_output_param,
-                    test_file_path
                 );
-                if (!nob_cmd_run(&gcc_debug_compile_command)) return 1;
+
+                for (int32_t source_file_idx = 0;; ++source_file_idx)
+                {
+                    char* source_file = unit_test->files[source_file_idx];
+                    if (source_file == NULL)
+                        break;
+                        
+                    nob_cmd_append(&msvc_debug_compile_command, source_file);
+                }
+
+                if (!nob_cmd_run(&msvc_debug_compile_command)) return 1;
 
                 Nob_Cmd msvc_debug_run_command = {0};
                 nob_cmd_append(&msvc_debug_run_command, exe_name);
@@ -323,41 +358,51 @@ int32_t main(int32_t argc, char **argv)
                 char obj_output_param[256] = "/Fo";
                 char obj_name[256] = "tests\\bin\\opt_msvc_release_";
 
-                strncat(exe_name, test_file_name, strlen(test_file_name));
-                strncat(exe_name, ".exe", 4);
-                strncat(exe_output_param, exe_name, strlen(exe_name));
-                strncat(obj_name, test_file_name, strlen(test_file_name));
-                strncat(obj_name, ".obj", 4);
-                strncat(obj_output_param, obj_name, strlen(obj_name));
+                strcat(exe_name, unit_test->executable_name);
+                strcat(exe_name, ".exe");
+                strcat(exe_output_param, exe_name);
+                strcat(obj_name, unit_test->executable_name);
+                strcat(obj_name, ".obj");
+                strcat(obj_output_param, obj_name);
 
-                Nob_Cmd gcc_optimized_compile_command = {0};
+                Nob_Cmd msvc_optimized_compile_command = {0};
                 nob_cmd_append(
-                    &gcc_optimized_compile_command,
+                    &msvc_optimized_compile_command,
                     "cl.exe",
                     "/nologo",
+                    "/I\"src\\\"",
                     "/TC",
                     "/O2",
                     "/W4",
                     "/WX",
                     "/std:c11",
                     exe_output_param,
-                    obj_output_param,
-                    test_file_path
+                    obj_output_param
                 );
-                if (!nob_cmd_run(&gcc_optimized_compile_command)) return 1;
+
+                for (int32_t source_file_idx = 0;; ++source_file_idx)
+                {
+                    char* source_file = unit_test->files[source_file_idx];
+                    if (source_file == NULL)
+                        break;
+                        
+                    nob_cmd_append(&msvc_optimized_compile_command, source_file);
+                }
+
+                if (!nob_cmd_run(&msvc_optimized_compile_command)) return 1;
 
                 Nob_Cmd msvc_optimized_run_command = {0};
                 nob_cmd_append(&msvc_optimized_run_command, exe_name);
                 if (!nob_cmd_run(&msvc_optimized_run_command)) return 1;
             }
 
-        #elif defined(__linux__) || defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__)
+        #elif JSL_IS_POSIX
 
             {
                 char exe_name[256] = "tests/bin/debug_gcc_";
 
-                strncat(exe_name, test_file_name, strlen(test_file_name));
-                strncat(exe_name, ".out", 4);
+                strcat(exe_name, test_file_name);
+                strcat(exe_name, ".out");
 
                 Nob_Cmd gcc_debug_compile_command = {0};
                 nob_cmd_append(
@@ -366,18 +411,27 @@ int32_t main(int32_t argc, char **argv)
                     "-O0",
                     "-g",
                     "-std=c11",
+                    "-Isrc/",
                     "-Wall",
                     "-Wextra",
                     "-pedantic",
                     "-fsanitize=address",
-                    
-                    "-o", exe_name,
-                    test_file_path
+                    "-o", exe_name
                 );
+
+                for (int32_t source_file_idx = 0;; ++source_file_idx)
+                {
+                    char* source_file = unit_test->files[source_file_idx];
+                    if (source_file == NULL)
+                        break;
+                        
+                    nob_cmd_append(&gcc_debug_compile_command, source_file);
+                }
+
                 if (!nob_cmd_run(&gcc_debug_compile_command)) return 1;
 
                 char run_command[256] = "./";
-                strncat(run_command, exe_name, strlen(exe_name));
+                strcat(run_command, exe_name);
 
                 Nob_Cmd gcc_debug_run_command = {0};
                 nob_cmd_append(&gcc_debug_run_command, run_command);
@@ -387,8 +441,8 @@ int32_t main(int32_t argc, char **argv)
             {
                 char exe_name[256] = "tests/bin/opt_gcc_";
 
-                strncat(exe_name, test_file_name, strlen(test_file_name));
-                strncat(exe_name, ".out", 4);
+                strcat(exe_name, test_file_name);
+                strcat(exe_name, ".out");
 
                 Nob_Cmd gcc_optimized_compile_command = {0};
                 nob_cmd_append(
@@ -397,12 +451,22 @@ int32_t main(int32_t argc, char **argv)
                     "-O3",
                     "-march=native",
                     "-std=c11",
+                    "-Isrc/",
                     "-Wall",
                     "-Wextra",
                     "-pedantic",
-                    "-o", exe_name,
-                    test_file_path
+                    "-o", exe_name
                 );
+
+                for (int32_t source_file_idx = 0;; ++source_file_idx)
+                {
+                    char* source_file = unit_test->files[source_file_idx];
+                    if (source_file == NULL)
+                        break;
+                        
+                    nob_cmd_append(&gcc_optimized_compile_command, source_file);
+                }
+
                 if (!nob_cmd_run(&gcc_optimized_compile_command)) return 1;
 
                 char run_command[256] = "./";
