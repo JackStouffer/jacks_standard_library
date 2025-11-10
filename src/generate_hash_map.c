@@ -29,11 +29,13 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#include <stdalign.h>
+#ifdef INCLUDE_MAIN
+    #define JSL_IMPLEMENTATION
+
+    #define _CRT_SECURE_NO_WARNINGS
+#endif
 
 #define JSL_INCLUDE_FILE_UTILS
-#define JSL_INCLUDE_SHORT_NAMES
-#define JSL_IMPLEMENTATION
 #include "jacks_standard_library.h"
 
 #include "generate_hash_map.h"
@@ -577,7 +579,7 @@ JSLFatPtr dynamic_expand_function_code = JSL_FATPTR_LITERAL(""
  * @param hash_function_name Name of your custom hash function if you have one, NULL otherwise.
  * @param include_header_count Number of additional header files to include in the generated header.
  * @param include_header_count Number of additional header files to include in the generated header.
- *
+ 
  * @return JSLFatPtr containing the generated header file content
  *
  * @warning Ensure the arena has sufficient space (minimum 512KB recommended) to avoid
@@ -591,7 +593,7 @@ void write_hash_map_header(
     JSLFatPtr key_type_name,
     JSLFatPtr value_type_name,
     JSLFatPtr hash_function_name,
-    JSLFatPtr* hash_function_array,
+    JSLFatPtr* include_header_array,
     int32_t include_header_count
 )
 {
@@ -600,14 +602,16 @@ void write_hash_map_header(
 
     jsl_string_builder_format(builder, static_hash_map_header_docstring, hash_map_name, key_type_name, value_type_name);
 
-    jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#pragma once\n\n"));
-    jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include <stdint.h>\n"));
-    jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include \"jacks_hash_map.h\"\n\n"));
+    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_LITERAL("#pragma once\n\n"));
+    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_LITERAL("#include <stdint.h>\n"));
+    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_LITERAL("#include \"jacks_hash_map.h\"\n\n"));
 
     for (int32_t i = 0; i < include_header_count; ++i)
     {
-        jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include \"%s\"\n"), hash_function_array[i]);
+        jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include \"%y\"\n"), include_header_array[i]);
     }
+    
+    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_LITERAL("\n"));
     
     jsl_string_builder_format(builder, static_map_type_typedef, key_type_name, value_type_name, hash_map_name, key_type_name, value_type_name, hash_map_name);
 
@@ -624,7 +628,13 @@ void write_hash_map_header(
         key_type_name
     );
 
-    jsl_string_builder_format(builder, static_delete_function_signature, function_prefix, hash_map_name, key_type_name);
+    jsl_string_builder_format(
+        builder,
+        static_delete_function_signature,
+        function_prefix,
+        hash_map_name,
+        key_type_name
+    );
 
     jsl_string_builder_format(
         builder,
@@ -663,23 +673,25 @@ void write_hash_map_source(
     JSLFatPtr key_type_name,
     JSLFatPtr value_type_name,
     JSLFatPtr hash_function_name,
-    JSLFatPtr* hash_function_array,
+    JSLFatPtr* include_header_array,
     int32_t include_header_count
 )
 {
     (void) impl;
     (void) hash_function_name;
 
-    jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include <stddef.h>\n"));
-    jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include <stdint.h>\n"));
-    jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include \"jacks_standard_library.h\"\n"));
-    jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include \"jacks_hash_map.h\"\n\n"));
+    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_LITERAL("#include <stddef.h>\n"));
+    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_LITERAL("#include <stdint.h>\n"));
+    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_LITERAL("#include \"jacks_standard_library.h\"\n"));
+    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_LITERAL("#include \"jacks_hash_map.h\"\n\n"));
 
     for (int32_t i = 0; i < include_header_count; ++i)
     {
-        jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include \"%s\"\n"), hash_function_array[i]);
+        jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include \"%y\"\n"), include_header_array[i]);
     }
     
+    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_LITERAL("\n"));
+
     jsl_string_builder_format(
         builder,
         static_init_function_code,
@@ -767,16 +779,16 @@ int32_t main(int32_t argc, char** argv)
     {
         JSLFatPtr arg = jsl_fatptr_from_cstr(argv[i]);
         
-        if (jsl_fatptr_memory_compare(arg, FP("-h")) || jsl_fatptr_memory_compare(arg, FP("--help")))
+        if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("-h")) || jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--help")))
         {
             show_help = true;
         }
-        else if (jsl_fatptr_memory_compare(arg, FP("--name=")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--name=")))
         {
             name = arg;
             JSL_FATPTR_ADVANCE(name, 7);
         }
-        else if (jsl_fatptr_memory_compare(arg, FP("--name")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--name")))
         {
             if (i + 1 < argc)
             {
@@ -785,29 +797,32 @@ int32_t main(int32_t argc, char** argv)
             else
             {
                 fprintf(stderr, "Error: --name requires a value\n");
-                return 1;
+                return EXIT_FAILURE;
             }
         }
-        else if (jsl_fatptr_memory_compare(arg, FP("--function_prefix=")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--function_prefix=")))
         {
             function_prefix = arg;
             JSL_FATPTR_ADVANCE(function_prefix, 18);
         }
-        else if (jsl_fatptr_memory_compare(arg, FP("--function_prefix")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--function_prefix")))
         {
-            if (i + 1 < argc) {
+            if (i + 1 < argc)
+            {
                 function_prefix = jsl_fatptr_from_cstr(argv[++i]);
-            } else {
+            }
+            else
+            {
                 fprintf(stderr, "Error: --function_prefix requires a value\n");
-                return 1;
+                return EXIT_FAILURE;
             }
         }
-        else if (jsl_fatptr_memory_compare(arg, FP("--key_type=")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--key_type=")))
         {
             key_type = arg;
             JSL_FATPTR_ADVANCE(key_type, 11);
         }
-        else if (jsl_fatptr_memory_compare(arg, FP("--key_type")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--key_type")))
         {
             if (i + 1 < argc)
             {
@@ -816,15 +831,15 @@ int32_t main(int32_t argc, char** argv)
             else
             {
                 fprintf(stderr, "Error: --key_type requires a value\n");
-                return 1;
+                return EXIT_FAILURE;
             }
         }
-        else if (jsl_fatptr_memory_compare(arg, FP("--value_type=")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--value_type=")))
         {
             value_type = arg;
             JSL_FATPTR_ADVANCE(value_type, 13);
         }
-        else if (jsl_fatptr_memory_compare(arg, FP("--value_type")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--value_type")))
         {
             if (i + 1 < argc)
             {
@@ -833,26 +848,26 @@ int32_t main(int32_t argc, char** argv)
             else
             {
                 fprintf(stderr, "Error: --value_type requires a value\n");
-                return 1;
+                return EXIT_FAILURE;
             }
         }
-        else if (jsl_fatptr_memory_compare(arg, FP("--static")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--static")))
         {
             impl = IMPL_STATIC;
         }
-        else if (jsl_fatptr_memory_compare(arg, FP("--dynamic")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--dynamic")))
         {
             impl = IMPL_DYNAMIC;
         }
-        else if (jsl_fatptr_memory_compare(arg, FP("--header")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--header")))
         {
             print_header = true;
         }
-        else if (jsl_fatptr_memory_compare(arg, FP("--source")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--source")))
         {
             print_header = false;
         }
-        else if (jsl_fatptr_memory_compare(arg, FP("--add-header")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--add-header")))
         {
             ++header_includes_count;
             header_includes = realloc(header_includes, sizeof(JSLFatPtr) * header_includes_count);
@@ -860,39 +875,39 @@ int32_t main(int32_t argc, char** argv)
         }
         else
         {
-            jsl_format_file(stderr, FP("Error: Unknown argument: %y\n"), arg);
-            return 1;
+            jsl_format_file(stderr, JSL_FATPTR_LITERAL("Error: Unknown argument: %y\n"), arg);
+            return EXIT_FAILURE;
         }
     }
     
     if (show_help)
     {
         jsl_format_file(stdout, help_message);
-        return 0;
+        return EXIT_SUCCESS;
     }
     // Check that all required parameters are provided
     else if (name.data == NULL)
     {
         jsl_format_file(stderr, JSL_FATPTR_LITERAL("Error: --name is required\n"));
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (function_prefix.data == NULL)
     {
         jsl_format_file(stderr, JSL_FATPTR_LITERAL("Error: --function_prefix is required\n"));
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (key_type.data == NULL)
     {
         jsl_format_file(stderr, JSL_FATPTR_LITERAL("Error: --key_type is required\n"));
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (value_type.data == NULL)
     {
         jsl_format_file(stderr, JSL_FATPTR_LITERAL("Error: --value_type is required\n"));
-        return 1;
+        return EXIT_FAILURE;
     }
 
     if (impl == IMPL_ERROR)
@@ -901,10 +916,14 @@ int32_t main(int32_t argc, char** argv)
     }
     
     JSLArena arena;
-    jsl_arena_init(&arena, malloc(JSL_MEGABYTES(8)), JSL_MEGABYTES(8));
+    void* backing_data = malloc(JSL_MEGABYTES(8));
+    if (backing_data == NULL)
+        return EXIT_FAILURE;
+
+    jsl_arena_init(&arena, backing_data, JSL_MEGABYTES(8));
     
     JSLStringBuilder builder;
-    jsl_string_builder_init2(&builder, &arena, 512, 32);
+    jsl_string_builder_init2(&builder, &arena, 1024, 8);
 
     if (print_header)
     {

@@ -545,12 +545,17 @@ typedef struct JSLArena
  *      uint8_t buffer[16 * 1024];
  *      JSLArena stack_arena = JSL_ARENA_FROM_STACK(buffer);
  * 
+ *      // example hash map, not real
  *      IntToStrMap map = int_to_str_ctor(&arena);
  *      int_to_str_add(&map, 64, JSL_FATPTR_LITERAL("This is my string data!"));
+ * 
+ *      // hash map cleaned up automatically
  * }
  * ```
  *
  * Fast, cheap, easy automatic memory management!
+ * 
+ * @warning This macro does not work on MSVC.
  */
 #define JSL_ARENA_FROM_STACK(buf) \
     (JSLArena){ .start = (uint8_t *)(buf), \
@@ -565,29 +570,38 @@ typedef struct JSLArena
  * While this is called string builder, the underlying data store is just bytes, so
  * any binary data which is built in chunks can use the string builder.
  *
+ * ## Implementation
+ * 
  * A string builder is different from a normal dynamic array in two ways. One, it
  * has specific operations for writing string data in both fat pointer form but also
  * as a `snprintf` like operation. Two, the resulting string data is not stored as a
  * contiguous range of memory, but as a series of chunks which is given to the user
  * as an iterator when the string is finished. 
  *
- * This is due to the nature of arena allocations. If you're using an arena for a
- * life time in your program, then the most common case is 
+ * This is due to the nature of arena allocations. If you have some part of your
+ * program which generates string output, the most common form of that code would be:
  *
  * 1. You do some operations, these operations themselves allocate
- * 2. You add generate a string from the operations
+ * 2. You generate a string from the operations
  * 3. The string is concatenated into some buffer
  * 4. Repeat
  *
  * A dynamically sized array which grows would mean throwing away the old memory when
- * the array resizes. A separate arena that's used purely for the array would work, but
- * with the string builder allows for less lifetimes to track.
+ * the array resizes. This would be fine for your typical heap but for an arena this
+ * the old memory is unavailable until the arena is reset. A separate arena that's 
+ * used purely for the array would work, but that sort of defeats the whole purpose
+ * of an arena, which is it's supposed to make lifetime tracking easier. Having a
+ * whole bunch of separate arenas for different objects makes the program more
+ * complicated than it should be.
+ * 
+ * Having the memory in chunks means that a single arena is not wasteful with its
+ * available memory.
  * 
  * By default, each chunk is 256 bytes and is aligned to a 32 byte address. These are
  * tuneable parameters that you can set during init. The custom alignment helps if you
  * want to use SIMD code on the consuming code.
  * 
- * Functions:
+ * ## Functions
  * 
  * * jsl_string_builder_init
  * * jsl_string_builder_init2
@@ -1477,21 +1491,6 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     JSL__ASAN_OFF JSL_DEF bool jsl_format_file(FILE* out, JSLFatPtr fmt, ...);
 
 #endif // JSL_INCLUDE_FILE_UTILS
-
-
-#ifdef JSL_INCLUDE_SHORT_NAMES
-
-    /**
-     * Short name for jsl_format
-     */
-    #define format jsl_format
-
-    /**
-     * Short name for JSL_FATPTR_LITERAL
-     */
-    #define FP JSL_FATPTR_LITERAL
-
-#endif
 
 #ifdef __cplusplus
 } /* extern "C" */
