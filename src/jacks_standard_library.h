@@ -101,7 +101,7 @@ extern "C" {
 #ifndef JSL_DEBUG
     #ifndef JSL__FORCE_INLINE
 
-        #if defined(_MSC_VER)
+        #if defined(_MSC_VER) && !defined(__clang__)
             #define JSL__FORCE_INLINE __forceinline
         #elif defined(__clang__) || defined(__GNUC__)
             #define JSL__FORCE_INLINE inline __attribute__((__always_inline__))
@@ -403,7 +403,7 @@ extern "C" {
  * ```c
  * // Reserve two gigabytes of virtual address space starting at 2 terabytes.
  * // If you're using static offsets this means that your objects in memory will
- * // be at the same place everytime you run your program in your debugger!
+ * // be at the same place every time you run your program in your debugger!
  * 
  * void* buffer = VirtualAlloc(JSL_TERABYTES(2), JSL_GIGABYTES(2), MEM_RESERVE, PAGE_READWRITE);
  * JSLArena arena;
@@ -446,23 +446,85 @@ typedef struct JSLFatPtr
     int64_t length;
 } JSLFatPtr;
 
-/**
- * Creates a JSLFatPtr from a string literal at compile time.
- *
- * @note The resulting fat pointer points directly to the string literal's memory,
- * so no copying occurs.
- *
- * Example:
- * 
- * ```c
- * // Create fat pointers from string literals
- * JSLFatPtr hello = JSL_FATPTR_LITERAL("Hello, World!");
- * JSLFatPtr path = JSL_FATPTR_LITERAL("/usr/local/bin");
- * JSLFatPtr empty = JSL_FATPTR_LITERAL("");
- * ```
- */
-#define JSL_FATPTR_LITERAL(s) \
-    ((JSLFatPtr){ .data = (uint8_t*)(s), .length = (int64_t)(sizeof("" s "") - 1) })
+#if defined(_MSC_VER) && !defined(__clang__)
+
+    /**
+     * Creates a JSLFatPtr from a string literal at compile time. The resulting fat pointer
+     * points directly to the string literal's memory, so no copying occurs.
+     * 
+     * @warning With MSVC this will only work during variable initialization as MSVC
+     * still does not support compound literals.
+     *
+     * Example:
+     * 
+     * ```c
+     * // Create fat pointers from string literals
+     * JSLFatPtr hello = JSL_FATPTR_INITIALIZER("Hello, World!");
+     * JSLFatPtr path = JSL_FATPTR_INITIALIZER("/usr/local/bin");
+     * JSLFatPtr empty = JSL_FATPTR_INITIALIZER("");
+     * ```
+     */
+    #define JSL_FATPTR_INITIALIZER(s) { (uint8_t*)(s), (int64_t)(sizeof(s) - 1) }
+
+#else
+
+    /**
+     * Creates a JSLFatPtr from a string literal at compile time. The resulting fat pointer
+     * points directly to the string literal's memory, so no copying occurs.
+     *
+     * Example:
+     * 
+     * ```c
+     * JSLFatPtr hello = JSL_FATPTR_INITIALIZER("Hello, World!");
+     * JSLFatPtr path = JSL_FATPTR_INITIALIZER("/usr/local/bin");
+     * JSLFatPtr empty = JSL_FATPTR_INITIALIZER("");
+     * ```
+     */
+    #define JSL_FATPTR_INITIALIZER(s) ((JSLFatPtr){ .data = (uint8_t*)(s), .length = (int64_t)(sizeof(s) - 1) })
+
+#endif
+
+
+#if defined(_MSC_VER) && !defined(__clang__)
+    
+    /**
+     * Creates a JSLFatPtr from a string literal for usage as an rvalue. The resulting fat pointer
+     * points directly to the string literal's memory, so no copying occurs.
+     * 
+     * @warning On MSVC this will be a function call as MSVC does not support compound literals.
+     * On all other compilers this will be a zero cost compound literal.
+     *
+     * Example:
+     * 
+     * ```c
+     * void my_function(JSLFatPtr data);
+     * 
+     * my_function(JSL_FATPTR_EXPRESSION("my data"));
+     * ```
+     */
+    #define JSL_FATPTR_EXPRESSION(s) jsl_fatptr_init((uint8_t*) (s), (int64_t)(sizeof(s) - 1))
+
+#else
+
+    /**
+     * Creates a JSLFatPtr from a string literal for usage as an rvalue. The resulting fat pointer
+     * points directly to the string literal's memory, so no copying occurs.
+     * 
+     * @warning On MSVC this will be a function call as MSVC does not support compound literals.
+     * On all other compilers this will be a zero cost compound literal
+     *
+     * Example:
+     * 
+     * ```c
+     * void my_function(JSLFatPtr data);
+     * 
+     * my_function(JSL_FATPTR_EXPRESSION("my data"));
+     * ```
+     */
+    #define JSL_FATPTR_EXPRESSION(s) ((JSLFatPtr){ (uint8_t*)(s), (int64_t)(sizeof(s) - 1) })
+
+#endif
+
 
 /**
  * Advances a fat pointer forward by `n`.
@@ -547,7 +609,7 @@ typedef struct JSLArena
  * 
  *      // example hash map, not real
  *      IntToStrMap map = int_to_str_ctor(&arena);
- *      int_to_str_add(&map, 64, JSL_FATPTR_LITERAL("This is my string data!"));
+ *      int_to_str_add(&map, 64, JSL_FATPTR_INITIALIZER("This is my string data!"));
  * 
  *      // hash map cleaned up automatically
  * }
@@ -869,7 +931,7 @@ JSL_DEF bool jsl_fatptr_ends_with(JSLFatPtr str, JSLFatPtr postfix);
  * original input pointer.
  *
  * @code
- * JSLFatPtr path = JSL_FATPTR_LITERAL("/tmp/example.txt");
+ * JSLFatPtr path = JSL_FATPTR_INITIALIZER("/tmp/example.txt");
  * JSLFatPtr base = jsl_fatptr_basename(path); // "example.txt"
  * @endcode
  */
@@ -893,7 +955,7 @@ JSL_DEF JSLFatPtr jsl_fatptr_basename(JSLFatPtr filename);
  * when no extension exists.
  *
  * @code
- * JSLFatPtr path = JSL_FATPTR_LITERAL("archive.tar.gz");
+ * JSLFatPtr path = JSL_FATPTR_INITIALIZER("archive.tar.gz");
  * JSLFatPtr ext = jsl_fatptr_get_file_extension(path); // "gz"
  * @endcode
  */
@@ -1368,6 +1430,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         #include <fcntl.h>
         #include <stdio.h>
         #include <io.h>
+        #include <share.h>
         #include <sys\stat.h>
 
     #elif JSL_IS_POSIX
@@ -2707,7 +2770,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             res.data = aligned_current;
             res.length = bytes;
 
-            #ifdef _MSC_VER
+            #if defined(_MSC_VER) && !defined(__clang__)
                 arena->current = potential_end;
             #else
                 #if defined(__SANITIZE_ADDRESS__)
@@ -4691,14 +4754,20 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         if (got_path)
         {
             #if JSL_IS_WIN32
-                file_descriptor = _open(path_buffer, _O_BINARY);
+                errno_t open_err = _sopen_s(
+                    &file_descriptor,
+                    path_buffer,
+                    _O_BINARY,
+                    _SH_DENYNO,
+                    _S_IREAD
+                );
+                opened_file = (open_err == 0);
             #elif JSL_IS_POSIX
                 file_descriptor = open(path_buffer, 0);
+                opened_file = file_descriptor > -1;
             #else
                 #error "Unsupported platform"
             #endif
-            
-            opened_file = file_descriptor > -1;
         }
 
         int64_t file_size = -1;
@@ -4818,14 +4887,20 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         if (got_path)
         {
             #if JSL_IS_WIN32
-                file_descriptor = _open(path_buffer, _O_BINARY);
+                errno_t open_err = _sopen_s(
+                    &file_descriptor,
+                    path_buffer,
+                    _O_BINARY,
+                    _SH_DENYNO,
+                    _S_IREAD
+                );
+                opened_file = (open_err == 0);
             #elif JSL_IS_POSIX
                 file_descriptor = open(path_buffer, 0);
+                opened_file = file_descriptor > -1;
             #else
                 #error "Unsupported platform"
             #endif
-            
-            opened_file = file_descriptor > -1;
         }
 
         int64_t file_size = -1;
@@ -4931,12 +5006,18 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         if (got_path)
         {
             #if JSL_IS_WIN32
-                file_descriptor = _open(path_buffer, _O_CREAT, _S_IREAD | _S_IWRITE);
+                errno_t open_err = _sopen_s(
+                    &file_descriptor,
+                    path_buffer,
+                    _O_CREAT,
+                    _SH_DENYNO,
+                    _S_IREAD | _S_IWRITE
+                );
+                opened_file = (open_err == 0);
             #elif JSL_IS_POSIX
                 file_descriptor = open(path_buffer, O_CREAT, S_IRUSR | S_IWUSR);
+                opened_file = file_descriptor > -1;
             #endif
-    
-            opened_file = file_descriptor > -1;
         }
 
         int64_t write_res = -1;

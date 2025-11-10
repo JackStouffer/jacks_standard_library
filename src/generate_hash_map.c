@@ -119,7 +119,7 @@
 //         JSL_HASHMAP_ITERATOR_TYPE_NAME(name) function_prefix##_iterator_start(JSL_HASHMAP_TYPE_NAME(name)* hashmap);\
 //         JSL_HASHMAP_ITEM_TYPE_NAME(name)* function_prefix##_iterator_next(JSL_HASHMAP_ITERATOR_TYPE_NAME(name)* iterator);
 
-JSLFatPtr static_hash_map_header_docstring = JSL_FATPTR_LITERAL("/**\n"
+JSLFatPtr static_hash_map_header_docstring = JSL_FATPTR_INITIALIZER("/**\n"
 " * AUTO GENERATED FILE\n"
 " *\n"
 " * This file contains the header for a hash map %y which maps `%y` keys to `%y` values.\n"
@@ -147,7 +147,7 @@ JSLFatPtr static_hash_map_header_docstring = JSL_FATPTR_LITERAL("/**\n"
 " * want a normal hash map either as you'd be streaming things in and out of memory).\n"
 " */\n\n");
 
-JSLFatPtr static_map_type_typedef = JSL_FATPTR_LITERAL("/**\n"
+JSLFatPtr static_map_type_typedef = JSL_FATPTR_INITIALIZER("/**\n"
     " * A hash map which maps `%y` keys to `%y` values.\n"
     " *\n"
     " * This hash map uses open addressing with linear probing. However, it never grows.\n"
@@ -167,7 +167,7 @@ JSLFatPtr static_map_type_typedef = JSL_FATPTR_LITERAL("/**\n"
     "\n");
 
 /// @brief param 1 is the hash map type name, param 2 is the function prefix, param 3 is the hash map type name
-JSLFatPtr static_init_function_signature = JSL_FATPTR_LITERAL("/**\n"
+JSLFatPtr static_init_function_signature = JSL_FATPTR_INITIALIZER("/**\n"
     " * Initialize an instance of the hash map.\n"
     " *\n"
     " * All of the memory that this hash map will need will be allocated from the passed in arena.\n"
@@ -186,7 +186,7 @@ JSLFatPtr static_init_function_signature = JSL_FATPTR_LITERAL("/**\n"
     "void %y_init(%y* hash_map, JSLArena* arena, int64_t max_item_count, uint64_t seed);\n\n");
 
 /// @brief param 1 is the hash map type name, param 2 is the key type, param 3 is the value type
-JSLFatPtr static_insert_function_signature = JSL_FATPTR_LITERAL("/**\n"
+JSLFatPtr static_insert_function_signature = JSL_FATPTR_INITIALIZER("/**\n"
     " * Insert the given value into the hash map. This function will allocate if there's not\n"
     " * enough space. If the key already exists in the map the value will be overwritten. If\n"
     " * the key type for this hash map is a pointer, then a NULL key is accepted.\n"
@@ -198,7 +198,7 @@ JSLFatPtr static_insert_function_signature = JSL_FATPTR_LITERAL("/**\n"
     " */\n"
     "bool %y_insert(%y* hash_map, %y key, %y value);\n\n");
 
-JSLFatPtr static_get_function_signature = JSL_FATPTR_LITERAL("/**\n"
+JSLFatPtr static_get_function_signature = JSL_FATPTR_INITIALIZER("/**\n"
     " * Get a value from the hash map if it exists. If it does not NULL is returned\n"
     " *\n"
     " * @warning The pointer returned actually points to value stored inside of hash map.\n"
@@ -212,12 +212,12 @@ JSLFatPtr static_get_function_signature = JSL_FATPTR_LITERAL("/**\n"
     " */\n"
     "%y* %y_get(%y* hash_map, %y key);\n\n");
 
-JSLFatPtr static_delete_function_signature = JSL_FATPTR_LITERAL("/**\n"
+JSLFatPtr static_delete_function_signature = JSL_FATPTR_INITIALIZER("/**\n"
     " * Remove a key/value pair from the hash map if it exists. If it does not false is returned\n"
     " */\n"
     "bool %y_delete(%y* hashmap, %y key);\n\n");
 
-JSLFatPtr static_iterator_start_function_signature = JSL_FATPTR_LITERAL("/**\n"
+JSLFatPtr static_iterator_start_function_signature = JSL_FATPTR_INITIALIZER("/**\n"
     " * Create a new iterator over this hash map.\n"
     " *\n"
     " * An iterator is a struct which holds enough state that it allows a loop to visit\n"
@@ -240,7 +240,7 @@ JSLFatPtr static_iterator_start_function_signature = JSL_FATPTR_LITERAL("/**\n"
     " */\n"
     "void %y_iterator_start(%y* hashmap, %yIterator* iterator);\n\n");
 
-JSLFatPtr static_iterator_next_function_signature = JSL_FATPTR_LITERAL("/**\n"
+JSLFatPtr static_iterator_next_function_signature = JSL_FATPTR_INITIALIZER("/**\n"
     " * Iterate over the hash map. If a key/value was found then true is returned.\n"
     " *\n"
     " * Example usage:\n"
@@ -256,7 +256,7 @@ JSLFatPtr static_iterator_next_function_signature = JSL_FATPTR_LITERAL("/**\n"
     " */\n"
     "bool %y_iterator_next(%yIterator* iterator, %y key, %y value);\n\n");
 
-JSLFatPtr static_init_function_code = JSL_FATPTR_LITERAL(""
+JSLFatPtr static_init_function_code = JSL_FATPTR_INITIALIZER(""
 "void %y_init(%y* hash_map, JSLArena* arena, int64_t max_item_count, uint64_t seed)\n"
 "{\n"
 "    JSL_DEBUG_ASSERT(hashmap != NULL);\n"
@@ -285,7 +285,7 @@ JSLFatPtr static_init_function_code = JSL_FATPTR_LITERAL(""
 "    ).data;\n"
 "}\n\n");
 
-JSLFatPtr static_hash_function_code = JSL_FATPTR_LITERAL(""
+JSLFatPtr static_hash_function_code = JSL_FATPTR_INITIALIZER(""
 "static inline %y %y_hash_and_find_slot(\n"
 "    %y* hashmap,\n"
 "    key_type key,\n"
@@ -364,7 +364,7 @@ JSLFatPtr static_hash_function_code = JSL_FATPTR_LITERAL(""
 "    return return_value;\n"
 "}\n\n");
 
-JSLFatPtr static_insert_function_code = JSL_FATPTR_LITERAL(""
+JSLFatPtr static_insert_function_code = JSL_FATPTR_INITIALIZER(""
 "bool function_prefix##_insert(JSL_HASHMAP_TYPE_NAME(name)* hashmap, key_type key, value_type value)\n"
 "{\n"
 "    JSL_HASHMAP_CHECK_EMPTY(false)\n"
@@ -411,7 +411,7 @@ JSLFatPtr static_insert_function_code = JSL_FATPTR_LITERAL(""
 "    return insert_success;\n"
 "}\n\n");
 
-JSLFatPtr static_get_function_code = JSL_FATPTR_LITERAL(""
+JSLFatPtr static_get_function_code = JSL_FATPTR_INITIALIZER(""
 "value_type* function_prefix##_get(JSL_HASHMAP_TYPE_NAME(name)* hashmap, key_type key)\n"
 "{\n"
 "    JSL_HASHMAP_CHECK_EMPTY(NULL)\n"
@@ -426,7 +426,7 @@ JSLFatPtr static_get_function_code = JSL_FATPTR_LITERAL(""
 "    return res;\n"
 "}\n\n");
 
-JSLFatPtr static_delete_function_code = JSL_FATPTR_LITERAL(""
+JSLFatPtr static_delete_function_code = JSL_FATPTR_INITIALIZER(""
 "bool function_prefix##_delete(JSL_HASHMAP_TYPE_NAME(name)* hashmap, key_type key)\n"
 "{\n"
 "    JSL_HASHMAP_CHECK_EMPTY(false)\n"
@@ -447,7 +447,7 @@ JSLFatPtr static_delete_function_code = JSL_FATPTR_LITERAL(""
 "    return success;\n"
 "}\n\n");
 
-JSLFatPtr static_iterator_start_function_code = JSL_FATPTR_LITERAL(""
+JSLFatPtr static_iterator_start_function_code = JSL_FATPTR_INITIALIZER(""
 "JSL_HASHMAP_ITERATOR_TYPE_NAME(name) function_prefix##_iterator_start(JSL_HASHMAP_TYPE_NAME(name)* hashmap)\n"
 "{\n"
 "    JSL_DEBUG_ASSERT(hashmap != NULL);\n"
@@ -465,7 +465,7 @@ JSLFatPtr static_iterator_start_function_code = JSL_FATPTR_LITERAL(""
 "    return iterator;\n"
 "}\n\n");
 
-JSLFatPtr static_iterator_next_function_code = JSL_FATPTR_LITERAL(""
+JSLFatPtr static_iterator_next_function_code = JSL_FATPTR_INITIALIZER(""
 "JSL_HASHMAP_ITEM_TYPE_NAME(name)* function_prefix##_iterator_next(JSL_HASHMAP_ITERATOR_TYPE_NAME(name)* iterator)\n"
 "{\n"
 "    JSL_DEBUG_ASSERT(iterator != NULL);\n"
@@ -495,7 +495,7 @@ JSLFatPtr static_iterator_next_function_code = JSL_FATPTR_LITERAL(""
 "    return result;\n"
 "}\n\n");
 
-JSLFatPtr dynamic_expand_function_code = JSL_FATPTR_LITERAL(""
+JSLFatPtr dynamic_expand_function_code = JSL_FATPTR_INITIALIZER(""
 "static bool function_prefix##_expand(JSL_HASHMAP_TYPE_NAME(name)* hashmap)\n"
 "{\n"
 "    JSL_DEBUG_ASSERT(hashmap != NULL);\n"
@@ -602,16 +602,16 @@ void write_hash_map_header(
 
     jsl_string_builder_format(builder, static_hash_map_header_docstring, hash_map_name, key_type_name, value_type_name);
 
-    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_LITERAL("#pragma once\n\n"));
-    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_LITERAL("#include <stdint.h>\n"));
-    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_LITERAL("#include \"jacks_hash_map.h\"\n\n"));
+    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#pragma once\n\n"));
+    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include <stdint.h>\n"));
+    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include \"jacks_hash_map.h\"\n\n"));
 
     for (int32_t i = 0; i < include_header_count; ++i)
     {
-        jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include \"%y\"\n"), include_header_array[i]);
+        jsl_string_builder_format(builder, JSL_FATPTR_EXPRESSION("#include \"%y\"\n"), include_header_array[i]);
     }
     
-    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_LITERAL("\n"));
+    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("\n"));
     
     jsl_string_builder_format(builder, static_map_type_typedef, key_type_name, value_type_name, hash_map_name, key_type_name, value_type_name, hash_map_name);
 
@@ -680,17 +680,17 @@ void write_hash_map_source(
     (void) impl;
     (void) hash_function_name;
 
-    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_LITERAL("#include <stddef.h>\n"));
-    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_LITERAL("#include <stdint.h>\n"));
-    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_LITERAL("#include \"jacks_standard_library.h\"\n"));
-    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_LITERAL("#include \"jacks_hash_map.h\"\n\n"));
+    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include <stddef.h>\n"));
+    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include <stdint.h>\n"));
+    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include \"jacks_standard_library.h\"\n"));
+    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include \"jacks_hash_map.h\"\n\n"));
 
     for (int32_t i = 0; i < include_header_count; ++i)
     {
-        jsl_string_builder_format(builder, JSL_FATPTR_LITERAL("#include \"%y\"\n"), include_header_array[i]);
+        jsl_string_builder_format(builder, JSL_FATPTR_EXPRESSION("#include \"%y\"\n"), include_header_array[i]);
     }
     
-    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_LITERAL("\n"));
+    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("\n"));
 
     jsl_string_builder_format(
         builder,
@@ -741,7 +741,7 @@ void write_hash_map_source(
 
 #ifdef INCLUDE_MAIN
 
-JSLFatPtr help_message = JSL_FATPTR_LITERAL(
+JSLFatPtr help_message = JSL_FATPTR_INITIALIZER(
     "OVERVIEW:\n\n"
     "Hash map C code generation utility\n\n"
     "This program generates both a C source and header file for a hash map with the given\n"
@@ -779,16 +779,16 @@ int32_t main(int32_t argc, char** argv)
     {
         JSLFatPtr arg = jsl_fatptr_from_cstr(argv[i]);
         
-        if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("-h")) || jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--help")))
+        if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("-h")) || jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--help")))
         {
             show_help = true;
         }
-        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--name=")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--name=")))
         {
             name = arg;
             JSL_FATPTR_ADVANCE(name, 7);
         }
-        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--name")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--name")))
         {
             if (i + 1 < argc)
             {
@@ -800,12 +800,12 @@ int32_t main(int32_t argc, char** argv)
                 return EXIT_FAILURE;
             }
         }
-        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--function_prefix=")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--function_prefix=")))
         {
             function_prefix = arg;
             JSL_FATPTR_ADVANCE(function_prefix, 18);
         }
-        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--function_prefix")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--function_prefix")))
         {
             if (i + 1 < argc)
             {
@@ -817,12 +817,12 @@ int32_t main(int32_t argc, char** argv)
                 return EXIT_FAILURE;
             }
         }
-        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--key_type=")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--key_type=")))
         {
             key_type = arg;
             JSL_FATPTR_ADVANCE(key_type, 11);
         }
-        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--key_type")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--key_type")))
         {
             if (i + 1 < argc)
             {
@@ -834,12 +834,12 @@ int32_t main(int32_t argc, char** argv)
                 return EXIT_FAILURE;
             }
         }
-        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--value_type=")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--value_type=")))
         {
             value_type = arg;
             JSL_FATPTR_ADVANCE(value_type, 13);
         }
-        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--value_type")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--value_type")))
         {
             if (i + 1 < argc)
             {
@@ -851,23 +851,23 @@ int32_t main(int32_t argc, char** argv)
                 return EXIT_FAILURE;
             }
         }
-        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--static")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--static")))
         {
             impl = IMPL_STATIC;
         }
-        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--dynamic")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--dynamic")))
         {
             impl = IMPL_DYNAMIC;
         }
-        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--header")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--header")))
         {
             print_header = true;
         }
-        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--source")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--source")))
         {
             print_header = false;
         }
-        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_LITERAL("--add-header")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--add-header")))
         {
             ++header_includes_count;
             header_includes = realloc(header_includes, sizeof(JSLFatPtr) * header_includes_count);
@@ -875,7 +875,7 @@ int32_t main(int32_t argc, char** argv)
         }
         else
         {
-            jsl_format_file(stderr, JSL_FATPTR_LITERAL("Error: Unknown argument: %y\n"), arg);
+            jsl_format_file(stderr, JSL_FATPTR_EXPRESSION("Error: Unknown argument: %y\n"), arg);
             return EXIT_FAILURE;
         }
     }
@@ -888,25 +888,25 @@ int32_t main(int32_t argc, char** argv)
     // Check that all required parameters are provided
     else if (name.data == NULL)
     {
-        jsl_format_file(stderr, JSL_FATPTR_LITERAL("Error: --name is required\n"));
+        jsl_format_file(stderr, JSL_FATPTR_EXPRESSION("Error: --name is required\n"));
         return EXIT_FAILURE;
     }
 
     if (function_prefix.data == NULL)
     {
-        jsl_format_file(stderr, JSL_FATPTR_LITERAL("Error: --function_prefix is required\n"));
+        jsl_format_file(stderr, JSL_FATPTR_EXPRESSION("Error: --function_prefix is required\n"));
         return EXIT_FAILURE;
     }
 
     if (key_type.data == NULL)
     {
-        jsl_format_file(stderr, JSL_FATPTR_LITERAL("Error: --key_type is required\n"));
+        jsl_format_file(stderr, JSL_FATPTR_EXPRESSION("Error: --key_type is required\n"));
         return EXIT_FAILURE;
     }
 
     if (value_type.data == NULL)
     {
-        jsl_format_file(stderr, JSL_FATPTR_LITERAL("Error: --value_type is required\n"));
+        jsl_format_file(stderr, JSL_FATPTR_EXPRESSION("Error: --value_type is required\n"));
         return EXIT_FAILURE;
     }
 

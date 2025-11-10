@@ -99,8 +99,6 @@ void test_jsl_load_file_contents(void)
     );
 
     lok(res == JSL_FILE_LOAD_SUCCESS);
-    // printf("stack_buffer %s\n", stack_buffer);
-    // jsl_format_file(stdout, JSL_FATPTR_LITERAL("%y\n"), contents);
     lmemcmp(stack_buffer, contents.data, file_size);
 }
 
@@ -127,7 +125,7 @@ void test_jsl_load_file_contents_buffer(void)
 
     JSLLoadFileResultEnum res = jsl_load_file_contents_buffer(
         &writer,
-        JSL_FATPTR_LITERAL("./tests/example.txt"),
+        JSL_FATPTR_EXPRESSION("./tests/example.txt"),
         NULL
     );
 
@@ -191,12 +189,12 @@ void test_jsl_fatptr_slice(void)
 
 void test_jsl_fatptr_substring_search(void)
 {
-    JSLFatPtr medium_str = JSL_FATPTR_LITERAL(
+    JSLFatPtr medium_str = JSL_FATPTR_INITIALIZER(
         "This is a very long string that is going to trigger SIMD code, "
         "as it's longer than a single AVX2 register when using 8-bit "
         "values, which we are since we're using ASCII/UTF-8."
     );
-    JSLFatPtr long_str = JSL_FATPTR_LITERAL(
+    JSLFatPtr long_str = JSL_FATPTR_INITIALIZER(
         "Lorem ipsum dolor sit amet, consectetur adipiscing elit. "
         "Nulla purus justo, iaculis sit amet interdum sit amet, "
         "tincidunt at erat. Etiam vulputate ornare dictum. Nullam "
@@ -226,136 +224,136 @@ void test_jsl_fatptr_substring_search(void)
     );
 
     {
-        JSLFatPtr string = JSL_FATPTR_LITERAL("");
-        JSLFatPtr substring = JSL_FATPTR_LITERAL("");
+        JSLFatPtr string = JSL_FATPTR_INITIALIZER("");
+        JSLFatPtr substring = JSL_FATPTR_INITIALIZER("");
         int64_t res = jsl_fatptr_substring_search(string, substring);
         TEST_INT64_EQUAL(res, (int64_t) -1);
     }
     
     {
-        JSLFatPtr string = JSL_FATPTR_LITERAL("");
-        JSLFatPtr substring = JSL_FATPTR_LITERAL("111111");
+        JSLFatPtr string = JSL_FATPTR_INITIALIZER("");
+        JSLFatPtr substring = JSL_FATPTR_INITIALIZER("111111");
         int64_t res = jsl_fatptr_substring_search(string, substring);
         TEST_INT64_EQUAL(res, (int64_t) -1);
     }
 
     {
-        JSLFatPtr string = JSL_FATPTR_LITERAL("111111");
-        JSLFatPtr substring = JSL_FATPTR_LITERAL("");
+        JSLFatPtr string = JSL_FATPTR_INITIALIZER("111111");
+        JSLFatPtr substring = JSL_FATPTR_INITIALIZER("");
         int64_t res = jsl_fatptr_substring_search(string, substring);
         TEST_INT64_EQUAL(res, (int64_t) -1);
     }
 
     {
-        JSLFatPtr string = JSL_FATPTR_LITERAL("Hello, World!");
-        JSLFatPtr substring = JSL_FATPTR_LITERAL("Longer substring than the original string");
+        JSLFatPtr string = JSL_FATPTR_INITIALIZER("Hello, World!");
+        JSLFatPtr substring = JSL_FATPTR_INITIALIZER("Longer substring than the original string");
         int64_t res = jsl_fatptr_substring_search(string, substring);
         TEST_INT64_EQUAL(res, (int64_t) -1);
     }
 
     {
-        JSLFatPtr string = JSL_FATPTR_LITERAL("111111");
-        JSLFatPtr substring = JSL_FATPTR_LITERAL("1");
+        JSLFatPtr string = JSL_FATPTR_INITIALIZER("111111");
+        JSLFatPtr substring = JSL_FATPTR_INITIALIZER("1");
         int64_t res = jsl_fatptr_substring_search(string, substring);
         TEST_INT64_EQUAL(res, (int64_t) 0);
     }
 
     {
-        JSLFatPtr string = JSL_FATPTR_LITERAL("Hello, World!");
-        JSLFatPtr substring = JSL_FATPTR_LITERAL("W");
+        JSLFatPtr string = JSL_FATPTR_INITIALIZER("Hello, World!");
+        JSLFatPtr substring = JSL_FATPTR_INITIALIZER("W");
         int64_t res = jsl_fatptr_substring_search(string, substring);
         TEST_INT64_EQUAL(res, (int64_t) 7);
     }
 
     {
-        JSLFatPtr string = JSL_FATPTR_LITERAL("Hello, World!");
-        JSLFatPtr substring = JSL_FATPTR_LITERAL("World");
+        JSLFatPtr string = JSL_FATPTR_INITIALIZER("Hello, World!");
+        JSLFatPtr substring = JSL_FATPTR_INITIALIZER("World");
         int64_t res = jsl_fatptr_substring_search(string, substring);
         TEST_INT64_EQUAL(res, (int64_t) 7);
     }
 
     {
-        JSLFatPtr string = JSL_FATPTR_LITERAL("Hello, World!");
-        JSLFatPtr substring = JSL_FATPTR_LITERAL("Hello, World!");
+        JSLFatPtr string = JSL_FATPTR_INITIALIZER("Hello, World!");
+        JSLFatPtr substring = JSL_FATPTR_INITIALIZER("Hello, World!");
         int64_t res = jsl_fatptr_substring_search(string, substring);
         TEST_INT64_EQUAL(res, (int64_t) 0);
     }
 
     {
-        JSLFatPtr string = JSL_FATPTR_LITERAL("Hello, World!");
-        JSLFatPtr substring = JSL_FATPTR_LITERAL("Blorp");
+        JSLFatPtr string = JSL_FATPTR_INITIALIZER("Hello, World!");
+        JSLFatPtr substring = JSL_FATPTR_INITIALIZER("Blorp");
         int64_t res = jsl_fatptr_substring_search(string, substring);
         TEST_INT64_EQUAL(res, (int64_t) -1);
     }
 
     {
-        JSLFatPtr substring = JSL_FATPTR_LITERAL("8-bit");
+        JSLFatPtr substring = JSL_FATPTR_INITIALIZER("8-bit");
         int64_t res = jsl_fatptr_substring_search(medium_str, substring);
         TEST_INT64_EQUAL(res, (int64_t) 117);
     }
 
     {
-        JSLFatPtr substring = JSL_FATPTR_LITERAL("8-blit");
+        JSLFatPtr substring = JSL_FATPTR_INITIALIZER("8-blit");
         int64_t res = jsl_fatptr_substring_search(medium_str, substring);
         TEST_INT64_EQUAL(res, (int64_t) -1);
     }
 
     {
-        JSLFatPtr substring = JSL_FATPTR_LITERAL("Blorf");
+        JSLFatPtr substring = JSL_FATPTR_INITIALIZER("Blorf");
         int64_t res = jsl_fatptr_substring_search(medium_str, substring);
         TEST_INT64_EQUAL(res, (int64_t) -1);
     }
 
     {
-        JSLFatPtr substring = JSL_FATPTR_LITERAL("ASCII/UTF-8");
+        JSLFatPtr substring = JSL_FATPTR_INITIALIZER("ASCII/UTF-8");
         int64_t res = jsl_fatptr_substring_search(medium_str, substring);
         TEST_INT64_EQUAL(res, (int64_t) 162);
     }
 
     {
-        JSLFatPtr substring = JSL_FATPTR_LITERAL("single AVX2 register when using 8-bit values, which we are since we're using ASCII/UTF-8.");
+        JSLFatPtr substring = JSL_FATPTR_INITIALIZER("single AVX2 register when using 8-bit values, which we are since we're using ASCII/UTF-8.");
         int64_t res = jsl_fatptr_substring_search(medium_str, substring);
         TEST_INT64_EQUAL(res, (int64_t) 85);
     }
 
     {
-        JSLFatPtr substring = JSL_FATPTR_LITERAL("This is a very long string that is going to trigger SIMD code, as it's longer than a single AVX2 register when using 8-bit values, which we are since we're using ASCII/UTF-8.");
+        JSLFatPtr substring = JSL_FATPTR_INITIALIZER("This is a very long string that is going to trigger SIMD code, as it's longer than a single AVX2 register when using 8-bit values, which we are since we're using ASCII/UTF-8.");
         int64_t res = jsl_fatptr_substring_search(medium_str, substring);
         TEST_INT64_EQUAL(res, (int64_t) 0);
     }
 
     {
-        JSLFatPtr substring = JSL_FATPTR_LITERAL("i");
+        JSLFatPtr substring = JSL_FATPTR_INITIALIZER("i");
         int64_t res = jsl_fatptr_substring_search(long_str, substring);
         TEST_INT64_EQUAL(res, (int64_t) 6);
     }
 
     {
-        JSLFatPtr substring = JSL_FATPTR_LITERAL("at");
+        JSLFatPtr substring = JSL_FATPTR_INITIALIZER("at");
         int64_t res = jsl_fatptr_substring_search(long_str, substring);
         TEST_INT64_EQUAL(res, (int64_t) 122);
     }
 
     {
-        JSLFatPtr substring = JSL_FATPTR_LITERAL("Sed");
+        JSLFatPtr substring = JSL_FATPTR_INITIALIZER("Sed");
         int64_t res = jsl_fatptr_substring_search(long_str, substring);
         TEST_INT64_EQUAL(res, (int64_t) 1171);
     }
 
     {
-        JSLFatPtr substring = JSL_FATPTR_LITERAL("elit");
+        JSLFatPtr substring = JSL_FATPTR_INITIALIZER("elit");
         int64_t res = jsl_fatptr_substring_search(long_str, substring);
         TEST_INT64_EQUAL(res, (int64_t) 51);
     }
 
     {
-        JSLFatPtr substring = JSL_FATPTR_LITERAL("vitae");
+        JSLFatPtr substring = JSL_FATPTR_INITIALIZER("vitae");
         int64_t res = jsl_fatptr_substring_search(long_str, substring);
         TEST_INT64_EQUAL(res, (int64_t) 263);
     }
 
     {
-        JSLFatPtr substring = JSL_FATPTR_LITERAL("Lorem");
+        JSLFatPtr substring = JSL_FATPTR_INITIALIZER("Lorem");
         int64_t res = jsl_fatptr_substring_search(long_str, substring);
         TEST_INT64_EQUAL(res, (int64_t) 0);
     }
@@ -363,97 +361,97 @@ void test_jsl_fatptr_substring_search(void)
 
 void test_jsl_fatptr_index_of(void)
 {
-    JSLFatPtr buffer1 = JSL_FATPTR_LITERAL("");
+    JSLFatPtr buffer1 = JSL_FATPTR_INITIALIZER("");
     int64_t res1 = jsl_fatptr_index_of(buffer1, '3');
     lok(res1 == -1);
 
-    JSLFatPtr buffer2 = JSL_FATPTR_LITERAL(".");
+    JSLFatPtr buffer2 = JSL_FATPTR_INITIALIZER(".");
     int64_t res2 = jsl_fatptr_index_of(buffer2, '.');
     lok(res2 == 0);
 
-    JSLFatPtr buffer3 = JSL_FATPTR_LITERAL("......");
+    JSLFatPtr buffer3 = JSL_FATPTR_INITIALIZER("......");
     int64_t res3 = jsl_fatptr_index_of(buffer3, '.');
     lok(res3 == 0);
 
-    JSLFatPtr buffer4 = JSL_FATPTR_LITERAL("Hello.World");
+    JSLFatPtr buffer4 = JSL_FATPTR_INITIALIZER("Hello.World");
     int64_t res4 = jsl_fatptr_index_of(buffer4, '.');
     lok(res4 == 5);
 
-    JSLFatPtr buffer5 = JSL_FATPTR_LITERAL("Hello          . Hello");
+    JSLFatPtr buffer5 = JSL_FATPTR_INITIALIZER("Hello          . Hello");
     int64_t res5 = jsl_fatptr_index_of(buffer5, '.');
     lok(res5 == 15);
 
-    JSLFatPtr buffer6 = JSL_FATPTR_LITERAL("Hello.World.");
+    JSLFatPtr buffer6 = JSL_FATPTR_INITIALIZER("Hello.World.");
     int64_t res6 = jsl_fatptr_index_of(buffer6, '.');
     lok(res6 == 5);
 
-    JSLFatPtr buffer7 = JSL_FATPTR_LITERAL("Hello Hello ");
+    JSLFatPtr buffer7 = JSL_FATPTR_INITIALIZER("Hello Hello ");
     int64_t res7 = jsl_fatptr_index_of(buffer7, ' ');
     lok(res7 == 5);
 
-    JSLFatPtr buffer8 = JSL_FATPTR_LITERAL("This is a very long string that is going to trigger SIMD code, as it's longer than a single AVX2 register when using 8-bit values, which we are since we're using ASCII/UTF-8.");
+    JSLFatPtr buffer8 = JSL_FATPTR_INITIALIZER("This is a very long string that is going to trigger SIMD code, as it's longer than a single AVX2 register when using 8-bit values, which we are since we're using ASCII/UTF-8.");
     int64_t res8 = jsl_fatptr_index_of(buffer8, '8');
     lok(res8 == 117);
 }
 
 void test_jsl_fatptr_index_of_reverse(void)
 {
-    JSLFatPtr buffer1 = JSL_FATPTR_LITERAL("");
+    JSLFatPtr buffer1 = JSL_FATPTR_INITIALIZER("");
     int64_t res1 = jsl_fatptr_index_of_reverse(buffer1, '3');
     lok(res1 == -1);
 
-    JSLFatPtr buffer2 = JSL_FATPTR_LITERAL(".");
+    JSLFatPtr buffer2 = JSL_FATPTR_INITIALIZER(".");
     int64_t res2 = jsl_fatptr_index_of_reverse(buffer2, '.');
     lok(res2 == 0);
 
-    JSLFatPtr buffer3 = JSL_FATPTR_LITERAL("......");
+    JSLFatPtr buffer3 = JSL_FATPTR_INITIALIZER("......");
     int64_t res3 = jsl_fatptr_index_of_reverse(buffer3, '.');
     lok(res3 == 5);
 
-    JSLFatPtr buffer4 = JSL_FATPTR_LITERAL("Hello.World");
+    JSLFatPtr buffer4 = JSL_FATPTR_INITIALIZER("Hello.World");
     int64_t res4 = jsl_fatptr_index_of_reverse(buffer4, '.');
     lok(res4 == 5);
 
-    JSLFatPtr buffer5 = JSL_FATPTR_LITERAL("Hello          . Hello");
+    JSLFatPtr buffer5 = JSL_FATPTR_INITIALIZER("Hello          . Hello");
     int64_t res5 = jsl_fatptr_index_of_reverse(buffer5, '.');
     lok(res5 == 15);
 
-    JSLFatPtr buffer6 = JSL_FATPTR_LITERAL("Hello.World.");
+    JSLFatPtr buffer6 = JSL_FATPTR_INITIALIZER("Hello.World.");
     int64_t res6 = jsl_fatptr_index_of_reverse(buffer6, '.');
     lok(res6 == 11);
 
-    JSLFatPtr buffer7 = JSL_FATPTR_LITERAL("This is a very long string that is going to trigger SIMD code, as it's longer than a single AVX2 register when using 8-bit values, which we are since we're using ASCII/UTF-8.");
+    JSLFatPtr buffer7 = JSL_FATPTR_INITIALIZER("This is a very long string that is going to trigger SIMD code, as it's longer than a single AVX2 register when using 8-bit values, which we are since we're using ASCII/UTF-8.");
     int64_t res7 = jsl_fatptr_index_of_reverse(buffer7, 'M');
     lok(res7 == 54);
 
-    JSLFatPtr buffer8 = JSL_FATPTR_LITERAL("This is a very long string that is going to trigger SIMD code, as it's longer than a single AVX2 register when using 8-bit values, which we are since we're using ASCII/UTF-8.");
+    JSLFatPtr buffer8 = JSL_FATPTR_INITIALIZER("This is a very long string that is going to trigger SIMD code, as it's longer than a single AVX2 register when using 8-bit values, which we are since we're using ASCII/UTF-8.");
     int64_t res8 = jsl_fatptr_index_of_reverse(buffer8, 'w');
     lok(res8 == 150);
 }
 
 void test_jsl_fatptr_get_file_extension(void)
 {
-    JSLFatPtr buffer1 = JSL_FATPTR_LITERAL("");
+    JSLFatPtr buffer1 = JSL_FATPTR_INITIALIZER("");
     JSLFatPtr res1 = jsl_fatptr_get_file_extension(buffer1);
     lok(jsl_fatptr_cstr_compare(res1, ""));
 
-    JSLFatPtr buffer2 = JSL_FATPTR_LITERAL(".");
+    JSLFatPtr buffer2 = JSL_FATPTR_INITIALIZER(".");
     JSLFatPtr res2 = jsl_fatptr_get_file_extension(buffer2);
     lok(jsl_fatptr_cstr_compare(res2, ""));
 
-    JSLFatPtr buffer3 = JSL_FATPTR_LITERAL("......");
+    JSLFatPtr buffer3 = JSL_FATPTR_INITIALIZER("......");
     JSLFatPtr res3 = jsl_fatptr_get_file_extension(buffer3);
     lok(jsl_fatptr_cstr_compare(res3, ""));
 
-    JSLFatPtr buffer4 = JSL_FATPTR_LITERAL("Hello.text");
+    JSLFatPtr buffer4 = JSL_FATPTR_INITIALIZER("Hello.text");
     JSLFatPtr res4 = jsl_fatptr_get_file_extension(buffer4);
     lok(jsl_fatptr_cstr_compare(res4, "text"));
 
-    JSLFatPtr buffer5 = JSL_FATPTR_LITERAL("Hello          .css");
+    JSLFatPtr buffer5 = JSL_FATPTR_INITIALIZER("Hello          .css");
     JSLFatPtr res5 = jsl_fatptr_get_file_extension(buffer5);
     lok(jsl_fatptr_cstr_compare(res5, "css"));
 
-    JSLFatPtr buffer6 = JSL_FATPTR_LITERAL("Hello.min.css");
+    JSLFatPtr buffer6 = JSL_FATPTR_INITIALIZER("Hello.min.css");
     JSLFatPtr res6 = jsl_fatptr_get_file_extension(buffer6);
     lok(jsl_fatptr_cstr_compare(res6, "css"));
 }
@@ -510,110 +508,110 @@ void test_jsl_fatptr_to_int32(void)
 {
     int32_t result;
 
-    JSLFatPtr buffer1 = JSL_FATPTR_LITERAL("0");
+    JSLFatPtr buffer1 = JSL_FATPTR_INITIALIZER("0");
     lok(jsl_fatptr_to_int32(buffer1, &result) == 1);
     lok(result == 0);
 
-    JSLFatPtr buffer2 = JSL_FATPTR_LITERAL("-0");
+    JSLFatPtr buffer2 = JSL_FATPTR_INITIALIZER("-0");
     lok(jsl_fatptr_to_int32(buffer2, &result) == 2);
     lok(result == 0);
 
-    JSLFatPtr buffer3 = JSL_FATPTR_LITERAL("11");
+    JSLFatPtr buffer3 = JSL_FATPTR_INITIALIZER("11");
     lok(jsl_fatptr_to_int32(buffer3, &result) == 2);
     lok(result == 11);
 
-    JSLFatPtr buffer4 = JSL_FATPTR_LITERAL("-1243");
+    JSLFatPtr buffer4 = JSL_FATPTR_INITIALIZER("-1243");
     lok(jsl_fatptr_to_int32(buffer4, &result) == 5);
     lok(result == -1243);
 
-    JSLFatPtr buffer5 = JSL_FATPTR_LITERAL("000003");
+    JSLFatPtr buffer5 = JSL_FATPTR_INITIALIZER("000003");
     lok(jsl_fatptr_to_int32(buffer5, &result) == 6);
     lok(result == 3);
 
-    JSLFatPtr buffer6 = JSL_FATPTR_LITERAL("000000");
+    JSLFatPtr buffer6 = JSL_FATPTR_INITIALIZER("000000");
     lok(jsl_fatptr_to_int32(buffer6, &result) == 6);
     lok(result == 0);
 
-    JSLFatPtr buffer7 = JSL_FATPTR_LITERAL("-000000");
+    JSLFatPtr buffer7 = JSL_FATPTR_INITIALIZER("-000000");
     lok(jsl_fatptr_to_int32(buffer7, &result) == 7);
     lok(result == 0);
 
-    JSLFatPtr buffer8 = JSL_FATPTR_LITERAL("98468465");
+    JSLFatPtr buffer8 = JSL_FATPTR_INITIALIZER("98468465");
     lok(jsl_fatptr_to_int32(buffer8, &result) == 8);
     lok(result == 98468465);
 
-    JSLFatPtr buffer9 = JSL_FATPTR_LITERAL("454 hello, world");
+    JSLFatPtr buffer9 = JSL_FATPTR_INITIALIZER("454 hello, world");
     lok(jsl_fatptr_to_int32(buffer9, &result) == 3);
     lok(result == 454);
 
-    JSLFatPtr buffer10 = JSL_FATPTR_LITERAL("+488 hello, world");
+    JSLFatPtr buffer10 = JSL_FATPTR_INITIALIZER("+488 hello, world");
     lok(jsl_fatptr_to_int32(buffer10, &result) == 4);
     lok(result == 488);
 }
 
 void test_jsl_fatptr_starts_with(void)
 {
-    JSLFatPtr buffer1 = JSL_FATPTR_LITERAL("Hello, World!");
-    JSLFatPtr prefix1 = JSL_FATPTR_LITERAL("Hello, World!");
+    JSLFatPtr buffer1 = JSL_FATPTR_INITIALIZER("Hello, World!");
+    JSLFatPtr prefix1 = JSL_FATPTR_INITIALIZER("Hello, World!");
     lok(jsl_fatptr_starts_with(buffer1, prefix1) == true);
 
-    JSLFatPtr buffer2 = JSL_FATPTR_LITERAL("Hello, World!");
-    JSLFatPtr prefix2 = JSL_FATPTR_LITERAL("Hello");
+    JSLFatPtr buffer2 = JSL_FATPTR_INITIALIZER("Hello, World!");
+    JSLFatPtr prefix2 = JSL_FATPTR_INITIALIZER("Hello");
     lok(jsl_fatptr_starts_with(buffer2, prefix2) == true);
 
-    JSLFatPtr buffer3 = JSL_FATPTR_LITERAL("Hello, World!");
-    JSLFatPtr prefix3 = JSL_FATPTR_LITERAL("World");
+    JSLFatPtr buffer3 = JSL_FATPTR_INITIALIZER("Hello, World!");
+    JSLFatPtr prefix3 = JSL_FATPTR_INITIALIZER("World");
     lok(jsl_fatptr_starts_with(buffer3, prefix3) == false);
 
-    JSLFatPtr buffer4 = JSL_FATPTR_LITERAL("Hello, World!");
-    JSLFatPtr prefix4 = JSL_FATPTR_LITERAL("");
+    JSLFatPtr buffer4 = JSL_FATPTR_INITIALIZER("Hello, World!");
+    JSLFatPtr prefix4 = JSL_FATPTR_INITIALIZER("");
     lok(jsl_fatptr_starts_with(buffer4, prefix4) == true);
 
-    JSLFatPtr buffer5 = JSL_FATPTR_LITERAL("");
-    JSLFatPtr prefix5 = JSL_FATPTR_LITERAL("");
+    JSLFatPtr buffer5 = JSL_FATPTR_INITIALIZER("");
+    JSLFatPtr prefix5 = JSL_FATPTR_INITIALIZER("");
     lok(jsl_fatptr_starts_with(buffer5, prefix5) == true);
 
-    JSLFatPtr buffer6 = JSL_FATPTR_LITERAL("");
-    JSLFatPtr prefix6 = JSL_FATPTR_LITERAL("HHHHHHHHHHHHHHHHH");
+    JSLFatPtr buffer6 = JSL_FATPTR_INITIALIZER("");
+    JSLFatPtr prefix6 = JSL_FATPTR_INITIALIZER("HHHHHHHHHHHHHHHHH");
     lok(jsl_fatptr_starts_with(buffer6, prefix6) == false);
 
-    JSLFatPtr buffer7 = JSL_FATPTR_LITERAL("HHHHHHHHHHHHHHHH");
-    JSLFatPtr prefix7 = JSL_FATPTR_LITERAL("HHHHHHHHHHHHHHHHH");
+    JSLFatPtr buffer7 = JSL_FATPTR_INITIALIZER("HHHHHHHHHHHHHHHH");
+    JSLFatPtr prefix7 = JSL_FATPTR_INITIALIZER("HHHHHHHHHHHHHHHHH");
     lok(jsl_fatptr_starts_with(buffer7, prefix7) == false);
 }
 
 void test_jsl_fatptr_ends_with(void)
 {
-    JSLFatPtr buffer1 = JSL_FATPTR_LITERAL("Hello, World!");
-    JSLFatPtr postfix1 = JSL_FATPTR_LITERAL("Hello, World!");
+    JSLFatPtr buffer1 = JSL_FATPTR_INITIALIZER("Hello, World!");
+    JSLFatPtr postfix1 = JSL_FATPTR_INITIALIZER("Hello, World!");
     lok(jsl_fatptr_ends_with(buffer1, postfix1) == true);
 
-    JSLFatPtr buffer2 = JSL_FATPTR_LITERAL("Hello, World!");
-    JSLFatPtr postfix2 = JSL_FATPTR_LITERAL("World!");
+    JSLFatPtr buffer2 = JSL_FATPTR_INITIALIZER("Hello, World!");
+    JSLFatPtr postfix2 = JSL_FATPTR_INITIALIZER("World!");
     lok(jsl_fatptr_ends_with(buffer2, postfix2) == true);
 
-    JSLFatPtr buffer3 = JSL_FATPTR_LITERAL("Hello, World!");
-    JSLFatPtr postfix3 = JSL_FATPTR_LITERAL("Hello");
+    JSLFatPtr buffer3 = JSL_FATPTR_INITIALIZER("Hello, World!");
+    JSLFatPtr postfix3 = JSL_FATPTR_INITIALIZER("Hello");
     lok(jsl_fatptr_ends_with(buffer3, postfix3) == false);
 
-    JSLFatPtr buffer4 = JSL_FATPTR_LITERAL("Hello, World!");
-    JSLFatPtr postfix4 = JSL_FATPTR_LITERAL("");
+    JSLFatPtr buffer4 = JSL_FATPTR_INITIALIZER("Hello, World!");
+    JSLFatPtr postfix4 = JSL_FATPTR_INITIALIZER("");
     lok(jsl_fatptr_ends_with(buffer4, postfix4) == true);
 
-    JSLFatPtr buffer5 = JSL_FATPTR_LITERAL("");
-    JSLFatPtr postfix5 = JSL_FATPTR_LITERAL("");
+    JSLFatPtr buffer5 = JSL_FATPTR_INITIALIZER("");
+    JSLFatPtr postfix5 = JSL_FATPTR_INITIALIZER("");
     lok(jsl_fatptr_ends_with(buffer5, postfix5) == true);
 
-    JSLFatPtr buffer6 = JSL_FATPTR_LITERAL("");
-    JSLFatPtr postfix6 = JSL_FATPTR_LITERAL("HHHHHHHHHHHHHHHHH");
+    JSLFatPtr buffer6 = JSL_FATPTR_INITIALIZER("");
+    JSLFatPtr postfix6 = JSL_FATPTR_INITIALIZER("HHHHHHHHHHHHHHHHH");
     lok(jsl_fatptr_ends_with(buffer6, postfix6) == false);
 
-    JSLFatPtr buffer7 = JSL_FATPTR_LITERAL("HHHHHHHHHHHHHHHH");
-    JSLFatPtr postfix7 = JSL_FATPTR_LITERAL("HHHHHHHHHHHHHHHHH");
+    JSLFatPtr buffer7 = JSL_FATPTR_INITIALIZER("HHHHHHHHHHHHHHHH");
+    JSLFatPtr postfix7 = JSL_FATPTR_INITIALIZER("HHHHHHHHHHHHHHHHH");
     lok(jsl_fatptr_ends_with(buffer7, postfix7) == false);
 
-    JSLFatPtr buffer8 = JSL_FATPTR_LITERAL("Hello, World!");
-    JSLFatPtr postfix8 = JSL_FATPTR_LITERAL("!");
+    JSLFatPtr buffer8 = JSL_FATPTR_INITIALIZER("Hello, World!");
+    JSLFatPtr postfix8 = JSL_FATPTR_INITIALIZER("!");
     lok(jsl_fatptr_ends_with(buffer8, postfix8) == true);
 }
 
@@ -632,32 +630,32 @@ void test_jsl_fatptr_compare_ascii_insensitive(void)
     }
 
     {
-        JSLFatPtr buffer1 = JSL_FATPTR_LITERAL("");
-        JSLFatPtr buffer2 = JSL_FATPTR_LITERAL("");
+        JSLFatPtr buffer1 = JSL_FATPTR_INITIALIZER("");
+        JSLFatPtr buffer2 = JSL_FATPTR_INITIALIZER("");
         lok(jsl_fatptr_compare_ascii_insensitive(buffer1, buffer2) == true);
     }
 
     {
-        JSLFatPtr buffer1 = JSL_FATPTR_LITERAL("");
-        JSLFatPtr buffer2 = JSL_FATPTR_LITERAL("Hello, World!");
+        JSLFatPtr buffer1 = JSL_FATPTR_INITIALIZER("");
+        JSLFatPtr buffer2 = JSL_FATPTR_INITIALIZER("Hello, World!");
         lok(jsl_fatptr_compare_ascii_insensitive(buffer1, buffer2) == false);
     }
 
     {
-        JSLFatPtr buffer1 = JSL_FATPTR_LITERAL("Hello, World!");
-        JSLFatPtr buffer2 = JSL_FATPTR_LITERAL("Hello, World!");
+        JSLFatPtr buffer1 = JSL_FATPTR_INITIALIZER("Hello, World!");
+        JSLFatPtr buffer2 = JSL_FATPTR_INITIALIZER("Hello, World!");
         lok(jsl_fatptr_compare_ascii_insensitive(buffer1, buffer2) == true);
     }
 
     {
-        JSLFatPtr buffer1 = JSL_FATPTR_LITERAL("Hello, World!");
-        JSLFatPtr buffer2 = JSL_FATPTR_LITERAL("hello, world!");
+        JSLFatPtr buffer1 = JSL_FATPTR_INITIALIZER("Hello, World!");
+        JSLFatPtr buffer2 = JSL_FATPTR_INITIALIZER("hello, world!");
         lok(jsl_fatptr_compare_ascii_insensitive(buffer1, buffer2) == true);
     }
 
     {
-        JSLFatPtr buffer1 = JSL_FATPTR_LITERAL("AAAAAAAAAA");
-        JSLFatPtr buffer2 = JSL_FATPTR_LITERAL("AaaaAaAaAA");
+        JSLFatPtr buffer1 = JSL_FATPTR_INITIALIZER("AAAAAAAAAA");
+        JSLFatPtr buffer2 = JSL_FATPTR_INITIALIZER("AaaaAaAaAA");
         lok(jsl_fatptr_compare_ascii_insensitive(buffer1, buffer2) == true);
     }
 
@@ -666,30 +664,30 @@ void test_jsl_fatptr_compare_ascii_insensitive(void)
             .data = NULL,
             .length = 0
         };
-        JSLFatPtr buffer2 = JSL_FATPTR_LITERAL("THIS is a string example THAT will span multiple AVX2 chunks so THAT we can test if the loop is workING properly.");
+        JSLFatPtr buffer2 = JSL_FATPTR_INITIALIZER("THIS is a string example THAT will span multiple AVX2 chunks so THAT we can test if the loop is workING properly.");
         lok(jsl_fatptr_compare_ascii_insensitive(buffer1, buffer2) == false);
     }
 
     {
-        JSLFatPtr buffer1 = JSL_FATPTR_LITERAL("");
-        JSLFatPtr buffer2 = JSL_FATPTR_LITERAL("This is a string example that will span multiple AVX2 chunks so that we can test if the loop is working properly.");
+        JSLFatPtr buffer1 = JSL_FATPTR_INITIALIZER("");
+        JSLFatPtr buffer2 = JSL_FATPTR_INITIALIZER("This is a string example that will span multiple AVX2 chunks so that we can test if the loop is working properly.");
         lok(jsl_fatptr_compare_ascii_insensitive(buffer1, buffer2) == false);
     }
     {
-        JSLFatPtr buffer1 = JSL_FATPTR_LITERAL("This is a string example that will span multiple AVX2 chunks so that we can test if the loop is working properly.");
-        JSLFatPtr buffer2 = JSL_FATPTR_LITERAL("This is a string example that will span multiple AVX2 chunks so that we can test if the loop is working properly.");
+        JSLFatPtr buffer1 = JSL_FATPTR_INITIALIZER("This is a string example that will span multiple AVX2 chunks so that we can test if the loop is working properly.");
+        JSLFatPtr buffer2 = JSL_FATPTR_INITIALIZER("This is a string example that will span multiple AVX2 chunks so that we can test if the loop is working properly.");
         lok(jsl_fatptr_compare_ascii_insensitive(buffer1, buffer2) == true);
     }
 
     {
-        JSLFatPtr buffer1 = JSL_FATPTR_LITERAL("This is a string example that WILL span multiple AVX2 chunks so that we can test if the loop is working properly.");
-        JSLFatPtr buffer2 = JSL_FATPTR_LITERAL("THIS is a string example THAT will span multiple AVX2 chunks so THAT we can test if the loop is workING properly.");
+        JSLFatPtr buffer1 = JSL_FATPTR_INITIALIZER("This is a string example that WILL span multiple AVX2 chunks so that we can test if the loop is working properly.");
+        JSLFatPtr buffer2 = JSL_FATPTR_INITIALIZER("THIS is a string example THAT will span multiple AVX2 chunks so THAT we can test if the loop is workING properly.");
         lok(jsl_fatptr_compare_ascii_insensitive(buffer1, buffer2) == true);
     }
 
     {
-        JSLFatPtr buffer1 = JSL_FATPTR_LITERAL("This is a string example that WILL span multiple AVX2 chunkz so that we can test if the loop is workING properly.");
-        JSLFatPtr buffer2 = JSL_FATPTR_LITERAL("THIS is a string example THAT will span multiple AVX2 chunks so THAT we can test if the loop is workING properly.");
+        JSLFatPtr buffer1 = JSL_FATPTR_INITIALIZER("This is a string example that WILL span multiple AVX2 chunkz so that we can test if the loop is workING properly.");
+        JSLFatPtr buffer2 = JSL_FATPTR_INITIALIZER("THIS is a string example THAT will span multiple AVX2 chunks so THAT we can test if the loop is workING properly.");
         lok(jsl_fatptr_compare_ascii_insensitive(buffer1, buffer2) == false);
     }
 }

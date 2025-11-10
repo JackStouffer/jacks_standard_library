@@ -205,7 +205,7 @@ void test_jsl_string_builder_insert_fatptr_edge_cases(void)
     bool ok = jsl_string_builder_init2(&builder, &global_arena, 8, 8);
     lok(ok);
 
-    JSLFatPtr empty = JSL_FATPTR_LITERAL("");
+    JSLFatPtr empty = JSL_FATPTR_INITIALIZER("");
     lok(jsl_string_builder_insert_fatptr(&builder, empty));
     uint8_t actual[8] = {0};
     JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(actual);
@@ -295,7 +295,7 @@ void test_jsl_string_builder_format_needs_multiple_chunks(void)
     lok(ok);
 
     char long_fragment[] = "0123456789ABCDEF0123456789";
-    lok(jsl_string_builder_format(&builder, JSL_FATPTR_LITERAL("%s"), long_fragment));
+    lok(jsl_string_builder_format(&builder, JSL_FATPTR_INITIALIZER("%s"), long_fragment));
 
     uint8_t actual[128] = {0};
     JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(actual);
