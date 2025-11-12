@@ -73,10 +73,50 @@ static UnitTestDecl unit_test_declarations[] = {
 };
 
 static HashMapDecl hash_map_declarations[] = {
-    { "IntToIntMap", "int32_to_int32_map", "int32_t", "int32_t", "--static", (char*[]) {"../tests/test_hash_map_types.h", NULL} },
-    { "IntToCompositeType1Map", "int32_to_comp1_map", "int32_t", "CompositeType1", "--static", (char*[]) {"../tests/test_hash_map_types.h", NULL} },
-    { "CompositeType2ToIntMap", "comp2_to_int_map", "CompositeType2", "int32_t", "--static", (char*[]) {"../tests/test_hash_map_types.h", NULL} },
-    { "CompositeTyp3ToCompositeType2Map", "comp3_to_comp2_map", "CompositeType3", "CompositeType2", "--static", (char*[]) {"../tests/test_hash_map_types.h", NULL} }
+    {
+        "IntToIntMap",
+        "int32_to_int32_map",
+        "int32_t",
+        "int32_t",
+        "--static",
+        (char*[]) {
+            "../tests/hash_maps/int32_to_int32_map.h",
+            "../tests/test_hash_map_types.h", NULL
+        }
+    },
+    {
+        "IntToCompositeType1Map",
+        "int32_to_comp1_map",
+        "int32_t",
+        "CompositeType1",
+        "--static",
+        (char*[]) {
+            "../tests/hash_maps/int32_to_comp1_map.h",
+            "../tests/test_hash_map_types.h", NULL
+        }
+    },
+    {
+        "CompositeType2ToIntMap",
+        "comp2_to_int_map",
+        "CompositeType2",
+        "int32_t",
+        "--static",
+        (char*[]) {
+            "../tests/hash_maps/comp2_to_int_map.h",
+            "../tests/test_hash_map_types.h", NULL
+        }
+    },
+    {
+        "CompositeTyp3ToCompositeType2Map",
+        "comp3_to_comp2_map",
+        "CompositeType3",
+        "CompositeType2",
+        "--static",
+        (char*[]) {
+            "../tests/hash_maps/comp3_to_comp2_map.h",
+            "../tests/test_hash_map_types.h", NULL
+        }
+    }
 };
 
 int32_t main(int32_t argc, char **argv)

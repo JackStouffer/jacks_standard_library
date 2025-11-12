@@ -119,10 +119,10 @@
 //         JSL_HASHMAP_ITERATOR_TYPE_NAME(name) function_prefix##_iterator_start(JSL_HASHMAP_TYPE_NAME(name)* hashmap);\
 //         JSL_HASHMAP_ITEM_TYPE_NAME(name)* function_prefix##_iterator_next(JSL_HASHMAP_ITERATOR_TYPE_NAME(name)* iterator);
 
-JSLFatPtr static_hash_map_header_docstring = JSL_FATPTR_INITIALIZER("/**\n"
+JSLFatPtr static_hash_map_docstring = JSL_FATPTR_INITIALIZER("/**\n"
 " * AUTO GENERATED FILE\n"
 " *\n"
-" * This file contains the header for a hash map %y which maps `%y` keys to `%y` values.\n"
+" * This file contains the %y for a hash map %y which maps `%y` keys to `%y` values.\n"
 " *\n"
 " * This file was auto generated from the hash map generation utility that's part of the \"Jack's Standard Library\" project.\n"
 " * The utility generates a header file and a C file for a type safe, open addressed, hash map.\n"
@@ -157,14 +157,28 @@ JSLFatPtr static_map_type_typedef = JSL_FATPTR_INITIALIZER("/**\n"
     "typedef struct %y {\n"
     "    %y* keys_array;\n"
     "    %y* items_array;\n"
-    "    int64_t slots_array_length;\n"
+    "    /** length of both keys_array and items_array */\n"
+    "    int64_t arrays_length;\n"
     "    uint32_t* is_set_flags_array;\n"
     "    int64_t is_set_flags_array_length;\n"
     "    int64_t item_count;\n"
     "    uint16_t generational_id;\n"
     "    uint8_t flags;\n"
     "} %y;\n"
-    "\n");
+    "\n"
+);
+
+JSLFatPtr static_map_iterator_typedef = JSL_FATPTR_INITIALIZER("/**\n"
+    " * Iterator type which is used by the iterator functions to\n"
+    " * allow you to loop over the hash map contents.\n"
+    " */\n"
+    "typedef struct %yIterator {\n"
+    "    %y* hashmap;\n"
+    "    int64_t current_slot_index;\n"
+    "    uint16_t generational_id;\n"
+    "} %yIterator;\n"
+    "\n"
+);
 
 /// @brief param 1 is the hash map type name, param 2 is the function prefix, param 3 is the hash map type name
 JSLFatPtr static_init_function_signature = JSL_FATPTR_INITIALIZER("/**\n"
@@ -259,35 +273,33 @@ JSLFatPtr static_iterator_next_function_signature = JSL_FATPTR_INITIALIZER("/**\
 JSLFatPtr static_init_function_code = JSL_FATPTR_INITIALIZER(""
 "void %y_init(%y* hash_map, JSLArena* arena, int64_t max_item_count, uint64_t seed)\n"
 "{\n"
-"    JSL_DEBUG_ASSERT(hashmap != NULL);\n"
+"    JSL_DEBUG_ASSERT(hash_map != NULL);\n"
 "    JSL_DEBUG_ASSERT(arena != NULL);\n"
 "\n"
-"    hashmap->arena = arena;\n"
-"    hashmap->item_count = 0;\n"
-"    hashmap->flags = 0;\n"
-"    hashmap->generational_id = 0;\n"
+"    hash_map->item_count = 0;\n"
+"    hash_map->flags = 0;\n"
+"    hash_map->generational_id = 0;\n"
 "\n"
-"    if (item_count_guess <= 16)\n"
-"        hashmap->slots_array_length = 32;\n"
-"    else if (jss__is_power_of_two(item_count_guess))\n"
-"        hashmap->slots_array_length = item_count_guess * 2;\n"
-"    else\n"
-"        hashmap->slots_array_length = jss__next_power_of_two(item_count_guess) * 2;\n"
+"    hash_map->arrays_length = jsl__next_power_of_two(max_item_count) * 2;\n"
 "\n"
-"    hashmap->is_set_flags_array_length = hashmap->slots_array_length >> 5L;\n"
+"    hash_map->is_set_flags_array_length = hash_map->arrays_length >> 5L;\n"
 "\n"
-"    hashmap->slots_array = (%y*) jss_arena_allocate(\n"
-"        arena, sizeof(%y) * hashmap->slots_array_length, false\n"
+"    hash_map->keys_array = (%y*) jsl_arena_allocate(\n"
+"        arena, sizeof(%y) * hash_map->arrays_length, false\n"
 "    ).data;\n"
 "\n"
-"    hashmap->is_set_flags_array = (uint32_t*) jss_arena_allocate(\n"
-"        arena, sizeof(uint32_t) * hashmap->is_set_flags_array_length, true\n"
+"    hash_map->items_array = (%y*) jsl_arena_allocate(\n"
+"        arena, sizeof(%y) * hash_map->arrays_length, false\n"
+"    ).data;\n"
+"\n"
+"    hash_map->is_set_flags_array = (uint32_t*) jsl_arena_allocate(\n"
+"        arena, sizeof(uint32_t) * hash_map->is_set_flags_array_length, true\n"
 "    ).data;\n"
 "}\n\n");
 
 JSLFatPtr static_hash_function_code = JSL_FATPTR_INITIALIZER(""
 "static inline %y %y_hash_and_find_slot(\n"
-"    %y* hashmap,\n"
+"    %y* hash_map,\n"
 "    key_type key,\n"
 "    bool is_insert\n"
 ")\n"
@@ -295,11 +307,11 @@ JSLFatPtr static_hash_function_code = JSL_FATPTR_INITIALIZER(""
 "    JSL_HASHMAP_FIND_RES_TYPE_NAME(name) return_value;\n"
 "    return_value.slot = NULL;\n"
 "\n"
-"    uint64_t hash = jss__wyhash(&key, sizeof(%y), jss__hash_seed, jss__wyhash_secret);\n"
+"    uint64_t hash = jsl__wyhash(&key, sizeof(%y), jsl__hash_seed, jsl__wyhash_secret);\n"
 "\n"
 "    int64_t total_checked = 0;\n"
 "    /* Since our slot array length is always a pow 2, we can avoid a modulo  */\n"
-"    int64_t slot_index = (int64_t) (hash & (hashmap->slots_array_length - 1));\n"
+"    int64_t slot_index = (int64_t) (hash & (hash_map->slots_array_length - 1));\n"
 "    return_value.is_set_array_index = (int64_t) JSL_GET_SET_FLAG_INDEX(slot_index);\n"
 "    /* Manual remainder here too  */\n"
 "    return_value.is_set_array_bit = slot_index - (return_value.is_set_array_index * 32);\n"
@@ -308,13 +320,13 @@ JSLFatPtr static_hash_function_code = JSL_FATPTR_INITIALIZER(""
 "    {\n"
 "        uint32_t bit_flag = JSL_MAKE_BITFLAG(return_value.is_set_array_bit);\n"
 "        uint32_t is_slot_set = JSL_IS_BITFLAG_SET(\n"
-"            hashmap->is_set_flags_array[return_value.is_set_array_index],\n"
+"            hash_map->is_set_flags_array[return_value.is_set_array_index],\n"
 "            bit_flag\n"
 "        );\n"
 "\n"
 "        if (is_slot_set == 0 && is_insert)\n"
 "        {\n"
-"            return_value.slot = &hashmap->slots_array[slot_index];\n"
+"            return_value.slot = &hash_map->slots_array[slot_index];\n"
 "            return_value.is_update = false;\n"
 "            break;\n"
 "        }\n"
@@ -322,13 +334,13 @@ JSLFatPtr static_hash_function_code = JSL_FATPTR_INITIALIZER(""
 "        else if (is_slot_set == 1)\n"
 "        {\n"
 "            int32_t memcmp_res = memcmp(\n"
-"                &hashmap->slots_array[slot_index].key,\n"
+"                &hash_map->slots_array[slot_index].key,\n"
 "                &key,\n"
 "                sizeof(%y)\n"
 "            );\n"
 "            if (memcmp_res == 0)\n"
 "            {\n"
-"                return_value.slot = &hashmap->slots_array[slot_index];\n"
+"                return_value.slot = &hash_map->slots_array[slot_index];\n"
 "                return_value.is_update = true;\n"
 "                break;\n"
 "            }\n"
@@ -340,8 +352,8 @@ JSLFatPtr static_hash_function_code = JSL_FATPTR_INITIALIZER(""
 "        ++return_value.is_set_array_bit;\n"
 "        ++slot_index;\n"
 "\n"
-"        /* We can't expand and the hashmap is completely full  */\n"
-"        if (total_checked == hashmap->slots_array_length)\n"
+"        /* We can't expand and the hash_map is completely full  */\n"
+"        if (total_checked == hash_map->slots_array_length)\n"
 "        {\n"
 "            break;\n"
 "        }\n"
@@ -353,7 +365,7 @@ JSLFatPtr static_hash_function_code = JSL_FATPTR_INITIALIZER(""
 "        }\n"
 "\n"
 "        /* Loop all the way back around */\n"
-"        if (slot_index == hashmap->slots_array_length)\n"
+"        if (slot_index == hash_map->slots_array_length)\n"
 "        {\n"
 "            slot_index = 0;\n"
 "            return_value.is_set_array_bit = 0;\n"
@@ -365,23 +377,23 @@ JSLFatPtr static_hash_function_code = JSL_FATPTR_INITIALIZER(""
 "}\n\n");
 
 JSLFatPtr static_insert_function_code = JSL_FATPTR_INITIALIZER(""
-"bool function_prefix##_insert(JSL_HASHMAP_TYPE_NAME(name)* hashmap, key_type key, value_type value)\n"
+"bool function_prefix##_insert(JSL_HASHMAP_TYPE_NAME(name)* hash_map, key_type key, value_type value)\n"
 "{\n"
 "    JSL_HASHMAP_CHECK_EMPTY(false)\n"
 "    bool insert_success = false;\n"
 "\n"
-"    if (JSL_IS_BITFLAG_NOT_SET(hashmap->flags, JSL__HASHMAP_CANT_EXPAND)\n"
-"        && jss__hashmap_should_expand(hashmap->slots_array_length, hashmap->item_count + 1))\n"
+"    if (JSL_IS_BITFLAG_NOT_SET(hash_map->flags, JSL__HASHMAP_CANT_EXPAND)\n"
+"        && jsl__hashmap_should_expand(hash_map->slots_array_length, hash_map->item_count + 1))\n"
 "    {\n"
-"        bool expand_res = function_prefix##_expand(hashmap);\n"
+"        bool expand_res = function_prefix##_expand(hash_map);\n"
 "        if (!expand_res)\n"
 "        {\n"
-"            JSL_SET_BITFLAG(&hashmap->flags, JSL__HASHMAP_CANT_EXPAND);\n"
+"            JSL_SET_BITFLAG(&hash_map->flags, JSL__HASHMAP_CANT_EXPAND);\n"
 "        }\n"
 "    }\n"
 "\n"
 "    JSL_HASHMAP_FIND_RES_TYPE_NAME(name) find_res = function_prefix##_hash_and_find_slot(\n"
-"        hashmap,\n"
+"        hash_map,\n"
 "        key,\n"
 "        true\n"
 "    );\n"
@@ -398,26 +410,26 @@ JSLFatPtr static_insert_function_code = JSL_FATPTR_INITIALIZER(""
 "            find_res.slot->value = value;\n"
 "            uint32_t bit_flag = JSL_MAKE_BITFLAG(find_res.is_set_array_bit);\n"
 "            JSL_SET_BITFLAG(\n"
-"                &hashmap->is_set_flags_array[find_res.is_set_array_index],\n"
+"                &hash_map->is_set_flags_array[find_res.is_set_array_index],\n"
 "                bit_flag\n"
 "            );\n"
-"            ++hashmap->item_count;\n"
+"            ++hash_map->item_count;\n"
 "            insert_success = true;\n"
 "        }\n"
 "\n"
-"        ++hashmap->generational_id;\n"
+"        ++hash_map->generational_id;\n"
 "    }\n"
 "\n"
 "    return insert_success;\n"
 "}\n\n");
 
 JSLFatPtr static_get_function_code = JSL_FATPTR_INITIALIZER(""
-"value_type* function_prefix##_get(JSL_HASHMAP_TYPE_NAME(name)* hashmap, key_type key)\n"
+"value_type* function_prefix##_get(JSL_HASHMAP_TYPE_NAME(name)* hash_map, key_type key)\n"
 "{\n"
 "    JSL_HASHMAP_CHECK_EMPTY(NULL)\n"
 "    value_type* res = NULL;\n"
 "\n"
-"    JSL_HASHMAP_FIND_RES_TYPE_NAME(name) find_res = function_prefix##_hash_and_find_slot(hashmap, key, false);\n"
+"    JSL_HASHMAP_FIND_RES_TYPE_NAME(name) find_res = function_prefix##_hash_and_find_slot(hash_map, key, false);\n"
 "    if (find_res.slot != NULL && find_res.is_update)\n"
 "    {\n"
 "        res = &find_res.slot->value;\n"
@@ -427,20 +439,20 @@ JSLFatPtr static_get_function_code = JSL_FATPTR_INITIALIZER(""
 "}\n\n");
 
 JSLFatPtr static_delete_function_code = JSL_FATPTR_INITIALIZER(""
-"bool function_prefix##_delete(JSL_HASHMAP_TYPE_NAME(name)* hashmap, key_type key)\n"
+"bool function_prefix##_delete(JSL_HASHMAP_TYPE_NAME(name)* hash_map, key_type key)\n"
 "{\n"
 "    JSL_HASHMAP_CHECK_EMPTY(false)\n"
 "    bool success = false;\n"
-"    JSL_HASHMAP_FIND_RES_TYPE_NAME(name) find_res = function_prefix##_hash_and_find_slot(hashmap, key, false);\n"
+"    JSL_HASHMAP_FIND_RES_TYPE_NAME(name) find_res = function_prefix##_hash_and_find_slot(hash_map, key, false);\n"
 "\n"
 "    if (find_res.slot != NULL && find_res.is_update)\n"
 "    {\n"
 "        uint32_t bit_flag = JSL_MAKE_BITFLAG(find_res.is_set_array_bit);\n"
 "        JSL_UNSET_BITFLAG(\n"
-"            &hashmap->is_set_flags_array[find_res.is_set_array_index],\n"
+"            &hash_map->is_set_flags_array[find_res.is_set_array_index],\n"
 "            bit_flag\n"
 "        );\n"
-"        --hashmap->item_count;\n"
+"        --hash_map->item_count;\n"
 "        success = true;\n"
 "    }\n"
 "\n"
@@ -448,19 +460,19 @@ JSLFatPtr static_delete_function_code = JSL_FATPTR_INITIALIZER(""
 "}\n\n");
 
 JSLFatPtr static_iterator_start_function_code = JSL_FATPTR_INITIALIZER(""
-"JSL_HASHMAP_ITERATOR_TYPE_NAME(name) function_prefix##_iterator_start(JSL_HASHMAP_TYPE_NAME(name)* hashmap)\n"
+"JSL_HASHMAP_ITERATOR_TYPE_NAME(name) function_prefix##_iterator_start(JSL_HASHMAP_TYPE_NAME(name)* hash_map)\n"
 "{\n"
-"    JSL_DEBUG_ASSERT(hashmap != NULL);\n"
-"    JSL_DEBUG_ASSERT(hashmap->arena != NULL);\n"
-"    JSL_DEBUG_ASSERT(hashmap->slots_array != NULL);\n"
-"    JSL_DEBUG_ASSERT(hashmap->is_set_flags_array != NULL);\n"
+"    JSL_DEBUG_ASSERT(hash_map != NULL);\n"
+"    JSL_DEBUG_ASSERT(hash_map->arena != NULL);\n"
+"    JSL_DEBUG_ASSERT(hash_map->slots_array != NULL);\n"
+"    JSL_DEBUG_ASSERT(hash_map->is_set_flags_array != NULL);\n"
 "\n"
 "    JSL_HASHMAP_ITERATOR_TYPE_NAME(name) iterator = {\n"
-"        .hashmap = hashmap,\n"
+"        .hash_map = hash_map,\n"
 "        .current_slot_index = 0\n"
 "    };\n"
 "\n"
-"    iterator.generational_id = hashmap->generational_id;\n"
+"    iterator.generational_id = hash_map->generational_id;\n"
 "\n"
 "    return iterator;\n"
 "}\n\n");
@@ -469,24 +481,24 @@ JSLFatPtr static_iterator_next_function_code = JSL_FATPTR_INITIALIZER(""
 "JSL_HASHMAP_ITEM_TYPE_NAME(name)* function_prefix##_iterator_next(JSL_HASHMAP_ITERATOR_TYPE_NAME(name)* iterator)\n"
 "{\n"
 "    JSL_DEBUG_ASSERT(iterator != NULL);\n"
-"    JSL_DEBUG_ASSERT(iterator->hashmap != NULL);\n"
-"    JSL_DEBUG_ASSERT(iterator->hashmap->slots_array != NULL);\n"
-"    JSL_DEBUG_ASSERT(iterator->hashmap->is_set_flags_array != NULL);\n"
-"    JSL_DEBUG_ASSERT(iterator->generational_id == iterator->hashmap->generational_id);\n"
+"    JSL_DEBUG_ASSERT(iterator->hash_map != NULL);\n"
+"    JSL_DEBUG_ASSERT(iterator->hash_map->slots_array != NULL);\n"
+"    JSL_DEBUG_ASSERT(iterator->hash_map->is_set_flags_array != NULL);\n"
+"    JSL_DEBUG_ASSERT(iterator->generational_id == iterator->hash_map->generational_id);\n"
 "\n"
 "    JSL_HASHMAP_ITEM_TYPE_NAME(name)* result = NULL;\n"
 "\n"
-"    for (; iterator->current_slot_index < iterator->hashmap->slots_array_length; iterator->current_slot_index++)\n"
+"    for (; iterator->current_slot_index < iterator->hash_map->slots_array_length; iterator->current_slot_index++)\n"
 "    {\n"
 "        int64_t is_set_flags_index = JSL_GET_SET_FLAG_INDEX(iterator->current_slot_index);\n"
 "        int32_t current_is_set_flags_bit = iterator->current_slot_index - (is_set_flags_index * 32);\n"
 "        uint32_t bitflag = JSL_MAKE_BITFLAG(current_is_set_flags_bit);\n"
 "\n"
 "        if (JSL_IS_BITFLAG_SET(\n"
-"            iterator->hashmap->is_set_flags_array[is_set_flags_index], bitflag\n"
+"            iterator->hash_map->is_set_flags_array[is_set_flags_index], bitflag\n"
 "        ))\n"
 "        {\n"
-"            result = &iterator->hashmap->slots_array[iterator->current_slot_index];\n"
+"            result = &iterator->hash_map->slots_array[iterator->current_slot_index];\n"
 "            ++iterator->current_slot_index;\n"
 "            break;\n"
 "        }\n"
@@ -496,38 +508,38 @@ JSLFatPtr static_iterator_next_function_code = JSL_FATPTR_INITIALIZER(""
 "}\n\n");
 
 JSLFatPtr dynamic_expand_function_code = JSL_FATPTR_INITIALIZER(""
-"static bool function_prefix##_expand(JSL_HASHMAP_TYPE_NAME(name)* hashmap)\n"
+"static bool function_prefix##_expand(JSL_HASHMAP_TYPE_NAME(name)* hash_map)\n"
 "{\n"
-"    JSL_DEBUG_ASSERT(hashmap != NULL);\n"
-"    JSL_DEBUG_ASSERT(hashmap->arena != NULL);\n"
-"    JSL_DEBUG_ASSERT(hashmap->slots_array != NULL);\n"
-"    JSL_DEBUG_ASSERT(hashmap->is_set_flags_array != NULL);\n"
+"    JSL_DEBUG_ASSERT(hash_map != NULL);\n"
+"    JSL_DEBUG_ASSERT(hash_map->arena != NULL);\n"
+"    JSL_DEBUG_ASSERT(hash_map->slots_array != NULL);\n"
+"    JSL_DEBUG_ASSERT(hash_map->is_set_flags_array != NULL);\n"
 "\n"
 "    bool success;\n"
 "\n"
-"    JSL_HASHMAP_ITEM_TYPE_NAME(name)* old_slots_array = hashmap->slots_array;\n"
-"    int64_t old_slots_array_length = hashmap->slots_array_length;\n"
+"    JSL_HASHMAP_ITEM_TYPE_NAME(name)* old_slots_array = hash_map->slots_array;\n"
+"    int64_t old_slots_array_length = hash_map->slots_array_length;\n"
 "\n"
-"    uint32_t* old_is_set_flags_array = hashmap->is_set_flags_array;\n"
-"    int64_t old_is_set_flags_array_length = hashmap->is_set_flags_array_length;\n"
+"    uint32_t* old_is_set_flags_array = hash_map->is_set_flags_array;\n"
+"    int64_t old_is_set_flags_array_length = hash_map->is_set_flags_array_length;\n"
 "\n"
-"    int64_t new_slots_array_length = jss__hashmap_expand_size(old_slots_array_length);\n"
-"    JSL_HASHMAP_ITEM_TYPE_NAME(name)* new_slots_array = (JSL_HASHMAP_ITEM_TYPE_NAME(name)*) jss_arena_allocate(\n"
-"        hashmap->arena, sizeof(JSL_HASHMAP_ITEM_TYPE_NAME(name)) * new_slots_array_length, false\n"
+"    int64_t new_slots_array_length = jsl__hashmap_expand_size(old_slots_array_length);\n"
+"    JSL_HASHMAP_ITEM_TYPE_NAME(name)* new_slots_array = (JSL_HASHMAP_ITEM_TYPE_NAME(name)*) jsl_arena_allocate(\n"
+"        hash_map->arena, sizeof(JSL_HASHMAP_ITEM_TYPE_NAME(name)) * new_slots_array_length, false\n"
 "    ).data;\n"
 "\n"
 "    int64_t new_is_set_flags_array_length = new_slots_array_length >> 5L;\n"
-"    uint32_t* new_is_set_flags_array = (uint32_t*) jss_arena_allocate(\n"
-"        hashmap->arena, sizeof(uint32_t) * new_is_set_flags_array_length, true\n"
+"    uint32_t* new_is_set_flags_array = (uint32_t*) jsl_arena_allocate(\n"
+"        hash_map->arena, sizeof(uint32_t) * new_is_set_flags_array_length, true\n"
 "    ).data;\n"
 "\n"
 "    if (new_slots_array != NULL && new_is_set_flags_array != NULL)\n"
 "    {\n"
-"        hashmap->item_count = 0;\n"
-"        hashmap->slots_array = new_slots_array;\n"
-"        hashmap->slots_array_length = new_slots_array_length;\n"
-"        hashmap->is_set_flags_array = new_is_set_flags_array;\n"
-"        hashmap->is_set_flags_array_length = new_is_set_flags_array_length;\n"
+"        hash_map->item_count = 0;\n"
+"        hash_map->slots_array = new_slots_array;\n"
+"        hash_map->slots_array_length = new_slots_array_length;\n"
+"        hash_map->is_set_flags_array = new_is_set_flags_array;\n"
+"        hash_map->is_set_flags_array_length = new_is_set_flags_array_length;\n"
 "\n"
 "        int64_t slot_index = 0;\n"
 "        for (\n"
@@ -541,7 +553,7 @@ JSLFatPtr dynamic_expand_function_code = JSL_FATPTR_INITIALIZER(""
 "                uint32_t bitflag = JSL_MAKE_BITFLAG(current_bit);\n"
 "                if (JSL_IS_BITFLAG_SET(old_is_set_flags_array[is_set_flags_index], bitflag))\n"
 "                {\n"
-"                    function_prefix##_insert(hashmap, old_slots_array[slot_index].key, old_slots_array[slot_index].value);\n"
+"                    function_prefix##_insert(hash_map, old_slots_array[slot_index].key, old_slots_array[slot_index].value);\n"
 "                }\n"
 "                ++slot_index;\n"
 "            }\n"
@@ -600,7 +612,14 @@ void write_hash_map_header(
     (void) impl;
     (void) hash_function_name;
 
-    jsl_string_builder_format(builder, static_hash_map_header_docstring, hash_map_name, key_type_name, value_type_name);
+    jsl_string_builder_format(
+        builder,
+        static_hash_map_docstring,
+        JSL_FATPTR_EXPRESSION("header"),
+        hash_map_name,
+        key_type_name,
+        value_type_name
+    );
 
     jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#pragma once\n\n"));
     jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include <stdint.h>\n"));
@@ -613,11 +632,40 @@ void write_hash_map_header(
     
     jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("\n"));
     
-    jsl_string_builder_format(builder, static_map_type_typedef, key_type_name, value_type_name, hash_map_name, key_type_name, value_type_name, hash_map_name);
+    jsl_string_builder_format(
+        builder,
+        static_map_type_typedef,
+        key_type_name,
+        value_type_name,
+        hash_map_name,
+        key_type_name,
+        value_type_name,
+        hash_map_name
+    );
 
-    jsl_string_builder_format(builder, static_init_function_signature, function_prefix, hash_map_name);
+    jsl_string_builder_format(
+        builder,
+        static_map_iterator_typedef,
+        hash_map_name,
+        hash_map_name,
+        hash_map_name
+    );
 
-    jsl_string_builder_format(builder, static_insert_function_signature, function_prefix, hash_map_name, key_type_name, value_type_name);
+    jsl_string_builder_format(
+        builder,
+        static_init_function_signature,
+        function_prefix,
+        hash_map_name
+    );
+
+    jsl_string_builder_format(
+        builder,
+        static_insert_function_signature,
+        function_prefix,
+        hash_map_name,
+        key_type_name,
+        value_type_name
+    );
 
     jsl_string_builder_format(
         builder,
@@ -680,10 +728,23 @@ void write_hash_map_source(
     (void) impl;
     (void) hash_function_name;
 
+    jsl_string_builder_format(
+        builder,
+        static_hash_map_docstring,
+        JSL_FATPTR_EXPRESSION("source"),
+        hash_map_name,
+        key_type_name,
+        value_type_name
+    );
+    
+    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("// DEFAULT INCLUDED HEADERS\n"));
+
     jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include <stddef.h>\n"));
     jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include <stdint.h>\n"));
     jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include \"jacks_standard_library.h\"\n"));
     jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include \"jacks_hash_map.h\"\n\n"));
+
+    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("// USER INCLUDED HEADERS\n"));
 
     for (int32_t i = 0; i < include_header_count; ++i)
     {
@@ -697,6 +758,7 @@ void write_hash_map_source(
         static_init_function_code,
         function_prefix,
         hash_map_name,
+        key_type_name,
         value_type_name,
         value_type_name,
         value_type_name
