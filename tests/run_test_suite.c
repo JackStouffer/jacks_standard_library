@@ -126,6 +126,8 @@ int32_t main(int32_t argc, char **argv)
 
     nob_log(NOB_INFO, "Generating Hash Map Files");
 
+    Nob_Procs hash_map_procs = {0};
+
     for (int32_t i = 0; i < hash_map_test_count; ++i)
     {
         HashMapDecl* decl = &hash_map_declarations[i];
@@ -160,7 +162,11 @@ int32_t main(int32_t argc, char **argv)
         strcat(out_path_header, decl->prefix);
         strcat(out_path_header, ".h");
 
-        if (!nob_cmd_run(&write_hash_map_header, .stdout_path = out_path_header)) return 1;
+        if (!nob_cmd_run(
+            &write_hash_map_header,
+            .stdout_path = out_path_header,
+            .async = &hash_map_procs
+        )) return 1;
 
         Nob_Cmd write_hash_map_source = {0};
         nob_cmd_append(
@@ -192,8 +198,15 @@ int32_t main(int32_t argc, char **argv)
         strcat(out_path_source, decl->prefix);
         strcat(out_path_source, ".c");
 
-        if (!nob_cmd_run(&write_hash_map_source, .stdout_path = out_path_source)) return 1;
+        if (!nob_cmd_run(
+            &write_hash_map_source,
+            .stdout_path = out_path_source,
+            .async = &hash_map_procs
+        )) return 1;
     }
+
+    if (!nob_procs_wait(hash_map_procs)) return 1;
+    nob_da_free(hash_map_procs);
 
     nob_log(NOB_INFO, "Running unit test suite");
 
@@ -206,6 +219,8 @@ int32_t main(int32_t argc, char **argv)
      */
 
     int32_t test_count = sizeof(unit_test_declarations) / sizeof(UnitTestDecl);
+    Nob_Procs compile_procs = {0};
+
     for (int32_t i = 0; i < test_count; i++)
     {
         UnitTestDecl* unit_test = &unit_test_declarations[i];
@@ -216,12 +231,8 @@ int32_t main(int32_t argc, char **argv)
 
             #if defined(_WIN32)
                 strcat(exe_name, ".exe");
-                char exe_run_command[256] = {0};
-                strcat(exe_run_command, exe_name);
             #else
                 strcat(exe_name, ".out");
-                char exe_run_command[256] = "./";
-                strcat(exe_run_command, exe_name);
             #endif
 
             Nob_Cmd clang_debug_compile_command = {0};
@@ -252,11 +263,7 @@ int32_t main(int32_t argc, char **argv)
                 nob_cmd_append(&clang_debug_compile_command, source_file);
             }
 
-            if (!nob_cmd_run(&clang_debug_compile_command)) return 1;
-
-            Nob_Cmd clang_debug_run_command = {0};
-            nob_cmd_append(&clang_debug_run_command, exe_name);
-            if (!nob_cmd_run(&clang_debug_run_command)) return 1;
+            if (!nob_cmd_run(&clang_debug_compile_command, .async = &compile_procs)) return 1;
         }
 
         {
@@ -265,12 +272,8 @@ int32_t main(int32_t argc, char **argv)
 
             #if defined(_WIN32)
                 strcat(exe_name, ".exe");
-                char exe_run_command[256] = {0};
-                strncat(exe_run_command, exe_name, strlen(exe_name));
             #else
                 strcat(exe_name, ".out");
-                char exe_run_command[256] = "./";
-                strcat(exe_run_command, exe_name);
             #endif
 
             Nob_Cmd clang_optimized_compile_command = {0};
@@ -297,20 +300,16 @@ int32_t main(int32_t argc, char **argv)
                 nob_cmd_append(&clang_optimized_compile_command, source_file);
             }
 
-            if (!nob_cmd_run(&clang_optimized_compile_command)) return 1;
-
-            Nob_Cmd clang_optimized_run_command = {0};
-            nob_cmd_append(&clang_optimized_run_command, exe_name);
-            if (!nob_cmd_run(&clang_optimized_run_command)) return 1;
+            if (!nob_cmd_run(&clang_optimized_compile_command, .async = &compile_procs)) return 1;
         }
 
         #if JSL_IS_WIN32
 
             {
                 char exe_output_param[256] = "/Fe";
-                char exe_name[256] = "tests\\bin\\opt_msvc_";
+                char exe_name[256] = "tests\\bin\\debug_msvc_";
                 char obj_output_param[256] = "/Fo";
-                char obj_name[256] = "tests\\bin\\opt_msvc_debug_";
+                char obj_name[256] = "tests\\bin\\debug_msvc_";
 
                 strcat(exe_name, unit_test->executable_name);
                 strcat(exe_name, ".exe");
@@ -345,11 +344,7 @@ int32_t main(int32_t argc, char **argv)
                     nob_cmd_append(&msvc_debug_compile_command, source_file);
                 }
 
-                if (!nob_cmd_run(&msvc_debug_compile_command)) return 1;
-
-                Nob_Cmd msvc_debug_run_command = {0};
-                nob_cmd_append(&msvc_debug_run_command, exe_name);
-                if (!nob_cmd_run(&msvc_debug_run_command)) return 1;
+                if (!nob_cmd_run(&msvc_debug_compile_command, .async = &compile_procs)) return 1;
             }
 
             {
@@ -389,14 +384,12 @@ int32_t main(int32_t argc, char **argv)
                     nob_cmd_append(&msvc_optimized_compile_command, source_file);
                 }
 
-                if (!nob_cmd_run(&msvc_optimized_compile_command)) return 1;
-
-                Nob_Cmd msvc_optimized_run_command = {0};
-                nob_cmd_append(&msvc_optimized_run_command, exe_name);
-                if (!nob_cmd_run(&msvc_optimized_run_command)) return 1;
+                if (!nob_cmd_run(&msvc_optimized_compile_command, .async = &compile_procs)) return 1;
             }
 
         #elif JSL_IS_POSIX
+
+            const char* test_file_name = unit_test->executable_name;
 
             {
                 char exe_name[256] = "tests/bin/debug_gcc_";
@@ -428,14 +421,7 @@ int32_t main(int32_t argc, char **argv)
                     nob_cmd_append(&gcc_debug_compile_command, source_file);
                 }
 
-                if (!nob_cmd_run(&gcc_debug_compile_command)) return 1;
-
-                char run_command[256] = "./";
-                strcat(run_command, exe_name);
-
-                Nob_Cmd gcc_debug_run_command = {0};
-                nob_cmd_append(&gcc_debug_run_command, run_command);
-                if (!nob_cmd_run(&gcc_debug_run_command)) return 1;
+                if (!nob_cmd_run(&gcc_debug_compile_command, .async = &compile_procs)) return 1;
             }
 
             {
@@ -467,16 +453,101 @@ int32_t main(int32_t argc, char **argv)
                     nob_cmd_append(&gcc_optimized_compile_command, source_file);
                 }
 
-                if (!nob_cmd_run(&gcc_optimized_compile_command)) return 1;
-
-                char run_command[256] = "./";
-                strncat(run_command, exe_name, strlen(exe_name));
-
-                Nob_Cmd gcc_optimized_run_command = {0};
-                nob_cmd_append(&gcc_optimized_run_command, run_command);
-                if (!nob_cmd_run(&gcc_optimized_run_command)) return 1;
+                if (!nob_cmd_run(&gcc_optimized_compile_command, .async = &compile_procs)) return 1;
             }
         
+        #else
+            #error "Unrecognized platform. Only windows and POSIX platforms are supported."
+        #endif
+    }
+
+    if (!nob_procs_wait(compile_procs)) return 1;
+    nob_da_free(compile_procs);
+
+    for (int32_t i = 0; i < test_count; i++)
+    {
+        UnitTestDecl* unit_test = &unit_test_declarations[i];
+
+        {
+            char exe_name[256] = "tests/bin/debug_clang_";
+            strcat(exe_name, unit_test->executable_name);
+
+            #if defined(_WIN32)
+                strcat(exe_name, ".exe");
+            #else
+                strcat(exe_name, ".out");
+            #endif
+
+            Nob_Cmd clang_debug_run_command = {0};
+            nob_cmd_append(&clang_debug_run_command, exe_name);
+            if (!nob_cmd_run(&clang_debug_run_command)) return 1;
+        }
+
+        {
+            char exe_name[256] = "tests/bin/opt_clang_";
+            strcat(exe_name, unit_test->executable_name);
+
+            #if defined(_WIN32)
+                strcat(exe_name, ".exe");
+            #else
+                strcat(exe_name, ".out");
+            #endif
+
+            Nob_Cmd clang_optimized_run_command = {0};
+            nob_cmd_append(&clang_optimized_run_command, exe_name);
+            if (!nob_cmd_run(&clang_optimized_run_command)) return 1;
+        }
+
+        #if JSL_IS_WIN32
+
+            {
+                char exe_name[256] = "tests\\bin\\debug_msvc_";
+
+                strcat(exe_name, unit_test->executable_name);
+                strcat(exe_name, ".exe");
+
+                Nob_Cmd msvc_debug_run_command = {0};
+                nob_cmd_append(&msvc_debug_run_command, exe_name);
+                if (!nob_cmd_run(&msvc_debug_run_command)) return 1;
+            }
+
+            {
+                char exe_name[256] = "tests\\bin\\opt_msvc_";
+
+                strcat(exe_name, unit_test->executable_name);
+                strcat(exe_name, ".exe");
+
+                Nob_Cmd msvc_optimized_run_command = {0};
+                nob_cmd_append(&msvc_optimized_run_command, exe_name);
+                if (!nob_cmd_run(&msvc_optimized_run_command)) return 1;
+            }
+
+        #elif JSL_IS_POSIX
+
+            const char* test_file_name = unit_test->executable_name;
+
+            {
+                char exe_name[256] = "./tests/bin/debug_gcc_";
+
+                strcat(exe_name, test_file_name);
+                strcat(exe_name, ".out");
+
+                Nob_Cmd gcc_debug_run_command = {0};
+                nob_cmd_append(&gcc_debug_run_command, exe_name);
+                if (!nob_cmd_run(&gcc_debug_run_command)) return 1;
+            }
+
+            {
+                char exe_name[256] = "./tests/bin/opt_gcc_";
+
+                strcat(exe_name, test_file_name);
+                strcat(exe_name, ".out");
+
+                Nob_Cmd gcc_optimized_run_command = {0};
+                nob_cmd_append(&gcc_optimized_run_command, exe_name);
+                if (!nob_cmd_run(&gcc_optimized_run_command)) return 1;
+            }
+
         #else
             #error "Unrecognized platform. Only windows and POSIX platforms are supported."
         #endif
