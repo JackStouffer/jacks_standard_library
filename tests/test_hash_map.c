@@ -231,20 +231,24 @@ void test_delete(void)
 
         lok(hashmap.item_count == 3);
 
-        bool delete_res = my_map_delete(&hashmap, 9999999);
+        bool delete_res = int32_to_int32_map_delete(&hashmap, 9999999);
         lok(delete_res == false);
         lok(hashmap.item_count == 3);
 
-        delete_res = my_map_delete(&hashmap, 23940);
+        delete_res = int32_to_int32_map_delete(&hashmap, 23940);
         lok(delete_res == true);
         lok(hashmap.item_count == 2);
 
         int32_t count = 0;
-        MyHashMapIterator iter = my_map_iterator_start(&hashmap);
-        MyHashMapItem* next_item;
-        while ((next_item = my_map_iterator_next(&iter)) != NULL)
+        IntToIntMapIterator iter;
+        int32_t iter_key;
+        int32_t iter_value;
+        bool iter_ok = int32_to_int32_map_iterator_start(&hashmap, &iter);
+        lok(iter_ok == true);
+
+        while (int32_to_int32_map_iterator_next(&iter, &iter_key, &iter_value))
         {
-            lok(next_item->key != 23940);
+            lok(iter_key != 23940);
             ++count;
         }
 
@@ -281,11 +285,16 @@ void test_delete(void)
         lok(hashmap.item_count == 2);
 
         int32_t count = 0;
-        CompMapIterator iter = comp_map_iterator_start(&hashmap);
-        CompMapItem* next_item;
-        while ((next_item = comp_map_iterator_next(&iter)) != NULL)
+
+        IntToCompositeType1MapIterator iter;
+        int32_t iter_key;
+        CompositeType1 iter_value;
+        bool iter_ok = int32_to_comp1_map_iterator_start(&hashmap, &iter);
+        lok(iter_ok == true);
+
+        while (int32_to_comp1_map_iterator_next(&iter, &iter_key, &iter_value))
         {
-            lok(next_item->key != 23940);
+            lok(iter_key != 23940);
             ++count;
         }
 
@@ -400,20 +409,27 @@ void test_iterator(void)
         }
 
         int32_t count = 0;
-        MyHashMapIterator iter = my_map_iterator_start(&hashmap);
-        MyHashMapItem* next_item = NULL;
-        while ((next_item = my_map_iterator_next(&iter)) != NULL)
+
+        IntToIntMapIterator iter;
+        int32_t iter_key;
+        int32_t iter_value;
+        bool iter_ok = int32_to_int32_map_iterator_start(&hashmap, &iter);
+        lok(iter_ok == true);
+
+        while (int32_to_int32_map_iterator_next(&iter, &iter_key, &iter_value))
         {
             ++count;
         }
 
         lok(count == 300);
 
-        my_map_delete(&hashmap, 100);
+        int32_to_int32_map_delete(&hashmap, 100);
 
         count = 0;
-        iter = my_map_iterator_start(&hashmap);
-        while ((next_item = my_map_iterator_next(&iter)) != NULL)
+        iter_ok = int32_to_int32_map_iterator_start(&hashmap);
+        lok(iter_ok == true);
+
+        while (int32_to_int32_map_iterator_next(&iter, &iter_key, &iter_value))
         {
             ++count;
         }
@@ -437,7 +453,7 @@ void test_iterator(void)
         }
 
         int32_t count = 0;
-        CompMapIterator iter = comp_map_iterator_start(&hashmap);
+        IntToCompositeType1MapIterator iter = int32_to_comp1_map_iterator_start(&hashmap);
         CompMapItem* next_item;
         while ((next_item = comp_map_iterator_next(&iter)) != NULL)
         {
@@ -449,7 +465,7 @@ void test_iterator(void)
         comp_map_delete(&hashmap, 100);
 
         count = 0;
-        iter = comp_map_iterator_start(&hashmap);
+        iter = int32_to_comp1_map_iterator_start(&hashmap);
         while ((next_item = comp_map_iterator_next(&iter)) != NULL)
         {
             ++count;
