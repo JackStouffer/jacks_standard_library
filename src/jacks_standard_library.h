@@ -160,6 +160,38 @@ extern "C" {
  * 
  */
 
+#ifndef JSL_ASSERT
+    #include <assert.h>
+
+    void jsl__assert(int condition, char* file, int line)
+    {
+        (void) file;
+        (void) line;
+        assert(condition);
+    }
+
+    #define JSL_ASSERT(condition) jsl__assert(condition, __FILE__, __LINE__)
+#endif
+
+#ifndef JSL_MEMCPY
+    #include <string.h>
+    #define JSL_MEMCPY memcpy
+#endif
+
+#ifndef JSL_MEMCMP
+    #include <string.h>
+    #define JSL_MEMCMP memcmp
+#endif
+
+#ifndef JSL_MEMSET
+    #include <string.h>
+    #define JSL_MEMSET memset
+#endif
+
+#ifndef JSL_STRLEN
+    #include <string.h>
+    #define JSL_STRLEN strlen
+#endif
 
 #if defined(_WIN32)
     
@@ -411,6 +443,17 @@ extern "C" {
  * ```
  */
 #define JSL_TERABYTES(x) x * 1024 * 1024 * 1024 * 1024
+
+
+/**
+ * Round x up the next power of two. If x is a power of two it returns
+ * the same value. To cover this case you can just add one before passing
+ * x in to make sure you always get a larger value.
+ * 
+ * @param x The value to round up
+ * @returns the next power of two
+ */
+uint32_t jsl_next_power_of_two_u32(uint32_t x);
 
 /** 
  * A fat pointer is a representation of a chunk of memory. It **is not** a container
@@ -1579,39 +1622,20 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
         #include <arm_neon.h>
     #endif
+        
+    uint32_t jsl_next_power_of_two_u32(uint32_t x) 
+    {
+        if (x == 0) return 1;
 
-    #ifndef JSL_ASSERT
-        #include <assert.h>
-
-        static void jsl__assert(int condition, char* file, int line)
-        {
-            (void) file;
-            (void) line;
-            assert(condition);
-        }
-
-        #define JSL_ASSERT(condition) jsl__assert(condition, __FILE__, __LINE__)
-    #endif
-
-    #ifndef JSL_MEMCPY
-        #include <string.h>
-        #define JSL_MEMCPY memcpy
-    #endif
-
-    #ifndef JSL_MEMCMP
-        #include <string.h>
-        #define JSL_MEMCMP memcmp
-    #endif
-
-    #ifndef JSL_MEMSET
-        #include <string.h>
-        #define JSL_MEMSET memset
-    #endif
-
-    #ifndef JSL_STRLEN
-        #include <string.h>
-        #define JSL_STRLEN strlen
-    #endif
+        x--;
+        x |= x >> 1;
+        x |= x >> 2;
+        x |= x >> 4;
+        x |= x >> 8;
+        x |= x >> 16;
+        x++;
+        return x;
+    }
 
     #if defined(__ARM_NEON) || defined(__ARM_NEON__)
         static inline uint32_t jsl__neon_movemask_u8(uint8x16_t input)

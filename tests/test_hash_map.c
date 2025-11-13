@@ -34,17 +34,17 @@
 
 #include "minctest.h"
 #include "test_hash_map_types.h"
-#include "tests/hash_maps/comp2_to_int_map.h"
-#include "tests/hash_maps/comp3_to_comp2_map.h"
-#include "tests/hash_maps/int32_to_comp1_map.h"
-#include "tests/hash_maps/int32_to_int32_map.h"
+#include "hash_maps/comp2_to_int_map.h"
+#include "hash_maps/comp3_to_comp2_map.h"
+#include "hash_maps/int32_to_comp1_map.h"
+#include "hash_maps/int32_to_int32_map.h"
 
 const int64_t arena_size = 2 * 1024 * 1024;
 JSLArena arena;
 
 void test_insert(void)
 {
-    jss_arena_reset(&arena);
+    jsl_arena_reset(&arena);
 
     {
         IntToIntMap hashmap;
@@ -56,7 +56,7 @@ void test_insert(void)
         lok(hashmap.item_count == 1);
     }
 
-    jss_arena_reset(&arena);
+    jsl_arena_reset(&arena);
 
     {
         IntToCompositeType1Map hashmap;
@@ -71,7 +71,7 @@ void test_insert(void)
         lok(hashmap.item_count == 1);
     }
 
-    jss_arena_reset(&arena);
+    jsl_arena_reset(&arena);
 
     {
         CompositeType2ToIntMap hashmap;
@@ -87,7 +87,7 @@ void test_insert(void)
         lok(hashmap.item_count == 1);
     }
 
-    jss_arena_reset(&arena);
+    jsl_arena_reset(&arena);
 
     {
         CompositeTyp3ToCompositeType2Map hashmap;
@@ -112,12 +112,12 @@ void test_insert(void)
         lok(hashmap.item_count == 1);
     }
 
-    jss_arena_reset(&arena);
+    jsl_arena_reset(&arena);
 }
 
 void test_get(void)
 {
-    jss_arena_reset(&arena);
+    jsl_arena_reset(&arena);
 
     {
         IntToIntMap hashmap;
@@ -133,7 +133,7 @@ void test_get(void)
         lok(*get_res == 1111);
     }
 
-    jss_arena_reset(&arena);
+    jsl_arena_reset(&arena);
 
     {
         IntToCompositeType1Map hashmap;
@@ -153,7 +153,7 @@ void test_get(void)
         lok(memcmp(get_res, &value, sizeof(CompositeType1)) == 0);
     }
 
-    jss_arena_reset(&arena);
+    jsl_arena_reset(&arena);
 
     {
         CompositeType2ToIntMap hashmap;
@@ -176,7 +176,7 @@ void test_get(void)
         lok(*get_res == 777777);
     }
 
-    jss_arena_reset(&arena);
+    jsl_arena_reset(&arena);
 
     {
         CompositeTyp3ToCompositeType2Map hashmap;
@@ -209,12 +209,12 @@ void test_get(void)
         lok(memcmp(get_res, &value, sizeof(CompositeType1)) == 0);
     }
 
-    jss_arena_reset(&arena);
+    jsl_arena_reset(&arena);
 }
 
 void test_delete(void)
 {
-    jss_arena_reset(&arena);
+    jsl_arena_reset(&arena);
 
     {
         IntToIntMap hashmap;
@@ -252,7 +252,7 @@ void test_delete(void)
         lok(count == hashmap.item_count);
     }
 
-    jss_arena_reset(&arena);
+    jsl_arena_reset(&arena);
 
     {
         IntToCompositeType1Map hashmap;
@@ -293,7 +293,7 @@ void test_delete(void)
         lok(count == hashmap.item_count);
     }
 
-    jss_arena_reset(&arena);
+    jsl_arena_reset(&arena);
 
     {
         CompositeType2ToIntMap hashmap;
@@ -336,7 +336,7 @@ void test_delete(void)
         lok(count == hashmap.item_count);
     }
 
-    jss_arena_reset(&arena);
+    jsl_arena_reset(&arena);
 
     {
         CompositeTyp3ToCompositeType2Map hashmap;
@@ -382,12 +382,12 @@ void test_delete(void)
         lok(count == hashmap.item_count);
     }
 
-    jss_arena_reset(&arena);
+    jsl_arena_reset(&arena);
 }
 
 void test_iterator(void)
 {
-    jss_arena_reset(&arena);
+    jsl_arena_reset(&arena);
 
     {
         IntToIntMap hashmap;
@@ -421,7 +421,7 @@ void test_iterator(void)
         lok(count == 299);
     }
 
-    jss_arena_reset(&arena);
+    jsl_arena_reset(&arena);
 
     {
         IntToCompositeType1Map hashmap;
@@ -458,7 +458,7 @@ void test_iterator(void)
         lok(count == 299);
     }
 
-    jss_arena_reset(&arena);
+    jsl_arena_reset(&arena);
 
     {
         CompositeType2ToIntMap hashmap;
@@ -498,7 +498,7 @@ void test_iterator(void)
         lok(count == 299);
     }
 
-    jss_arena_reset(&arena);
+    jsl_arena_reset(&arena);
 
     {
         CompositeTyp3ToCompositeType2Map hashmap;
@@ -543,17 +543,17 @@ void test_iterator(void)
         lok(count == 299);
     }
 
-    jss_arena_reset(&arena);
+    jsl_arena_reset(&arena);
 }
 
 // void test_string_insert(void)
 // {
-//     jss_arena_reset(&arena);
+//     jsl_arena_reset(&arena);
 
 //     StrMap hashmap;
 //     str_map_ctor(&hashmap, &arena);
 
-//     JSLFatPtr key = jss_fatptr_from_cstr("string_key");
+//     JSLFatPtr key = jsl_fatptr_from_cstr("string_key");
 //     CompositeType1 value;
 //     value.a = 887;
 //     value.b = 56784587;
@@ -562,20 +562,20 @@ void test_iterator(void)
 //     lok(insert_res == true);
 //     lok(hashmap.item_count == 1);
 
-//     jss_arena_reset(&arena);
+//     jsl_arena_reset(&arena);
 // }
 
 // void test_string_get(void)
 // {
-//     jss_arena_reset(&arena);
+//     jsl_arena_reset(&arena);
 
 //     StrMap hashmap;
 //     str_map_ctor(&hashmap, &arena);
 
-//     JSLFatPtr key1 = jss_fatptr_from_cstr("minister");
-//     JSLFatPtr key2 = jss_fatptr_from_cstr("agile");
-//     JSLFatPtr key3 = jss_fatptr_from_cstr("disagreement");
-//     JSLFatPtr key4 = jss_fatptr_from_cstr("invisible");
+//     JSLFatPtr key1 = jsl_fatptr_from_cstr("minister");
+//     JSLFatPtr key2 = jsl_fatptr_from_cstr("agile");
+//     JSLFatPtr key3 = jsl_fatptr_from_cstr("disagreement");
+//     JSLFatPtr key4 = jsl_fatptr_from_cstr("invisible");
 //     JSLFatPtr key5 = {0};
 
 //     CompositeType1 value;
@@ -608,7 +608,7 @@ void test_iterator(void)
 //     lok(get_res != NULL);
 //     lok(get_res->b == 47689);
 
-//     jss_arena_reset(&arena);
+//     jsl_arena_reset(&arena);
 // }
 
 // static void rand_str(uint8_t* dest, int32_t length)
@@ -626,7 +626,7 @@ void test_iterator(void)
 
 // void test_string_iterator(void)
 // {
-//     jss_arena_reset(&arena);
+//     jsl_arena_reset(&arena);
 
 //     uint8_t key_data[32];
 
@@ -639,7 +639,7 @@ void test_iterator(void)
 //     for (int32_t i = 0; i < 300; ++i)
 //     {
 //         rand_str(key_data, 32);
-//         int32_t res = str_map_insert(&hashmap, jss_fatptr_ctor(key_data, 32), value);
+//         int32_t res = str_map_insert(&hashmap, jsl_fatptr_ctor(key_data, 32), value);
 //         lok(res == true);
 //     }
 
@@ -656,12 +656,12 @@ void test_iterator(void)
 
 //     lok(count == 301);
 
-//     jss_arena_reset(&arena);
+//     jsl_arena_reset(&arena);
 // }
 
 // void test_string_delete(void)
 // {
-//     jss_arena_reset(&arena);
+//     jsl_arena_reset(&arena);
 
 //     StrMap hashmap;
 //     str_map_ctor(&hashmap, &arena);
@@ -670,10 +670,10 @@ void test_iterator(void)
 //     value.a = 887;
 //     value.b = 56784587;
 
-//     JSLFatPtr key1 = jss_fatptr_from_cstr("minister");
-//     JSLFatPtr key2 = jss_fatptr_from_cstr("agile");
-//     JSLFatPtr key3 = jss_fatptr_from_cstr("disagreement");
-//     JSLFatPtr key4 = jss_fatptr_from_cstr("invisible");
+//     JSLFatPtr key1 = jsl_fatptr_from_cstr("minister");
+//     JSLFatPtr key2 = jsl_fatptr_from_cstr("agile");
+//     JSLFatPtr key3 = jsl_fatptr_from_cstr("disagreement");
+//     JSLFatPtr key4 = jsl_fatptr_from_cstr("invisible");
 //     JSLFatPtr key5 = {0};
 
 //     bool insert_res = str_map_insert(&hashmap, key1, value);
@@ -703,7 +703,7 @@ void test_iterator(void)
 //     StrMapIteratorReturn next_item;
 //     while ((next_item = str_map_iterator_next(&iter)).value != NULL)
 //     {
-//         lok(jss_fatptr_memory_compare(next_item.key, key2) == false);
+//         lok(jsl_fatptr_memory_compare(next_item.key, key2) == false);
 //         ++count;
 //     }
 
@@ -713,156 +713,156 @@ void test_iterator(void)
 
 // void test_string_to_string_insert(void)
 // {
-//     jss_arena_reset(&arena);
+//     jsl_arena_reset(&arena);
 
 //     JSLStrToStrMap hashmap;
-//     jss_str_to_str_map_ctor(&hashmap, &arena);
+//     jsl_str_to_str_map_ctor(&hashmap, &arena);
 
-//     JSLFatPtr key = jss_fatptr_from_cstr("string_key");
-//     JSLFatPtr value = jss_fatptr_from_cstr("string_value");
-//     int32_t insert_res = jss_str_to_str_map_insert(&hashmap, key, value);
+//     JSLFatPtr key = jsl_fatptr_from_cstr("string_key");
+//     JSLFatPtr value = jsl_fatptr_from_cstr("string_value");
+//     int32_t insert_res = jsl_str_to_str_map_insert(&hashmap, key, value);
 
 //     lok(insert_res == true);
 //     lok(hashmap.item_count == 1);
 
-//     jss_arena_reset(&arena);
+//     jsl_arena_reset(&arena);
 // }
 
 // void test_string_to_string_get(void)
 // {
-//     jss_arena_reset(&arena);
+//     jsl_arena_reset(&arena);
 
 //     JSLStrToStrMap hashmap;
-//     jss_str_to_str_map_ctor(&hashmap, &arena);
+//     jsl_str_to_str_map_ctor(&hashmap, &arena);
 
-//     JSLFatPtr key1 = jss_fatptr_from_cstr("minister");
-//     JSLFatPtr key2 = jss_fatptr_from_cstr("agile");
-//     JSLFatPtr key3 = jss_fatptr_from_cstr("disagreement");
-//     JSLFatPtr key4 = jss_fatptr_from_cstr("invisible");
+//     JSLFatPtr key1 = jsl_fatptr_from_cstr("minister");
+//     JSLFatPtr key2 = jsl_fatptr_from_cstr("agile");
+//     JSLFatPtr key3 = jsl_fatptr_from_cstr("disagreement");
+//     JSLFatPtr key4 = jsl_fatptr_from_cstr("invisible");
 //     JSLFatPtr key5 = {0};
-//     JSLFatPtr key6 = jss_fatptr_from_cstr("headquarters");
+//     JSLFatPtr key6 = jsl_fatptr_from_cstr("headquarters");
 
-//     JSLFatPtr value1 = jss_fatptr_from_cstr("conductor");
-//     JSLFatPtr value2 = jss_fatptr_from_cstr("participate");
-//     JSLFatPtr value3 = jss_fatptr_from_cstr("situation");
-//     JSLFatPtr value4 = jss_fatptr_from_cstr("advocate");
+//     JSLFatPtr value1 = jsl_fatptr_from_cstr("conductor");
+//     JSLFatPtr value2 = jsl_fatptr_from_cstr("participate");
+//     JSLFatPtr value3 = jsl_fatptr_from_cstr("situation");
+//     JSLFatPtr value4 = jsl_fatptr_from_cstr("advocate");
 //     JSLFatPtr value5 = {0};
 
 //     bool insert_res;
-//     insert_res = jss_str_to_str_map_insert(&hashmap, key1, value1);
+//     insert_res = jsl_str_to_str_map_insert(&hashmap, key1, value1);
 //     lok(insert_res == true);
-//     insert_res = jss_str_to_str_map_insert(&hashmap, key2, value2);
+//     insert_res = jsl_str_to_str_map_insert(&hashmap, key2, value2);
 //     lok(insert_res == true);
-//     insert_res = jss_str_to_str_map_insert(&hashmap, key3, value3);
+//     insert_res = jsl_str_to_str_map_insert(&hashmap, key3, value3);
 //     lok(insert_res == true);
-//     insert_res = jss_str_to_str_map_insert(&hashmap, key5, value4);
+//     insert_res = jsl_str_to_str_map_insert(&hashmap, key5, value4);
 //     lok(insert_res == true);
-//     insert_res = jss_str_to_str_map_insert(&hashmap, key6, value5);
+//     insert_res = jsl_str_to_str_map_insert(&hashmap, key6, value5);
 //     lok(insert_res == true);
 
 //     JSLFatPtr get_value;
-//     bool get_res = jss_str_to_str_map_get(&hashmap, key1, &get_value);
+//     bool get_res = jsl_str_to_str_map_get(&hashmap, key1, &get_value);
 //     lok(get_res == true);
-//     lok(jss_fatptr_memory_compare(get_value, value1));
+//     lok(jsl_fatptr_memory_compare(get_value, value1));
 
-//     get_res = jss_str_to_str_map_get(&hashmap, key2, &get_value);
+//     get_res = jsl_str_to_str_map_get(&hashmap, key2, &get_value);
 //     lok(get_res == true);
-//     lok(jss_fatptr_memory_compare(get_value, value2));
+//     lok(jsl_fatptr_memory_compare(get_value, value2));
 
-//     get_res = jss_str_to_str_map_get(&hashmap, key3, &get_value);
+//     get_res = jsl_str_to_str_map_get(&hashmap, key3, &get_value);
 //     lok(get_res == true);
-//     lok(jss_fatptr_memory_compare(get_value, value3));
+//     lok(jsl_fatptr_memory_compare(get_value, value3));
 
-//     get_res = jss_str_to_str_map_get(&hashmap, key4, &get_value);
+//     get_res = jsl_str_to_str_map_get(&hashmap, key4, &get_value);
 //     lok(get_res == false);
 
-//     get_res = jss_str_to_str_map_get(&hashmap, key5, &get_value);
+//     get_res = jsl_str_to_str_map_get(&hashmap, key5, &get_value);
 //     lok(get_res == true);
-//     lok(jss_fatptr_memory_compare(get_value, value4));
+//     lok(jsl_fatptr_memory_compare(get_value, value4));
 
-//     get_res = jss_str_to_str_map_get(&hashmap, key6, &get_value);
+//     get_res = jsl_str_to_str_map_get(&hashmap, key6, &get_value);
 //     lok(get_res == true);
 //     lok(get_value.data == NULL);
 
-//     jss_arena_reset(&arena);
+//     jsl_arena_reset(&arena);
 // }
 
 // void test_string_to_string_iterator(void)
 // {
-//     jss_arena_reset(&arena);
+//     jsl_arena_reset(&arena);
 
 //     uint8_t key_data[32];
-//     JSLFatPtr value = jss_fatptr_from_cstr("conductor");
+//     JSLFatPtr value = jsl_fatptr_from_cstr("conductor");
 
 //     JSLStrToStrMap hashmap;
-//     jss_str_to_str_map_ctor(&hashmap, &arena);
+//     jsl_str_to_str_map_ctor(&hashmap, &arena);
 
 //     for (int32_t i = 0; i < 300; ++i)
 //     {
 //         rand_str(key_data, 32);
-//         int32_t res = jss_str_to_str_map_insert(&hashmap, jss_fatptr_ctor(key_data, 32), value);
+//         int32_t res = jsl_str_to_str_map_insert(&hashmap, jsl_fatptr_ctor(key_data, 32), value);
 //         lok(res == true);
 //     }
 
 //     JSLFatPtr null_key = {0};
-//     jss_str_to_str_map_insert(&hashmap, null_key, value);
+//     jsl_str_to_str_map_insert(&hashmap, null_key, value);
 
 //     int32_t count = 0;
-//     JSLStrToStrMapIterator iter = jss_str_to_str_map_iterator_start(&hashmap);
+//     JSLStrToStrMapIterator iter = jsl_str_to_str_map_iterator_start(&hashmap);
 //     JSLStrToStrMapIteratorReturn next_item;
-//     while ((next_item = jss_str_to_str_map_iterator_next(&iter)).value != NULL)
+//     while ((next_item = jsl_str_to_str_map_iterator_next(&iter)).value != NULL)
 //     {
 //         ++count;
 //     }
 
 //     lok(count == 301);
 
-//     jss_arena_reset(&arena);
+//     jsl_arena_reset(&arena);
 // }
 
 // void test_string_to_string_delete(void)
 // {
-//     jss_arena_reset(&arena);
+//     jsl_arena_reset(&arena);
 
 //     JSLStrToStrMap hashmap;
-//     jss_str_to_str_map_ctor(&hashmap, &arena);
+//     jsl_str_to_str_map_ctor(&hashmap, &arena);
 
-//     JSLFatPtr value = jss_fatptr_from_cstr("conductor");
+//     JSLFatPtr value = jsl_fatptr_from_cstr("conductor");
 
-//     JSLFatPtr key1 = jss_fatptr_from_cstr("minister");
-//     JSLFatPtr key2 = jss_fatptr_from_cstr("agile");
-//     JSLFatPtr key3 = jss_fatptr_from_cstr("disagreement");
-//     JSLFatPtr key4 = jss_fatptr_from_cstr("invisible");
+//     JSLFatPtr key1 = jsl_fatptr_from_cstr("minister");
+//     JSLFatPtr key2 = jsl_fatptr_from_cstr("agile");
+//     JSLFatPtr key3 = jsl_fatptr_from_cstr("disagreement");
+//     JSLFatPtr key4 = jsl_fatptr_from_cstr("invisible");
 //     JSLFatPtr key5 = {0};
 
-//     bool insert_res = jss_str_to_str_map_insert(&hashmap, key1, value);
+//     bool insert_res = jsl_str_to_str_map_insert(&hashmap, key1, value);
 //     lok(insert_res == true);
 
-//     insert_res = jss_str_to_str_map_insert(&hashmap, key2, value);
+//     insert_res = jsl_str_to_str_map_insert(&hashmap, key2, value);
 //     lok(insert_res == true);
 
-//     insert_res = jss_str_to_str_map_insert(&hashmap, key3, value);
+//     insert_res = jsl_str_to_str_map_insert(&hashmap, key3, value);
 //     lok(insert_res == true);
 
-//     insert_res = jss_str_to_str_map_insert(&hashmap, key5, value);
+//     insert_res = jsl_str_to_str_map_insert(&hashmap, key5, value);
 //     lok(insert_res == true);
 
 //     lok(hashmap.item_count == 4);
 
-//     bool delete_res = jss_str_to_str_map_delete(&hashmap, key4);
+//     bool delete_res = jsl_str_to_str_map_delete(&hashmap, key4);
 //     lok(delete_res == false);
 //     lok(hashmap.item_count == 4);
 
-//     delete_res = jss_str_to_str_map_delete(&hashmap, key2);
+//     delete_res = jsl_str_to_str_map_delete(&hashmap, key2);
 //     lok(delete_res == true);
 //     lok(hashmap.item_count == 3);
 
 //     int32_t count = 0;
-//     JSLStrToStrMapIterator iter = jss_str_to_str_map_iterator_start(&hashmap);
+//     JSLStrToStrMapIterator iter = jsl_str_to_str_map_iterator_start(&hashmap);
 //     JSLStrToStrMapIteratorReturn next_item;
-//     while ((next_item = jss_str_to_str_map_iterator_next(&iter)).value != NULL)
+//     while ((next_item = jsl_str_to_str_map_iterator_next(&iter)).value != NULL)
 //     {
-//         lok(jss_fatptr_memory_compare(next_item.key, key2) == false);
+//         lok(jsl_fatptr_memory_compare(next_item.key, key2) == false);
 //         ++count;
 //     }
 
@@ -872,31 +872,31 @@ void test_iterator(void)
 
 // void test_string_to_string_clear(void)
 // {
-//     jss_arena_reset(&arena);
+//     jsl_arena_reset(&arena);
 
 //     JSLStrToStrMap hashmap;
-//     jss_str_to_str_map_ctor(&hashmap, &arena);
+//     jsl_str_to_str_map_ctor(&hashmap, &arena);
 
-//     JSLFatPtr value = jss_fatptr_from_cstr("conductor");
+//     JSLFatPtr value = jsl_fatptr_from_cstr("conductor");
 
-//     JSLFatPtr key1 = jss_fatptr_from_cstr("minister");
-//     JSLFatPtr key2 = jss_fatptr_from_cstr("agile");
+//     JSLFatPtr key1 = jsl_fatptr_from_cstr("minister");
+//     JSLFatPtr key2 = jsl_fatptr_from_cstr("agile");
 //     JSLFatPtr key3 = {0};
 
-//     jss_str_to_str_map_insert(&hashmap, key1, value);
-//     jss_str_to_str_map_insert(&hashmap, key2, value);
-//     jss_str_to_str_map_insert(&hashmap, key3, value);
+//     jsl_str_to_str_map_insert(&hashmap, key1, value);
+//     jsl_str_to_str_map_insert(&hashmap, key2, value);
+//     jsl_str_to_str_map_insert(&hashmap, key3, value);
 
 //     lok(hashmap.item_count == 3);
-//     jss_str_to_str_map_clear(&hashmap);
+//     jsl_str_to_str_map_clear(&hashmap);
 //     lok(hashmap.item_count == 0);
 
 //     int32_t count = 0;
-//     JSLStrToStrMapIterator iter = jss_str_to_str_map_iterator_start(&hashmap);
+//     JSLStrToStrMapIterator iter = jsl_str_to_str_map_iterator_start(&hashmap);
 //     JSLStrToStrMapIteratorReturn next_item;
-//     while ((next_item = jss_str_to_str_map_iterator_next(&iter)).value != NULL)
+//     while ((next_item = jsl_str_to_str_map_iterator_next(&iter)).value != NULL)
 //     {
-//         lok(jss_fatptr_memory_compare(next_item.key, key2) == false);
+//         lok(jsl_fatptr_memory_compare(next_item.key, key2) == false);
 //         ++count;
 //     }
 
@@ -905,7 +905,7 @@ void test_iterator(void)
 
 int main(void)
 {
-    arena = jss_arena_ctor(malloc(arena_size), arena_size);
+    arena = jsl_arena_ctor(malloc(arena_size), arena_size);
 
     lrun("Test hashmap insert", test_insert);
     lrun("Test hashmap get", test_get);

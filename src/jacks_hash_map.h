@@ -278,9 +278,15 @@ RAPIDHASH_INLINE_CONSTEXPR uint64_t jsl__rapidhash_internal(const void *key, siz
 *
 *  Returns a 64-bit hash.
 */
-RAPIDHASH_INLINE_CONSTEXPR uint64_t jsl__rapidhash_withSeed(const void *key, size_t len, uint64_t seed) RAPIDHASH_NOEXCEPT {
+RAPIDHASH_INLINE_CONSTEXPR uint64_t jsl__rapidhash_withSeed(
+    const void *key,
+    size_t len,
+    uint64_t seed
+) RAPIDHASH_NOEXCEPT {
     return jsl__rapidhash_internal(key, len, seed, jsl__rapid_secret);
 }
+
+#define JSL__HASH_MAP_GET_SET_FLAG_INDEX(slot_number) slot_number >> 5L
 
 enum JSL__HashmapFlags
 {
