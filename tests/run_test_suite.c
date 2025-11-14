@@ -107,7 +107,7 @@ static HashMapDecl hash_map_declarations[] = {
         }
     },
     {
-        "CompositeTyp3ToCompositeType2Map",
+        "CompositeType3ToCompositeType2Map",
         "comp3_to_comp2_map",
         "CompositeType3",
         "CompositeType2",

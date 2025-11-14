@@ -162,14 +162,7 @@ extern "C" {
 
 #ifndef JSL_ASSERT
     #include <assert.h>
-
-    void jsl__assert(int condition, char* file, int line)
-    {
-        (void) file;
-        (void) line;
-        assert(condition);
-    }
-
+    void jsl__assert(int condition, char* file, int line);
     #define JSL_ASSERT(condition) jsl__assert(condition, __FILE__, __LINE__)
 #endif
 
@@ -232,9 +225,9 @@ extern "C" {
 
 #ifndef JSL_DEFAULT_ALLOCATION_ALIGNMENT
     /**
-     * Sets the alignment of allocations that aren't explicitly set. Defaults to 16 bytes.
+     * Sets the alignment of allocations that aren't explicitly set. Defaults to 8 bytes.
      */
-    #define JSL_DEFAULT_ALLOCATION_ALIGNMENT 16
+    #define JSL_DEFAULT_ALLOCATION_ALIGNMENT 8
 #endif
 
 #ifndef JSL_WARN_UNUSED
@@ -701,7 +694,7 @@ typedef struct JSLArena
  * Having the memory in chunks means that a single arena is not wasteful with its
  * available memory.
  * 
- * By default, each chunk is 256 bytes and is aligned to a 32 byte address. These are
+ * By default, each chunk is 256 bytes and is aligned to a 8 byte address. These are
  * tuneable parameters that you can set during init. The custom alignment helps if you
  * want to use SIMD code on the consuming code.
  * 
@@ -1622,6 +1615,13 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
         #include <arm_neon.h>
     #endif
+
+    void jsl__assert(int condition, char* file, int line)
+    {
+        (void) file;
+        (void) line;
+        assert(condition);
+    }
         
     uint32_t jsl_next_power_of_two_u32(uint32_t x) 
     {
@@ -2557,7 +2557,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             builder,
             arena,
             256,
-            32
+            8
         );
     }
 

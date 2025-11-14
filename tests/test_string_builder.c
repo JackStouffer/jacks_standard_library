@@ -58,7 +58,7 @@ void test_jsl_string_builder_init(void)
     lok(ok);
     lok(builder.arena == &global_arena);
     lok(builder.chunk_size == 256);
-    lok(builder.alignment == 32);
+    lok(builder.alignment == 8);
     lok(builder.head != NULL);
     lok(builder.tail == builder.head);
     lok(builder.head->buffer.length == builder.chunk_size);
