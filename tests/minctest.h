@@ -33,18 +33,18 @@
  * Example:
  *
  *      void test1() {
- *           lok('a' == 'a');
+ *           TEST_BOOL('a' == 'a');
  *      }
  *
  *      void test2() {
- *           lequal(5, 6);
- *           lfequal(5.5, 5.6);
+ *           TEST_INT32_EQUAL(5, 6);
+ *           TEST_F32_EQUAL(5.5, 5.6);
  *      }
  *
  *      int main() {
- *           lrun("test1", test1);
- *           lrun("test2", test2);
- *           lresults();
+ *           RUN_TEST_FUNCTION("test1", test1);
+ *           RUN_TEST_FUNCTION("test2", test2);
+ *           TEST_RESULTS();
  *           return lfails != 0;
  *      }
  *
@@ -67,8 +67,8 @@
 
 
 /* How far apart can floats be before we consider them unequal. */
-#ifndef LTEST_FLOAT_TOLERANCE
-#define LTEST_FLOAT_TOLERANCE 0.001
+#ifndef TESTING_FLOAT_TOLERANCE
+#define TESTING_FLOAT_TOLERANCE 0.001
 #endif
 
 
@@ -79,7 +79,7 @@ static size_t lfails = 0;
 
 
 /* Display the test results. */
-#define lresults() do {\
+#define TEST_RESULTS() do {\
     if (lfails == 0) {\
         printf("ALL TESTS PASSED (%zu/%zu)\n", ltests, ltests);\
     } else {\
@@ -89,7 +89,7 @@ static size_t lfails = 0;
 
 
 /* Run a test. Name can be any string to print out, test is the function name to call. */
-#define lrun(name, test) do {\
+#define RUN_TEST_FUNCTION(name, test) do {\
     const size_t ts = ltests;\
     const size_t fs = lfails;\
     const clock_t start = clock();\
@@ -102,7 +102,7 @@ static size_t lfails = 0;
 
 
 /* Assert a true statement. */
-#define lok(test) do {\
+#define TEST_BOOL(test) do {\
     ++ltests;\
     if (!(test)) {\
         ++lfails;\
@@ -111,7 +111,7 @@ static size_t lfails = 0;
 
 
 /* Prototype to assert equal. */
-#define lequal_base(equality, a, b, format) do {\
+#define TEST_INT32_EQUAL_base(equality, a, b, format) do {\
     ++ltests;\
     if (!(equality)) {\
         ++lfails;\
@@ -120,26 +120,22 @@ static size_t lfails = 0;
 
 
 /* Assert two integers are equal. */
-#define lequal(a, b)\
-    lequal_base((a) == (b), a, b, "%d")
+#define TEST_INT32_EQUAL(a, b)\
+    TEST_INT32_EQUAL_base((a) == (b), a, b, "%d")
 
 
 /* Assert two int64 are equal. */
 #define TEST_INT64_EQUAL(a, b)\
-    lequal_base((a) == (b), a, b, "%" PRId64)
+    TEST_INT32_EQUAL_base((a) == (b), a, b, "%" PRId64)
 
 
-/* Assert two floats are equal (Within LTEST_FLOAT_TOLERANCE). */
-#define lfequal(a, b)\
-    lequal_base(fabs((double)(a)-(double)(b)) <= LTEST_FLOAT_TOLERANCE\
+/* Assert two floats are equal (Within TESTING_FLOAT_TOLERANCE). */
+#define TEST_F32_EQUAL(a, b)\
+    TEST_INT32_EQUAL_base(fabs((double)(a)-(double)(b)) <= TESTING_FLOAT_TOLERANCE\
      && fabs((double)(a)-(double)(b)) == fabs((double)(a)-(double)(b)), (double)(a), (double)(b), "%f")
 
 
-/* Assert two strings are equal. */
-#define lsequal(a, b)\
-    lequal_base(strcmp(a, b) == 0, a, b, "%s")
-
-#define lmemcmp(buf_a, buf_b, buf_len) do {\
+#define TEST_BUFFERS_EQUAL(buf_a, buf_b, buf_len) do {\
     ++ltests;\
     const unsigned char *const _lm_a = (const unsigned char *)(buf_a);\
     const unsigned char *const _lm_b = (const unsigned char *)(buf_b);\

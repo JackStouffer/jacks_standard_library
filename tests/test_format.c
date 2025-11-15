@@ -57,7 +57,7 @@ SOFTWARE.
 
 #define CHECK_END(str)                                                              \
     JSLFatPtr written = jsl_fatptr_slice(buffer, 0, ret);                           \
-    lok(jsl_fatptr_cstr_compare(written, str) && ret == (int64_t) strlen(str))
+    TEST_BOOL(jsl_fatptr_cstr_compare(written, str) && ret == (int64_t) strlen(str))
 
 #define CHECK9(str, v1, v2, v3, v4, v5, v6, v7, v8, v9) \
 {                                                                                   \
@@ -341,7 +341,7 @@ static FILE* jsl__open_failing_stream(void)
 void test_jsl_format_file_formats_and_writes_output(void)
 {
     FILE* file = tmpfile();
-    lok(file != NULL);
+    TEST_BOOL(file != NULL);
     if (file == NULL)
         return;
 
@@ -351,16 +351,16 @@ void test_jsl_format_file_formats_and_writes_output(void)
         "World",
         42
     );
-    lok(res == true);
+    TEST_BOOL(res == true);
 
-    lok(fflush(file) == 0);
-    lok(fseek(file, 0, SEEK_SET) == 0);
+    TEST_BOOL(fflush(file) == 0);
+    TEST_BOOL(fseek(file, 0, SEEK_SET) == 0);
 
     char buffer[64] = {0};
     size_t read = fread(buffer, 1, sizeof(buffer), file);
     const char* expected = "Hello World 42";
-    lok(read == strlen(expected));
-    lok(memcmp(buffer, expected, read) == 0);
+    TEST_BOOL(read == strlen(expected));
+    TEST_BOOL(memcmp(buffer, expected, read) == 0);
 
     fclose(file);
 }
@@ -368,17 +368,17 @@ void test_jsl_format_file_formats_and_writes_output(void)
 void test_jsl_format_file_accepts_empty_format(void)
 {
     FILE* file = tmpfile();
-    lok(file != NULL);
+    TEST_BOOL(file != NULL);
     if (file == NULL)
         return;
 
     bool res = jsl_format_file(file, JSL_FATPTR_EXPRESSION(""));
-    lok(res == true);
+    TEST_BOOL(res == true);
 
-    lok(fflush(file) == 0);
-    lok(fseek(file, 0, SEEK_END) == 0);
+    TEST_BOOL(fflush(file) == 0);
+    TEST_BOOL(fseek(file, 0, SEEK_END) == 0);
     long size = ftell(file);
-    lok(size == 0);
+    TEST_BOOL(size == 0);
 
     fclose(file);
 }
@@ -386,7 +386,7 @@ void test_jsl_format_file_accepts_empty_format(void)
 void test_jsl_format_file_null_out_parameter(void)
 {
     bool res = jsl_format_file(NULL, JSL_FATPTR_EXPRESSION("Hello"));
-    lok(!res);
+    TEST_BOOL(!res);
 }
 
 void test_jsl_format_file_null_format_pointer(void)
@@ -397,7 +397,7 @@ void test_jsl_format_file_null_format_pointer(void)
     };
 
     bool res = jsl_format_file(stdout, fmt);
-    lok(!res);
+    TEST_BOOL(!res);
 }
 
 void test_jsl_format_file_negative_length(void)
@@ -408,7 +408,7 @@ void test_jsl_format_file_negative_length(void)
     };
 
     bool res = jsl_format_file(stdout, fmt);
-    lok(!res);
+    TEST_BOOL(!res);
 }
 
 void test_jsl_format_file_write_failure(void)
@@ -420,13 +420,13 @@ void test_jsl_format_file_write_failure(void)
         close(pipe_fds[0]);
 
         FILE* writer = fdopen(pipe_fds[1], "w");
-        lok(writer != NULL);
+        TEST_BOOL(writer != NULL);
         if (writer != NULL)
         {
-            lok(setvbuf(writer, NULL, _IONBF, 0) == 0);
+            TEST_BOOL(setvbuf(writer, NULL, _IONBF, 0) == 0);
             void (*previous_handler)(int) = signal(SIGPIPE, SIG_IGN);
             bool res = jsl_format_file(writer, JSL_FATPTR_EXPRESSION("Hello"));
-            lok(!res);
+            TEST_BOOL(!res);
             fclose(writer);
             if (previous_handler == SIG_ERR)
             {
@@ -448,7 +448,7 @@ void test_jsl_format_file_write_failure(void)
     if (file != NULL)
     {
         bool res = jsl_format_file(file, JSL_FATPTR_EXPRESSION("Hello"));
-        lok(!res);
+        TEST_BOOL(!res);
         fclose(file);
         return;
     }
@@ -459,7 +459,7 @@ void test_jsl_format_file_write_failure(void)
         fclose(setup);
 
     FILE* read_only = fopen(path, "rb");
-    lok(read_only != NULL);
+    TEST_BOOL(read_only != NULL);
     if (read_only == NULL)
     {
         remove(path);
@@ -467,7 +467,7 @@ void test_jsl_format_file_write_failure(void)
     }
 
     bool res = jsl_format_file(read_only, JSL_FATPTR_EXPRESSION("Hello"));
-    lok(!res);
+    TEST_BOOL(!res);
 
     fclose(read_only);
     remove(path);
@@ -481,23 +481,23 @@ int main(void)
         setvbuf(stdout, NULL, _IONBF, 0);
     #endif
 
-    lrun("Test format ints", test_integers);
-    lrun("Test format floating point", test_floating_point);
-    lrun("Test format length capture", test_n);
-    lrun("Test format hex floats", test_hex_floats);
-    lrun("Test format pointer", test_pointer);
-    lrun("Test format fat pointer", test_fatptr_format);
-    lrun("Test format quote modifier", test_quote_modifier);
-    lrun("Test format non-standard", test_nonstandard);
-    lrun("Test format separators", test_separators);
+    RUN_TEST_FUNCTION("Test format ints", test_integers);
+    RUN_TEST_FUNCTION("Test format floating point", test_floating_point);
+    RUN_TEST_FUNCTION("Test format length capture", test_n);
+    RUN_TEST_FUNCTION("Test format hex floats", test_hex_floats);
+    RUN_TEST_FUNCTION("Test format pointer", test_pointer);
+    RUN_TEST_FUNCTION("Test format fat pointer", test_fatptr_format);
+    RUN_TEST_FUNCTION("Test format quote modifier", test_quote_modifier);
+    RUN_TEST_FUNCTION("Test format non-standard", test_nonstandard);
+    RUN_TEST_FUNCTION("Test format separators", test_separators);
 
-    lrun("Test jsl_format_file formats and writes output", test_jsl_format_file_formats_and_writes_output);
-    lrun("Test jsl_format_file accepts empty format", test_jsl_format_file_accepts_empty_format);
-    lrun("Test jsl_format_file null out parameter", test_jsl_format_file_null_out_parameter);
-    lrun("Test jsl_format_file null format pointer", test_jsl_format_file_null_format_pointer);
-    lrun("Test jsl_format_file negative length", test_jsl_format_file_negative_length);
-    lrun("Test jsl_format_file write failure", test_jsl_format_file_write_failure);
+    RUN_TEST_FUNCTION("Test jsl_format_file formats and writes output", test_jsl_format_file_formats_and_writes_output);
+    RUN_TEST_FUNCTION("Test jsl_format_file accepts empty format", test_jsl_format_file_accepts_empty_format);
+    RUN_TEST_FUNCTION("Test jsl_format_file null out parameter", test_jsl_format_file_null_out_parameter);
+    RUN_TEST_FUNCTION("Test jsl_format_file null format pointer", test_jsl_format_file_null_format_pointer);
+    RUN_TEST_FUNCTION("Test jsl_format_file negative length", test_jsl_format_file_negative_length);
+    RUN_TEST_FUNCTION("Test jsl_format_file write failure", test_jsl_format_file_write_failure);
 
-    lresults();
+    TEST_RESULTS();
     return lfails != 0;
 }
