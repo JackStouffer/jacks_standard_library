@@ -2,10 +2,18 @@
 
 #include "jacks_standard_library.h"
 
-#ifndef JSL_MEMCPY
-    #include <string.h>
-    #define JSL_MEMCPY memcpy
-#endif
+// MurmurHash3 was written by Austin Appleby, and is placed in the public
+// domain. The author hereby disclaims copyright to this source code.
+static inline uint64_t murmur3_fmix_u64(uint64_t x, uint64_t seed)
+{
+    uint64_t z = x ^ seed;
+    z ^= z >> 33;
+    z *= 0xff51afd7ed558ccdULL;
+    z ^= z >> 33; 
+    z *= 0xc4ceb9fe1a85ec53ULL;
+    z ^= z >> 33;
+    return z;
+}
 
 /*
 * rapidhash V3 - Very fast, high quality, platform-independent hashing algorithm.

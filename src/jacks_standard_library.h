@@ -90,6 +90,10 @@ extern "C" {
     #include <stdbool.h>
 #endif
 
+#if UINTPTR_MAX == 0xFFFFFFFF
+    #error "ERROR: Jack's Standard Library cannot be used in 32-bit mode!"
+#endif
+
 #ifndef JSL_VERSION
     #define JSL_VERSION 0x010000  /* 1.0.0 */
 #else
@@ -563,10 +567,9 @@ typedef struct JSLFatPtr
 
 
 /**
- * Advances a fat pointer forward by `n`.
- *
- * @note This macro does not bounds check and is intentionally tiny so it can
- * live in hot loops without adding overhead.
+ * Advances a fat pointer forward by `n`. This macro does not bounds check
+ * and is intentionally tiny so it can live in hot loops without adding overhead.
+ * Only use this in cases where you've already checked the length.
  */
 #define JSL_FATPTR_ADVANCE(fatptr, n) do { \
     fatptr.data += n; \
@@ -747,6 +750,14 @@ JSL_DEF JSLFatPtr jsl_fatptr_init(uint8_t* ptr, int64_t length);
  * This function is bounds checked. Out of bounds slices will assert.
  */
 JSL_DEF JSLFatPtr jsl_fatptr_slice(JSLFatPtr fatptr, int64_t start, int64_t end);
+
+/**
+ * Create a new fat pointer that points to the given parameter's data but
+ * with a view of [start, length).
+ *
+ * This function is bounds checked. Out of bounds slices will assert.
+ */
+JSL_DEF JSLFatPtr jsl_fatptr_slice_to_end(JSLFatPtr fatptr, int64_t start);
 
 /**
  * Utility function to get the total amount of bytes written to the original
@@ -1673,18 +1684,31 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         return buffer;
     }
 
-    JSLFatPtr jsl_fatptr_slice(JSLFatPtr buffer, int64_t start, int64_t end)
+    JSLFatPtr jsl_fatptr_slice(JSLFatPtr fatptr, int64_t start, int64_t end)
     {
         JSL_ASSERT(
-            buffer.data != NULL
+            fatptr.data != NULL
             && start > -1
             && start <= end
-            && end <= buffer.length
+            && end <= fatptr.length
         );
 
-        buffer.data += start;
-        buffer.length = end - start;
-        return buffer;
+        fatptr.data += start;
+        fatptr.length = end - start;
+        return fatptr;
+    }
+
+    JSLFatPtr jsl_fatptr_slice_to_end(JSLFatPtr fatptr, int64_t start)
+    {
+        JSL_ASSERT(
+            fatptr.data != NULL
+            && start > -1
+            && start <= fatptr.length
+        );
+
+        fatptr.data += start;
+        fatptr.length -= start;
+        return fatptr;
     }
 
     int64_t jsl_fatptr_total_write_length(JSLFatPtr original_fatptr, JSLFatPtr writer_fatptr)
@@ -2570,9 +2594,10 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     {
         bool res = false;
 
+        JSL_MEMSET(builder, 0, sizeof(JSLStringBuilder));
+
         if (builder != NULL && arena != NULL && chunk_size > 0 && alignment > 0)
         {
-            JSL_MEMSET(builder, 0, sizeof(JSLStringBuilder));
             builder->arena = arena;
             builder->chunk_size = chunk_size;
             builder->alignment = alignment;
@@ -2584,7 +2609,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     bool jsl_string_builder_insert_char(JSLStringBuilder* builder, char c)
     {
-        if (builder->head == NULL || builder->tail == NULL)
+        if (builder == NULL || builder->head == NULL || builder->tail == NULL)
             return false;
 
         bool res = false;
@@ -2619,7 +2644,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     bool jsl_string_builder_insert_uint8_t(JSLStringBuilder* builder, uint8_t c)
     {
-        if (builder->head == NULL || builder->tail == NULL)
+        if (builder == NULL || builder->head == NULL || builder->tail == NULL)
             return false;
 
         bool res = false;
@@ -2654,7 +2679,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     bool jsl_string_builder_insert_fatptr(JSLStringBuilder* builder, JSLFatPtr data)
     {
-        if (builder->head == NULL || builder->tail == NULL)
+        if (builder == NULL || builder->head == NULL || builder->tail == NULL)
             return false;
 
         bool res = true;
@@ -2683,14 +2708,17 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     JSLFatPtr jsl_string_builder_iterator_next(JSLStringBuilderIterator* iterator)
     {
+        JSLFatPtr ret = {0};
+        if (iterator == NULL)
+            return ret;
+
         struct JSLStringBuilderChunk* current = iterator->current;
         if (current == NULL || current->buffer.data == NULL)
-        {
-            return jsl_fatptr_init(0, 0);
-        }
+            return ret;
 
         iterator->current = current->next;
-        return jsl_fatptr_auto_slice(current->buffer, current->writer);
+        ret = jsl_fatptr_auto_slice(current->buffer, current->writer);
+        return ret;
     }
 
     struct JSL__StringBuilderContext
@@ -2722,7 +2750,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     JSL__ASAN_OFF bool jsl_string_builder_format(JSLStringBuilder* builder, JSLFatPtr fmt, ...)
     {
-        if (builder->head == NULL || builder->tail == NULL)
+        if (builder == NULL || builder->head == NULL || builder->tail == NULL)
             return false;
 
         va_list va;

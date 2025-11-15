@@ -22,6 +22,60 @@ directly. There are C stdlib implementations for WASM but they are very bloated 
 can't use the majority of their functionality in a sandboxed environment. This library
 provides all of the functionality I need in a base utility layer.
 
+## Assertions
+
+At the moment, JSL only uses assertions for bounds checking. Other assertions may be
+added in the future for similar security measures. Otherwise, all other failure
+cases will simply be treated as a normal operation of the program and will result in
+an error return value from the function. This includes passing in null pointers for
+pointer parameters, failure to allocate, etc.
+
+Over use of assertions encourages laziness. Errors should not be given special treatment
+and should instead be treated like any other possible program state. 
+
+## Graceful Degradation
+
+With the above note about assertions in mind, there's a very useful property of
+JSL's APIs you should be aware of.
+
+When initialization can fail (string builder, hash map, etc.) functions which
+then operate on that type will turn into no-ops if initialization failed. For
+example,
+
+```c
+uint8_t buff[8];
+JSLArena arena = JSL_ARENA_FROM_STACK(buff);
+JSLStringBuilder builder;
+
+// fails, out of memory
+jsl_string_builder_init(&builder, &arena);
+
+// no op
+jsl_string_builder_insert_fatptr(&builder, JSL_FATPTR_EXPRESSION("Some data"));
+
+// no op
+jsl_string_builder_format(&builder, JSL_FATPTR_EXPRESSION("My string %d"), 42);
+
+JSLStringBuilderIterator iter;
+jsl_string_builder_iterator_init(&builder, &iter);
+
+while (true)
+{
+   JSLFatPtr str = jsl_string_builder_iterator_next(&iter);
+
+   // no data, breaks right away
+   if (str.data == NULL)
+      break;
+
+   jsl_format_file(stdout, str);
+}
+```
+
+**What this allows you to do is collapse failure cases into the same code path
+as successes.**
+
+There will be many times in your program when you 
+
 ## Why do you use signed 64 bit ints for sizes and not `size_t`?
 
 First of all **no one** is creating contiguous allocations larger than `2^63 - 1`
