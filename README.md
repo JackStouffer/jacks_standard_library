@@ -3,64 +3,7 @@ not finished yet
 # Jack's Standard Library
 
 A collection of types and functions designed to replace usage of the
-C Standard Library.
-
-## Usage
-
-1. Copy the `jacks_standard_library.h` file into your repo
-2. Include the header like normally in each source file:
-
-```c
-#include "jacks_standard_library.h"
-```
-
-3. Then, in ONE AND ONLY ONE file, do this:
-
-```c
-#define JSL_IMPLEMENTATION
-#include "jacks_standard_library.h"
-```
-
-This should probably be in the "main" file for your program, but it doesn't have to be.
-You can also define an empty `.c` file with this as the only thing in it if that would
-more easily integrate into your build.
-
-One note is that this library does not depend on the C standard library to be available
-at link time if you don't want to use it. However, it does require the "compile time"
-headers `stddef.h`, `stdint.h`, and `stdbool.h` (if using < C23). You'll also have to
-define the replacement functions for the C standard library functions like `assert` and
-`memcmp`. See the "Preprocessor Switches" section for more information.
-
-## Testing
-
-This file runs the test suite using a meta-program style of build system. Then bootstrap the executable once.
-
-On POSIX
-
-```bash
-cc -o run_test_suite ./tests/bin/run_test_suite.c 
-```
-
-On Windows
-
-```
-cl /Fe"run_test_suite.exe" tests\\bin\\run_test_suite.c 
-```
-
-Then run your executable. Every time afterwards when you run the test
-program it will check if there have been changes to the test file. If
-there have been it will rebuild itself using the program you used to
-build it in the first place. if there have been changes to the test
-file, so no need to 
-
-### Structure
-
-Each test file is compiled and run four times. On POSIX systems it's once
-with gcc unoptimized and with address sanitizer, once with gcc full optimization
-and native CPU code gen, and then the same thing again with clang. On
-Windows it's done with MSVC and clang.
-
-This may seem excessive but I've caught bugs with this before.
+C Standard Library with more modern, safe, and simple alternatives.
 
 ## Why
 
@@ -94,22 +37,12 @@ See the DESIGN.md file for more info.
    * dynamic array
    * hash map
    * hash set
-
-### File Utilities
-
-JSL includes a couple of functions or simple, cross platform file I/O. 
-
-These are specifically called file utils because they are intended for scripts or
-getting things going at the start of the project. In serious code, you would use
-I/O more tailored to your specific use case, e.g. asyncio, atomic file operations,
-custom package formats, etc.
-
-These are separated out from the main code since they require the standard
-library at link time, as they use OS level calls. Unfortunately, Linux is the only
-OS that has a robust syscall API, so accessing the OS on other systems is only
-valid through their runtime libraries.
-
-You can include these functions by using `#define JSL_INCLUDE_FILE_UTILS`. 
+* File Utilities
+   * Simple, cross platform file I/O
+   * Intended for scripts or getting things going at the start of the project
+   * In serious code, you would use I/O more tailored to your specific use case
+   * Separated out from the main code since they require the standard
+     library at link time, as they use OS level calls
 
 ## What's Not Included
 
@@ -133,6 +66,68 @@ Official support is for Windows, macOS, and Linux with MSVC, GCC, and clang.
 
 This might work on other POSIX systems with other C compilers, but I have not tested
 it.
+
+## Usage
+
+1. Copy the `jacks_standard_library.h` file into your repo
+2. Include the header like normally in each source file:
+
+```c
+#include "jacks_standard_library.h"
+```
+
+3. Then, in ONE AND ONLY ONE file, do this:
+
+```c
+#define JSL_IMPLEMENTATION
+#include "jacks_standard_library.h"
+```
+
+This should probably be in the "main" file for your program, but it doesn't have to be.
+You can also define an empty `.c` file with this as the only thing in it if that would
+more easily integrate into your build.
+
+One note is that this library does not depend on the C standard library to be available
+at link time if you don't want to use it. However, it does require the "compile time"
+headers `stddef.h`, `stdint.h`, and `stdbool.h` (if using < C23). You'll also have to
+define the replacement functions for the C standard library functions like `assert` and
+`memcmp`. See the "Preprocessor Switches" section for more information.
+
+## Testing
+
+Each test file is compiled and run many times. For example, Clang is used to build once
+with sanitizers and once optimized, same with GCC. This may seem excessive but I've caught
+bugs with this before.
+
+### Dependencies
+
+On windows, you will need Visual Studio, clang, and wasmtime. You need to have `cl.exe`,
+`clang`, and `wasmtime` available in the path.
+
+On POSIX systems you will need gcc, clang, and wasmtime. You need to have `gcc`,
+`clang`, and `wasmtime` available in the path.
+
+### Running
+
+This file runs the test suite using a meta-program style of build system. You need to
+bootstrap the executable first.
+
+On POSIX
+
+```bash
+cc -o run_test_suite ./tests/bin/run_test_suite.c 
+```
+
+On Windows
+
+```
+cl /Fe"run_test_suite.exe" tests\\bin\\run_test_suite.c 
+```
+
+Then run your executable. Every time afterwards when you run the test
+program it will check if there have been changes to the test file. If
+there have been it will rebuild itself using the command you used to
+build it in the first place.
 
 ## Caveats
 

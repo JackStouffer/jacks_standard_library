@@ -2441,7 +2441,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         return ch;
     }
 
-    #ifdef __AVX2__
+    #if defined(__AVX2__)
         static inline __m256i ascii_to_lower_avx2(__m256i data)
         {
             __m256i upper_A = _mm256_set1_epi8('A' - 1);
@@ -2456,6 +2456,20 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
             return _mm256_add_epi8(data, _mm256_and_si256(is_upper, case_diff));
         }
+    #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
+        static inline uint8x16_t ascii_to_lower_neon(uint8x16_t data)
+        {
+            const uint8x16_t upper_A = vdupq_n_u8('A' - 1);
+            const uint8x16_t upper_Z = vdupq_n_u8('Z' + 1);
+            const uint8x16_t case_diff = vdupq_n_u8(32);
+
+            uint8x16_t is_upper = vandq_u8(
+                vcgtq_u8(data, upper_A),
+                vcgtq_u8(upper_Z, data)
+            );
+
+            return vaddq_u8(data, vandq_u8(is_upper, case_diff));
+        }
     #endif
 
     bool jsl_fatptr_compare_ascii_insensitive(JSLFatPtr a, JSLFatPtr b)
@@ -2465,7 +2479,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
         int64_t i = 0;
 
-        #ifdef __AVX2__
+        #if defined(__AVX2__)
             for (; i <= a.length - 32; i += 32)
             {
                 __m256i a_vec = _mm256_loadu_si256((__m256i*)(a.data + i));
@@ -2476,6 +2490,19 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
                 __m256i cmp = _mm256_cmpeq_epi8(a_vec, b_vec);
                 if (_mm256_movemask_epi8(cmp) != -1)
+                    return false;
+            }
+        #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
+            for (; i <= a.length - 16; i += 16)
+            {
+                uint8x16_t a_vec = vld1q_u8(a.data + i);
+                uint8x16_t b_vec = vld1q_u8(b.data + i);
+
+                a_vec = ascii_to_lower_neon(a_vec);
+                b_vec = ascii_to_lower_neon(b_vec);
+
+                uint8x16_t cmp = vceqq_u8(a_vec, b_vec);
+                if (jsl__neon_movemask_u8(cmp) != 0xFFFF)
                     return false;
             }
         #endif
@@ -2594,14 +2621,17 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     {
         bool res = false;
 
-        JSL_MEMSET(builder, 0, sizeof(JSLStringBuilder));
-
-        if (builder != NULL && arena != NULL && chunk_size > 0 && alignment > 0)
+        if (builder != NULL)
         {
-            builder->arena = arena;
-            builder->chunk_size = chunk_size;
-            builder->alignment = alignment;
-            res = jsl__string_builder_add_chunk(builder);
+            JSL_MEMSET(builder, 0, sizeof(JSLStringBuilder));
+
+            if (arena != NULL && chunk_size > 0 && alignment > 0)
+            {
+                builder->arena = arena;
+                builder->chunk_size = chunk_size;
+                builder->alignment = alignment;
+                res = jsl__string_builder_add_chunk(builder);
+            }
         }
 
         return res;
@@ -2700,10 +2730,10 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         return res;
     }
 
-
     void jsl_string_builder_iterator_init(JSLStringBuilder* builder, JSLStringBuilderIterator* iterator)
     {
-        iterator->current = builder->head;
+        if (builder != NULL && iterator != NULL)
+            iterator->current = builder->head;
     }
 
     JSLFatPtr jsl_string_builder_iterator_next(JSLStringBuilderIterator* iterator)
