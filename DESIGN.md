@@ -2,6 +2,25 @@
 
 These are general notes on design decisions.
 
+## Table of Contents
+
+- [Why Write This Library?](#why-write-this-library)
+- [Assertions](#assertions)
+- [Graceful Degradation](#graceful-degradation)
+- [Why do you use signed 64 bit ints for sizes and not `size_t`?](#why-do-you-use-signed-64-bit-ints-for-sizes-and-not-size_t)
+- [Fat Pointers](#fat-pointers)
+  - [Writing](#writing)
+  - [Slicing](#slicing)
+- [An Essay On Memory Allocation](#an-essay-on-memory-allocation)
+  - [Why Memory Matters](#why-memory-matters)
+    - [Programmer Time](#programmer-time)
+    - [Performance](#performance)
+  - [It's Not That Hard](#its-not-that-hard)
+  - [Make The Problem Simpler](#make-the-problem-simpler)
+  - [Breaking Out of the Constructor/Destructor Mindset](#breaking-out-of-the-constructordestructor-mindset)
+  - [Concretely Defining The Problem Space](#concretely-defining-the-problem-space)
+- [Arenas](#arenas)
+
 ## Why Write This Library?
 
 Much of the C Standard Library is outdated, unsafe, or poorly designed. Some bad design
@@ -12,15 +31,14 @@ decisions include:
 * An object based file interface based around seeking with tiny reads and writes
 * Errors get special treatment
 * As part of the language that arrays decay to pointers, and there's no way to stop it.
-  This means a lot of functions don't have a way to pass 
 
 So I kept writing the same set of utilities across my different projects which avoided these
 pitfalls. I decided put them into a single repo.
 
 Also, I started working on WebAssembly (WASM) projects without emscripten, just using clang
 directly. There are C stdlib implementations for WASM but they are very bloated when you
-can't use the majority of their functionality in a sandboxed environment. This library
-provides all of the functionality I need in a base utility layer.
+can't use the majority of their functionality in a sandboxed environment like a browser.
+This library provides all of the functionality I need in a base utility layer.
 
 ## Assertions
 
@@ -30,8 +48,8 @@ cases will simply be treated as a normal operation of the program and will resul
 an error return value from the function. This includes passing in null pointers for
 pointer parameters, failure to allocate, etc.
 
-Over use of assertions encourages laziness. Errors should not be given special treatment
-and should instead be treated like any other possible program state. 
+Over use of assertions encourages laziness. The vast, vast majority of errors are
+recoverable. Errors should not be given special treatment and should instead be treated like any other possible program state. 
 
 ## Graceful Degradation
 
@@ -39,25 +57,19 @@ With the above note about assertions in mind, there's a very useful property of
 JSL's APIs you should be aware of.
 
 When initialization can fail (string builder, hash map, etc.) functions which
-then operate on that type will turn into no-ops if initialization failed. For
-example,
+then operate on that type will check if the data inside of the type was initialized
+correctly, and if not then the function becomes a no-op automatically. For example,
 
 ```c
 uint8_t buff[8];
 JSLArena arena = JSL_ARENA_FROM_STACK(buff);
 JSLStringBuilder builder;
-
-// fails, out of memory
-jsl_string_builder_init(&builder, &arena);
-
-// no op
-jsl_string_builder_insert_fatptr(&builder, JSL_FATPTR_EXPRESSION("Some data"));
-
-// no op
-jsl_string_builder_format(&builder, JSL_FATPTR_EXPRESSION("My string %d"), 42);
-
 JSLStringBuilderIterator iter;
-jsl_string_builder_iterator_init(&builder, &iter);
+
+jsl_string_builder_init(&builder, &arena); // fails, out of memory
+jsl_string_builder_insert_fatptr(&builder, JSL_FATPTR_EXPRESSION("Some data")); // no op
+jsl_string_builder_format(&builder, JSL_FATPTR_EXPRESSION("My string %d"), 42); // no op
+jsl_string_builder_iterator_init(&builder, &iter); // empty iterator
 
 while (true)
 {
@@ -74,7 +86,53 @@ while (true)
 **What this allows you to do is collapse failure cases into the same code path
 as successes.**
 
-There will be many times in your program when you 
+There will be many times in your programs when the failure of the initialization is
+fine or only needs a simple log, e.g. configuration issues or programmer error.
+
+```c
+bool init_success = jsl_string_builder_init(&builder, &arena);
+if (!init_success)
+   MY_ERROR_LOG("String builder init failed!");
+
+// continues on as normal, same code for success as failure
+```
+
+In those cases you simply fix the issue and run again.  
+
+Consider the alternative,
+
+```c
+uint8_t buff[8];
+JSLArena arena = JSL_ARENA_FROM_STACK(buff);
+JSLStringBuilder builder;
+JSLStringBuilderIterator iter;
+
+bool res = jsl_string_builder_init(&builder, &arena);
+
+if (res)
+   res = jsl_string_builder_insert_fatptr(&builder, JSL_FATPTR_EXPRESSION("Some data"));
+if (res)
+   res = jsl_string_builder_format(&builder, JSL_FATPTR_EXPRESSION("My string %d"), 42);
+if (res)
+   res = jsl_string_builder_iterator_init(&builder, &iter);
+
+if (res) while (true)
+{
+   JSLFatPtr str = jsl_string_builder_iterator_next(&iter);
+
+   if (str.data == NULL)
+      break;
+
+   jsl_format_file(stdout, str);
+}
+```
+
+This code is still more simple than what most people would write, as many people
+compound the issue by logging or other special error handing for every failed branch.
+
+In the above code, instead of one possible code path in your code, you get five.
+The code is harder to test and harder to understand. Try to stick to the first
+approach as much as possible.
 
 ## Why do you use signed 64 bit ints for sizes and not `size_t`?
 
