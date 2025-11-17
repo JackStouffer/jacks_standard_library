@@ -1,6 +1,6 @@
 /**
  * Copyright (c) 2025 Jack Stouffer
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the “Software”),
  * to deal in the Software without restriction, including without limitation
@@ -34,6 +34,40 @@
 #include "../src/jacks_standard_library.h"
 
 #include "minctest.h"
+
+JSLFatPtr medium_str = JSL_FATPTR_INITIALIZER(
+    "This is a very long string that is going to trigger SIMD code, "
+    "as it's longer than a single AVX2 register when using 8-bit "
+    "values, which we are since we're using ASCII/UTF-8."
+);
+JSLFatPtr long_str = JSL_FATPTR_INITIALIZER(
+    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. "
+    "Nulla purus justo, iaculis sit amet interdum sit amet, "
+    "tincidunt at erat. Etiam vulputate ornare dictum. Nullam "
+    "dapibus at orci id dictum. Pellentesque id lobortis nibh, "
+    "sit amet euismod lorem. Cras non ex vitae eros interdum blandit "
+    "in non justo. Pellentesque tincidunt orci a ipsum sagittis, at "
+    "interdum quam elementum. Mauris est elit, fringilla in placerat "
+    "consectetur, venenatis nec felis. Nam tempus, justo sit amet "
+    "sodales bibendum, tortor ipsum feugiat lectus, quis porta neque "
+    "ipsum accumsan velit. Nam a malesuada urna. Quisque elementum, "
+    "tellus auctor iaculis laoreet, dolor urna facilisis mauris, "
+    "vitae dignissim nulla nibh ut velit. Class aptent taciti sociosqu "
+    "ad litora torquent per conubia nostra, per inceptos himenaeos. Ut "
+    "luctus semper bibendum. Cras sagittis, nulla in venenatis blandit, "
+    "ante tortor pulvinar est, faucibus sollicitudin neque ante et diam. "
+    "Morbi vulputate eu tortor nec vestibulum.\n"
+    "Aliquam vel purus vel ipsum sollicitudin aliquet. Pellentesque "
+    "habitant morbi tristique senectus et netus et malesuada fames ac "
+    "turpis egestas. Phasellus ut varius nunc, sit amet placerat "
+    "libero. Sed eu velit velit. Sed id tortor quis neque rhoncus "
+    "tempor. Duis finibus at justo sed auctor. Fusce rhoncus nisi "
+    "non venenatis dignissim. Praesent sapien elit, elementum id quam "
+    "ut, volutpat imperdiet tellus. Nulla semper lorem id metus "
+    "tincidunt luctus. Fusce sodales accumsan varius. Donec faucibus "
+    "risus felis, vitae dapibus orci lobortis ut. Donec tincidunt eu "
+    "risus et rutrum."
+);
 
 void test_jsl_fatptr_from_cstr(void)
 {
@@ -189,47 +223,13 @@ void test_jsl_fatptr_slice(void)
 
 void test_jsl_fatptr_substring_search(void)
 {
-    JSLFatPtr medium_str = JSL_FATPTR_INITIALIZER(
-        "This is a very long string that is going to trigger SIMD code, "
-        "as it's longer than a single AVX2 register when using 8-bit "
-        "values, which we are since we're using ASCII/UTF-8."
-    );
-    JSLFatPtr long_str = JSL_FATPTR_INITIALIZER(
-        "Lorem ipsum dolor sit amet, consectetur adipiscing elit. "
-        "Nulla purus justo, iaculis sit amet interdum sit amet, "
-        "tincidunt at erat. Etiam vulputate ornare dictum. Nullam "
-        "dapibus at orci id dictum. Pellentesque id lobortis nibh, "
-        "sit amet euismod lorem. Cras non ex vitae eros interdum blandit "
-        "in non justo. Pellentesque tincidunt orci a ipsum sagittis, at "
-        "interdum quam elementum. Mauris est elit, fringilla in placerat "
-        "consectetur, venenatis nec felis. Nam tempus, justo sit amet "
-        "sodales bibendum, tortor ipsum feugiat lectus, quis porta neque "
-        "ipsum accumsan velit. Nam a malesuada urna. Quisque elementum, "
-        "tellus auctor iaculis laoreet, dolor urna facilisis mauris, "
-        "vitae dignissim nulla nibh ut velit. Class aptent taciti sociosqu "
-        "ad litora torquent per conubia nostra, per inceptos himenaeos. Ut "
-        "luctus semper bibendum. Cras sagittis, nulla in venenatis blandit, "
-        "ante tortor pulvinar est, faucibus sollicitudin neque ante et diam. "
-        "Morbi vulputate eu tortor nec vestibulum.\n"
-        "Aliquam vel purus vel ipsum sollicitudin aliquet. Pellentesque "
-        "habitant morbi tristique senectus et netus et malesuada fames ac "
-        "turpis egestas. Phasellus ut varius nunc, sit amet placerat "
-        "libero. Sed eu velit velit. Sed id tortor quis neque rhoncus "
-        "tempor. Duis finibus at justo sed auctor. Fusce rhoncus nisi "
-        "non venenatis dignissim. Praesent sapien elit, elementum id quam "
-        "ut, volutpat imperdiet tellus. Nulla semper lorem id metus "
-        "tincidunt luctus. Fusce sodales accumsan varius. Donec faucibus "
-        "risus felis, vitae dapibus orci lobortis ut. Donec tincidunt eu "
-        "risus et rutrum."
-    );
-
     {
         JSLFatPtr string = JSL_FATPTR_INITIALIZER("");
         JSLFatPtr substring = JSL_FATPTR_INITIALIZER("");
         int64_t res = jsl_fatptr_substring_search(string, substring);
         TEST_INT64_EQUAL(res, (int64_t) -1);
     }
-    
+
     {
         JSLFatPtr string = JSL_FATPTR_INITIALIZER("");
         JSLFatPtr substring = JSL_FATPTR_INITIALIZER("111111");
@@ -613,6 +613,10 @@ void test_jsl_fatptr_ends_with(void)
     JSLFatPtr buffer8 = JSL_FATPTR_INITIALIZER("Hello, World!");
     JSLFatPtr postfix8 = JSL_FATPTR_INITIALIZER("!");
     TEST_BOOL(jsl_fatptr_ends_with(buffer8, postfix8) == true);
+
+    JSLFatPtr buffer9 = JSL_FATPTR_INITIALIZER("This is a string example that will span multiple AVX2 chunks so that we can test if the loop is working properly.");
+    JSLFatPtr postfix9 = JSL_FATPTR_INITIALIZER("properly.");
+    TEST_BOOL(jsl_fatptr_ends_with(buffer9, postfix9));
 }
 
 void test_jsl_fatptr_compare_ascii_insensitive(void)
@@ -692,6 +696,59 @@ void test_jsl_fatptr_compare_ascii_insensitive(void)
     }
 }
 
+void test_jsl_fatptr_count(void)
+{
+    {
+        JSLFatPtr buffer = JSL_FATPTR_INITIALIZER("");
+        uint8_t item = 'a';
+        TEST_INT64_EQUAL(jsl_fatptr_count(buffer, item), (int64_t) 0);
+    }
+
+    {
+        JSLFatPtr buffer = JSL_FATPTR_INITIALIZER("Test string");
+        uint8_t item = 'a';
+        TEST_INT64_EQUAL(jsl_fatptr_count(buffer, item), (int64_t) 0);
+    }
+
+    {
+        JSLFatPtr buffer = JSL_FATPTR_INITIALIZER("Test string a");
+        uint8_t item = 'a';
+        TEST_INT64_EQUAL(jsl_fatptr_count(buffer, item), (int64_t) 1);
+    }
+
+    {
+        JSLFatPtr buffer = JSL_FATPTR_INITIALIZER("a Test string");
+        uint8_t item = 'a';
+        TEST_INT64_EQUAL(jsl_fatptr_count(buffer, item), (int64_t) 1);
+    }
+
+    {
+        JSLFatPtr buffer = JSL_FATPTR_INITIALIZER("A Test string");
+        uint8_t item = 'a';
+        TEST_INT64_EQUAL(jsl_fatptr_count(buffer, item), (int64_t) 0);
+    }
+
+    {
+        uint8_t item = 'i';
+        TEST_INT64_EQUAL(jsl_fatptr_count(medium_str, item), (int64_t) 14);
+    }
+
+    {
+        uint8_t item = 'z';
+        TEST_INT64_EQUAL(jsl_fatptr_count(medium_str, item), (int64_t) 0);
+    }
+
+    {
+        uint8_t item = 'i';
+        TEST_INT64_EQUAL(jsl_fatptr_count(long_str, item), (int64_t) 129);
+    }
+
+    {
+        uint8_t item = '=';
+        TEST_INT64_EQUAL(jsl_fatptr_count(long_str, item), (int64_t) 0);
+    }
+}
+
 int main(void)
 {
     RUN_TEST_FUNCTION("Test jsl_fatptr_from_cstr", test_jsl_fatptr_from_cstr);
@@ -706,6 +763,7 @@ int main(void)
     RUN_TEST_FUNCTION("Test jsl_fatptr_starts_with", test_jsl_fatptr_starts_with);
     RUN_TEST_FUNCTION("Test jsl_fatptr_ends_with", test_jsl_fatptr_ends_with);
     RUN_TEST_FUNCTION("Test jsl_fatptr_compare_ascii_insensitive", test_jsl_fatptr_compare_ascii_insensitive);
+    RUN_TEST_FUNCTION("Test jsl_fatptr_count", test_jsl_fatptr_count);
 
     RUN_TEST_FUNCTION("Test jsl_fatptr_load_file_contents", test_jsl_load_file_contents);
     RUN_TEST_FUNCTION("Test jsl_fatptr_load_file_contents_buffer", test_jsl_load_file_contents_buffer);

@@ -91,14 +91,23 @@ extern "C" {
 #endif
 
 #if UINTPTR_MAX == 0xFFFFFFFF
-    #error "ERROR: Jack's Standard Library cannot be used in 32-bit mode!"
+    #error "ERROR: jacks_standard_library.h cannot be used in 32-bit mode!"
+#endif
+
+#if (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
+    || defined(_BIG_ENDIAN)
+    || defined(__BIG_ENDIAN__)
+    || defined(__ARMEB__)
+    || defined(__MIPSEB__)
+
+    #error "ERROR: jacks_standard_library.h does not support big endian targets!"
 #endif
 
 #ifndef JSL_VERSION
     #define JSL_VERSION 0x010000  /* 1.0.0 */
 #else
     #if JSL_VERSION != 0x010000
-        #error "jacks_standard_library.h version mismatch across includes"
+        #error "ERROR: jacks_standard_library.h version mismatch across includes"
     #endif
 #endif
 
@@ -212,6 +221,18 @@ extern "C" {
 
     #define JSL_IS_WIN32 0
     #define JSL_IS_POSIX 0
+
+#endif
+
+#if defined(_M_X64) || defined(_M_AMD64) || defined(__x86_64__) || defined(__amd64__)
+
+    #define JSL_IS_X86 1
+    #define JSL_IS_ARM 0
+
+#elif defined(__aarch64__) || defined(_M_ARM64)
+
+    #define JSL_IS_X86 0
+    #define JSL_IS_ARM 1
 
 #endif
 
@@ -1649,29 +1670,18 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     }
 
     #if defined(__ARM_NEON) || defined(__ARM_NEON__)
-        static inline uint32_t jsl__neon_movemask_u8(uint8x16_t input)
+        static inline uint32_t jsl__neon_movemask(uint8x16_t v)
         {
-            const uint8x16_t bit_select = {
-                1, 2, 4, 8, 16, 32, 64, 128,
-                1, 2, 4, 8, 16, 32, 64, 128
-            };
+            const uint8x8_t weights = {1,2,4,8,16,32,64,128};
 
-            uint8x16_t shifted = vshrq_n_u8(input, 7);
+            uint8x16_t msb = vshrq_n_u8(v, 7);
+            uint16x8_t lo16 = vmull_u8(vget_low_u8(msb),  weights);
+            uint16x8_t hi16 = vmull_u8(vget_high_u8(msb), weights);
 
-            uint16x8_t low = vmull_u8(vget_low_u8(shifted), vget_low_u8(bit_select));
-            uint16x8_t high = vmull_u8(vget_high_u8(shifted), vget_high_u8(bit_select));
+            uint32_t lower = vaddvq_u16(lo16);   // reduce 8×u16 -> scalar
+            uint32_t upper = vaddvq_u16(hi16);
 
-            uint16x4_t low_sum = vadd_u16(vget_low_u16(low), vget_high_u16(low));
-            low_sum = vpadd_u16(low_sum, low_sum);
-            low_sum = vpadd_u16(low_sum, low_sum);
-            uint32_t lower_mask = vget_lane_u16(low_sum, 0);
-
-            uint16x4_t high_sum = vadd_u16(vget_low_u16(high), vget_high_u16(high));
-            high_sum = vpadd_u16(high_sum, high_sum);
-            high_sum = vpadd_u16(high_sum, high_sum);
-            uint32_t upper_mask = vget_lane_u16(high_sum, 0);
-
-            return lower_mask | (upper_mask << 8);
+            return lower | (upper << 8);
         }
     #endif
 
@@ -2125,36 +2135,51 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     {
         int64_t count = 0;
 
-        #ifdef __AVX2__
-        while (str.length >= 32)
-        {
-            __m256i chunk = _mm256_loadu_si256((__m256i*) str.data);
-            __m256i item_wide = _mm256_set1_epi8(item);
-            __m256i cmp = _mm256_cmpeq_epi8(chunk, item_wide);
-            int mask = _mm256_movemask_epi8(cmp);
+        #ifdef JSL_IS_X86
+            #ifdef __AVX2__
+                while (str.length >= 32)
+                {
+                    __m256i chunk = _mm256_loadu_si256((__m256i*) str.data);
+                    __m256i item_wide = _mm256_set1_epi8(item);
+                    __m256i cmp = _mm256_cmpeq_epi8(chunk, item_wide);
+                    int mask = _mm256_movemask_epi8(cmp);
 
-            // Count the number of set bits (matches) in the mask
-            count += __builtin_popcount(mask);
+                    // Count the number of set bits (matches) in the mask
+                    count += __builtin_popcount(mask);
 
-            str.data += 32;
-            str.length -= 32;
-        }
-        #endif
+                    str.data += 32;
+                    str.length -= 32;
+                }
+            #endif
 
-        #ifdef __SSE3__
-        while (str.length >= 16)
-        {
-            __m128i chunk = _mm_loadu_si128((__m128i*) str.data);
-            __m128i item_wide = _mm_set1_epi8(item);
-            __m128i cmp = _mm_cmpeq_epi8(chunk, item_wide);
-            int mask = _mm_movemask_epi8(cmp);
+            #ifdef __SSE3__
+                while (str.length >= 16)
+                {
+                    __m128i chunk = _mm_loadu_si128((__m128i*) str.data);
+                    __m128i item_wide = _mm_set1_epi8(item);
+                    __m128i cmp = _mm_cmpeq_epi8(chunk, item_wide);
+                    int mask = _mm_movemask_epi8(cmp);
 
-            // Count the number of set bits (matches) in the mask
-            count += __builtin_popcount(mask);
+                    // Count the number of set bits (matches) in the mask
+                    count += __builtin_popcount(mask);
 
-            str.data += 16;
-            str.length -= 16;
-        }
+                    str.data += 16;
+                    str.length -= 16;
+                }
+            #endif
+        #elif JSL_IS_ARM
+            #if defined(__ARM_NEON) || defined(__ARM_NEON__)
+                while (str.length >= 16)
+                {
+                    uint8x16_t chunk = vld1q_u8(str.data);
+                    uint8x16_t item_wide = vdupq_n_u8(item);
+                    uint8x16_t cmp = vceqq_u8(chunk, item_wide);
+                    uint8x16_t ones = vshrq_n_u8(cmp, 7);
+                    count += vaddvq_u8(ones);
+
+                    JSL_FATPTR_ADVANCE(str, 16);
+                }
+            #endif
         #endif
 
         while (str.length > 0)
@@ -2162,8 +2187,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             if (str.data[0] == item)
                 count++;
 
-            ++str.data;
-            --str.length;
+            JSL_FATPTR_ADVANCE(str, 1);
         }
 
         return count;
@@ -2502,7 +2526,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                 b_vec = ascii_to_lower_neon(b_vec);
 
                 uint8x16_t cmp = vceqq_u8(a_vec, b_vec);
-                if (jsl__neon_movemask_u8(cmp) != 0xFFFF)
+                if (jsl__neon_movemask(cmp) != 0xFFFF)
                     return false;
             }
         #endif
@@ -3112,9 +3136,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         f = fmt;
 
         #if defined(__AVX2__)
-            __m256i percent_wide = _mm256_set1_epi8('%');
+            const __m256i percent_wide = _mm256_set1_epi8('%');
         #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
-            uint8x16_t percent_wide = vdupq_n_u8('%');
+            const uint8x16_t percent_wide = vdupq_n_u8('%');
         #endif
 
         while (f.length > 0)
@@ -3212,9 +3236,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
                 while (f.length > 15)
                 {
-                    uint8x16_t data = vld1q_u8(f.data);
-                    uint8x16_t percent_mask = vceqq_u8(data, percent_wide);
-                    uint32_t mask = jsl__neon_movemask_u8(percent_mask);
+                    const uint8x16_t data = vld1q_u8(f.data);
+                    const uint8x16_t percent_mask = vceqq_u8(data, percent_wide);
+                    uint32_t mask = jsl__neon_movemask(percent_mask);
 
                     if (mask == 0)
                     {

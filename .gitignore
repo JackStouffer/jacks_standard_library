@@ -1,4 +1,5 @@
 .vscode/
+.zed/
 *.exe
 *.ilk
 *.pdb
@@ -13,6 +14,7 @@
 bin/
 *.dSYM
 run_tests
+generate_hash_map
 *.old
 tests/hash_maps
 .DS_Store
