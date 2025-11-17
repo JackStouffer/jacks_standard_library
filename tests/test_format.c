@@ -229,23 +229,49 @@ void test_pointer(void)
 
 void test_fatptr_format(void)
 {
-    uint8_t _buf[1024];
-    JSLFatPtr buffer = jsl_fatptr_init(_buf, 1024);
+    uint8_t _buf[4096];
+    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(_buf);
 
-    uint8_t hello_data[] = "hello";
-    JSLFatPtr hello = jsl_fatptr_init(hello_data, 5);
+    JSLFatPtr hello = JSL_FATPTR_INITIALIZER("hello");
     CHECK2("hello", "%y", hello);
 
-    uint8_t world_data[] = "world";
-    JSLFatPtr world = jsl_fatptr_init(world_data, 5);
+    JSLFatPtr world = JSL_FATPTR_INITIALIZER("world");
     CHECK2("begin-world", "begin-%y", world);
 
-    JSLFatPtr empty = jsl_fatptr_init(NULL, 0);
+    JSLFatPtr empty = {0};
     CHECK2("ed(ERROR)ge", "ed%yge", empty);
 
-    uint8_t beta_data[] = "beta";
-    JSLFatPtr beta = jsl_fatptr_init(beta_data, 4);
+    JSLFatPtr beta = JSL_FATPTR_INITIALIZER("beta");
     CHECK3("hello-beta", "%y-%y", hello, beta);
+
+    JSLFatPtr medium_str = JSL_FATPTR_INITIALIZER(
+        "This is a very long string that is going to trigger SIMD code, "
+        "as it's longer than a single AVX2 register when using 8-bit "
+        "values, which we are since we're using ASCII/UTF-8."
+    );
+    CHECK2(
+        "This is a very long string that is going to trigger SIMD code, "
+        "as it's longer than a single AVX2 register when using 8-bit "
+        "values, which we are since we're using ASCII/UTF-8.",
+
+        "%y",
+
+        medium_str
+    );
+
+    CHECK2(
+        "This time not only is the string we're inserting long but also the format "
+        "This is a very long string that is going to trigger SIMD code, "
+        "as it's longer than a single AVX2 register when using 8-bit "
+        "values, which we are since we're using ASCII/UTF-8. "
+        "string itself is also pretty long to trigger AVX2 code!",
+
+        "This time not only is the string we're inserting long but also the format "
+        "%y "
+        "string itself is also pretty long to trigger AVX2 code!",
+
+        medium_str
+    );
 }
 
 void test_quote_modifier(void)

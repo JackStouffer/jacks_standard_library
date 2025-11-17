@@ -3238,9 +3238,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                 {
                     const uint8x16_t data = vld1q_u8(f.data);
                     const uint8x16_t percent_mask = vceqq_u8(data, percent_wide);
-                    uint32_t mask = jsl__neon_movemask(percent_mask);
+                    const int has_match = vmaxvq_u8(percent_mask);
 
-                    if (mask == 0)
+                    if (!has_match)
                     {
                         stbsp__chk_cb_buf(16);
                         vst1q_u8(buffer_cursor, data);
@@ -3249,6 +3249,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     }
                     else
                     {
+                        uint32_t mask = jsl__neon_movemask(percent_mask);
                         int special_pos = __builtin_ctz(mask);
                         stbsp__chk_cb_buf(special_pos);
                         JSL_MEMCPY(buffer_cursor, f.data, special_pos);
