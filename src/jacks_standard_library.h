@@ -1,58 +1,58 @@
 /**
  * # Jack's Standard Library
- * 
+ *
  * A collection of utilities which are designed to replace much of the C standard
  * library.
- * 
+ *
  * See README.md for a detailed intro.
- * 
+ *
  * See DESIGN.md for background on the design decisions.
- * 
+ *
  * See DOCUMENTATION.md for a single markdown file containing all of the docstrings
  * from this file. It's more nicely formatted and contains hyperlinks.
- * 
+ *
  * The convention of this library is that all symbols prefixed with either `jsl__`
  * or `JSL__` (with two underscores) are meant to be private to this library. They
  * are not a stable part of the API.
  *
  * ## Preprocessor Switches
- * 
+ *
  * `JSL_DEBUG` - turns on some debugging features, like overwriting stale memory with
  * `0xfeefee`.
- * 
+ *
  * `JSL_DEF` - allows you to override linkage/visibility (e.g., __declspec) for all of
  * the functions defined by this library. By default this is empty.
- * 
+ *
  * `JSL_WARN_UNUSED` - this controls the function attribute which tells the compiler to
  * issue a warning if the return value of the function is not stored in a variable, or if
  * that variable is never read. This is auto defined for clang and gcc, there's no
  * C11 compatible implementation for MSVC. If you want to turn this off, just define it as
  * empty string.
- * 
+ *
  * `JSL_ASSERT` - Assertion function definition. By default this will use `assert.h`.
  * If you wish to override it, it must be a function which takes three parameters, a int
  * conditional, a char* of the filename, and an int line number. You can also provide an
  * empty function if you just want to turn off asserts altogether; this is not
  * recommended. The small speed boost you get is from avoiding a branch is generally not
  * worth the loss of correctness.
- * 
+ *
  * `JSL_MEMCPY` - Controls memcpy calls in the library. By default this will include
  * `string.h` and be an alias to C's `memcpy`.
- * 
+ *
  * `JSL_MEMCMP` - Controls memcmp calls in the library. By default this will include
  * `string.h` and be an alias to C's `memcmp`.
- * 
+ *
  * `JSL_MEMSET` - Controls memset calls in the library. By default this will include
  * `string.h` and be an alias to C's `memset`.
- * 
+ *
  * `JSL_DEFAULT_ALLOCATION_ALIGNMENT` - Sets the alignment of allocations that aren't
  * explicitly set. Defaults to 16 bytes.
- * 
+ *
  * `JSL_INCLUDE_FILE_UTILS` - Include the file loading and writing utilities. These
  * require linking the standard library.
  *
  * ## License
- * 
+ *
  * Copyright (c) 2025 Jack Stouffer
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -157,11 +157,11 @@ extern "C" {
 
 
 /**
- * 
- * 
+ *
+ *
  *                      PUBLIC API
- * 
- * 
+ *
+ *
  */
 
 #ifndef JSL_ASSERT
@@ -191,7 +191,7 @@ extern "C" {
 #endif
 
 #if defined(_WIN32)
-    
+
     #define JSL_IS_WIN32 1
     #define JSL_IS_POSIX 0
 
@@ -258,12 +258,12 @@ extern "C" {
  * @warning This macro evaluates its arguments multiple times. Do not use with
  * arguments that have side effects (e.g., function calls, increment/decrement
  * operations) as they will be executed more than once.
- * 
+ *
  * Example:
  * ```c
  * int max_val = JSL_MAX(10, 20);        // Returns 20
  * double max_d = JSL_MAX(3.14, 2.71);   // Returns 3.14
- * 
+ *
  * // DANGER: Don't do this - increment happens twice!
  * // int bad = JSL_MAX(++x, y);
  * ```
@@ -276,12 +276,12 @@ extern "C" {
  * @warning This macro evaluates its arguments multiple times. Do not use with
  * arguments that have side effects (e.g., function calls, increment/decrement
  * operations) as they will be executed more than once.
- * 
+ *
  * Example:
  * ```c
  * int max_val = JSL_MAX(10, 20);        // Returns 20
  * double max_d = JSL_MAX(3.14, 2.71);   // Returns 3.14
- * 
+ *
  * // DANGER: Don't do this - increment happens twice!
  * // int bad = JSL_MAX(++x, y);
  * ```
@@ -299,16 +299,16 @@ extern "C" {
  * operations) as they will be executed more than once.
  *
  * Example:
- * 
+ *
  * ```
  * #define FLAG_READ    JSL_MAKE_BITFLAG(1)
- * #define FLAG_WRITE   JSL_MAKE_BITFLAG(2) 
+ * #define FLAG_WRITE   JSL_MAKE_BITFLAG(2)
  *
  * uint32_t permissions = 0;
- * 
+ *
  * JSL_SET_BITFLAG(&permissions, FLAG_READ);
  * JSL_SET_BITFLAG(&permissions, FLAG_WRITE);
- * 
+ *
  * // DANGER: Don't do this - increment happens twice!
  * // JSL_SET_BITFLAG(&array[++index], some_flag);
  * ```
@@ -433,7 +433,7 @@ extern "C" {
  * // Reserve two gigabytes of virtual address space starting at 2 terabytes.
  * // If you're using static offsets this means that your objects in memory will
  * // be at the same place every time you run your program in your debugger!
- * 
+ *
  * void* buffer = VirtualAlloc(JSL_TERABYTES(2), JSL_GIGABYTES(2), MEM_RESERVE, PAGE_READWRITE);
  * JSLArena arena;
  * jsl_arena_init(&arena, buffer, JSL_GIGABYTES(2));
@@ -446,19 +446,19 @@ extern "C" {
  * Round x up the next power of two. If x is a power of two it returns
  * the same value. To cover this case you can just add one before passing
  * x in to make sure you always get a larger value.
- * 
+ *
  * @param x The value to round up
  * @returns the next power of two
  */
 uint32_t jsl_next_power_of_two_u32(uint32_t x);
 
-/** 
+/**
  * A fat pointer is a representation of a chunk of memory. It **is not** a container
  * or an abstract data type.
  *
  * A fat pointer is very similar to D or Go's slices. This provides several useful
  * functions like bounds checked reads/writes.
- * 
+ *
  * One very important thing to note is that the fat pointer is always defined as mutable.
  * In my opinion, const in C provides very little protection and a world a headaches during
  * refactors, especially since C does not have generics or function overloading. I find the
@@ -468,7 +468,7 @@ typedef struct JSLFatPtr
 {
     /**
      * The data pointer.
-     * 
+     *
      * uint8_t because, annoyingly, `void*` doesn't have a size, so you can't
      * do `ptr++`. Also, it effectively communicates that this is a range
      * of bytes.
@@ -477,7 +477,7 @@ typedef struct JSLFatPtr
 
     /**
      * Length.
-     * 
+     *
      * Intentionally signed. You really don't need the high bit (you are not
      * working with chunks of memory larger than `(2^63) - 1` bytes), and it avoids
      * all sorts of nasty bugs. Any time you subtract from an unsigned value
@@ -491,12 +491,12 @@ typedef struct JSLFatPtr
     /**
      * Creates a JSLFatPtr from a string literal at compile time. The resulting fat pointer
      * points directly to the string literal's memory, so no copying occurs.
-     * 
+     *
      * @warning With MSVC this will only work during variable initialization as MSVC
      * still does not support compound literals.
      *
      * Example:
-     * 
+     *
      * ```c
      * // Create fat pointers from string literals
      * JSLFatPtr hello = JSL_FATPTR_INITIALIZER("Hello, World!");
@@ -513,7 +513,7 @@ typedef struct JSLFatPtr
      * points directly to the string literal's memory, so no copying occurs.
      *
      * Example:
-     * 
+     *
      * ```c
      * JSLFatPtr hello = JSL_FATPTR_INITIALIZER("Hello, World!");
      * JSLFatPtr path = JSL_FATPTR_INITIALIZER("/usr/local/bin");
@@ -526,19 +526,19 @@ typedef struct JSLFatPtr
 
 
 #if defined(_MSC_VER) && !defined(__clang__)
-    
+
     /**
      * Creates a JSLFatPtr from a string literal for usage as an rvalue. The resulting fat pointer
      * points directly to the string literal's memory, so no copying occurs.
-     * 
+     *
      * @warning On MSVC this will be a function call as MSVC does not support compound literals.
      * On all other compilers this will be a zero cost compound literal.
      *
      * Example:
-     * 
+     *
      * ```c
      * void my_function(JSLFatPtr data);
-     * 
+     *
      * my_function(JSL_FATPTR_EXPRESSION("my data"));
      * ```
      */
@@ -549,15 +549,15 @@ typedef struct JSLFatPtr
     /**
      * Creates a JSLFatPtr from a string literal for usage as an rvalue. The resulting fat pointer
      * points directly to the string literal's memory, so no copying occurs.
-     * 
+     *
      * @warning On MSVC this will be a function call as MSVC does not support compound literals.
      * On all other compilers this will be a zero cost compound literal
      *
      * Example:
-     * 
+     *
      * ```c
      * void my_function(JSLFatPtr data);
-     * 
+     *
      * my_function(JSL_FATPTR_EXPRESSION("my data"));
      * ```
      */
@@ -583,12 +583,12 @@ typedef struct JSLFatPtr
  * `sizeof` to determine its capacity at compile time.
  *
  * Example:
- * 
+ *
  * ```c
  * uint8_t buffer[JSL_KILOBYTES(4)];
  * JSLFatPtr ptr = JSL_FATPTR_FROM_STACK(buffer);
  * ```
- * 
+ *
  * @warning This macro only works for variable initializers and cannot be used as a
  * normal rvalue.
  */
@@ -598,12 +598,12 @@ typedef struct JSLFatPtr
  * A bump allocator. Designed for situations in your program when you know a
  * definite lifetime and a good upper bound on how much memory that lifetime will
  * need.
- * 
+ *
  * See the DESIGN.md file for detailed notes on arena implementation, their uses,
  * and when they shouldn't be used.
- * 
+ *
  * Functions and Macros:
- * 
+ *
  * * jsl_arena_init
  * * jsl_arena_init2
  * * jsl_arena_allocate
@@ -630,7 +630,7 @@ typedef struct JSLArena
  * Creates an arena from stack memory.
  *
  * Example
- * 
+ *
  * ```
  * uint8_t buffer[2048];
  * JSLArena stack_arena = JSL_ARENA_FROM_STACK(buffer);
@@ -646,17 +646,17 @@ typedef struct JSLArena
  * {
  *      uint8_t buffer[16 * 1024];
  *      JSLArena stack_arena = JSL_ARENA_FROM_STACK(buffer);
- * 
+ *
  *      // example hash map, not real
  *      IntToStrMap map = int_to_str_ctor(&arena);
  *      int_to_str_add(&map, 64, JSL_FATPTR_INITIALIZER("This is my string data!"));
- * 
+ *
  *      // hash map cleaned up automatically
  * }
  * ```
  *
  * Fast, cheap, easy automatic memory management!
- * 
+ *
  * @warning This macro only works for variable initializers and cannot be used as a
  * normal rvalue.
  */
@@ -666,17 +666,17 @@ typedef struct JSLArena
  * A string builder is a container for building large strings. It's specialized for
  * situations where many different smaller operations result in small strings being
  * coalesced into a final result, specifically using an arena as its allocator.
- * 
+ *
  * While this is called string builder, the underlying data store is just bytes, so
  * any binary data which is built in chunks can use the string builder.
  *
  * ## Implementation
- * 
+ *
  * A string builder is different from a normal dynamic array in two ways. One, it
  * has specific operations for writing string data in both fat pointer form but also
  * as a `snprintf` like operation. Two, the resulting string data is not stored as a
  * contiguous range of memory, but as a series of chunks which is given to the user
- * as an iterator when the string is finished. 
+ * as an iterator when the string is finished.
  *
  * This is due to the nature of arena allocations. If you have some part of your
  * program which generates string output, the most common form of that code would be:
@@ -688,21 +688,21 @@ typedef struct JSLArena
  *
  * A dynamically sized array which grows would mean throwing away the old memory when
  * the array resizes. This would be fine for your typical heap but for an arena this
- * the old memory is unavailable until the arena is reset. A separate arena that's 
+ * the old memory is unavailable until the arena is reset. A separate arena that's
  * used purely for the array would work, but that sort of defeats the whole purpose
  * of an arena, which is it's supposed to make lifetime tracking easier. Having a
  * whole bunch of separate arenas for different objects makes the program more
  * complicated than it should be.
- * 
+ *
  * Having the memory in chunks means that a single arena is not wasteful with its
  * available memory.
- * 
+ *
  * By default, each chunk is 256 bytes and is aligned to a 8 byte address. These are
  * tuneable parameters that you can set during init. The custom alignment helps if you
  * want to use SIMD code on the consuming code.
- * 
+ *
  * ## Functions
- * 
+ *
  * * jsl_string_builder_init
  * * jsl_string_builder_init2
  * * jsl_string_builder_insert_char
@@ -721,12 +721,12 @@ typedef struct JSLStringBuilder
 
 /**
  * The iterator type for a JSLStringBuilder instance. This keeps track of
- * where the iterator is over the course of calling the next function. 
- * 
- * @warning It is not valid to modify a string builder while iterating over it. 
- * 
+ * where the iterator is over the course of calling the next function.
+ *
+ * @warning It is not valid to modify a string builder while iterating over it.
+ *
  * Functions:
- * 
+ *
  * * jsl_string_builder_iterator_init
  * * jsl_string_builder_iterator_next
  */
@@ -763,10 +763,10 @@ JSL_DEF JSLFatPtr jsl_fatptr_slice_to_end(JSLFatPtr fatptr, int64_t start);
  * Utility function to get the total amount of bytes written to the original
  * fat pointer when compared to a writer fat pointer. See jsl_fatptr_auto_slice
  * to get a slice of the written portion.
- * 
+ *
  * This function checks for NULL and checks that `writer_fatptr` points to data
  * in `original_fatptr`. If either of these checks fail, then `-1` is returned.
- * 
+ *
  * ```
  * JSLFatPtr original = jsl_arena_allocate(arena, 128 * 1024 * 1024);
  * JSLFatPtr writer = original;
@@ -774,7 +774,7 @@ JSL_DEF JSLFatPtr jsl_fatptr_slice_to_end(JSLFatPtr fatptr, int64_t start);
  * jsl_write_file_contents(&writer, "file_two.txt");
  * int64_t write_len = jsl_fatptr_total_write_length(original, writer);
  * ```
- * 
+ *
  * @param original_fatptr The pointer to the originally allocated buffer
  * @param writer_fatptr The pointer that has been advanced during writing operations
  * @returns The amount of data which has been written, or -1 if there was an issue
@@ -785,11 +785,11 @@ JSL_DEF int64_t jsl_fatptr_total_write_length(JSLFatPtr original_fatptr, JSLFatP
  * Returns the slice in `original_fatptr` that represents the written to portion, given
  * the size and pointer in `writer_fatptr`. If either parameter has a NULL data
  * field, has a negative length, or if the writer does not point to a portion
- * of the original allocation, this function will return a fat pointer with a 
+ * of the original allocation, this function will return a fat pointer with a
  * `NULL` data pointer.
- * 
+ *
  * Example:
- * 
+ *
  * ```
  * JSLFatPtr original = jsl_arena_allocate(arena, 128 * 1024 * 1024);
  * JSLFatPtr writer = original;
@@ -837,7 +837,7 @@ JSL_DEF int64_t jsl_fatptr_memory_copy(JSLFatPtr* destination, JSLFatPtr source)
  * This function is bounds checked, meaning a max of `destination->length` bytes
  * will be copied into `destination`. This function does not check for overlapping
  * pointers.
- * 
+ *
  * If `cstring` is not a valid null terminated string then this function's behavior
  * is undefined, as it uses JSL_STRLEN.
  *
@@ -856,7 +856,7 @@ JSL_DEF int64_t jsl_fatptr_cstr_memory_copy(
  * Searches `string` for the byte sequence in `substring` and returns the index of the first
  * match or `-1` when no match exists. This is roughly equivalent to C's `strstr` for
  * fat pointers.
- * 
+ *
  * This function is optimized with SIMD specific implementations when SIMD code generation
  * is enabled during compilation. When SIMD is not enabled, this function falls back to a
  * combination of BNDM and Sunday algorithms (based on substring size). These algorithms
@@ -864,8 +864,8 @@ JSL_DEF int64_t jsl_fatptr_cstr_memory_copy(
  * contains a lot of repeated text. In the general case performance is closer to `O(n/m)`.
  *
  * In cases where any of the following are true you will want to use a different search
- * function: 
- * 
+ * function:
+ *
  *  * Your string is very long, e.g. hundreds of megabytes or more
  *  * Your string is full of small repeating patterns
  *  * Your substring is more than a couple of kilobytes
@@ -913,7 +913,7 @@ JSL_DEF int64_t jsl_fatptr_count(JSLFatPtr str, uint8_t item);
 
 /**
  * Locate the final occurrence of `character` within a fat pointer.
- * 
+ *
  * @note The comparison operates on raw code units. In UTF encodings, multiple code units can
  * form a single grapheme cluster, so the index does not necessarily map to user-perceived
  * characters. No Unicode normalization is performed; normalize inputs first if combining mark
@@ -960,7 +960,7 @@ JSL_DEF bool jsl_fatptr_ends_with(JSLFatPtr str, JSLFatPtr postfix);
 
 /**
  * Get the file name from a filepath.
- * 
+ *
  * Returns a view over the final path component that follows the last `/` byte in `filename`.
  * The resulting fat pointer aliases the original buffer; the data is neither copied nor
  * reallocated. If no `/` byte is present, or the suffix after the final `/` is fewer than two
@@ -985,7 +985,7 @@ JSL_DEF JSLFatPtr jsl_fatptr_basename(JSLFatPtr filename);
 
 /**
  * Get the file extension from a file name or file path.
- * 
+ *
  * Returns a view over the substring that follows the final `.` in `filename`.
  * The returned fat pointer reuses the original buffer; no allocations or copies
  * are performed. If `filename` does not contain a `.` byte, the result has a
@@ -1012,7 +1012,7 @@ JSL_DEF JSLFatPtr jsl_fatptr_get_file_extension(JSLFatPtr filename);
  * Element by element comparison of the contents of the two fat pointers. If either
  * parameter has a null value for its data or a zero length, then this function will
  * return false.
- * 
+ *
  * @note Do not use this to compare Unicode strings when grapheme based equality is
  * desired. Use this only when absolute byte equality is desired. See the note at the
  * top of the file about Unicode normalization.
@@ -1021,7 +1021,7 @@ JSL_DEF JSLFatPtr jsl_fatptr_get_file_extension(JSLFatPtr filename);
  * two password hashes. This function is vulnerable to timing attacks since it bails out
  * at the first inequality.
  *
- * @returns true if equal, false otherwise. 
+ * @returns true if equal, false otherwise.
  */
 JSL_DEF bool jsl_fatptr_memory_compare(JSLFatPtr a, JSLFatPtr b);
 
@@ -1033,7 +1033,7 @@ JSL_DEF bool jsl_fatptr_memory_compare(JSLFatPtr a, JSLFatPtr b);
  * @note Do not use this to compare Unicode strings when grapheme based equality is
  * desired. Use this only when absolute byte equality is desired. See the note at the
  * top of the file about Unicode normalization.
- * 
+ *
  * @param a First comparator
  * @param cstr A valid null terminated string
  */
@@ -1042,8 +1042,8 @@ JSL_DEF bool jsl_fatptr_cstr_compare(JSLFatPtr a, char* cstr);
 /**
  * Compare two fatptrs that both contain ASCII data for equality while ignoring case
  * differences. ASCII data validity is not checked.
- * 
- * @returns true for equals, false for not equal 
+ *
+ * @returns true for equals, false for not equal
  */
 JSL_DEF bool jsl_fatptr_compare_ascii_insensitive(JSLFatPtr a, JSLFatPtr b);
 
@@ -1060,10 +1060,10 @@ JSL_DEF void jsl_fatptr_to_lowercase_ascii(JSLFatPtr str);
  * Stops once it hits the first non-accepted character. This function does
  * not check for overflows or underflows. `result` is not written to if
  * there were no successfully parsed bytes.
- * 
+ *
  * @param str a string with an int representation at the start
  * @param result out parameter where the parsing result will be stored
- * @return The number of bytes that were successfully read from the string 
+ * @return The number of bytes that were successfully read from the string
  */
 JSL_DEF int32_t jsl_fatptr_to_int32(JSLFatPtr str, int32_t* result);
 
@@ -1161,7 +1161,7 @@ JSL_DEF void jsl_arena_reset(JSLArena* arena);
  * it as an "arena inside an arena". Basically the save function marks the current
  * state of the arena and the load function sets the saved state to the given arena,
  * wiping out any allocations which happened in the interim.
- * 
+ *
  * This is very useful when you need memory from the arena but only for a specific
  * function.
  *
@@ -1183,7 +1183,7 @@ JSL_DEF uint8_t* jsl_arena_save_restore_point(JSLArena* arena);
  * it as an "arena inside an arena". Basically the save function marks the current
  * state of the arena and the load function sets the saved state to the given arena,
  * wiping out any allocations which happened in the interim.
- * 
+ *
  * This is very useful when you need memory from the arena but only for a specific
  * function.
  *
@@ -1255,7 +1255,7 @@ bool jsl_string_builder_init2(JSLStringBuilder* builder, JSLArena* arena, int32_
 bool jsl_string_builder_insert_char(JSLStringBuilder* builder, char c);
 
 /**
- * Append a single raw byte to the end of the string builder without interpretation. 
+ * Append a single raw byte to the end of the string builder without interpretation.
  * The value is written as-is, so it can be used for arbitrary binary data, including
  * zero bytes. Each append may result in an allocation if there's no more space. If
  * that allocation fails then this function returns false.
@@ -1291,10 +1291,10 @@ bool jsl_string_builder_format(JSLStringBuilder* builder, JSLFatPtr fmt, ...);
  * Initialize an iterator instance so it will traverse the given string builder
  * from the begining. It's easiest to just put an empty iterator on the stack
  * and then call this function.
- * 
+ *
  * ```
  * JSLStringBuilder builder = ...;
- * 
+ *
  * JSLStringBuilderIterator iter;
  * jsl_string_builder_iterator_init(&builder, &iter);
  * ```
@@ -1307,24 +1307,24 @@ void jsl_string_builder_iterator_init(JSLStringBuilder* builder, JSLStringBuilde
 /**
  * Get the next chunk of data a string builder iterator. The chunk will
  * have a `NULL` data pointer when iteration is over.
- * 
+ *
  * This example program prints all the data in a string builder to stdout:
- * 
+ *
  * ```
  * #include <stdio.h>
- * 
+ *
  * JSLStringBuilder builder = ...;
- * 
+ *
  * JSLStringBuilderIterator iter;
  * jsl_string_builder_iterator_init(&builder, &iter);
- * 
+ *
  * while (true)
  * {
  *      JSLFatPtr str = jsl_string_builder_iterator_next(&iter);
- * 
+ *
  *      if (str.data == NULL)
  *          break;
- *      
+ *
  *      jsl_format_file(stdout, str);
  * }
  * ```
@@ -1362,7 +1362,7 @@ typedef uint8_t* JSL_FORMAT_CALLBACK(uint8_t* buf, void *user, int64_t len);
  * This returns the number of bytes written.
  *
  * There are a set of different functions for different use cases
- * 
+ *
  * * jsl_format
  * * jsl_format_buffer
  * * jsl_format_valist
@@ -1370,7 +1370,7 @@ typedef uint8_t* JSL_FORMAT_CALLBACK(uint8_t* buf, void *user, int64_t len);
  * * jsl_string_builder_format
  *
  * ## Fat Pointers
- * 
+ *
  * Fat pointers can be written into the resulting string using the `%y`
  * format specifier. This works exactly the same way as `%.*s`. Keep in
  * mind that, much like `snprintf`, this function is limited to 32bit
@@ -1393,13 +1393,13 @@ typedef uint8_t* JSL_FORMAT_CALLBACK(uint8_t* buf, void *user, int64_t len);
  * This library also supports 64-bit integers and you can use MSVC style or
  * GCC style indicators (%I64d or %lld).  It supports the C99 specifiers
  * for uint64_t and ptr_diff_t (%jd %zd) as well.
- * 
+ *
  * ## Extras
  *
  * Like some GCCs, for integers and floats, you can use a ' (single quote)
  * specifier and commas will be inserted on the thousands: "%'d" on 12345
  * would print 12,345.
- * 
+ *
  * For integers and floats, you can use a "$" specifier and the number
  * will be converted to float and then divided to get kilo, mega, giga or
  * tera and then printed, so "%$d" 1000 is "1.0 k", "%$.2d" 2536000 is
@@ -1407,12 +1407,12 @@ typedef uint8_t* JSL_FORMAT_CALLBACK(uint8_t* buf, void *user, int64_t len);
  * 2536000 to "2.42 Mi". If you prefer JEDEC suffixes to SI ones, use three
  * $:s: "%$$$d" -> "2.42 M". To remove the space between the number and the
  * suffix, add "_" specifier: "%_$d" -> "2.53M".
- * 
+ *
  * In addition to octal and hexadecimal conversions, you can print
  * integers in binary: "%b" for 256 would print 100.
- * 
+ *
  * ## Caveat
- * 
+ *
  * The internal counters are all unsigned 32 byte values, so if for some reason
  * you're using this function to print multiple gigabytes at a time, break it
  * into chunks.
@@ -1421,7 +1421,7 @@ JSL_DEF JSLFatPtr jsl_format(JSLArena* arena, JSLFatPtr fmt, ...);
 
 /**
  * See docs for jsl_format.
- * 
+ *
  * Writes into a provided buffer, up to `buffer.length` bytes.
  */
 JSL_DEF int64_t jsl_format_buffer(
@@ -1432,7 +1432,7 @@ JSL_DEF int64_t jsl_format_buffer(
 
 /**
  * See docs for jsl_format.
- * 
+ *
  * Writes into a provided buffer, up to `buffer.length` bytes using a variadic
  * argument list.
  */
@@ -1449,7 +1449,7 @@ JSL_DEF int64_t jsl_format_valist(
  * Your callback can then copy the chars out, print them or whatever.
  * This function is actually the workhorse for everything else.
  * The buffer you pass in must hold at least JSL_FORMAT_MIN_BUFFER characters.
- * 
+ *
  * You return the next buffer to use or 0 to stop converting
  */
 JSL_DEF int64_t jsl_format_callback(
@@ -1534,8 +1534,8 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     /**
      * Load the contents of the file at `path` into a newly allocated buffer
      * from the given arena. The buffer will be the exact size of the file contents.
-     * 
-     * If the arena does not have enough space, 
+     *
+     * If the arena does not have enough space,
      */
     JSL_WARN_UNUSED JSL_DEF JSLLoadFileResultEnum jsl_load_file_contents(
         JSLArena* arena,
@@ -1551,7 +1551,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
      * pointer by the amount read so the caller can continue writing into the same
      * backing storage. Returns a `JSLLoadFileResultEnum` describing the outcome and
      * optionally stores the system `errno` in `out_errno` on failure.
-     * 
+     *
      * @param buffer buffer to write to
      * @param path The file system path
      * @param out_errno A pointer which will be written to with the errno on failure
@@ -1609,11 +1609,11 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
 
 /**
- * 
- * 
+ *
+ *
  *                      IMPLEMENTATION
- * 
- * 
+ *
+ *
  */
 
 
@@ -1633,8 +1633,8 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         (void) line;
         assert(condition);
     }
-        
-    uint32_t jsl_next_power_of_two_u32(uint32_t x) 
+
+    uint32_t jsl_next_power_of_two_u32(uint32_t x)
     {
         if (x == 0) return 1;
 
@@ -1828,21 +1828,21 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         {
             /**
              * From http://0x80.pl/notesen/2016-11-28-simd-strfind.html
-             * 
+             *
              * Copyright (c) 2008-2016, Wojciech Muła
              * All rights reserved.
-             * 
+             *
              * Redistribution and use in source and binary forms, with or without
              * modification, are permitted provided that the following conditions are
              * met:
-             * 
+             *
              * 1. Redistributions of source code must retain the above copyright
              * notice, this list of conditions and the following disclaimer.
-             * 
+             *
              * 2. Redistributions in binary form must reproduce the above copyright
              * notice, this list of conditions and the following disclaimer in the
              * documentation and/or other materials provided with the distribution.
-             * 
+             *
              * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
              * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
              * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
@@ -1938,7 +1938,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     {
         uint64_t masks[256] = {0};
 
-        // Map rightmost pattern byte to bit 0 (LSB), leftmost to bit m-1          
+        // Map rightmost pattern byte to bit 0 (LSB), leftmost to bit m-1
         for (int64_t i = 0; i < substring.length; ++i)
         {
             uint32_t bit = (uint32_t)(substring.length - 1 - i);
@@ -2005,13 +2005,13 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         }
 
         int64_t pos = 0;
-        while (pos + substring.length <= string.length) 
+        while (pos + substring.length <= string.length)
         {
             if (JSL_MEMCMP(string.data + pos, substring.data, substring.length) == 0)
             {
                 return pos;
             }
-            
+
             int64_t next = pos + substring.length;
             if (next < string.length)
             {
@@ -2362,7 +2362,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         JSLFatPtr allocation = jsl_arena_allocate(arena, sizeof(uint8_t) * length, false);
         if (allocation.data == NULL || allocation.length < length)
             return ret;
-        
+
         ret = allocation;
         JSL_MEMCPY(ret.data, str, length);
         return ret;
@@ -2554,7 +2554,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
         if (i > 0)
             *result = ret;
-        
+
         return i;
     }
 
@@ -2584,7 +2584,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
             if (builder->head == NULL)
                 builder->head = chunk;
-            
+
             if (builder->tail == NULL)
             {
                 builder->tail = chunk;
@@ -3013,7 +3013,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     static JSL__ASAN_OFF uint32_t stbsp__strlen_limited(char const *string, uint32_t limit)
     {
         char const* source_ptr = string;
-        
+
         #if defined(__AVX2__)
 
             for (;;)
@@ -3027,7 +3027,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                 ++source_ptr;
                 --limit;
             }
-            
+
             __m256i zero_wide = _mm256_setzero_si256();
 
             while (limit >= 32)
@@ -3743,7 +3743,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                         JSL_MEMCPY(string, source_ptr, l);
                         string += l;
                         source_ptr += l;
-                        
+
                         trailing_zeros = precision - (n + l);
                         comma_spacing = 1 + (3 << 24); // how many tens did we write (for commas below)
                     }
@@ -4060,7 +4060,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                                 field_width -= i;
                                 JSL_MEMSET(buffer_cursor, ' ', i);
                                 buffer_cursor += i;
-                                
+
                                 stbsp__chk_cb_buf(1);
                             }
                         }
@@ -4088,7 +4088,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                         {
                         stbsp__cb_buf_clamp(i, precision);
                         precision -= i;
-                        
+
                         if (JSL_IS_BITFLAG_NOT_SET(formatting_flags, STBSP__TRIPLET_COMMA))
                         {
                             JSL_MEMSET(buffer_cursor, '0', i);
@@ -4155,7 +4155,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     {
                         int32_t i;
                         stbsp__cb_buf_clamp(i, trailing_zeros);
-                        
+
                         trailing_zeros -= i;
                         JSL_MEMSET(buffer_cursor, '0', i);
                         buffer_cursor += i;
@@ -4169,12 +4169,12 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     {
                         int32_t i;
                         stbsp__cb_buf_clamp(i, tail[0]);
-                        
+
                         tail[0] -= (char)i;
                         JSL_MEMCPY(buffer_cursor, source_ptr, i);
                         buffer_cursor += i;
                         source_ptr += i;
-                        
+
                         stbsp__chk_cb_buf(1);
                     }
 
@@ -4760,11 +4760,11 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
 
     /**
-     * 
-     * 
+     *
+     *
      *                      FILE UTILITIES
-     * 
-     * 
+     *
+     *
      */
 
     #ifdef JSL_INCLUDE_FILE_UTILS

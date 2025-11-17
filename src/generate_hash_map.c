@@ -1,8 +1,8 @@
 /**
- * 
- * 
+ *
+ *
  * ## License
- * 
+ *
  * Copyright (c) 2025 Jack Stouffer
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -631,10 +631,10 @@ JSLFatPtr dynamic_expand_function_code = JSL_FATPTR_INITIALIZER(""
 /**
  * Generates the header file data for your hash map. This file includes all the typedefs
  * and function signatures for this hash map.
- * 
+ *
  * The generated header file includes "jacks_hash_map.h", and it's assumed to be in the
  * same directory as where this header file will live.
- * 
+ *
  * If your type needs a custom hash function, it must have the function signature
  * `uint64_t my_hash_function(void* data, int64_t length, uint64_t seed);`.
  *
@@ -650,7 +650,7 @@ JSLFatPtr dynamic_expand_function_code = JSL_FATPTR_INITIALIZER(""
  * @param hash_function_name Name of your custom hash function if you have one, NULL otherwise.
  * @param include_header_count Number of additional header files to include in the generated header.
  * @param include_header_count Number of additional header files to include in the generated header.
- 
+
  * @return JSLFatPtr containing the generated header file content
  *
  * @warning Ensure the arena has sufficient space (minimum 512KB recommended) to avoid
@@ -688,9 +688,9 @@ void write_hash_map_header(
     {
         jsl_string_builder_format(builder, JSL_FATPTR_EXPRESSION("#include \"%y\"\n"), include_header_array[i]);
     }
-    
+
     jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("\n"));
-    
+
     jsl_string_builder_format(
         builder,
         static_map_type_typedef,
@@ -800,7 +800,7 @@ void write_hash_map_source(
         key_type_name,
         value_type_name
     );
-    
+
     jsl_string_builder_insert_fatptr(
         builder,
         JSL_FATPTR_EXPRESSION("// DEFAULT INCLUDED HEADERS\n")
@@ -832,7 +832,7 @@ void write_hash_map_source(
     {
         jsl_string_builder_format(builder, JSL_FATPTR_EXPRESSION("#include \"%y\"\n"), include_header_array[i]);
     }
-    
+
     jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("\n"));
 
     jsl_string_builder_format(
@@ -858,7 +858,7 @@ void write_hash_map_source(
         static JSLFatPtr long_str = JSL_FATPTR_INITIALIZER("long");
         static JSLFatPtr uint64_t_str = JSL_FATPTR_INITIALIZER("uint64_t");
         static JSLFatPtr unsigned_long_str = JSL_FATPTR_INITIALIZER("unsigned long");
-        
+
         uint8_t hash_function_call_buffer[4098];
         JSLArena hash_function_scratch_arena = JSL_ARENA_FROM_STACK(hash_function_call_buffer);
 
@@ -899,7 +899,7 @@ void write_hash_map_source(
                 key_type_name
             );
         }
-        
+
         jsl_string_builder_format(
             builder,
             static_hash_function_code,
@@ -912,7 +912,7 @@ void write_hash_map_source(
             key_type_name
         );
     }
-    
+
     jsl_string_builder_format(
         builder,
         static_insert_function_code,
@@ -923,7 +923,7 @@ void write_hash_map_source(
         hash_map_name,
         function_prefix
     );
-    
+
     jsl_string_builder_format(
         builder,
         static_get_function_code,
@@ -935,7 +935,7 @@ void write_hash_map_source(
         hash_map_name,
         function_prefix
     );
-    
+
     jsl_string_builder_format(
         builder,
         static_delete_function_code,
@@ -945,7 +945,7 @@ void write_hash_map_source(
         hash_map_name,
         function_prefix
     );
-    
+
     jsl_string_builder_format(
         builder,
         static_iterator_start_function_code,
@@ -953,7 +953,7 @@ void write_hash_map_source(
         hash_map_name,
         hash_map_name
     );
-    
+
     jsl_string_builder_format(
         builder,
         static_iterator_next_function_code,
@@ -1000,12 +1000,12 @@ int32_t main(int32_t argc, char** argv)
     HashMapImplementation impl = IMPL_ERROR;
     JSLFatPtr* header_includes = NULL;
     int32_t header_includes_count = 0;
-    
+
     // Parse command line arguments
     for (int i = 1; i < argc; i++)
     {
         JSLFatPtr arg = jsl_fatptr_from_cstr(argv[i]);
-        
+
         if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("-h")) || jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--help")))
         {
             show_help = true;
@@ -1127,7 +1127,7 @@ int32_t main(int32_t argc, char** argv)
             return EXIT_FAILURE;
         }
     }
-    
+
     if (show_help)
     {
         jsl_format_file(stdout, help_message);
@@ -1162,14 +1162,14 @@ int32_t main(int32_t argc, char** argv)
     {
         impl = IMPL_DYNAMIC;
     }
-    
+
     JSLArena arena;
     void* backing_data = malloc(JSL_MEGABYTES(8));
     if (backing_data == NULL)
         return EXIT_FAILURE;
 
     jsl_arena_init(&arena, backing_data, JSL_MEGABYTES(8));
-    
+
     JSLStringBuilder builder;
     jsl_string_builder_init2(&builder, &arena, 1024, 8);
 
@@ -1179,7 +1179,7 @@ int32_t main(int32_t argc, char** argv)
             impl,
             &builder,
             name,
-            function_prefix, 
+            function_prefix,
             key_type,
             value_type,
             hash_function_name,
@@ -1187,13 +1187,13 @@ int32_t main(int32_t argc, char** argv)
             header_includes_count
         );
     }
-    else 
+    else
     {
         write_hash_map_source(
             impl,
             &builder,
             name,
-            function_prefix, 
+            function_prefix,
             key_type,
             value_type,
             hash_function_name,

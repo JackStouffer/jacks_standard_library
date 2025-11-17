@@ -9,7 +9,7 @@ static inline uint64_t murmur3_fmix_u64(uint64_t x, uint64_t seed)
     uint64_t z = x ^ seed;
     z ^= z >> 33;
     z *= 0xff51afd7ed558ccdULL;
-    z ^= z >> 33; 
+    z ^= z >> 33;
     z *= 0xc4ceb9fe1a85ec53ULL;
     z ^= z >> 33;
     return z;
@@ -19,7 +19,7 @@ static inline uint64_t murmur3_fmix_u64(uint64_t x, uint64_t seed)
 * rapidhash V3 - Very fast, high quality, platform-independent hashing algorithm.
 *
 * Based on 'wyhash', by Wang Yi <godspeed_china@yeah.net>
-* 
+*
 * Copyright (C) 2025 Nicolas De Carli
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -152,8 +152,8 @@ RAPIDHASH_INLINE_CONSTEXPR void jsl__rapid_mum(uint64_t *A, uint64_t *B) RAPIDHA
     #else
     uint64_t ha=*A>>32, hb=*B>>32, la=(uint32_t)*A, lb=(uint32_t)*B;
     uint64_t rh=ha*hb, rm0=ha*lb, rm1=hb*la, rl=la*lb, t=rl+(rm0<<32), c=t<rl;
-    uint64_t lo=t+(rm1<<32); 
-    c+=lo<t; 
+    uint64_t lo=t+(rm1<<32);
+    c+=lo<t;
     uint64_t hi=rh+(rm0>>32)+(rm1>>32)+c;
     *A=lo;  *B=hi;
     #endif
@@ -241,7 +241,7 @@ RAPIDHASH_INLINE_CONSTEXPR uint64_t jsl__rapidhash_internal(const void *key, siz
             p += 112;
             i -= 112;
         } while(i > 112);
-    
+
         seed ^= see1;
         see2 ^= see3;
         see4 ^= see5;
