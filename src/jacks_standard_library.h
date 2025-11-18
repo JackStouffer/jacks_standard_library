@@ -90,10 +90,6 @@ extern "C" {
     #include <stdbool.h>
 #endif
 
-#if UINTPTR_MAX == 0xFFFFFFFF
-    #error "ERROR: jacks_standard_library.h cannot be used in 32-bit mode!"
-#endif
-
 #if (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
     || defined(_BIG_ENDIAN)
     || defined(__BIG_ENDIAN__)
@@ -203,6 +199,7 @@ extern "C" {
 
     #define JSL_IS_WIN32 1
     #define JSL_IS_POSIX 0
+    #define JSL_IS_WASM32 0
 
 #elif defined(__linux__) || defined(__linux) || \
     defined(__APPLE__) || defined(__MACH__) || \
@@ -216,11 +213,19 @@ extern "C" {
 
     #define JSL_IS_WIN32 0
     #define JSL_IS_POSIX 1
+    #define JSL_IS_WASM32 0
+
+#elif defined(__wasm__) && defined(__wasm32__) && !defined(__wasm64__)
+
+    #define JSL_IS_WIN32 0
+    #define JSL_IS_POSIX 0
+    #define JSL_IS_WASM32 1
 
 #else
 
     #define JSL_IS_WIN32 0
     #define JSL_IS_POSIX 0
+    #define JSL_IS_WASM32 0
 
 #endif
 
@@ -1642,10 +1647,12 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
  #ifdef JSL_IMPLEMENTATION
 
-    #if defined(__x86_64__) || defined(_M_IX86) || defined(_M_X64)
+    #if JSL_IS_X86
         #include <immintrin.h>
     #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
         #include <arm_neon.h>
+    #elif JSL_IS_WASM32 && defined(__wasm_simd128__)
+        #include <wasm_simd128.h>
     #endif
 
     #if defined(__ARM_NEON) || defined(__ARM_NEON__)
@@ -2102,7 +2109,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             #ifdef __AVX2__
                 __m256i needle = _mm256_set1_epi8(item);
 
-                while (string.length - i >= 32)
+                while (i < string.length - 32)
                 {
                     __m256i elements = _mm256_loadu_si256((__m256i*) (string.data + i));
                     __m256i eq_needle = _mm256_cmpeq_epi8(elements, needle);
@@ -2117,6 +2124,18 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
                     i += 32;
                 }
+            #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
+                uint8x16_t needle = vdupq_n_u8(item);
+
+                while (i < string.length - 16)
+                {
+                    const uint8x16_t chunk = vld1q_u8(str.data + i);
+                    const uint8x16_t cmp = vceqq_u8(chunk, needle);
+                    const uint8_t horizontal_maximum0 = vmaxvq_u8(cmp);
+
+                    i += 16;
+                }
+
             #endif
 
             while (i < string.length)
@@ -2137,42 +2156,41 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
         #ifdef JSL_IS_X86
             #ifdef __AVX2__
+                __m256i item_wide_avx = _mm256_set1_epi8(item);
+
                 while (str.length >= 32)
                 {
                     __m256i chunk = _mm256_loadu_si256((__m256i*) str.data);
-                    __m256i item_wide = _mm256_set1_epi8(item);
-                    __m256i cmp = _mm256_cmpeq_epi8(chunk, item_wide);
+                    __m256i cmp = _mm256_cmpeq_epi8(chunk, item_wide_avx);
                     int mask = _mm256_movemask_epi8(cmp);
 
-                    // Count the number of set bits (matches) in the mask
                     count += __builtin_popcount(mask);
 
-                    str.data += 32;
-                    str.length -= 32;
+                    JSL_FATPTR_ADVANCE(str, 32);
                 }
             #endif
 
             #ifdef __SSE3__
+                __m128i item_wide_sse = _mm_set1_epi8(item);
+
                 while (str.length >= 16)
                 {
                     __m128i chunk = _mm_loadu_si128((__m128i*) str.data);
-                    __m128i item_wide = _mm_set1_epi8(item);
-                    __m128i cmp = _mm_cmpeq_epi8(chunk, item_wide);
+                    __m128i cmp = _mm_cmpeq_epi8(chunk, item_wide_sse);
                     int mask = _mm_movemask_epi8(cmp);
 
-                    // Count the number of set bits (matches) in the mask
                     count += __builtin_popcount(mask);
 
-                    str.data += 16;
-                    str.length -= 16;
+                    JSL_FATPTR_ADVANCE(str, 16);
                 }
             #endif
         #elif JSL_IS_ARM
             #if defined(__ARM_NEON) || defined(__ARM_NEON__)
+                uint8x16_t item_wide = vdupq_n_u8(item);
+
                 while (str.length >= 16)
                 {
                     uint8x16_t chunk = vld1q_u8(str.data);
-                    uint8x16_t item_wide = vdupq_n_u8(item);
                     uint8x16_t cmp = vceqq_u8(chunk, item_wide);
                     uint8x16_t ones = vshrq_n_u8(cmp, 7);
                     count += vaddvq_u8(ones);
@@ -3127,7 +3145,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     {
         static char hex[] = "0123456789abcdefxp";
         static char hexu[] = "0123456789ABCDEFXP";
-        static JSLFatPtr err_string = { (uint8_t*) "(ERROR)", (int64_t)(sizeof("(ERROR)") - 1) };
+        static JSLFatPtr err_string = JSL_FATPTR_INITIALIZER("(ERROR)");
         uint8_t* buffer_cursor;
         JSLFatPtr f;
         int32_t tlen = 0;
@@ -3181,9 +3199,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
                 // Get 32 byte aligned address instead of doing unaligned loads
                 // which will give big performance wins to long format strings and
-                // are not that big of a deal to short ones
+                // are not that big of a deal to short ones.
                 //
-                // performance win comes from not loading across a page boundary,
+                // The performance win comes from not loading across a page boundary,
                 // thus requiring two loads for each load intrinsic
                 while (((uintptr_t) f.data) & 31 && f.length > 0)
                 {
@@ -3234,13 +3252,13 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
             #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
 
-                // Get 32 byte aligned address instead of doing unaligned loads
+                // Get 16 byte aligned address instead of doing unaligned loads
                 // which will give big performance wins to long format strings and
-                // are not that big of a deal to short ones
+                // are not that big of a deal to short ones.
                 //
-                // performance win comes from not loading across a page boundary,
-                // thus requiring two loads for each load intrinsic
-                while (((uintptr_t) f.data) & 31 && f.length > 0)
+                // The performance win comes from not loading across a page boundary,
+                // thus requiring two loads for each load intrinsic.
+                while (((uintptr_t) f.data) & 15 && f.length > 0)
                 {
                     schk1:
                     if (f.data[0] == '%')
@@ -3254,13 +3272,15 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
                 while (f.length > 31)
                 {
-                    uint8x16_t data0 = vld1q_u8(f.data);
-                    uint8x16_t data1 = vld1q_u8(f.data + 16);
+                    const uint8x16_t data0 = vld1q_u8(f.data);
+                    const uint8x16_t data1 = vld1q_u8(f.data + 16);
 
-                    uint8x16_t percent_cmp0 = vceqq_u8(data0, percent_wide);
-                    uint8x16_t percent_cmp1 = vceqq_u8(data1, percent_wide);
-                    uint32_t combined_presence = vmaxvq_u8(percent_cmp0) | vmaxvq_u8(percent_cmp1);
+                    const uint8x16_t percent_cmp0 = vceqq_u8(data0, percent_wide);
+                    const uint8x16_t percent_cmp1 = vceqq_u8(data1, percent_wide);
+                    const uint8_t horizontal_maximum0 = vmaxvq_u8(percent_cmp0);
+                    const uint8_t horizontal_maximum1 = vmaxvq_u8(percent_cmp1);
 
+                    const uint32_t combined_presence = horizontal_maximum0 | horizontal_maximum1;
                     if (combined_presence == 0)
                     {
                         stbsp__chk_cb_buf(32);
