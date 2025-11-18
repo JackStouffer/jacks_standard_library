@@ -1648,6 +1648,22 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         #include <arm_neon.h>
     #endif
 
+    #if defined(__ARM_NEON) || defined(__ARM_NEON__)
+        static inline uint32_t jsl__neon_movemask(uint8x16_t v)
+        {
+            const uint8x8_t weights = {1,2,4,8,16,32,64,128};
+
+            uint8x16_t msb = vshrq_n_u8(v, 7);
+            uint16x8_t lo16 = vmull_u8(vget_low_u8(msb),  weights);
+            uint16x8_t hi16 = vmull_u8(vget_high_u8(msb), weights);
+
+            uint32_t lower = vaddvq_u16(lo16);   // reduce 8×u16 -> scalar
+            uint32_t upper = vaddvq_u16(hi16);
+
+            return lower | (upper << 8);
+        }
+    #endif
+
     void jsl__assert(int condition, char* file, int line)
     {
         (void) file;
@@ -1668,22 +1684,6 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         x++;
         return x;
     }
-
-    #if defined(__ARM_NEON) || defined(__ARM_NEON__)
-        static inline uint32_t jsl__neon_movemask(uint8x16_t v)
-        {
-            const uint8x8_t weights = {1,2,4,8,16,32,64,128};
-
-            uint8x16_t msb = vshrq_n_u8(v, 7);
-            uint16x8_t lo16 = vmull_u8(vget_low_u8(msb),  weights);
-            uint16x8_t hi16 = vmull_u8(vget_high_u8(msb), weights);
-
-            uint32_t lower = vaddvq_u16(lo16);   // reduce 8×u16 -> scalar
-            uint32_t upper = vaddvq_u16(hi16);
-
-            return lower | (upper << 8);
-        }
-    #endif
 
     JSLFatPtr jsl_fatptr_init(uint8_t* ptr, int64_t length)
     {
@@ -3234,22 +3234,48 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
             #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
 
-                while (f.length > 15)
+                // Get 32 byte aligned address instead of doing unaligned loads
+                // which will give big performance wins to long format strings and
+                // are not that big of a deal to short ones
+                //
+                // performance win comes from not loading across a page boundary,
+                // thus requiring two loads for each load intrinsic
+                while (((uintptr_t) f.data) & 31 && f.length > 0)
                 {
-                    const uint8x16_t data = vld1q_u8(f.data);
-                    const uint8x16_t percent_mask = vceqq_u8(data, percent_wide);
-                    const int has_match = vmaxvq_u8(percent_mask);
+                    schk1:
+                    if (f.data[0] == '%')
+                        goto L_PROCESS_PERCENT;
 
-                    if (!has_match)
+                    stbsp__chk_cb_buf(1);
+                    *buffer_cursor = f.data[0];
+                    ++buffer_cursor;
+                    JSL_FATPTR_ADVANCE(f, 1);
+                }
+
+                while (f.length > 31)
+                {
+                    uint8x16_t data0 = vld1q_u8(f.data);
+                    uint8x16_t data1 = vld1q_u8(f.data + 16);
+
+                    uint8x16_t percent_cmp0 = vceqq_u8(data0, percent_wide);
+                    uint8x16_t percent_cmp1 = vceqq_u8(data1, percent_wide);
+                    uint32_t combined_presence = vmaxvq_u8(percent_cmp0) | vmaxvq_u8(percent_cmp1);
+
+                    if (combined_presence == 0)
                     {
-                        stbsp__chk_cb_buf(16);
-                        vst1q_u8(buffer_cursor, data);
-                        JSL_FATPTR_ADVANCE(f, 16);
-                        buffer_cursor += 16;
+                        stbsp__chk_cb_buf(32);
+                        vst1q_u8(buffer_cursor, data0);
+                        vst1q_u8(buffer_cursor + 16, data1);
+                        JSL_FATPTR_ADVANCE(f, 32);
+                        buffer_cursor += 32;
                     }
                     else
                     {
-                        uint32_t mask = jsl__neon_movemask(percent_mask);
+                        uint32_t mask0 = jsl__neon_movemask(percent_cmp0);
+                        uint32_t mask1 = jsl__neon_movemask(percent_cmp1);
+                        uint32_t mask  = mask0 | (mask1 << 16);
+
+                        // uint32_t mask = jsl__neon_movemask(percent_mask);
                         int special_pos = __builtin_ctz(mask);
                         stbsp__chk_cb_buf(special_pos);
                         JSL_MEMCPY(buffer_cursor, f.data, special_pos);
@@ -3261,18 +3287,10 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     }
                 }
 
-                while (f.length > 0)
-                {
-                    if (f.data[0] == '%')
-                        goto L_PROCESS_PERCENT;
-
-                    stbsp__chk_cb_buf(1);
-                    *buffer_cursor = f.data[0];
-                    ++buffer_cursor;
-                    JSL_FATPTR_ADVANCE(f, 1);
-                }
-
-                goto L_END_FORMAT;
+                if (f.length == 0)
+                    goto L_END_FORMAT;
+                else
+                    goto schk1;
 
             #else
 
