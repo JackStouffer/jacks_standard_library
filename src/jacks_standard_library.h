@@ -85,6 +85,7 @@ extern "C" {
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <limits.h>
 
 #if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L
     #include <stdbool.h>
@@ -169,6 +170,13 @@ extern "C" {
  *
  */
 
+
+/**
+ *
+ *  Libc Override Macros
+ *
+ */
+
 #ifndef JSL_ASSERT
     #include <assert.h>
     void jsl__assert(int condition, char* file, int line);
@@ -195,9 +203,15 @@ extern "C" {
     #define JSL_STRLEN strlen
 #endif
 
+/**
+ *
+ *  Platform Detection Macros
+ *
+ */
+
 #if defined(_WIN32)
 
-    #define JSL_IS_WIN32 1
+    #define JSL_IS_WINDOWS 1
     #define JSL_IS_POSIX 0
     #define JSL_IS_WASM32 0
 
@@ -211,19 +225,19 @@ extern "C" {
     defined(_AIX) || \
     defined(__CYGWIN__)
 
-    #define JSL_IS_WIN32 0
+    #define JSL_IS_WINDOWS 0
     #define JSL_IS_POSIX 1
     #define JSL_IS_WASM32 0
 
 #elif defined(__wasm__) && defined(__wasm32__) && !defined(__wasm64__)
 
-    #define JSL_IS_WIN32 0
+    #define JSL_IS_WINDOWS 0
     #define JSL_IS_POSIX 0
     #define JSL_IS_WASM32 1
 
 #else
 
-    #define JSL_IS_WIN32 0
+    #define JSL_IS_WINDOWS 0
     #define JSL_IS_POSIX 0
     #define JSL_IS_WASM32 0
 
@@ -241,6 +255,31 @@ extern "C" {
 
 #endif
 
+#if defined(__GNUC__) && !defined(__clang__)
+
+    #define JSL_IS_GCC 1
+    #define JSL_IS_CLANG 0
+    #define JSL_IS_MSVC 0
+
+#elif defined(__clang__)
+
+    #define JSL_IS_GCC 0
+    #define JSL_IS_CLANG 1
+    #define JSL_IS_MSVC 0
+
+#else
+
+    #define JSL_IS_GCC 0
+    #define JSL_IS_CLANG 0
+    #define JSL_IS_MSVC 0
+
+#endif
+
+/**
+ *
+ *  Function Signature Macros
+ *
+ */
 
 #ifndef JSL_DEF
     /**
@@ -276,6 +315,96 @@ extern "C" {
     #endif
 
 #endif
+
+
+/**
+ *
+ *  Built Ins Macros For MSVC Compatibility
+ *
+ */
+
+
+#if JSL_IS_GCC || JSL_IS_CLANG
+    /**
+     * Platform specific intrinsic for returning the count of trailing zeros.
+     * 
+     * In order to be as fast as possible, this does not represent a cross
+     * platform abstraction over different ctz implementations.
+     * On GCC and clang, this is replaced with `__builtin_ctz`. On MSVC
+     * `_BitScanForward` is used in a forced inline function call. Behavior
+     * with zero is undefined for GCC and clang while MSVC will give 32.
+     */
+    #define JSL_PLATFORM_COUNT_TRAILING_ZEROS(x) __builtin_ctz(x)
+
+    #if UINT64_MAX == ULLONG_MAX
+        /**
+         * TODO: docs
+         */
+        #define JSL_PLATFORM_COUNT_TRAILING_ZEROS64(x) __builtin_ctzll(x)
+    #elif UINT64_MAX == ULONG_MAX
+    
+        /**
+         * TODO: docs
+         */
+        #define JSL_PLATFORM_COUNT_TRAILING_ZEROS64(x) __builtin_ctzl(x)
+    #endif
+
+    /**
+     * TODO: docs
+     */
+    #define JSL_PLATFORM_POPULATION_COUNT(x) __builtin_popcount(x)
+
+    #if UINT64_MAX == ULLONG_MAX
+        /**
+         * TODO: docs
+         */
+        #define JSL_PLATFORM_POPULATION_COUNT64(x) __builtin_popcountll(x)
+    #elif UINT64_MAX == ULONG_MAX
+        /**
+         * TODO: docs
+         */
+        #define JSL_PLATFORM_POPULATION_COUNT64(x) __builtin_popcountl(x)
+    #endif
+
+    /**
+     * TODO: docs
+     */
+    #define JSL_PLATFORM_FIND_FIRST_SET(x) __builtin_ffs(x)
+
+    #if UINT64_MAX == ULLONG_MAX
+        /**
+         * TODO: docs
+         */
+        #define JSL_PLATFORM_FIND_FIRST_SET64(x) __builtin_ffsll(x)
+    #elif UINT64_MAX == ULONG_MAX
+        /**
+         * TODO: docs
+         */
+        #define JSL_PLATFORM_FIND_FIRST_SET64(x) __builtin_ffsl(x)
+    #endif
+
+#else
+
+    uint32_t jsl__count_trailing_zeros_u32(uint32_t x);
+    uint64_t jsl__count_trailing_zeros_u64(uint64_t x);
+    uint32_t jsl__find_first_set_u32(uint32_t x);
+    uint64_t jsl__find_first_set_u64(uint64_t x);
+
+    #define JSL_PLATFORM_COUNT_TRAILING_ZEROS(x) jsl__count_trailing_zeros_u32(x)
+    #define JSL_PLATFORM_COUNT_TRAILING_ZEROS64(x) jsl__count_trailing_zeros_u64(x)
+    #define JSL_PLATFORM_POPULATION_COUNT(x) __popcnt(x)
+    #define JSL_PLATFORM_POPULATION_COUNT64(x) __popcnt64(x)
+    #define JSL_PLATFORM_FIND_FIRST_SET(x) jsl__find_first_set_u32(x)
+    #define JSL_PLATFORM_FIND_FIRST_SET64(x) jsl__find_first_set_u64(x)
+
+#endif
+
+
+/**
+ *
+ *  Utility Macros
+ *
+ */
 
 
 /**
@@ -466,7 +595,6 @@ extern "C" {
  * ```
  */
 #define JSL_TERABYTES(x) x * 1024 * 1024 * 1024 * 1024
-
 
 /**
  * Round x up the next power of two. If x is a power of two it returns
@@ -1494,7 +1622,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
 #ifdef JSL_INCLUDE_FILE_UTILS
 
-    #if JSL_IS_WIN32
+    #if JSL_IS_WINDOWS
 
         #include <errno.h>
         #include <fcntl.h>
@@ -1654,6 +1782,10 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     #elif JSL_IS_WASM32 && defined(__wasm_simd128__)
         #include <wasm_simd128.h>
     #endif
+    
+    #if JSL_IS_MSVC
+        #include <intrin.h>
+    #endif
 
     #if defined(__ARM_NEON) || defined(__ARM_NEON__)
         static inline uint32_t jsl__neon_movemask(uint8x16_t v)
@@ -1676,6 +1808,81 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         (void) file;
         (void) line;
         assert(condition);
+    }
+
+    JSL__FORCE_INLINE uint32_t jsl__count_trailing_zeros_u32(uint32_t x)
+    {
+        #if JSL_IS_MSVC
+            unsigned long index;
+            _BitScanForward(&index, x);
+            return (uint32_t) index;
+        #else
+            uint32_t n = 0;
+            while ((x & 1u) == 0)
+            {
+                x >>= 1;
+                ++n;
+            }
+            return n;
+        #endif
+    }
+
+    JSL__FORCE_INLINE uint64_t jsl__count_trailing_zeros_u64(uint64_t x)
+    {
+        #if JSL_IS_MSVC
+            unsigned long index;
+            _BitScanForward64(&index, x);
+            return (uint64_t) index;
+        #else
+            uint64_t n = 0;
+            while ((x & 1u) == 0)
+            {
+                x >>= 1;
+                ++n;
+            }
+            return n;
+        #endif
+    }
+
+    JSL__FORCE_INLINE uint32_t jsl__find_first_set_u32(uint32_t x)
+    {
+        #if JSL_IS_MSVC
+            unsigned long index;
+            _BitScanForward(&index, x);
+            return (uint32_t) (index + 1);
+        #else
+            if (x == 0) return 0;
+
+            int n = 1;
+            if ((x & 0xFFFF) == 0) { x >>= 16; n += 16; }
+            if ((x & 0xFF) == 0)   { x >>= 8;  n += 8;  }
+            if ((x & 0xF) == 0)    { x >>= 4;  n += 4;  }
+            if ((x & 0x3) == 0)    { x >>= 2;  n += 2;  }
+            if ((x & 0x1) == 0)    { n += 1; }
+
+            return n;
+        #endif
+    }
+
+    JSL__FORCE_INLINE uint64_t jsl__find_first_set_u64(uint64_t x)
+    {
+        #if JSL_IS_MSVC
+            unsigned long index;
+            _BitScanForward64(&index, x);
+            return (uint64_t) (index + 1);
+        #else
+            if (x == 0) return 0;
+
+            int n = 1;
+            if ((x & 0xFFFFFFFFULL) == 0) { x >>= 32; n += 32; }
+            if ((x & 0xFFFFULL) == 0)     { x >>= 16; n += 16; }
+            if ((x & 0xFFULL) == 0)       { x >>= 8;  n += 8;  }
+            if ((x & 0xFULL) == 0)        { x >>= 4;  n += 4;  }
+            if ((x & 0x3ULL) == 0)        { x >>= 2;  n += 2;  }
+            if ((x & 0x1ULL) == 0)        { n += 1; }
+
+            return n;
+        #endif
     }
 
     uint32_t jsl_next_power_of_two_u32(uint32_t x)
@@ -1900,7 +2107,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
                 while (mask != 0)
                 {
-                    int32_t bit_position = __builtin_ctzll(mask);
+                    int32_t bit_position = JSL_PLATFORM_COUNT_TRAILING_ZEROS64(mask);
 
                     if (JSL_MEMCMP(string.data + i + bit_position + 1, substring.data + 1, substring.length - 2) == 0)
                     {
@@ -2118,7 +2325,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
                     if (mask != 0)
                     {
-                        int32_t bit_position = __builtin_ctz(mask);
+                        int32_t bit_position = JSL_PLATFORM_COUNT_TRAILING_ZEROS(mask);
                         return i + bit_position;
                     }
 
@@ -2164,7 +2371,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     __m256i cmp = _mm256_cmpeq_epi8(chunk, item_wide_avx);
                     int mask = _mm256_movemask_epi8(cmp);
 
-                    count += __builtin_popcount(mask);
+                    count += JSL_PLATFORM_POPULATION_COUNT(mask);
 
                     JSL_FATPTR_ADVANCE(str, 32);
                 }
@@ -2179,7 +2386,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     __m128i cmp = _mm_cmpeq_epi8(chunk, item_wide_sse);
                     int mask = _mm_movemask_epi8(cmp);
 
-                    count += __builtin_popcount(mask);
+                    count += JSL_PLATFORM_POPULATION_COUNT(mask);
 
                     JSL_FATPTR_ADVANCE(str, 16);
                 }
@@ -2247,7 +2454,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
                     if (mask != 0)
                     {
-                        int32_t bit_position = __builtin_ctz(mask);
+                        int32_t bit_position = JSL_PLATFORM_COUNT_TRAILING_ZEROS(mask);
                         return i + bit_position;
                     }
 
@@ -3085,7 +3292,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                 }
                 else
                 {
-                    int null_pos = __builtin_ffs(mask) - 1;
+                    int null_pos = JSL_PLATFORM_FIND_FIRST_SET(mask) - 1;
                     source_ptr += null_pos;
                     limit -= null_pos;
                     break;
@@ -3234,7 +3441,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     }
                     else
                     {
-                        int special_pos = __builtin_ctz(mask);
+                        int special_pos = JSL_PLATFORM_COUNT_TRAILING_ZEROS(mask);
                         stbsp__chk_cb_buf(special_pos);
 
                         JSL_MEMCPY(buffer_cursor, f.data, special_pos);
@@ -3295,8 +3502,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                         uint32_t mask1 = jsl__neon_movemask(percent_cmp1);
                         uint32_t mask  = mask0 | (mask1 << 16);
 
-                        // uint32_t mask = jsl__neon_movemask(percent_mask);
-                        int special_pos = __builtin_ctz(mask);
+                        int special_pos = JSL_PLATFORM_COUNT_TRAILING_ZEROS(mask);
                         stbsp__chk_cb_buf(special_pos);
                         JSL_MEMCPY(buffer_cursor, f.data, special_pos);
 
@@ -4837,7 +5043,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         int64_t result_size = -1;
         bool stat_success = false;
 
-        #if JSL_IS_WIN32
+        #if JSL_IS_WINDOWS
             struct _stat64 file_info;
             int stat_result = _fstat64(file_descriptor, &file_info);
             if (stat_result == 0)
@@ -4897,7 +5103,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         bool opened_file = false;
         if (got_path)
         {
-            #if JSL_IS_WIN32
+            #if JSL_IS_WINDOWS
                 errno_t open_err = _sopen_s(
                     &file_descriptor,
                     path_buffer,
@@ -4946,7 +5152,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         bool did_read_data = false;
         if (got_memory)
         {
-            #if JSL_IS_WIN32
+            #if JSL_IS_WINDOWS
                 read_res = (int64_t) _read(file_descriptor, allocation.data, (unsigned int) file_size);
             #elif JSL_IS_POSIX
                 read_res = (int64_t) read(file_descriptor, allocation.data, file_size);
@@ -4976,7 +5182,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         bool did_close = false;
         if (opened_file)
         {
-            #if JSL_IS_WIN32
+            #if JSL_IS_WINDOWS
                 int32_t close_res = _close(file_descriptor);
             #elif JSL_IS_POSIX
                 int32_t close_res = close(file_descriptor);
@@ -5030,7 +5236,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         bool opened_file = false;
         if (got_path)
         {
-            #if JSL_IS_WIN32
+            #if JSL_IS_WINDOWS
                 errno_t open_err = _sopen_s(
                     &file_descriptor,
                     path_buffer,
@@ -5067,7 +5273,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         {
             int64_t read_size = JSL_MIN(file_size, buffer->length);
 
-            #if JSL_IS_WIN32
+            #if JSL_IS_WINDOWS
                 read_res = (int64_t) _read(file_descriptor, buffer->data, (unsigned int) read_size);
             #elif JSL_IS_POSIX
                 read_res = (int64_t) read(file_descriptor, buffer->data, read_size);
@@ -5099,7 +5305,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         bool did_close = false;
         if (opened_file)
         {
-            #if JSL_IS_WIN32
+            #if JSL_IS_WINDOWS
                 int32_t close_res = _close(file_descriptor);
             #elif JSL_IS_POSIX
                 int32_t close_res = close(file_descriptor);
@@ -5149,7 +5355,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         bool opened_file = false;
         if (got_path)
         {
-            #if JSL_IS_WIN32
+            #if JSL_IS_WINDOWS
                 errno_t open_err = _sopen_s(
                     &file_descriptor,
                     path_buffer,
@@ -5167,7 +5373,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         int64_t write_res = -1;
         if (opened_file)
         {
-            #if JSL_IS_WIN32
+            #if JSL_IS_WINDOWS
                 write_res = _write(
                     file_descriptor,
                     contents.data,
@@ -5202,7 +5408,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         int32_t close_res = -1;
         if (opened_file)
         {
-            #if JSL_IS_WIN32
+            #if JSL_IS_WINDOWS
                 close_res = _close(file_descriptor);
             #elif JSL_IS_POSIX
                 close_res = close(file_descriptor);

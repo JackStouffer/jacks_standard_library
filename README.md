@@ -60,12 +60,26 @@ atomics or threading.
 
 ## What's Supported
 
-Official support is for Windows, macOS, and Linux with MSVC, GCC, and clang.
+Official support:
 
-64 bit little endian executables only.
+* Windows
+   * MSVC and clang
+   * x86_64
+   * 32 bit pointer mode supported, must have 64bit registers
+* macOS
+   * gcc and clang
+   * x86_64 and ARM little endian
+   * 32 bit pointer mode supported, must have 64bit registers
+* Linux
+   * gcc and clang
+   * x86_64 and ARM little endian
+   * 32 bit pointer mode supported, must have 64bit registers
+* WebAssembly
+   * clang and emscripten
+   * WASM32
 
 This might work on other POSIX systems with other C compilers, but I have not tested
-it.
+it. This will not work on other compilers on Windows without edits.
 
 ## Usage
 

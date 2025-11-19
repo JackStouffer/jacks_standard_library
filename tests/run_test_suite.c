@@ -136,7 +136,7 @@ int32_t main(int32_t argc, char **argv)
 
     nob_log(NOB_INFO, "Compiling generate hash map program");
 
-    #if JSL_IS_WIN32
+    #if JSL_IS_WINDOWS
         char generate_hash_map_exe_name[256] = "tests\\bin\\generate_hash_map.exe";
         char generate_hash_map_run_exe_command[256] = ".\\tests\\bin\\generate_hash_map.exe";
     #elif JSL_IS_POSIX
@@ -343,7 +343,7 @@ int32_t main(int32_t argc, char **argv)
             if (!nob_cmd_run(&clang_optimized_compile_command, .async = &compile_procs)) return 1;
         }
 
-        #if JSL_IS_WIN32
+        #if JSL_IS_WINDOWS
 
             {
                 char exe_output_param[256] = "/Fe";
@@ -364,15 +364,15 @@ int32_t main(int32_t argc, char **argv)
                     "cl.exe",
                     "/nologo",
                     "/DJSL_DEBUG",
-                    "/I\"src\\\"",
+                    "/Isrc",
                     "/TC",
                     "/Od",
                     "/Zi",
                     "/W4",
                     "/WX",
                     "/std:c11",
-                    exe_output_param,
-                    obj_output_param,
+                    exe_output_param
+                    // obj_output_param,
                 );
 
                 for (int32_t source_file_idx = 0;; ++source_file_idx)
@@ -384,7 +384,9 @@ int32_t main(int32_t argc, char **argv)
                     nob_cmd_append(&msvc_debug_compile_command, source_file);
                 }
 
-                if (!nob_cmd_run(&msvc_debug_compile_command, .async = &compile_procs)) return 1;
+                // TODO, speed: Add .async = &compile_procs for MSVC, right now
+                // pdbs over write each other causing errors
+                if (!nob_cmd_run(&msvc_debug_compile_command)) return 1;
             }
 
             {
@@ -405,14 +407,14 @@ int32_t main(int32_t argc, char **argv)
                     &msvc_optimized_compile_command,
                     "cl.exe",
                     "/nologo",
-                    "/I\"src\\\"",
+                    "/Isrc",
                     "/TC",
                     "/O2",
                     "/W4",
                     "/WX",
                     "/std:c11",
-                    exe_output_param,
-                    obj_output_param
+                    exe_output_param
+                    // obj_output_param
                 );
 
                 for (int32_t source_file_idx = 0;; ++source_file_idx)
@@ -424,7 +426,9 @@ int32_t main(int32_t argc, char **argv)
                     nob_cmd_append(&msvc_optimized_compile_command, source_file);
                 }
 
-                if (!nob_cmd_run(&msvc_optimized_compile_command, .async = &compile_procs)) return 1;
+                // TODO, speed: Add .async = &compile_procs for MSVC, right now
+                // pdbs over write each other causing errors
+                if (!nob_cmd_run(&msvc_optimized_compile_command)) return 1;
             }
 
         #elif JSL_IS_POSIX
@@ -538,7 +542,7 @@ int32_t main(int32_t argc, char **argv)
             if (!nob_cmd_run(&clang_optimized_run_command)) return 1;
         }
 
-        #if JSL_IS_WIN32
+        #if JSL_IS_WINDOWS
 
             {
                 char exe_name[256] = "tests\\bin\\debug_msvc_";
