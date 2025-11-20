@@ -259,6 +259,15 @@ extern "C" {
         #define JSL__COUNT_TRAILING_ZEROS_IMPL64(x) __builtin_ctzl(x)
     #endif
 
+    #define JSL__COUNT_LEADING_ZEROS_IMPL(x) __builtin_clz(x)
+
+    #if UINT64_MAX == ULLONG_MAX
+        #define JSL__COUNT_LEADING_ZEROS_IMPL64(x) __builtin_clzll(x)
+    #elif UINT64_MAX == ULONG_MAX
+        #define JSL__COUNT_LEADING_ZEROS_IMPL64(x) __builtin_clzl(x)
+    #endif
+
+
     #define JSL__POPULATION_COUNT_IMPL(x) __builtin_popcount(x)
 
     #if UINT64_MAX == ULLONG_MAX
@@ -275,17 +284,39 @@ extern "C" {
         #define JSL__FIND_FIRST_SET_IMPL64(x) __builtin_ffsl(x)
     #endif
 
-#else
+#elif JSL_IS_MSVC
 
     uint32_t jsl__count_trailing_zeros_u32(uint32_t x);
-    uint64_t jsl__count_trailing_zeros_u64(uint64_t x);
+    uint32_t jsl__count_trailing_zeros_u64(uint64_t x);
     uint32_t jsl__find_first_set_u32(uint32_t x);
-    uint64_t jsl__find_first_set_u64(uint64_t x);
+    uint32_t jsl__find_first_set_u64(uint64_t x);
 
     #define JSL__COUNT_TRAILING_ZEROS_IMPL(x) jsl__count_trailing_zeros_u32(x)
     #define JSL__COUNT_TRAILING_ZEROS_IMPL64(x) jsl__count_trailing_zeros_u64(x)
+    #define JSL__COUNT_LEADING_ZEROS_IMPL(x) __lzcnt(x)
+    #define JSL__COUNT_LEADING_ZEROS_IMPL64(x) __lzcnt64(x)
     #define JSL__POPULATION_COUNT_IMPL(x) __popcnt(x)
     #define JSL__POPULATION_COUNT_IMPL64(x) __popcnt64(x)
+    #define JSL__FIND_FIRST_SET_IMPL(x) jsl__find_first_set_u32(x)
+    #define JSL__FIND_FIRST_SET_IMPL64(x) jsl__find_first_set_u64(x)
+
+#else
+
+    uint32_t jsl__count_trailing_zeros_u32(uint32_t x);
+    uint32_t jsl__count_trailing_zeros_u64(uint64_t x);
+    uint32_t jsl__count_leading_zeros_u32(uint32_t x);
+    uint32_t jsl__count_leading_zeros_u64(uint64_t x);
+    uint32_t jsl__population_count_u32(uint32_t x);
+    uint32_t jsl__population_count_u64(uint64_t x);
+    uint32_t jsl__find_first_set_u32(uint32_t x);
+    uint32_t jsl__find_first_set_u64(uint64_t x);
+
+    #define JSL__COUNT_TRAILING_ZEROS_IMPL(x) jsl__count_trailing_zeros_u32(x)
+    #define JSL__COUNT_TRAILING_ZEROS_IMPL64(x) jsl__count_trailing_zeros_u64(x)
+    #define JSL__COUNT_LEADING_ZEROS_IMPL(x) jsl__count_leading_zeros_u32(x)
+    #define JSL__COUNT_LEADING_ZEROS_IMPL64(x) jsl__count_leading_zeros_u64(x)
+    #define JSL__POPULATION_COUNT_IMPL(x) jsl__population_count_u32(x)
+    #define JSL__POPULATION_COUNT_IMPL64(x) jsl__population_count_u64(x)
     #define JSL__FIND_FIRST_SET_IMPL(x) jsl__find_first_set_u32(x)
     #define JSL__FIND_FIRST_SET_IMPL64(x) jsl__find_first_set_u64(x)
 
@@ -489,6 +520,30 @@ extern "C" {
 #define JSL_PLATFORM_COUNT_TRAILING_ZEROS64(x) JSL__COUNT_TRAILING_ZEROS_IMPL64((x))
 
 /**
+ * Platform specific intrinsic for returning the count of leading zeros for 32
+ * bit signed and unsigned integers.
+ *
+ * In order to be as fast as possible, this does not represent a cross
+ * platform abstraction over different clz implementations.
+ * On GCC and clang, this is replaced with `__builtin_clz`. On MSVC
+ * `_BitScanReverse` is used in a forced inline function call. Behavior
+ * with zero is undefined for GCC and clang while MSVC will give 32.
+ */
+#define JSL_PLATFORM_COUNT_LEADING_ZEROS(x) JSL__COUNT_LEADING_ZEROS_IMPL((x))
+
+/**
+ * Platform specific intrinsic for returning the count of leading zeros for 64
+ * bit signed and unsigned integers.
+ *
+ * In order to be as fast as possible, this does not represent a cross
+ * platform abstraction over different clz implementations.
+ * On GCC and clang, this is replaced with `__builtin_clzll`. On MSVC
+ * `_BitScanReverse64` is used in a forced inline function call. Behavior
+ * with zero is undefined for GCC and clang while MSVC will give 32.
+ */
+#define JSL_PLATFORM_COUNT_LEADING_ZEROS64(x) JSL__COUNT_LEADING_ZEROS_IMPL64((x))
+
+/**
  * Platform specific intrinsic for returning the count of set bits for 32
  * bit signed and unsigned integers.
  *
@@ -569,6 +624,24 @@ extern "C" {
  * ```
  */
 #define JSL_MIN(a,b) ((a) < (b) ? (a) : (b))
+
+/**
+ * Returns `x` bound between the two given values.
+ *
+ * @warning This macro evaluates its arguments multiple times. Do not use with
+ * arguments that have side effects (e.g., function calls, increment/decrement
+ * operations) as they will be executed more than once.
+ *
+ * Example:
+ * ```c
+ * int max_val = JSL_BETWEEN(10, 15, 20);        // Returns 15
+ * double max_d = JSL_BETWEEN(1.2, 0.1, 3.14);   // Returns 1.2
+ *
+ * // DANGER: Don't do this - increment happens more than once!
+ * // int bad = JSL_BETWEEN(32, ++x, 64);
+ * ```
+ */
+#define JSL_BETWEEN(min, x, max) ((x) < (min) ? (min) : ((x) > (max) ? (max) : (x)))
 
 /**
  * Sets a specific bit flag in a bitfield by performing a bitwise OR operation.
@@ -724,14 +797,86 @@ extern "C" {
 #define JSL_TERABYTES(x) x * 1024 * 1024 * 1024 * 1024
 
 /**
- * Round x up the next power of two. If x is a power of two it returns
- * the same value. To cover this case you can just add one before passing
- * x in to make sure you always get a larger value.
+ * Round x up to the next power of two. If x is a power of two it returns
+ * the same value.
+ * 
+ * This function is designed to be used in tight loops and other performance
+ * critical areas. Therefore, both zero and values greater than 2^31 not special
+ * cased. The return values for these cases are compiler, OS, and ISA specific.
+ * If you need consistent behavior, then you can easily call this function like
+ * so:
+ * 
+ * ```
+ * jsl_next_power_of_two_u32(
+ *      JSL_BETWEEN(1u, x, 0x80000000u)
+ * );
+ * ```
  *
  * @param x The value to round up
  * @returns the next power of two
  */
 uint32_t jsl_next_power_of_two_u32(uint32_t x);
+
+/**
+ * Round x up to the next power of two. If x is a power of two it returns
+ * the same value.
+ * 
+ * This function is designed to be used in tight loops and other performance
+ * critical areas. Therefore, both zero and values greater than 2^63 not special
+ * cased. The return values for these cases are compiler, OS, and ISA specific.
+ * If you need consistent behavior, then you can easily call this function like
+ * so:
+ * 
+ * ```
+ * jsl_next_power_of_two_u64(
+ *      JSL_BETWEEN(1ull, x, 0x8000000000000000ull)
+ * );
+ * ```
+ *
+ * @param x The value to round up
+ * @returns the next power of two
+ */
+uint64_t jsl_next_power_of_two_u64(uint64_t x);
+
+/**
+ * Round x down to the previous power of two. If x is a power of two it returns
+ * the same value.
+ * 
+ * This function is designed to be used in tight loops and other performance
+ * critical areas. Therefore, zero is not special cased. The return value is
+ * compiler, OS, and ISA specific. If you need consistent behavior, then you
+ * can easily call this function like so:
+ * 
+ * ```
+ * jsl_previous_power_of_two_u32(
+ *      JSL_MAX(1, x)
+ * );
+ * ```
+ *
+ * @param x The value to round up
+ * @returns the next power of two
+ */
+uint32_t jsl_previous_power_of_two_u32(uint32_t x);
+
+/**
+ * Round x down to the previous power of two. If x is a power of two it returns
+ * the same value.
+ * 
+ * This function is designed to be used in tight loops and other performance
+ * critical areas. Therefore, zero is not special cased. The return value is
+ * compiler, OS, and ISA specific. If you need consistent behavior, then you
+ * can easily call this function like so:
+ * 
+ * ```
+ * jsl_previous_power_of_two_u64(
+ *      JSL_MAX(1UL, x)
+ * );
+ * ```
+ *
+ * @param x The value to round up
+ * @returns the next power of two
+ */
+uint64_t jsl_previous_power_of_two_u64(uint64_t x);
 
 /**
  * A fat pointer is a representation of a chunk of memory. It **is not** a container
@@ -1933,14 +2078,14 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         #endif
     }
 
-    JSL__FORCE_INLINE uint64_t jsl__count_trailing_zeros_u64(uint64_t x)
+    JSL__FORCE_INLINE uint32_t jsl__count_trailing_zeros_u64(uint64_t x)
     {
         #if JSL_IS_MSVC
             unsigned long index;
             _BitScanForward64(&index, x);
-            return (uint64_t) index;
+            return (uint32_t) index;
         #else
-            uint64_t n = 0;
+            uint32_t n = 0;
             while ((x & 1u) == 0)
             {
                 x >>= 1;
@@ -1948,6 +2093,31 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             }
             return n;
         #endif
+    }
+
+    JSL__FORCE_INLINE uint32_t jsl__count_leading_zeros_u32(uint32_t x)
+    {
+        if (x == 0) return 32;
+        uint32_t n = 0;
+        if ((x & 0xFFFF0000) == 0) { n += 16; x <<= 16; }
+        if ((x & 0xFF000000) == 0) { n += 8;  x <<= 8;  }
+        if ((x & 0xF0000000) == 0) { n += 4;  x <<= 4;  }
+        if ((x & 0xC0000000) == 0) { n += 2;  x <<= 2;  }
+        if ((x & 0x80000000) == 0) { n += 1; }
+        return n;
+    }
+
+    JSL__FORCE_INLINE uint32_t jsl__count_leading_zeros_u64(uint64_t x)
+    {
+        if (x == 0) return 64;
+        uint32_t n = 0;
+        if ((x & 0xFFFFFFFF00000000ULL) == 0) { n += 32; x <<= 32; }
+        if ((x & 0xFFFF000000000000ULL) == 0) { n += 16; x <<= 16; }
+        if ((x & 0xFF00000000000000ULL) == 0) { n += 8;  x <<= 8;  }
+        if ((x & 0xF000000000000000ULL) == 0) { n += 4;  x <<= 4;  }
+        if ((x & 0xC000000000000000ULL) == 0) { n += 2;  x <<= 2;  }
+        if ((x & 0x8000000000000000ULL) == 0) { n += 1; }
+        return n;
     }
 
     JSL__FORCE_INLINE uint32_t jsl__find_first_set_u32(uint32_t x)
@@ -1970,12 +2140,12 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         #endif
     }
 
-    JSL__FORCE_INLINE uint64_t jsl__find_first_set_u64(uint64_t x)
+    JSL__FORCE_INLINE uint32_t jsl__find_first_set_u64(uint64_t x)
     {
         #if JSL_IS_MSVC
             unsigned long index;
             _BitScanForward64(&index, x);
-            return (uint64_t) (index + 1);
+            return (uint32_t) (index + 1);
         #else
             if (x == 0) return 0;
 
@@ -1991,18 +2161,104 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         #endif
     }
 
+    JSL__FORCE_INLINE uint32_t jsl__population_count_u32(uint32_t x)
+    {
+        // Branchless SWAR
+        x = x - ((x >> 1) & 0x55555555u);
+        x = (x & 0x33333333u) + ((x >> 2) & 0x33333333u);
+        x = (x + (x >> 4)) & 0x0F0F0F0Fu;
+        x = x + (x >> 8);
+        x = x + (x >> 16);
+        return x & 0x3Fu;
+    }
+
+    JSL__FORCE_INLINE uint32_t jsl__population_count_u64(uint64_t x)
+    {
+        x = x - ((x >> 1) & 0x5555555555555555ULL);
+        x = (x & 0x3333333333333333ULL) + ((x >> 2) & 0x3333333333333333ULL);
+        x = (x + (x >> 4)) & 0x0F0F0F0F0F0F0F0FULL;
+        x = x + (x >> 8);
+        x = x + (x >> 16);
+        x = x + (x >> 32);
+        return x & 0x7F;  // result fits in 7 bits (0–64)
+    }
+
     uint32_t jsl_next_power_of_two_u32(uint32_t x)
     {
-        if (x == 0) return 1;
+        #if JSL_IS_CLANG || JSL_IS_GCC
 
-        x--;
-        x |= x >> 1;
-        x |= x >> 2;
-        x |= x >> 4;
-        x |= x >> 8;
-        x |= x >> 16;
-        x++;
-        return x;
+            return 1u << (32 - JSL_PLATFORM_COUNT_LEADING_ZEROS(x - 1));
+
+        #else
+
+            x--;
+            x |= x >> 1;
+            x |= x >> 2;
+            x |= x >> 4;
+            x |= x >> 8;
+            x |= x >> 16;
+            x++;
+            return x;
+
+        #endif
+    }
+
+    uint64_t jsl_next_power_of_two_u64(uint64_t x)
+    {
+        #if JSL_IS_CLANG || JSL_IS_GCC
+
+            return ((uint64_t) 1u) << (((uint64_t) 64u) - JSL_PLATFORM_COUNT_LEADING_ZEROS64(x - 1));
+
+        #else
+
+            x--;
+            x |= x >> 1;
+            x |= x >> 2;
+            x |= x >> 4;
+            x |= x >> 8;
+            x |= x >> 16;
+            x |= x >> 32;
+            x++;
+            return x;
+
+        #endif
+    }
+
+    uint32_t jsl_previous_power_of_two_u32(uint32_t x)
+    {
+        #if JSL_IS_CLANG || JSL_IS_GCC
+
+            return 1u << (31u - JSL_PLATFORM_COUNT_LEADING_ZEROS(x));
+
+        #else
+
+            x |= x >> 1;
+            x |= x >> 2;
+            x |= x >> 4;
+            x |= x >> 8;
+            x |= x >> 16;
+            return x - (x >> 1);
+
+        #endif
+    }
+
+    uint64_t jsl_previous_power_of_two_u64(uint64_t x)
+    {
+        #if JSL_IS_CLANG || JSL_IS_GCC
+
+            return ((uint64_t) 1u) << (((uint64_t) 63u) - JSL_PLATFORM_COUNT_LEADING_ZEROS64(x));
+
+        #else
+
+            x |= x >> 1;
+            x |= x >> 2;
+            x |= x >> 4;
+            x |= x >> 8;
+            x |= x >> 16;
+            x |= x >> 32;
+            return x - (x >> 1);
+
+        #endif
     }
 
     JSLFatPtr jsl_fatptr_init(uint8_t* ptr, int64_t length)
