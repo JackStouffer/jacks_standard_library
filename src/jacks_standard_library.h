@@ -15,38 +15,10 @@
  * or `JSL__` (with two underscores) are meant to be private to this library. They
  * are not a stable part of the API.
  *
- * ## Preprocessor Switches
+ * ## External Preprocessor Definitions
  *
  * `JSL_DEBUG` - turns on some debugging features, like overwriting stale memory with
  * `0xfeefee`.
- *
- * `JSL_DEF` - allows you to override linkage/visibility (e.g., __declspec) for all of
- * the functions defined by this library. By default this is empty.
- *
- * `JSL_WARN_UNUSED` - this controls the function attribute which tells the compiler to
- * issue a warning if the return value of the function is not stored in a variable, or if
- * that variable is never read. This is auto defined for clang and gcc, there's no
- * C11 compatible implementation for MSVC. If you want to turn this off, just define it as
- * empty string.
- *
- * `JSL_ASSERT` - Assertion function definition. By default this will use `assert.h`.
- * If you wish to override it, it must be a function which takes three parameters, a int
- * conditional, a char* of the filename, and an int line number. You can also provide an
- * empty function if you just want to turn off asserts altogether; this is not
- * recommended. The small speed boost you get is from avoiding a branch is generally not
- * worth the loss of correctness.
- *
- * `JSL_MEMCPY` - Controls memcpy calls in the library. By default this will include
- * `string.h` and be an alias to C's `memcpy`.
- *
- * `JSL_MEMCMP` - Controls memcmp calls in the library. By default this will include
- * `string.h` and be an alias to C's `memcmp`.
- *
- * `JSL_MEMSET` - Controls memset calls in the library. By default this will include
- * `string.h` and be an alias to C's `memset`.
- *
- * `JSL_DEFAULT_ALLOCATION_ALIGNMENT` - Sets the alignment of allocations that aren't
- * explicitly set. Defaults to 16 bytes.
  *
  * `JSL_INCLUDE_FILE_UTILS` - Include the file loading and writing utilities. These
  * require linking the standard library.
@@ -91,6 +63,16 @@ extern "C" {
     #include <stdbool.h>
 #endif
 
+
+/**
+ *
+ *
+ *                      INTERNAL DEFINITIONS
+ *
+ *
+ */
+
+
 #if (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)
     || defined(_BIG_ENDIAN)
     || defined(__BIG_ENDIAN__)
@@ -98,22 +80,121 @@ extern "C" {
     || defined(__MIPSEB__)
 
     #error "ERROR: jacks_standard_library.h does not support big endian targets!"
+
 #endif
 
 #ifndef JSL_VERSION
     #define JSL_VERSION 0x010000  /* 1.0.0 */
 #else
     #if JSL_VERSION != 0x010000
-        #error "ERROR: jacks_standard_library.h version mismatch across includes"
+        #error "ERROR: Conflicting versions of jacks_standard_library.h included in the same translation unit!"
     #endif
+#endif
+
+/**
+ *
+ *  Platform Detection Macros
+ *
+ */
+
+#if defined(_WIN32)
+
+    #define JSL__IS_WINDOWS_VAL 1
+    #define JSL__IS_POSIX_VAL 0
+    #define JSL__IS_WEB_ASSEMBLY_VAL 0
+
+#elif defined(__linux__) || defined(__linux) || \
+    defined(__APPLE__) || defined(__MACH__) || \
+    defined(__FreeBSD__) || defined(__OpenBSD__) || \
+    defined(__NetBSD__) || \
+    defined(__DragonFly__) || \
+    defined(__sun) || defined(sun) || \
+    defined(__hpux) || \
+    defined(_AIX) || \
+    defined(__CYGWIN__)
+
+    #define JSL__IS_WINDOWS_VAL 0
+    #define JSL__IS_POSIX_VAL 1
+    #define JSL__IS_WEB_ASSEMBLY_VAL 0
+
+#elif defined(__wasm__) && defined(__wasm32__) && !defined(__wasm64__)
+
+    #define JSL__IS_WINDOWS_VAL 0
+    #define JSL__IS_POSIX_VAL 0
+    #define JSL__IS_WEB_ASSEMBLY_VAL 1
+
+#else
+
+    #define JSL__IS_WINDOWS_VAL 0
+    #define JSL__IS_POSIX_VAL 0
+    #define JSL__IS_WEB_ASSEMBLY_VAL 0
+
+#endif
+
+#if defined(_M_X64) || defined(_M_AMD64) || defined(__x86_64__) || defined(__amd64__)
+
+    #define JSL__IS_X86_VAL 1
+    #define JSL__IS_ARM_VAL 0
+
+#elif defined(__aarch64__) || defined(_M_ARM64)
+
+    #define JSL__IS_X86_VAL 0
+    #define JSL__IS_ARM_VAL 1
+
+#endif
+
+#if defined(__GNUC__) && !defined(__clang__)
+
+    #define JSL__IS_GCC_VAL 1
+    #define JSL__IS_CLANG_VAL 0
+    #define JSL__IS_MSVC_VAL 0
+
+#elif defined(__clang__)
+
+    #define JSL__IS_GCC_VAL 0
+    #define JSL__IS_CLANG_VAL 1
+    #define JSL__IS_MSVC_VAL 0
+
+#else
+
+    #define JSL__IS_GCC_VAL 0
+    #define JSL__IS_CLANG_VAL 0
+    #define JSL__IS_MSVC_VAL 0
+
+#endif
+
+#if defined(__SIZEOF_POINTER__)
+    #if __SIZEOF_POINTER__ == 8
+        #define JSL__IS_POINTER_32_BITS_VAL 0
+        #define JSL__IS_POINTER_64_BITS_VAL 1
+    #elif __SIZEOF_POINTER__ == 4
+        #define JSL__IS_POINTER_32_BITS_VAL 1
+        #define JSL__IS_POINTER_64_BITS_VAL 0
+    #else
+        #error "ERROR: jacks_standard_library.h can only be used with 32 or 64 bit pointers"
+    #endif
+#elif defined(_WIN64)
+    #define JSL__IS_POINTER_32_BITS_VAL 0
+    #define JSL__IS_POINTER_64_BITS_VAL 1
+#elif defined(_WIN32)
+    #define JSL__IS_POINTER_32_BITS_VAL 1
+    #define JSL__IS_POINTER_64_BITS_VAL 0
+#elif defined(__x86_64__) || defined(__aarch64__) || defined(__ppc64__)
+    #define JSL__IS_POINTER_32_BITS_VAL 0
+    #define JSL__IS_POINTER_64_BITS_VAL 1
+#elif defined(__i386__) || defined(__arm__)
+    #define JSL__IS_POINTER_32_BITS_VAL 1
+    #define JSL__IS_POINTER_64_BITS_VAL 0
+#else
+    #error "ERROR: jacks_standard_library.h can only be used with 32 or 64 bit pointers"
 #endif
 
 #ifndef JSL_DEBUG
     #ifndef JSL__FORCE_INLINE
 
-        #if defined(_MSC_VER) && !defined(__clang__)
+        #if JSL_IS_MSVC
             #define JSL__FORCE_INLINE __forceinline
-        #elif defined(__clang__) || defined(__GNUC__)
+        #elif JSL_IS_CLANG || JSL_IS_GCC
             #define JSL__FORCE_INLINE inline __attribute__((__always_inline__))
         #else
             #define JSL__FORCE_INLINE
@@ -126,7 +207,7 @@ extern "C" {
 
 #ifndef JSL__LIKELY
 
-    #if defined(__clang__) ||  defined(__GNUC__)
+    #if JSL_IS_CLANG || JSL_IS_GCC
         #define JSL__LIKELY(x) __builtin_expect(!!(x), 1)
     #else
         #define JSL__LIKELY(x) (x)
@@ -136,7 +217,7 @@ extern "C" {
 
 #ifndef JSL__UNLIKELY
 
-    #if defined(__clang__) ||  defined(__GNUC__)
+    #if JSL_IS_CLANG || JSL_IS_GCC
         #define JSL__UNLIKELY(x) __builtin_expect(!!(x), 0)
     #else
         #define JSL__UNLIKELY(x) (x)
@@ -151,7 +232,7 @@ extern "C" {
     #define ASAN_UNPOISON_MEMORY_REGION(ptr, len)
 #endif
 
-#if defined(__GNUC__) || defined(__clang__)
+#if JSL_IS_CLANG || JSL_IS_GCC
     #if defined(__SANITIZE_ADDRESS__) && __SANITIZE_ADDRESS__
         #define JSL__ASAN_OFF __attribute__((__no_sanitize_address__))
     #endif
@@ -159,6 +240,55 @@ extern "C" {
 
 #ifndef JSL__ASAN_OFF
     #define JSL__ASAN_OFF
+#endif
+
+
+/**
+ *
+ *  Built Ins Macros For MSVC Compatibility
+ *
+ */
+
+
+#if JSL_IS_GCC || JSL_IS_CLANG
+    #define JSL__COUNT_TRAILING_ZEROS_IMPL(x) __builtin_ctz(x)
+
+    #if UINT64_MAX == ULLONG_MAX
+        #define JSL__COUNT_TRAILING_ZEROS_IMPL64(x) __builtin_ctzll(x)
+    #elif UINT64_MAX == ULONG_MAX
+        #define JSL__COUNT_TRAILING_ZEROS_IMPL64(x) __builtin_ctzl(x)
+    #endif
+
+    #define JSL__POPULATION_COUNT_IMPL(x) __builtin_popcount(x)
+
+    #if UINT64_MAX == ULLONG_MAX
+        #define JSL__POPULATION_COUNT_IMPL64(x) __builtin_popcountll(x)
+    #elif UINT64_MAX == ULONG_MAX
+        #define JSL__POPULATION_COUNT_IMPL64(x) __builtin_popcountl(x)
+    #endif
+
+    #define JSL__FIND_FIRST_SET_IMPL(x) __builtin_ffs(x)
+
+    #if UINT64_MAX == ULLONG_MAX
+        #define JSL__FIND_FIRST_SET_IMPL64(x) __builtin_ffsll(x)
+    #elif UINT64_MAX == ULONG_MAX
+        #define JSL__FIND_FIRST_SET_IMPL64(x) __builtin_ffsl(x)
+    #endif
+
+#else
+
+    uint32_t jsl__count_trailing_zeros_u32(uint32_t x);
+    uint64_t jsl__count_trailing_zeros_u64(uint64_t x);
+    uint32_t jsl__find_first_set_u32(uint32_t x);
+    uint64_t jsl__find_first_set_u64(uint64_t x);
+
+    #define JSL__COUNT_TRAILING_ZEROS_IMPL(x) jsl__count_trailing_zeros_u32(x)
+    #define JSL__COUNT_TRAILING_ZEROS_IMPL64(x) jsl__count_trailing_zeros_u64(x)
+    #define JSL__POPULATION_COUNT_IMPL(x) __popcnt(x)
+    #define JSL__POPULATION_COUNT_IMPL64(x) __popcnt64(x)
+    #define JSL__FIND_FIRST_SET_IMPL(x) jsl__find_first_set_u32(x)
+    #define JSL__FIND_FIRST_SET_IMPL64(x) jsl__find_first_set_u64(x)
+
 #endif
 
 
@@ -180,26 +310,65 @@ extern "C" {
 #ifndef JSL_ASSERT
     #include <assert.h>
     void jsl__assert(int condition, char* file, int line);
+    
+    /**
+     * Assertion function definition. By default this will use `assert.h`.
+     * If you wish to override it, it must be a function which takes three parameters, a int
+     * conditional, a char* of the filename, and an int line number. You can also provide an
+     * empty function if you just want to turn off asserts altogether; this is not
+     * recommended. The small speed boost you get is from avoiding a branch is generally not
+     * worth the loss of memory protection.
+     * 
+     * Define this as a macro before importing the library to override this.
+     */
     #define JSL_ASSERT(condition) jsl__assert(condition, __FILE__, __LINE__)
 #endif
 
 #ifndef JSL_MEMCPY
     #include <string.h>
+    
+    /**
+     * Controls memcpy calls in the library. By default this will include
+     * `string.h` and be an alias to C's `memcpy`.
+     * 
+     * Define this as a macro before importing the library to override this.
+     */
     #define JSL_MEMCPY memcpy
 #endif
 
 #ifndef JSL_MEMCMP
     #include <string.h>
+    
+    /**
+     * Controls memcmp calls in the library. By default this will include
+     * `string.h` and be an alias to C's `memcmp`.
+     * 
+     * Define this as a macro before importing the library to override this.
+     */
     #define JSL_MEMCMP memcmp
 #endif
 
 #ifndef JSL_MEMSET
     #include <string.h>
+    
+    /**
+     * Controls memset calls in the library. By default this will include
+     * `string.h` and be an alias to C's `memset`.
+     * 
+     * Define this as a macro before importing the library to override this.
+     */
     #define JSL_MEMSET memset
 #endif
 
 #ifndef JSL_STRLEN
     #include <string.h>
+    
+    /**
+     * Controls strlen calls in the library. By default this will include
+     * `string.h` and be an alias to C's `strlen`.
+     * 
+     * Define this as a macro before importing the library to override this.
+     */
     #define JSL_STRLEN strlen
 #endif
 
@@ -209,95 +378,55 @@ extern "C" {
  *
  */
 
-#if defined(_WIN32)
-
-    #define JSL_IS_WINDOWS 1
-    #define JSL_IS_POSIX 0
-    #define JSL_IS_WASM32 0
-
-#elif defined(__linux__) || defined(__linux) || \
-    defined(__APPLE__) || defined(__MACH__) || \
-    defined(__FreeBSD__) || defined(__OpenBSD__) || \
-    defined(__NetBSD__) || \
-    defined(__DragonFly__) || \
-    defined(__sun) || defined(sun) || \
-    defined(__hpux) || \
-    defined(_AIX) || \
-    defined(__CYGWIN__)
-
-    #define JSL_IS_WINDOWS 0
-    #define JSL_IS_POSIX 1
-    #define JSL_IS_WASM32 0
-
-#elif defined(__wasm__) && defined(__wasm32__) && !defined(__wasm64__)
-
-    #define JSL_IS_WINDOWS 0
-    #define JSL_IS_POSIX 0
-    #define JSL_IS_WASM32 1
-
-#else
-
-    #define JSL_IS_WINDOWS 0
-    #define JSL_IS_POSIX 0
-    #define JSL_IS_WASM32 0
-
-#endif
-
-#if defined(_M_X64) || defined(_M_AMD64) || defined(__x86_64__) || defined(__amd64__)
-
-    #define JSL_IS_X86 1
-    #define JSL_IS_ARM 0
-
-#elif defined(__aarch64__) || defined(_M_ARM64)
-
-    #define JSL_IS_X86 0
-    #define JSL_IS_ARM 1
-
-#endif
-
-#if defined(__GNUC__) && !defined(__clang__)
-
-    #define JSL_IS_GCC 1
-    #define JSL_IS_CLANG 0
-    #define JSL_IS_MSVC 0
-
-#elif defined(__clang__)
-
-    #define JSL_IS_GCC 0
-    #define JSL_IS_CLANG 1
-    #define JSL_IS_MSVC 0
-
-#else
-
-    #define JSL_IS_GCC 0
-    #define JSL_IS_CLANG 0
-    #define JSL_IS_MSVC 0
-
-#endif
+/**
+ * If the target platform is Windows OS, then 1, else 0.
+ */
+#define JSL_IS_WINDOWS JSL__IS_WINDOWS_VAL
 
 /**
- *
- *  Function Signature Macros
- *
+ * If the target platform is a POSIX, then 1, else 0.
  */
+#define JSL_IS_POSIX JSL__IS_POSIX_VAL
 
-#ifndef JSL_DEF
-    /**
-     * Allows you to override linkage/visibility (e.g., __declspec) for all of
-     * the functions defined by this library. By default this is empty, so extern.
-     *
-     * This also allows you to have multiple versions of this library in the same
-     * program (if you need that for whatever reason).
-     */
-    #define JSL_DEF
-#endif
+/**
+ * If the target platform is in WebAssembly, then 1, else 0.
+ */
+#define JSL_IS_WEB_ASSEMBLY JSL__IS_WEB_ASSEMBLY_VAL
 
-#ifndef JSL_DEFAULT_ALLOCATION_ALIGNMENT
-    /**
-     * Sets the alignment of allocations that aren't explicitly set. Defaults to 8 bytes.
-     */
-    #define JSL_DEFAULT_ALLOCATION_ALIGNMENT 8
-#endif
+/**
+ * If the target platform is in x86, then 1, else 0.
+ */
+#define JSL_IS_X86 JSL__IS_X86_VAL
+
+/**
+ * If the target platform is in ARM, then 1, else 0.
+ */
+#define JSL_IS_ARM JSL__IS_ARM_VAL
+
+/**
+ * If the host compiler is GCC, then 1, else 0.
+ */
+#define JSL_IS_GCC JSL__IS_GCC_VAL
+
+/**
+ * If the host compiler is clang, then 1, else 0.
+ */
+#define JSL_IS_CLANG JSL__IS_CLANG_VAL
+
+/**
+ * If the host compiler is MSVC, then 1, else 0.
+ */
+#define JSL_IS_MSVC JSL__IS_MSVC_VAL
+
+/**
+ * If the target executable uses 32 bit pointers, then 1, else 0.
+ */
+#define JSL_IS_POINTER_32_BITS JSL__IS_POINTER_32_BITS_VAL
+
+/**
+ * If the target executable uses 64 bit pointers, then 1, else 0.
+ */
+#define JSL_IS_POINTER_64_BITS JSL__IS_POINTER_64_BITS_VAL
 
 #ifndef JSL_WARN_UNUSED
 
@@ -316,96 +445,94 @@ extern "C" {
 
 #endif
 
-
-/**
- *
- *  Built Ins Macros For MSVC Compatibility
- *
- */
-
-
-#if JSL_IS_GCC || JSL_IS_CLANG
+#ifndef JSL_DEF
     /**
-     * Platform specific intrinsic for returning the count of trailing zeros.
+     * Allows you to override linkage/visibility (e.g., __declspec) for all of
+     * the functions defined by this library. By default this is empty, so extern.
      *
-     * In order to be as fast as possible, this does not represent a cross
-     * platform abstraction over different ctz implementations.
-     * On GCC and clang, this is replaced with `__builtin_ctz`. On MSVC
-     * `_BitScanForward` is used in a forced inline function call. Behavior
-     * with zero is undefined for GCC and clang while MSVC will give 32.
+     * Define this as a macro before importing the library to override this.
      */
-    #define JSL_PLATFORM_COUNT_TRAILING_ZEROS(x) __builtin_ctz(x)
-
-    #if UINT64_MAX == ULLONG_MAX
-        /**
-         * TODO: docs
-         */
-        #define JSL_PLATFORM_COUNT_TRAILING_ZEROS64(x) __builtin_ctzll(x)
-    #elif UINT64_MAX == ULONG_MAX
-
-        /**
-         * TODO: docs
-         */
-        #define JSL_PLATFORM_COUNT_TRAILING_ZEROS64(x) __builtin_ctzl(x)
-    #endif
-
-    /**
-     * TODO: docs
-     */
-    #define JSL_PLATFORM_POPULATION_COUNT(x) __builtin_popcount(x)
-
-    #if UINT64_MAX == ULLONG_MAX
-        /**
-         * TODO: docs
-         */
-        #define JSL_PLATFORM_POPULATION_COUNT64(x) __builtin_popcountll(x)
-    #elif UINT64_MAX == ULONG_MAX
-        /**
-         * TODO: docs
-         */
-        #define JSL_PLATFORM_POPULATION_COUNT64(x) __builtin_popcountl(x)
-    #endif
-
-    /**
-     * TODO: docs
-     */
-    #define JSL_PLATFORM_FIND_FIRST_SET(x) __builtin_ffs(x)
-
-    #if UINT64_MAX == ULLONG_MAX
-        /**
-         * TODO: docs
-         */
-        #define JSL_PLATFORM_FIND_FIRST_SET64(x) __builtin_ffsll(x)
-    #elif UINT64_MAX == ULONG_MAX
-        /**
-         * TODO: docs
-         */
-        #define JSL_PLATFORM_FIND_FIRST_SET64(x) __builtin_ffsl(x)
-    #endif
-
-#else
-
-    uint32_t jsl__count_trailing_zeros_u32(uint32_t x);
-    uint64_t jsl__count_trailing_zeros_u64(uint64_t x);
-    uint32_t jsl__find_first_set_u32(uint32_t x);
-    uint64_t jsl__find_first_set_u64(uint64_t x);
-
-    #define JSL_PLATFORM_COUNT_TRAILING_ZEROS(x) jsl__count_trailing_zeros_u32(x)
-    #define JSL_PLATFORM_COUNT_TRAILING_ZEROS64(x) jsl__count_trailing_zeros_u64(x)
-    #define JSL_PLATFORM_POPULATION_COUNT(x) __popcnt(x)
-    #define JSL_PLATFORM_POPULATION_COUNT64(x) __popcnt64(x)
-    #define JSL_PLATFORM_FIND_FIRST_SET(x) jsl__find_first_set_u32(x)
-    #define JSL_PLATFORM_FIND_FIRST_SET64(x) jsl__find_first_set_u64(x)
-
+    #define JSL_DEF
 #endif
 
+#ifndef JSL_DEFAULT_ALLOCATION_ALIGNMENT
+    /**
+     * Sets the alignment of allocations that aren't explicitly set. Defaults to 8 bytes.
+     * 
+     * Define this as a macro before importing the library to override this.
+     */
+    #define JSL_DEFAULT_ALLOCATION_ALIGNMENT 8
+#endif
 
 /**
+ * Platform specific intrinsic for returning the count of trailing zeros for 32
+ * bit signed and unsigned integers.
  *
- *  Utility Macros
- *
+ * In order to be as fast as possible, this does not represent a cross
+ * platform abstraction over different ctz implementations.
+ * On GCC and clang, this is replaced with `__builtin_ctz`. On MSVC
+ * `_BitScanForward` is used in a forced inline function call. Behavior
+ * with zero is undefined for GCC and clang while MSVC will give 32.
  */
+#define JSL_PLATFORM_COUNT_TRAILING_ZEROS(x) JSL__COUNT_TRAILING_ZEROS_IMPL((x))
 
+/**
+ * Platform specific intrinsic for returning the count of trailing zeros for 64
+ * bit signed and unsigned integers.
+ *
+ * In order to be as fast as possible, this does not represent a cross
+ * platform abstraction over different ctz implementations.
+ * On GCC and clang, this is replaced with `__builtin_ctzll`. On MSVC
+ * `_BitScanForward64` is used in a forced inline function call. Behavior
+ * with zero is undefined for GCC and clang while MSVC will give 32.
+ */
+#define JSL_PLATFORM_COUNT_TRAILING_ZEROS64(x) JSL__COUNT_TRAILING_ZEROS_IMPL64((x))
+
+/**
+ * Platform specific intrinsic for returning the count of set bits for 32
+ * bit signed and unsigned integers.
+ *
+ * In order to be as fast as possible, this does not represent a cross
+ * platform abstraction over different popcnt implementations.
+ * On GCC and clang, this is replaced with `__builtin_popcount`. On MSVC
+ * `__popcnt` is used.
+ */
+#define JSL_PLATFORM_POPULATION_COUNT(x) JSL__POPULATION_COUNT_IMPL((x))
+
+/**
+ * Platform specific intrinsic for returning the count of set bits for 64
+ * bit signed and unsigned integers.
+ *
+ * In order to be as fast as possible, this does not represent a cross
+ * platform abstraction over different popcnt implementations.
+ * On GCC and clang, this is replaced with `__builtin_popcountll`. On MSVC
+ * `__popcnt64` is used.
+ */
+#define JSL_PLATFORM_POPULATION_COUNT64(x) JSL__POPULATION_COUNT_IMPL64((x))
+
+/**
+ * Platform specific intrinsic for returning the index of the first set
+ * bit for 32 bit signed and unsigned integers.
+ *
+ * In order to be as fast as possible, this does not represent a cross
+ * platform abstraction over different ffs implementations.
+ * On GCC and clang, this is replaced with `__builtin_ffs`. On MSVC
+ * `_BitScanForward` is used in a forced inline function call. Behavior
+ * with zero is undefined for GCC and clang while MSVC will give 32.
+ */
+#define JSL_PLATFORM_FIND_FIRST_SET(x) JSL__FIND_FIRST_SET_IMPL((x))
+
+/**
+ * Platform specific intrinsic for returning the index of the first set
+ * bit for 64 bit signed and unsigned integers.
+ *
+ * In order to be as fast as possible, this does not represent a cross
+ * platform abstraction over different ffs implementations.
+ * On GCC and clang, this is replaced with `__builtin_ffsll`. On MSVC
+ * `_BitScanForward64` is used in a forced inline function call. Behavior
+ * with zero is undefined for GCC and clang while MSVC will give 32.
+ */
+#define JSL_PLATFORM_FIND_FIRST_SET64(x) JSL__FIND_FIRST_SET_IMPL64((x))
 
 /**
  * Evaluates the maximum of two values.
@@ -1758,7 +1885,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         #include <immintrin.h>
     #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
         #include <arm_neon.h>
-    #elif JSL_IS_WASM32 && defined(__wasm_simd128__)
+    #elif JSL_IS_WEB_ASSEMBLY && defined(__wasm_simd128__)
         #include <wasm_simd128.h>
     #endif
 
