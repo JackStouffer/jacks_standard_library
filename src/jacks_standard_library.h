@@ -327,7 +327,7 @@ extern "C" {
 #if JSL_IS_GCC || JSL_IS_CLANG
     /**
      * Platform specific intrinsic for returning the count of trailing zeros.
-     * 
+     *
      * In order to be as fast as possible, this does not represent a cross
      * platform abstraction over different ctz implementations.
      * On GCC and clang, this is replaced with `__builtin_ctz`. On MSVC
@@ -342,7 +342,7 @@ extern "C" {
          */
         #define JSL_PLATFORM_COUNT_TRAILING_ZEROS64(x) __builtin_ctzll(x)
     #elif UINT64_MAX == ULONG_MAX
-    
+
         /**
          * TODO: docs
          */
@@ -640,44 +640,23 @@ typedef struct JSLFatPtr
     int64_t length;
 } JSLFatPtr;
 
-#if defined(_MSC_VER) && !defined(__clang__)
-
-    /**
-     * Creates a JSLFatPtr from a string literal at compile time. The resulting fat pointer
-     * points directly to the string literal's memory, so no copying occurs.
-     *
-     * @warning With MSVC this will only work during variable initialization as MSVC
-     * still does not support compound literals.
-     *
-     * Example:
-     *
-     * ```c
-     * // Create fat pointers from string literals
-     * JSLFatPtr hello = JSL_FATPTR_INITIALIZER("Hello, World!");
-     * JSLFatPtr path = JSL_FATPTR_INITIALIZER("/usr/local/bin");
-     * JSLFatPtr empty = JSL_FATPTR_INITIALIZER("");
-     * ```
-     */
-    #define JSL_FATPTR_INITIALIZER(s) { (uint8_t*)(s), (int64_t)(sizeof(s) - 1) }
-
-#else
-
-    /**
-     * Creates a JSLFatPtr from a string literal at compile time. The resulting fat pointer
-     * points directly to the string literal's memory, so no copying occurs.
-     *
-     * Example:
-     *
-     * ```c
-     * JSLFatPtr hello = JSL_FATPTR_INITIALIZER("Hello, World!");
-     * JSLFatPtr path = JSL_FATPTR_INITIALIZER("/usr/local/bin");
-     * JSLFatPtr empty = JSL_FATPTR_INITIALIZER("");
-     * ```
-     */
-    #define JSL_FATPTR_INITIALIZER(s) ((JSLFatPtr){ .data = (uint8_t*)(s), .length = (int64_t)(sizeof(s) - 1) })
-
-#endif
-
+/**
+* Creates a JSLFatPtr from a string literal at compile time. The resulting fat pointer
+* points directly to the string literal's memory, so no copying occurs.
+*
+* @warning With MSVC this will only work during variable initialization as MSVC
+* still does not support compound literals.
+*
+* Example:
+*
+* ```c
+* // Create fat pointers from string literals
+* JSLFatPtr hello = JSL_FATPTR_INITIALIZER("Hello, World!");
+* JSLFatPtr path = JSL_FATPTR_INITIALIZER("/usr/local/bin");
+* JSLFatPtr empty = JSL_FATPTR_INITIALIZER("");
+* ```
+*/
+#define JSL_FATPTR_INITIALIZER(s) { (uint8_t*)(s), (int64_t)(sizeof(s) - 1) }
 
 #if defined(_MSC_VER) && !defined(__clang__)
 
@@ -1782,7 +1761,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     #elif JSL_IS_WASM32 && defined(__wasm_simd128__)
         #include <wasm_simd128.h>
     #endif
-    
+
     #if JSL_IS_MSVC
         #include <intrin.h>
     #endif
@@ -3498,11 +3477,11 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     }
                     else
                     {
-                        uint32_t mask0 = jsl__neon_movemask(percent_cmp0);
-                        uint32_t mask1 = jsl__neon_movemask(percent_cmp1);
-                        uint32_t mask  = mask0 | (mask1 << 16);
+                        const uint32_t mask0 = jsl__neon_movemask(percent_cmp0);
+                        const uint32_t mask1 = jsl__neon_movemask(percent_cmp1);
+                        const uint32_t mask  = mask0 | (mask1 << 16);
 
-                        int special_pos = JSL_PLATFORM_COUNT_TRAILING_ZEROS(mask);
+                        const int special_pos = JSL_PLATFORM_COUNT_TRAILING_ZEROS(mask);
                         stbsp__chk_cb_buf(special_pos);
                         JSL_MEMCPY(buffer_cursor, f.data, special_pos);
 
