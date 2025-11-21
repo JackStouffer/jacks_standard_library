@@ -3,7 +3,8 @@ not finished yet
 # Jack's Standard Library
 
 A collection of types and functions designed to replace usage of the
-C Standard Library with more modern, safe, and simple alternatives.
+C Standard Library with more modern, safe, and simple alternatives
+for C11/C23.
 
 ## Why
 
@@ -12,8 +13,10 @@ See the DESIGN.md file for more info.
 ## What's Included
 
 * Common macros
-   min, max
-   bitflag checks
+   * Target platform information, e.g. OS, ISA, pointer size, and host compiler
+   * min, max, between
+   * bitflag checks
+   * Alias macros for different intrinsic names on different compilers
 * A buffer type called a fat pointer
    * used everywhere
    * standardizes that pointers should carry their length
@@ -62,6 +65,7 @@ atomics or threading.
 
 Official support:
 
+* Standards modes C11, C17, C23
 * Windows
    * MSVC and clang
    * x86_64

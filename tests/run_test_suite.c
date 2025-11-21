@@ -3,13 +3,16 @@
  * 
  * This file runs the test suite using a meta-program style of build system.
  * 
- * Each test file is compiled and run four times. On POSIX systems it's once
- * with gcc unoptimized and with address sanitizer, once with gcc full optimization
- * and native CPU code gen, and then the same thing again with clang. On
- * Windows it's done with MSVC and clang.
+ * Each test file is compiled and many, many times, with a list of different
+ * configurations for each compiler. On Windows the compilers are MSVC and
+ * clang, on everything else it's gcc and clang. This means each test file
+ * is compiled and run upwards of a dozen times.
  * 
- * This may seem excessive, but I've caught bugs with this before. Especially
- * with bugs around pointer alignment.
+ * This may seem excessive but this is the trade off of C being so versatile
+ * for so many platforms/use-cases: there is a combinatoric explosion in
+ * possible command line configurations. If you want to make a library which
+ * is broadly usable you need to test that it actually works in all of these
+ * scenarios.
  * 
  * ## Running
  * 
@@ -54,6 +57,267 @@ typedef struct UnitTestDecl {
     char* executable_name;
     char** files;
 } UnitTestDecl;
+
+typedef struct CompilerConfig { 
+    char* prefix;
+    char** flags;
+} CompilerConfig;
+
+static CompilerConfig clang_configs[] = {
+    {
+        "clang_debug_c11_pointers64_",
+        (char*[]) {
+            "-O0",
+            "-glldb",
+            "-fno-omit-frame-pointer",
+            "-fno-optimize-sibling-calls",
+            "-DJSL_DEBUG",
+            "-fsanitize=address",
+            "-fsanitize=undefined",
+            "-std=c11",
+            "-m64",
+            "-Isrc/",
+            "-Wall",
+            "-Wextra",
+            "-pedantic",
+            NULL
+        }
+    },
+    {
+        "clang_debug_c11_pointers32_",
+        (char*[]) {
+            "-O0",
+            "-glldb",
+            "-fno-omit-frame-pointer",
+            "-fno-optimize-sibling-calls",
+            "-DJSL_DEBUG",
+            "-fsanitize=address",
+            "-fsanitize=undefined",
+            "-std=c11",
+            "-m32",
+            "-Isrc/",
+            "-Wall",
+            "-Wextra",
+            "-pedantic",
+            NULL
+        }
+    },
+    {
+        "clang_debug_c23_pointers64_",
+        (char*[]) {
+            "-O0",
+            "-glldb",
+            "-fno-omit-frame-pointer",
+            "-fno-optimize-sibling-calls",
+            "-DJSL_DEBUG",
+            "-fsanitize=address",
+            "-fsanitize=undefined",
+            "-std=c23",
+            "-m64",
+            "-Isrc/",
+            "-Wall",
+            "-Wextra",
+            "-pedantic",
+            NULL
+        }
+    },
+    {
+        "clang_debug_c23_pointers32_",
+        (char*[]) {
+            "-O0",
+            "-glldb",
+            "-fno-omit-frame-pointer",
+            "-fno-optimize-sibling-calls",
+            "-DJSL_DEBUG",
+            "-fsanitize=address",
+            "-fsanitize=undefined",
+            "-std=c23",
+            "-m32",
+            "-Isrc/",
+            "-Wall",
+            "-Wextra",
+            "-pedantic",
+            NULL
+        }
+    },
+    {
+        "clang_opt_level3_native_pointers64_c11_",
+        (char*[]) {
+            "-O3",
+            "-glldb",
+            "-march=native",
+            "-Isrc/",
+            "-std=c11",
+            "-m64",
+            "-Wall",
+            "-Wextra",
+            "-pedantic",
+            NULL
+        }
+    },
+    {
+        "clang_opt_level3_native_pointers32_c11_",
+        (char*[]) {
+            "-O3",
+            "-glldb",
+            "-march=native",
+            "-Isrc/",
+            "-std=c11",
+            "-m32",
+            "-Wall",
+            "-Wextra",
+            "-pedantic",
+            NULL
+        }
+    },
+    {
+        "clang_opt_level3_native_pointers64_c23_",
+        (char*[]) {
+            "-O3",
+            "-glldb",
+            "-march=native",
+            "-Isrc/",
+            "-std=c23",
+            "-m64",
+            "-Wall",
+            "-Wextra",
+            "-pedantic",
+            NULL
+        }
+    },
+    {
+        "clang_opt_level3_native_pointers32_c23_",
+        (char*[]) {
+            "-O3",
+            "-glldb",
+            "-march=native",
+            "-Isrc/",
+            "-std=c23",
+            "-m32",
+            "-Wall",
+            "-Wextra",
+            "-Wconversion",
+            "-Wshadow",
+            "-pedantic",
+            NULL
+        }
+    },
+    {
+        "clang_hardended_native_pointers64_c11_",
+        (char*[]) {
+            "-O2",
+            "-D_FORTIFY_SOURCE=2",
+            "-fstack-protector-strong",
+            "-fsanitize=shadow-call-stack",
+            "-fPIE",
+            "-pie",
+            "-glldb",
+            "-Isrc/",
+            "-std=c11",
+            "-m64",
+            "-Wall",
+            "-Wextra",
+            "-Wconversion",
+            "-Wshadow",
+            "-pedantic",
+            NULL
+        }
+    },
+    {
+        "clang_hardended_native_pointers32_c11_",
+        (char*[]) {
+            "-O2",
+            "-D_FORTIFY_SOURCE=2",
+            "-fstack-protector-strong",
+            "-fsanitize=shadow-call-stack",
+            "-fPIE",
+            "-pie",
+            "-glldb",
+            "-Isrc/",
+            "-std=c11",
+            "-m32",
+            "-Wall",
+            "-Wextra",
+            "-Wconversion",
+            "-Wshadow",
+            "-pedantic",
+            NULL
+        }
+    },
+    {
+        "clang_hardended_native_pointers64_c23_",
+        (char*[]) {
+            "-O2",
+            "-D_FORTIFY_SOURCE=2",
+            "-fstack-protector-strong",
+            "-fsanitize=shadow-call-stack",
+            "-fPIE",
+            "-pie",
+            "-glldb",
+            "-Isrc/",
+            "-std=c23",
+            "-m64",
+            "-Wall",
+            "-Wextra",
+            "-Wconversion",
+            "-Wshadow",
+            "-pedantic",
+            NULL
+        }
+    },
+    {
+        "clang_hardended_native_pointers32_c23_",
+        (char*[]) {
+            "-O2",
+            "-D_FORTIFY_SOURCE=2",
+            "-fstack-protector-strong",
+            "-fsanitize=shadow-call-stack",
+            "-fPIE",
+            "-pie",
+            "-glldb",
+            "-Isrc/",
+            "-std=c23",
+            "-m32",
+            "-Wall",
+            "-Wextra",
+            "-Wconversion",
+            "-Wshadow",
+            "-pedantic",
+            NULL
+        }
+    }
+};
+
+static CompilerConfig msvc_configs[] = {
+    {
+        "debug_msvc_",
+        (char*[]) {
+            "/nologo",
+            "/DJSL_DEBUG",
+            "/Isrc",
+            "/TC",
+            "/Od",
+            "/Zi",
+            "/W4",
+            "/WX",
+            "/std:c11",
+            NULL
+        }
+    },
+    {
+        "opt_msvc_",
+        (char*[]) {
+            "/nologo",
+            "/Isrc",
+            "/TC",
+            "/O2",
+            "/W4",
+            "/WX",
+            "/std:c11",
+            NULL
+        }
+    },
+};
 
 static UnitTestDecl unit_test_declarations[] = {
     { "test_fatptr", (char*[]) {"tests/test_fatptr.c", NULL} },
