@@ -128,7 +128,7 @@ typedef struct CStringArray {
 
 char* my_strdup(char* str)
 {
-    size_t len = strlen(str);
+    size_t len = strlen(str) + 1;
     char* ret = calloc(len, sizeof(char));
     assert(ret != NULL);
     memcpy(ret, str, len);
@@ -139,7 +139,7 @@ void cstring_array_init(CStringArray* array)
 {
     memset(array, 0, sizeof(CStringArray));
     array->capacity = 32;
-    array->array = malloc(sizeof(CStringArray) * array->capacity);
+    array->array = malloc(sizeof(char*) * array->capacity);
     assert(array->array != NULL);
 }
 
@@ -148,7 +148,7 @@ void cstring_array_insert(CStringArray* array, char* string)
     if (array->length == array->capacity)
     {
         array->capacity = jsl_next_power_of_two_u32(array->capacity + 1);
-        array->array = realloc(array->array, sizeof(CStringArray) * array->capacity);
+        array->array = realloc(array->array, sizeof(char*) * array->capacity);
         assert(array->array != NULL);
     }
 
@@ -390,10 +390,10 @@ int32_t main(int32_t argc, char **argv)
         #if JSL_IS_WINDOWS
 
             {
-                char exe_output_param[512] = "/Fe";
-                char exe_name[512] = "tests\\bin\\debug_msvc_";
-                char obj_output_param[512] = "/Fo";
-                char obj_name[512] = "tests\\bin\\debug_msvc_";
+                char exe_output_param[256] = "/Fe";
+                char exe_name[256] = "tests\\bin\\debug_msvc_";
+                char obj_output_param[256] = "/Fo";
+                char obj_name[256] = "tests\\bin\\debug_msvc_";
 
                 strcat(exe_name, unit_test->executable_name);
                 strcat(exe_name, ".exe");
