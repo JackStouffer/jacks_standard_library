@@ -118,16 +118,17 @@ static size_t lfails = 0;
         printf("%s:%d ("format " != " format")\n", __FILE__, __LINE__, (a), (b));\
     }} while (0)
 
-
-/* Assert two integers are equal. */
 #define TEST_INT32_EQUAL(a, b)\
     TEST_INT32_EQUAL_base((a) == (b), a, b, "%d")
 
+#define TEST_UINT32_EQUAL(a, b)\
+    TEST_INT32_EQUAL_base((a) == (b), a, b, "%u")
 
-/* Assert two int64 are equal. */
 #define TEST_INT64_EQUAL(a, b)\
     TEST_INT32_EQUAL_base((a) == (b), a, b, "%" PRId64)
 
+#define TEST_UINT64_EQUAL(a, b)\
+    TEST_INT32_EQUAL_base((a) == (b), a, b, "%" PRIu64)
 
 /* Assert two floats are equal (Within TESTING_FLOAT_TOLERANCE). */
 #define TEST_F32_EQUAL(a, b)\

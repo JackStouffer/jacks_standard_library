@@ -59,7 +59,8 @@ static UnitTestDecl unit_test_declarations[] = {
     { "test_fatptr", (char*[]) {"tests/test_fatptr.c", NULL} },
     { "test_format", (char*[]) {"tests/test_format.c", NULL} },
     { "test_string_builder", (char*[]) {"tests/test_string_builder.c", NULL} },
-    { 
+    { "test_intrinsics", (char*[]) {"tests/test_intrinsics.c", NULL} },
+    {
         "test_hash_map", 
         (char*[]) {
             "tests/test_hash_map.c",
@@ -118,6 +119,42 @@ static HashMapDecl hash_map_declarations[] = {
         }
     }
 };
+
+typedef struct CStringArray {
+    char** array;
+    int32_t length;
+    int32_t capacity;
+} CStringArray;
+
+char* my_strdup(char* str)
+{
+    size_t len = strlen(str);
+    char* ret = calloc(len, sizeof(char));
+    assert(ret != NULL);
+    memcpy(ret, str, len);
+    return ret;
+}
+
+void cstring_array_init(CStringArray* array)
+{
+    memset(array, 0, sizeof(CStringArray));
+    array->capacity = 32;
+    array->array = malloc(sizeof(CStringArray) * array->capacity);
+    assert(array->array != NULL);
+}
+
+void cstring_array_insert(CStringArray* array, char* string)
+{
+    if (array->length == array->capacity)
+    {
+        array->capacity = jsl_next_power_of_two_u32(array->capacity + 1);
+        array->array = realloc(array->array, sizeof(CStringArray) * array->capacity);
+        assert(array->array != NULL);
+    }
+
+    array->array[array->length] = my_strdup(string);
+    ++array->length;
+}
 
 int32_t main(int32_t argc, char **argv)
 {
@@ -258,6 +295,9 @@ int32_t main(int32_t argc, char **argv)
      *  
      */
 
+    CStringArray executables;
+    cstring_array_init(&executables);
+
     int32_t test_count = sizeof(unit_test_declarations) / sizeof(UnitTestDecl);
     Nob_Procs compile_procs = {0};
 
@@ -269,7 +309,7 @@ int32_t main(int32_t argc, char **argv)
             char exe_name[256] = "tests/bin/debug_clang_";
             strcat(exe_name, unit_test->executable_name);
 
-            #if defined(_WIN32)
+            #if JSL_IS_WINDOWS
                 strcat(exe_name, ".exe");
             #else
                 strcat(exe_name, ".out");
@@ -304,13 +344,15 @@ int32_t main(int32_t argc, char **argv)
             }
 
             if (!nob_cmd_run(&clang_debug_compile_command, .async = &compile_procs)) return 1;
+
+            cstring_array_insert(&executables, exe_name);
         }
 
         {
             char exe_name[256] = "tests/bin/opt_clang_";
             strcat(exe_name, unit_test->executable_name);
 
-            #if defined(_WIN32)
+            #if JSL_IS_WINDOWS
                 strcat(exe_name, ".exe");
             #else
                 strcat(exe_name, ".out");
@@ -341,15 +383,17 @@ int32_t main(int32_t argc, char **argv)
             }
 
             if (!nob_cmd_run(&clang_optimized_compile_command, .async = &compile_procs)) return 1;
+
+            cstring_array_insert(&executables, exe_name);
         }
 
         #if JSL_IS_WINDOWS
 
             {
-                char exe_output_param[256] = "/Fe";
-                char exe_name[256] = "tests\\bin\\debug_msvc_";
-                char obj_output_param[256] = "/Fo";
-                char obj_name[256] = "tests\\bin\\debug_msvc_";
+                char exe_output_param[512] = "/Fe";
+                char exe_name[512] = "tests\\bin\\debug_msvc_";
+                char obj_output_param[512] = "/Fo";
+                char obj_name[512] = "tests\\bin\\debug_msvc_";
 
                 strcat(exe_name, unit_test->executable_name);
                 strcat(exe_name, ".exe");
@@ -387,6 +431,8 @@ int32_t main(int32_t argc, char **argv)
                 // TODO, speed: Add .async = &compile_procs for MSVC, right now
                 // pdbs over write each other causing errors
                 if (!nob_cmd_run(&msvc_debug_compile_command)) return 1;
+
+                cstring_array_insert(&executables, exe_name);
             }
 
             {
@@ -429,6 +475,8 @@ int32_t main(int32_t argc, char **argv)
                 // TODO, speed: Add .async = &compile_procs for MSVC, right now
                 // pdbs over write each other causing errors
                 if (!nob_cmd_run(&msvc_optimized_compile_command)) return 1;
+        
+                cstring_array_insert(&executables, exe_name);
             }
 
         #elif JSL_IS_POSIX
@@ -466,6 +514,8 @@ int32_t main(int32_t argc, char **argv)
                 }
 
                 if (!nob_cmd_run(&gcc_debug_compile_command, .async = &compile_procs)) return 1;
+        
+                cstring_array_insert(&executables, exe_name);
             }
 
             {
@@ -498,6 +548,8 @@ int32_t main(int32_t argc, char **argv)
                 }
 
                 if (!nob_cmd_run(&gcc_optimized_compile_command, .async = &compile_procs)) return 1;
+        
+                cstring_array_insert(&executables, exe_name);
             }
         
         #else
@@ -508,92 +560,22 @@ int32_t main(int32_t argc, char **argv)
     if (!nob_procs_wait(compile_procs)) return 1;
     nob_da_free(compile_procs);
 
-    for (int32_t i = 0; i < test_count; i++)
+    for (int32_t i = 0; i < executables.length; ++i)
     {
-        UnitTestDecl* unit_test = &unit_test_declarations[i];
-
-        {
-            char exe_name[256] = "tests/bin/debug_clang_";
-            strcat(exe_name, unit_test->executable_name);
-
-            #if defined(_WIN32)
-                strcat(exe_name, ".exe");
-            #else
-                strcat(exe_name, ".out");
-            #endif
-
-            Nob_Cmd clang_debug_run_command = {0};
-            nob_cmd_append(&clang_debug_run_command, exe_name);
-            if (!nob_cmd_run(&clang_debug_run_command)) return 1;
-        }
-
-        {
-            char exe_name[256] = "tests/bin/opt_clang_";
-            strcat(exe_name, unit_test->executable_name);
-
-            #if defined(_WIN32)
-                strcat(exe_name, ".exe");
-            #else
-                strcat(exe_name, ".out");
-            #endif
-
-            Nob_Cmd clang_optimized_run_command = {0};
-            nob_cmd_append(&clang_optimized_run_command, exe_name);
-            if (!nob_cmd_run(&clang_optimized_run_command)) return 1;
-        }
-
         #if JSL_IS_WINDOWS
 
-            {
-                char exe_name[256] = "tests\\bin\\debug_msvc_";
-
-                strcat(exe_name, unit_test->executable_name);
-                strcat(exe_name, ".exe");
-
-                Nob_Cmd msvc_debug_run_command = {0};
-                nob_cmd_append(&msvc_debug_run_command, exe_name);
-                if (!nob_cmd_run(&msvc_debug_run_command)) return 1;
-            }
-
-            {
-                char exe_name[256] = "tests\\bin\\opt_msvc_";
-
-                strcat(exe_name, unit_test->executable_name);
-                strcat(exe_name, ".exe");
-
-                Nob_Cmd msvc_optimized_run_command = {0};
-                nob_cmd_append(&msvc_optimized_run_command, exe_name);
-                if (!nob_cmd_run(&msvc_optimized_run_command)) return 1;
-            }
-
-        #elif JSL_IS_POSIX
-
-            const char* test_file_name = unit_test->executable_name;
-
-            {
-                char exe_name[256] = "./tests/bin/debug_gcc_";
-
-                strcat(exe_name, test_file_name);
-                strcat(exe_name, ".out");
-
-                Nob_Cmd gcc_debug_run_command = {0};
-                nob_cmd_append(&gcc_debug_run_command, exe_name);
-                if (!nob_cmd_run(&gcc_debug_run_command)) return 1;
-            }
-
-            {
-                char exe_name[256] = "./tests/bin/opt_gcc_";
-
-                strcat(exe_name, test_file_name);
-                strcat(exe_name, ".out");
-
-                Nob_Cmd gcc_optimized_run_command = {0};
-                nob_cmd_append(&gcc_optimized_run_command, exe_name);
-                if (!nob_cmd_run(&gcc_optimized_run_command)) return 1;
-            }
+            Nob_Cmd run_command = {0};
+            nob_cmd_append(&run_command, executables.array[i]);
+            if (!nob_cmd_run(&run_command)) return 1;
 
         #else
-            #error "Unrecognized platform. Only windows and POSIX platforms are supported."
+
+            char execute_command[256] = "./";
+            strcat(execute_command, executables.array[i]);
+            Nob_Cmd run_command = {0};
+            nob_cmd_append(&run_command, execute_command);
+            if (!nob_cmd_run(&run_command)) return 1;
+
         #endif
     }
     
