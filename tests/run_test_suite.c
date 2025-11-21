@@ -21,7 +21,7 @@
  * On POSIX
  * 
  * ```bash
- * cc -o run_test_suite ./tests/run_test_suite.c 
+ * cc -o run_test_suite tests/run_test_suite.c 
  * ```
  * 
  * On Windows
@@ -657,14 +657,20 @@ int32_t main(int32_t argc, char **argv)
                 char exe_output_param[256] = "/Fe";
                 char exe_name[256] = "tests\\bin\\debug_msvc_";
                 char obj_output_param[256] = "/Fo";
-                char obj_name[256] = "tests\\bin\\debug_msvc_";
+                char obj_dir[256] = "tests\\bin\\debug_msvc_";
+                char pdb_output_param[256] = "/Fd";
+                char pdb_name[256] = "tests\\bin\\debug_msvc_";
 
                 strcat(exe_name, unit_test->executable_name);
                 strcat(exe_name, ".exe");
                 strcat(exe_output_param, exe_name);
-                strcat(obj_name, unit_test->executable_name);
-                strcat(obj_name, ".obj");
-                strcat(obj_output_param, obj_name);
+                strcat(obj_dir, unit_test->executable_name);
+                strcat(obj_dir, "_obj\\");
+                if (!nob_mkdir_if_not_exists(obj_dir)) return 1;
+                strcat(obj_output_param, obj_dir);
+                strcat(pdb_name, unit_test->executable_name);
+                strcat(pdb_name, ".pdb");
+                strcat(pdb_output_param, pdb_name);
 
                 Nob_Cmd msvc_debug_compile_command = {0};
                 nob_cmd_append(
@@ -679,8 +685,10 @@ int32_t main(int32_t argc, char **argv)
                     "/W4",
                     "/WX",
                     "/std:c11",
+                    "/FS", // allow concurrent PDB writes
+                    pdb_output_param,
+                    obj_output_param,
                     exe_output_param
-                    // obj_output_param,
                 );
 
                 for (int32_t source_file_idx = 0;; ++source_file_idx)
@@ -692,9 +700,7 @@ int32_t main(int32_t argc, char **argv)
                     nob_cmd_append(&msvc_debug_compile_command, source_file);
                 }
 
-                // TODO, speed: Add .async = &compile_procs for MSVC, right now
-                // pdbs over write each other causing errors
-                if (!nob_cmd_run(&msvc_debug_compile_command)) return 1;
+                if (!nob_cmd_run(&msvc_debug_compile_command, .async = &compile_procs)) return 1;
 
                 cstring_array_insert(&executables, exe_name);
             }
@@ -703,14 +709,20 @@ int32_t main(int32_t argc, char **argv)
                 char exe_output_param[256] = "/Fe";
                 char exe_name[256] = "tests\\bin\\opt_msvc_";
                 char obj_output_param[256] = "/Fo";
-                char obj_name[256] = "tests\\bin\\opt_msvc_release_";
+                char obj_dir[256] = "tests\\bin\\opt_msvc_";
+                char pdb_output_param[256] = "/Fd";
+                char pdb_name[256] = "tests\\bin\\opt_msvc_";
 
                 strcat(exe_name, unit_test->executable_name);
                 strcat(exe_name, ".exe");
                 strcat(exe_output_param, exe_name);
-                strcat(obj_name, unit_test->executable_name);
-                strcat(obj_name, ".obj");
-                strcat(obj_output_param, obj_name);
+                strcat(obj_dir, unit_test->executable_name);
+                strcat(obj_dir, "_obj\\");
+                if (!nob_mkdir_if_not_exists(obj_dir)) return 1;
+                strcat(obj_output_param, obj_dir);
+                strcat(pdb_name, unit_test->executable_name);
+                strcat(pdb_name, ".pdb");
+                strcat(pdb_output_param, pdb_name);
 
                 Nob_Cmd msvc_optimized_compile_command = {0};
                 nob_cmd_append(
@@ -723,8 +735,10 @@ int32_t main(int32_t argc, char **argv)
                     "/W4",
                     "/WX",
                     "/std:c11",
+                    "/FS", // allow concurrent PDB writes
+                    pdb_output_param,
+                    obj_output_param,
                     exe_output_param
-                    // obj_output_param
                 );
 
                 for (int32_t source_file_idx = 0;; ++source_file_idx)
@@ -736,9 +750,7 @@ int32_t main(int32_t argc, char **argv)
                     nob_cmd_append(&msvc_optimized_compile_command, source_file);
                 }
 
-                // TODO, speed: Add .async = &compile_procs for MSVC, right now
-                // pdbs over write each other causing errors
-                if (!nob_cmd_run(&msvc_optimized_compile_command)) return 1;
+                if (!nob_cmd_run(&msvc_optimized_compile_command, .async = &compile_procs)) return 1;
         
                 cstring_array_insert(&executables, exe_name);
             }
