@@ -183,20 +183,23 @@ void test_jsl_string_builder_insert_fatptr_multi_chunk(void)
     JSLFatPtr writer = buffer;
     debug_concatenate_builder(&builder, &writer);
     int64_t len = jsl_fatptr_total_write_length(buffer, writer);
-    TEST_BOOL(len == (int64_t) strlen(text));
-    TEST_BOOL(memcmp(actual, text, len) == 0);
+
+    TEST_INT64_EQUAL(len, (int64_t) strlen(text));
+    TEST_BUFFERS_EQUAL(actual, text, len);
 
     JSLStringBuilderIterator iterator;
     jsl_string_builder_iterator_init(&builder, &iterator);
     JSLFatPtr first = jsl_string_builder_iterator_next(&iterator);
     JSLFatPtr second = jsl_string_builder_iterator_next(&iterator);
     JSLFatPtr third = jsl_string_builder_iterator_next(&iterator);
-    TEST_BOOL(first.length == 4);
-    TEST_BOOL(second.length == 4);
-    TEST_BOOL(third.length == 2);
-    TEST_BOOL(memcmp(first.data, "abcd", 4) == 0);
-    TEST_BOOL(memcmp(second.data, "efgh", 4) == 0);
-    TEST_BOOL(memcmp(third.data, "ij", 2) == 0);
+
+    TEST_INT64_EQUAL(first.length, (int64_t) 4);
+    TEST_INT64_EQUAL(second.length, (int64_t) 4);
+    TEST_INT64_EQUAL(third.length, (int64_t) 2);
+
+    TEST_BUFFERS_EQUAL(first.data, "abcd", 4);
+    TEST_BUFFERS_EQUAL(second.data, "efgh", 4);
+    TEST_BUFFERS_EQUAL(third.data, "ij", 2);
 }
 
 void test_jsl_string_builder_insert_fatptr_edge_cases(void)
@@ -251,19 +254,21 @@ void test_jsl_string_builder_iterator_behavior(void)
 
     jsl_string_builder_iterator_init(&builder, &iterator);
     slice = jsl_string_builder_iterator_next(&iterator);
+
     TEST_BOOL(slice.length == 3);
-    TEST_BOOL(memcmp(slice.data, "123", 3) == 0);
+    TEST_BUFFERS_EQUAL(slice.data, "123", 3);
 
     JSLFatPtr end = jsl_string_builder_iterator_next(&iterator);
     TEST_BOOL(end.data == NULL);
-    TEST_BOOL(end.length == 0);
+    TEST_INT64_EQUAL(end.length, (int64_t) 0);
 
     JSLStringBuilder invalid = {0};
     JSLStringBuilderIterator invalid_iterator;
     jsl_string_builder_iterator_init(&invalid, &invalid_iterator);
     JSLFatPtr invalid_slice = jsl_string_builder_iterator_next(&invalid_iterator);
+
     TEST_BOOL(invalid_slice.data == NULL);
-    TEST_BOOL(invalid_slice.length == 0);
+    TEST_INT64_EQUAL(invalid_slice.length, (int64_t) 0);
 }
 
 void test_jsl_string_builder_format_success(void)
@@ -282,8 +287,8 @@ void test_jsl_string_builder_format_success(void)
     debug_concatenate_builder(&builder, &writer);
     int64_t len = jsl_fatptr_total_write_length(buffer, writer);
 
-    TEST_BOOL(len == (int64_t) strlen("alpha-42:AB"));
-    TEST_BOOL(memcmp(actual, "alpha-42:AB", len) == 0);
+    TEST_INT64_EQUAL(len, (int64_t) strlen("alpha-42:AB"));
+    TEST_BUFFERS_EQUAL(actual, "alpha-42:AB", len);
 }
 
 void test_jsl_string_builder_format_needs_multiple_chunks(void)
@@ -303,8 +308,9 @@ void test_jsl_string_builder_format_needs_multiple_chunks(void)
 
     debug_concatenate_builder(&builder, &writer);
     int64_t len = jsl_fatptr_total_write_length(buffer, writer);
-    TEST_BOOL(len == (int64_t) strlen(long_fragment));
-    TEST_BOOL(memcmp(actual, long_fragment, len) == 0);
+
+    TEST_INT64_EQUAL(len, (int64_t) strlen(long_fragment));
+    TEST_BUFFERS_EQUAL(actual, long_fragment, len);
     TEST_BOOL(builder.head != builder.tail);
 }
 

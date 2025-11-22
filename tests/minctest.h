@@ -140,7 +140,7 @@ static size_t lfails = 0;
     ++ltests;\
     const unsigned char *const _lm_a = (const unsigned char *)(buf_a);\
     const unsigned char *const _lm_b = (const unsigned char *)(buf_b);\
-    const size_t _lm_len = (buf_len);\
+    const size_t _lm_len = (size_t) (buf_len);\
     size_t _lm_i;\
     for (_lm_i = 0; _lm_i < _lm_len; ++_lm_i) {\
         const unsigned char _lm_va = _lm_a[_lm_i];\

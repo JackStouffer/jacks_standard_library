@@ -2394,7 +2394,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         if (a.data == b.data)
             return true;
 
-        return JSL_MEMCMP(a.data, b.data, a.length) == 0;
+        return JSL_MEMCMP(a.data, b.data, (size_t) a.length) == 0;
     }
 
     bool jsl_fatptr_cstr_compare(JSLFatPtr string, char* cstr)
@@ -2964,9 +2964,6 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     JSLFatPtr jsl_arena_cstr_to_fatptr(JSLArena* arena, char* str)
     {
-        JSL_ASSERT(arena != NULL);
-        JSL_ASSERT(str != NULL);
-
         JSLFatPtr ret = {0};
         if (arena == NULL || str == NULL)
             return ret;
@@ -2975,7 +2972,12 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         if (length == 0)
             return ret;
 
-        JSLFatPtr allocation = jsl_arena_allocate(arena, sizeof(uint8_t) * length, false);
+        int64_t allocation_size = length * (int64_t) sizeof(uint8_t);
+        JSLFatPtr allocation = jsl_arena_allocate(
+            arena,
+            allocation_size,
+            false
+        );
         if (allocation.data == NULL || allocation.length < length)
             return ret;
 
@@ -2986,9 +2988,6 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     JSLFatPtr jsl_fatptr_duplicate(JSLArena* arena, JSLFatPtr str)
     {
-        JSL_ASSERT(arena != NULL);
-        JSL_ASSERT(str.data != NULL && str.length > -1);
-
         JSLFatPtr res = {0};
         if (arena == NULL || str.data == NULL || str.length < 1)
             return res;
@@ -3005,8 +3004,8 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     void jsl_fatptr_to_lowercase_ascii(JSLFatPtr str)
     {
-        JSL_ASSERT(str.data != NULL);
-        JSL_ASSERT(str.length > -1);
+        if (str.data == NULL || str.length < 1)
+            return;
 
         #ifdef __AVX2__
             __m256i asciiA = _mm256_set1_epi8('A' - 1);
@@ -3442,22 +3441,28 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         return jsl_arena_allocate_aligned(arena, bytes, JSL_DEFAULT_ALLOCATION_ALIGNMENT, zeroed);
     }
 
-    static bool jsl__is_power_of_two(int32_t x)
+    static inline bool jsl__is_power_of_two(int32_t x)
     {
         return (x & (x-1)) == 0;
     }
 
     static inline uint8_t* align_ptr_upwards(uint8_t* ptr, int32_t align)
     {
-        uint32_t ualign = (uint32_t) align;
-        uintptr_t addr = (uintptr_t) ptr;
-        addr = (addr + (ualign - 1)) & -ualign;
-        return (uint8_t*) addr;
+        uintptr_t addr   = (uintptr_t)ptr;
+        uintptr_t ualign = (uintptr_t)(uint32_t)align;
+
+        uintptr_t mask = ualign - 1;
+        addr = (addr + mask) & ~mask;
+
+        return (uint8_t*)addr;
     }
 
     JSLFatPtr jsl_arena_allocate_aligned(JSLArena* arena, int64_t bytes, int32_t alignment, bool zeroed)
     {
-        JSL_ASSERT(alignment > 0 && jsl__is_power_of_two(alignment));
+        JSL_ASSERT(
+            alignment > 0
+            && jsl__is_power_of_two(alignment)
+        );
 
         JSLFatPtr res = {0};
         uint8_t* aligned_current = align_ptr_upwards(arena->current, alignment);
@@ -3468,16 +3473,12 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             res.data = aligned_current;
             res.length = bytes;
 
-            #if defined(_MSC_VER) && !defined(__clang__)
-                arena->current = potential_end;
+            #if defined(__SANITIZE_ADDRESS__)
+                // Add 8 to leave "guard" zones between allocations
+                arena->current = potential_end + 8;
+                ASAN_UNPOISON_MEMORY_REGION(res.data, res.length);
             #else
-                #if defined(__SANITIZE_ADDRESS__)
-                    // Add 8 to leave "guard" zones between allocations
-                    arena->current = potential_end + 8;
-                    ASAN_UNPOISON_MEMORY_REGION(res.data, res.length);
-                #else
-                    arena->current = potential_end;
-                #endif
+                arena->current = potential_end;
             #endif
 
             if (zeroed)
@@ -4015,7 +4016,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
             // get the field width
             if (f.data[0] == '*') {
-                field_width = va_arg(va, uint32_t);
+                field_width = (int32_t) va_arg(va, uint32_t);
                 JSL_FATPTR_ADVANCE(f, 1);
             } else {
                 while ((f.data[0] >= '0') && (f.data[0] <= '9')) {
@@ -4027,7 +4028,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             if (f.data[0] == '.') {
                 JSL_FATPTR_ADVANCE(f, 1);
                 if (f.data[0] == '*') {
-                    precision = va_arg(va, uint32_t);
+                    precision = (int32_t) va_arg(va, uint32_t);
                     JSL_FATPTR_ADVANCE(f, 1);
                 } else {
                     precision = 0;
@@ -4113,7 +4114,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     {
                         // get the length, limited to desired precision
                         // always limit to ~0u chars since our counts are 32b
-                        l = (precision >= 0) ? stbsp__strlen_limited(string, precision) : (uint32_t) JSL_STRLEN(string);
+                        l = (precision >= 0) 
+                            ? stbsp__strlen_limited(string, (uint32_t) precision)
+                            : (uint32_t) JSL_STRLEN(string);
                     }
 
                     lead[0] = 0;
@@ -4206,11 +4209,11 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     source_ptr = string;
 
                     // print the bits
-                    n = precision;
+                    n = (uint32_t) precision;
                     if (n > 13)
                         n = 13;
                     if (precision > (int32_t)n)
-                        trailing_zeros = precision - n;
+                        trailing_zeros = precision - (int32_t)n;
                     precision = 0;
                     while (n--) {
                         *string++ = h[(n64 >> 60) & 15];
@@ -4235,9 +4238,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     }
 
                     decimal_precision = (int32_t)(string - source_ptr);
-                    l = (int32_t)(string - (num + 64));
+                    l = (uint32_t)(string - (num + 64));
                     string = num + 64;
-                    comma_spacing = 1 + (3 << 24);
+                    comma_spacing = 1u + (3u << 24);
                     goto L_STRING_COPY;
 
                 case 'G': // float
@@ -4249,13 +4252,13 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     else if (precision == 0)
                         precision = 1; // default is 6
                     // read the double into a string
-                    if (stbsp__real_to_str(&source_ptr, &l, num, &decimal_precision, float_value, (precision - 1) | 0x80000000))
+                    if (stbsp__real_to_str(&source_ptr, &l, num, &decimal_precision, float_value, (uint32_t)(((uint32_t)(precision - 1)) | 0x80000000u)))
                         formatting_flags |= STBSP__NEGATIVE;
 
                     // clamp the precision and delete extra zeros after clamp
-                    n = precision;
+                    n = (uint32_t) precision;
                     if (l > (uint32_t)precision)
-                        l = precision;
+                        l = (uint32_t) precision;
                     while ((l > 1) && (precision) && (source_ptr[l - 1] == '0')) {
                         --precision;
                         --l;
@@ -4264,14 +4267,14 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     // should we use %e
                     if ((decimal_precision <= -4) || (decimal_precision > (int32_t)n)) {
                         if (precision > (int32_t)l)
-                        precision = l - 1;
+                        precision = (int32_t) l - 1;
                         else if (precision)
                         --precision; // when using %e, there is one digit before the decimal
                         goto L_DO_EXP_FROMG;
                     }
                     // this is the insane action to get the precision to match %g semantics for %f
                     if (decimal_precision > 0) {
-                        precision = (decimal_precision < (int32_t)l) ? l - decimal_precision : 0;
+                        precision = (decimal_precision < (int32_t)l) ? (int32_t)(l - (uint32_t) decimal_precision) : 0;
                     } else {
                         precision = -decimal_precision + ((precision > (int32_t)l) ? (int32_t) l : precision);
                     }
@@ -4284,7 +4287,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     if (precision == -1)
                         precision = 6; // default is 6
                     // read the double into a string
-                    if (stbsp__real_to_str(&source_ptr, &l, num, &decimal_precision, float_value, precision | 0x80000000))
+                    if (stbsp__real_to_str(&source_ptr, &l, num, &decimal_precision, float_value, ((uint32_t) precision) | 0x80000000u))
                         formatting_flags |= STBSP__NEGATIVE;
                 L_DO_EXP_FROMG:
                     tail[0] = 0;
@@ -4303,12 +4306,12 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                         *string++ = stbsp__period;
 
                     // handle after decimal
-                    if ((l - 1) > (uint32_t)precision)
-                        l = precision + 1;
+                    if ((l - 1u) > (uint32_t)precision)
+                        l = (uint32_t) precision + 1u;
                     for (n = 1; n < l; n++)
                         *string++ = source_ptr[n];
                     // trailing zeros
-                    trailing_zeros = precision - (l - 1);
+                    trailing_zeros = precision - (int32_t)(l - 1u);
                     precision = 0;
                     // dump expo
                     tail[1] = h[0xe];
@@ -4329,7 +4332,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                         --n;
                         decimal_precision /= 10;
                     }
-                    comma_spacing = 1 + (3 << 24); // how many tens
+                    comma_spacing = 1u + (3u << 24); // how many tens
                     goto flt_lead;
 
                 case 'f': // float
@@ -4351,7 +4354,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     if (precision == -1)
                         precision = 6; // default is 6
                     // read the double into a string
-                    if (stbsp__real_to_str(&source_ptr, &l, num, &decimal_precision, float_value, precision))
+                    if (stbsp__real_to_str(&source_ptr, &l, num, &decimal_precision, float_value, (uint32_t) precision))
                         formatting_flags |= STBSP__NEGATIVE;
                 L_DO_FLOAT_FROMG:
                     tail[0] = 0;
@@ -4371,22 +4374,22 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                         *string++ = '0';
                         if (precision)
                         *string++ = stbsp__period;
-                        n = -decimal_precision;
+                        n = (uint32_t)(-decimal_precision);
                         if ((int32_t)n > precision)
-                        n = precision;
+                        n = (uint32_t) precision;
 
                         JSL_MEMSET(string, '0', n);
                         string += n;
 
                         if ((int32_t)(l + n) > precision)
-                        l = precision - n;
+                        l = (uint32_t)(precision - (int32_t) n);
 
                         JSL_MEMCPY(string, source_ptr, l);
                         string += l;
                         source_ptr += l;
 
-                        trailing_zeros = precision - (n + l);
-                        comma_spacing = 1 + (3 << 24); // how many tens did we write (for commas below)
+                        trailing_zeros = precision - (int32_t)(n + l);
+                        comma_spacing = 1u + (3u << 24); // how many tens did we write (for commas below)
                     }
                     else
                     {
@@ -4406,7 +4409,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                             }
                         }
                         if (n < (uint32_t)decimal_precision) {
-                            n = decimal_precision - n;
+                            n = (uint32_t)(decimal_precision - (int32_t) n);
                             if ((formatting_flags & STBSP__TRIPLET_COMMA) == 0) {
                                 while (n) {
                                     if ((((uintptr_t)string) & 3) == 0)
@@ -4430,7 +4433,8 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                                 }
                             }
                         }
-                        comma_spacing = (int32_t)(string - (num + 64)) + (3 << 24); // comma_spacing is how many tens
+                        comma_spacing = (uint32_t)(string - (num + 64)); // comma_spacing is how many tens
+                        comma_spacing += (3u << 24);
                         if (precision) {
                             *string++ = stbsp__period;
                             trailing_zeros = precision;
@@ -4449,16 +4453,17 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                                     break;
                             }
                         }
-                        comma_spacing = (int32_t)(string - (num + 64)) + (3 << 24); // comma_spacing is how many tens
+                        comma_spacing = (uint32_t)(string - (num + 64)); // comma_spacing is how many tens
+                        comma_spacing += (3u << 24);
                         if (precision)
                             *string++ = stbsp__period;
-                        if ((l - decimal_precision) > (uint32_t)precision)
-                            l = precision + decimal_precision;
+                        if ((l - (uint32_t) decimal_precision) > (uint32_t)precision)
+                            l = (uint32_t)(precision + decimal_precision);
                         while (n < l) {
                             *string++ = source_ptr[n];
                             ++n;
                         }
-                        trailing_zeros = precision - (l - decimal_precision);
+                        trailing_zeros = precision - (int32_t)(l - (uint32_t) decimal_precision);
                         }
                     }
                     precision = 0;
@@ -4519,7 +4524,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                 case 'p': // pointer
                     formatting_flags |= (sizeof(void *) == 8) ? STBSP__INTMAX : 0;
                     precision = sizeof(void *) * 2;
-                    formatting_flags &= ~STBSP__LEADINGZERO; // 'p' only prints the pointer with zeros
+                    formatting_flags &= (uint32_t) ~STBSP__LEADINGZERO; // 'p' only prints the pointer with zeros
                                                 // fall through - to X
 
                 case 'X': // upper hex
@@ -4561,7 +4566,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                         if (formatting_flags & STBSP__TRIPLET_COMMA) {
                         ++l;
                         if ((l & 15) == ((l >> 4) & 15)) {
-                            l &= ~15;
+                            l &= ~UINT32_C(15);
                             *--string = stbsp__comma;
                         }
                         }
@@ -4657,19 +4662,19 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                         *--string = '0';
                         l = 1;
                     }
-                    comma_spacing = l + (3 << 24);
+                    comma_spacing = l + (3u << 24);
                     if (precision < 0)
                         precision = 0;
 
                 L_STRING_COPY:
                     // get field_width=leading/trailing space, precision=leading zeros
                     if (precision < (int32_t)l)
-                        precision = l;
-                    n = precision + lead[0] + tail[0] + trailing_zeros;
+                        precision = (int32_t) l;
+                    n = (uint32_t)(precision + lead[0] + tail[0] + trailing_zeros);
                     if (field_width < (int32_t)n)
-                        field_width = n;
-                    field_width -= n;
-                    precision -= l;
+                        field_width = (int32_t) n;
+                    field_width -= (int32_t) n;
+                    precision -= (int32_t) l;
 
                     // handle right justify and leading zeros
                     if ((formatting_flags & STBSP__LEFTJUST) == 0)
@@ -4681,7 +4686,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                         }
                         else
                         {
-                            formatting_flags &= ~STBSP__TRIPLET_COMMA; // if no leading zeros, then no commas
+                            formatting_flags &= (uint32_t) ~STBSP__TRIPLET_COMMA; // if no leading zeros, then no commas
                         }
                     }
 
@@ -4723,7 +4728,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                         // copy leading zeros
                         c = comma_spacing >> 24;
                         comma_spacing &= 0xffffff;
-                        comma_spacing = (formatting_flags & STBSP__TRIPLET_COMMA) ? ((uint32_t)(c - ((precision + comma_spacing) % (c + 1)))) : 0;
+                        comma_spacing = (formatting_flags & STBSP__TRIPLET_COMMA) ? ((uint32_t)(c - ((((uint32_t) precision) + comma_spacing) % (c + 1u)))) : 0;
 
                         while (precision > 0)
                         {
@@ -4742,7 +4747,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                                 if (comma_spacing == c)
                                 {
                                     comma_spacing = 0;
-                                    *buffer_cursor = stbsp__comma;
+                                    *buffer_cursor = (uint8_t) stbsp__comma;
                                 }
                                 else
                                 {
@@ -4780,11 +4785,11 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     while (n)
                     {
                         int32_t i;
-                        stbsp__cb_buf_clamp(i, n);
+                        stbsp__cb_buf_clamp(i, (int32_t) n);
 
                         JSL_MEMCPY(buffer_cursor, string, (size_t) i);
 
-                        n -= i;
+                        n -= (uint32_t) i;
                         buffer_cursor += i;
                         string += i;
 
@@ -5070,7 +5075,8 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     STBSP__COPYFP(b, d);
 
-    *bits = b & ((((uint64_t)1) << 52) - 1);
+    const int64_t mantissa_mask = (int64_t)((((uint64_t)1u) << 52u) - 1u);
+    *bits = b & mantissa_mask;
     *expo = (int32_t)(((b >> 52) & 2047) - 1023);
 
     return (int32_t)((uint64_t) b >> 63);
@@ -5263,7 +5269,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
         if (expo == 2047) // is nan or inf?
         {
-            *start = (bits & ((((uint64_t)1) << 52) - 1)) ? "NaN" : "Inf";
+            *start = ((uint64_t) bits & ((((uint64_t) 1u) << 52u) - 1u)) ? "NaN" : "Inf";
             *decimal_pos = STBSP__SPECIAL;
             *len = 3;
             return ng;
@@ -5309,7 +5315,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         }
 
         // now do the rounding in integer land
-        frac_digits = (frac_digits & 0x80000000) ? ((frac_digits & 0x7ffffff) + 1) : (tens + frac_digits);
+        frac_digits = (frac_digits & 0x80000000u) ? ((frac_digits & 0x7ffffffu) + 1u) : (frac_digits + (uint32_t) tens);
         if ((frac_digits < 24)) {
             uint32_t dg = 1;
             if ((uint64_t)bits >= stbsp__powten[9])
@@ -5322,11 +5328,11 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             if (frac_digits < dg) {
                 uint64_t r;
                 // add 0.5 at the right position and round
-                e = dg - frac_digits;
+                e = (int32_t) (dg - frac_digits);
                 if ((uint32_t)e >= 24)
                     goto L_NO_ROUND;
                 r = stbsp__powten[e];
-                bits = bits + (r / 2);
+                bits = bits + (int64_t) (r / 2);
                 if ((uint64_t) bits >= stbsp__powten[dg])
                     ++tens;
                 bits /= r;
