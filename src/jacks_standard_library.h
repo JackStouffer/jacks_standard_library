@@ -131,7 +131,12 @@ extern "C" {
 
 #endif
 
-#if defined(_M_X64) || defined(_M_AMD64) || defined(__x86_64__) || defined(__amd64__)
+#if defined(_M_X64) \
+    || defined(_M_AMD64) \
+    || defined(__x86_64__) \
+    || defined(__amd64__) \
+    || defined(__i386__) \
+    || defined(_M_IX86)
 
     #define JSL__IS_X86_VAL 1
     #define JSL__IS_ARM_VAL 0
@@ -2129,7 +2134,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         #else
             if (x == 0) return 0;
 
-            int n = 1;
+            uint32_t n = 1;
             if ((x & 0xFFFF) == 0) { x >>= 16; n += 16; }
             if ((x & 0xFF) == 0)   { x >>= 8;  n += 8;  }
             if ((x & 0xF) == 0)    { x >>= 4;  n += 4;  }
@@ -2149,7 +2154,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         #else
             if (x == 0) return 0;
 
-            int n = 1;
+            uint32_t n = 1;
             if ((x & 0xFFFFFFFFULL) == 0) { x >>= 32; n += 32; }
             if ((x & 0xFFFFULL) == 0)     { x >>= 16; n += 16; }
             if ((x & 0xFFULL) == 0)       { x >>= 8;  n += 8;  }
@@ -2352,7 +2357,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         }
 
         int64_t memcpy_length = JSL_MIN(source.length, destination->length);
-        JSL_MEMCPY(destination->data, source.data, memcpy_length);
+        JSL_MEMCPY(destination->data, source.data, (size_t) memcpy_length);
 
         destination->data += memcpy_length;
         destination->length -= memcpy_length;
@@ -2373,7 +2378,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             include_null_terminator ? (int64_t) JSL_STRLEN(cstring) + 1 : (int64_t) JSL_STRLEN(cstring),
             destination->length
         );
-        JSL_MEMCPY(destination->data, cstring, length);
+        JSL_MEMCPY(destination->data, cstring, (size_t) length);
 
         destination->data += length;
         destination->length -= length;
@@ -2405,7 +2410,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         if ((void*) string.data == (void*) cstr)
             return true;
 
-        return JSL_MEMCMP(string.data, cstr, cstr_length) == 0;
+        return JSL_MEMCMP(string.data, cstr, (size_t) cstr_length) == 0;
     }
 
     #ifdef __AVX2__
@@ -2593,7 +2598,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         int64_t pos = 0;
         while (pos + substring.length <= string.length)
         {
-            if (JSL_MEMCMP(string.data + pos, substring.data, substring.length) == 0)
+            if (JSL_MEMCMP(string.data + pos, substring.data, (size_t) substring.length) == 0)
             {
                 return pos;
             }
@@ -2647,7 +2652,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         }
         else if (string.length == substring.length)
         {
-            if (JSL_MEMCMP(string.data, substring.data, string.length) == 0)
+            if (JSL_MEMCMP(string.data, substring.data, (size_t) string.length) == 0)
                 return 0;
             else
                 return -1;
@@ -2952,7 +2957,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         if (allocation.data == NULL || allocation.length < allocation_size)
             return NULL;
 
-        JSL_MEMCPY(allocation.data, str.data, str.length);
+        JSL_MEMCPY(allocation.data, str.data, (size_t) str.length);
         allocation.data[str.length] = '\0';
         return (char*) allocation.data;
     }
@@ -2975,7 +2980,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             return ret;
 
         ret = allocation;
-        JSL_MEMCPY(ret.data, str, length);
+        JSL_MEMCPY(ret.data, str, (size_t) length);
         return ret;
     }
 
@@ -2993,7 +2998,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         if (allocation.data == NULL || allocation.length < str.length)
             return res;
 
-        JSL_MEMCPY(allocation.data, str.data, str.length);
+        JSL_MEMCPY(allocation.data, str.data, (size_t) str.length);
         res = allocation;
         return res;
     }
@@ -3258,7 +3263,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         bool needs_alloc = false;
         if (builder->tail->writer.length > 0)
         {
-            builder->tail->writer.data[0] = c;
+            builder->tail->writer.data[0] = (uint8_t) c;
             JSL_FATPTR_ADVANCE(builder->tail->writer, 1);
             res = true;
         }
@@ -3444,8 +3449,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     static inline uint8_t* align_ptr_upwards(uint8_t* ptr, int32_t align)
     {
+        uint32_t ualign = (uint32_t) align;
         uintptr_t addr = (uintptr_t) ptr;
-        addr = (addr + (align - 1)) & -align;
+        addr = (addr + (ualign - 1)) & -ualign;
         return (uint8_t*) addr;
     }
 
@@ -3475,7 +3481,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             #endif
 
             if (zeroed)
-                JSL_MEMSET((void*) res.data, 0, res.length);
+                JSL_MEMSET((void*) res.data, 0, (size_t) res.length);
         }
 
         return res;
@@ -3520,7 +3526,11 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             res = jsl_arena_allocate_aligned(arena, new_num_bytes, align, false);
             if (res.data != NULL)
             {
-                JSL_MEMCPY(res.data, original_allocation.data, original_allocation.length);
+                JSL_MEMCPY(
+                    res.data,
+                    original_allocation.data,
+                    (size_t) original_allocation.length
+                );
 
                 #ifdef JSL_DEBUG
                     JSL_MEMSET((void*) original_allocation.data, 0xfeeefeee, original_allocation.length);
@@ -4689,7 +4699,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                                 stbsp__cb_buf_clamp(i, field_width);
 
                                 field_width -= i;
-                                JSL_MEMSET(buffer_cursor, ' ', i);
+                                JSL_MEMSET(buffer_cursor, ' ', (size_t) i);
                                 buffer_cursor += i;
 
                                 stbsp__chk_cb_buf(1);
@@ -4703,7 +4713,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                             stbsp__cb_buf_clamp(i, lead[0]);
 
                             lead[0] -= (char) i;
-                            JSL_MEMCPY(buffer_cursor, source_ptr, i);
+                            JSL_MEMCPY(buffer_cursor, source_ptr, (size_t) i);
                             buffer_cursor += i;
                             source_ptr += i;
 
@@ -4722,7 +4732,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
                         if (JSL_IS_BITFLAG_NOT_SET(formatting_flags, STBSP__TRIPLET_COMMA))
                         {
-                            JSL_MEMSET(buffer_cursor, '0', i);
+                            JSL_MEMSET(buffer_cursor, '0', (size_t) i);
                             buffer_cursor += i;
                         }
                         else
@@ -4758,7 +4768,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                         stbsp__cb_buf_clamp(i, lead[0]);
 
                         lead[0] -= (char) i;
-                        JSL_MEMCPY(buffer_cursor, source_ptr, i);
+                        JSL_MEMCPY(buffer_cursor, source_ptr, (size_t) i);
                         buffer_cursor += i;
                         source_ptr += i;
 
@@ -4772,7 +4782,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                         int32_t i;
                         stbsp__cb_buf_clamp(i, n);
 
-                        JSL_MEMCPY(buffer_cursor, string, i);
+                        JSL_MEMCPY(buffer_cursor, string, (size_t) i);
 
                         n -= i;
                         buffer_cursor += i;
@@ -4788,7 +4798,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                         stbsp__cb_buf_clamp(i, trailing_zeros);
 
                         trailing_zeros -= i;
-                        JSL_MEMSET(buffer_cursor, '0', i);
+                        JSL_MEMSET(buffer_cursor, '0', (size_t) i);
                         buffer_cursor += i;
 
                         stbsp__chk_cb_buf(1);
@@ -4802,7 +4812,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                         stbsp__cb_buf_clamp(i, tail[0]);
 
                         tail[0] -= (char)i;
-                        JSL_MEMCPY(buffer_cursor, source_ptr, i);
+                        JSL_MEMCPY(buffer_cursor, source_ptr, (size_t) i);
                         buffer_cursor += i;
                         source_ptr += i;
 
@@ -4820,7 +4830,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                             stbsp__cb_buf_clamp(i, field_width);
 
                             field_width -= i;
-                            JSL_MEMSET(buffer_cursor, ' ', i);
+                            JSL_MEMSET(buffer_cursor, ' ', (size_t) i);
                             buffer_cursor += i;
 
                             stbsp__chk_cb_buf(1);
@@ -4832,7 +4842,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
                 default: // unknown, just copy code
                     string = num + STBSP__NUMSZ - 1;
-                    *string = f.data[0];
+                    *string = (char) f.data[0];
                     l = 1;
                     field_width = formatting_flags = 0;
                     lead[0] = 0;
@@ -4895,7 +4905,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         {
             if (buf != context->buffer.data)
             {
-                JSL_MEMCPY(context->buffer.data, buf, len);
+                JSL_MEMCPY(context->buffer.data, buf, (size_t) len);
             }
 
             context->buffer.data += len;
@@ -4988,7 +4998,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                 return 0;
         }
 
-        JSL_MEMCPY(context->cursor, buf, len);
+        JSL_MEMCPY(context->cursor, buf, (size_t) len);
         context->cursor += len;
 
         return context->buffer;
@@ -5317,7 +5327,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     goto L_NO_ROUND;
                 r = stbsp__powten[e];
                 bits = bits + (r / 2);
-                if ((uint64_t)bits >= stbsp__powten[dg])
+                if ((uint64_t) bits >= stbsp__powten[dg])
                     ++tens;
                 bits /= r;
             }
@@ -5376,7 +5386,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
         *decimal_pos = tens;
         *start = out;
-        *len = e;
+        *len = (uint32_t) e;
         return ng;
     }
 
@@ -5456,7 +5466,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         {
             // File system APIs require a null terminated string
 
-            JSL_MEMCPY(path_buffer, path.data, path.length);
+            JSL_MEMCPY(path_buffer, path.data, (size_t) path.length);
             path_buffer[path.length] = '\0';
             got_path = true;
         }
@@ -5589,7 +5599,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         {
             // File system APIs require a null terminated string
 
-            JSL_MEMCPY(path_buffer, path.data, path.length);
+            JSL_MEMCPY(path_buffer, path.data, (size_t) path.length);
             path_buffer[path.length] = '\0';
             got_path = true;
         }
@@ -5708,7 +5718,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             && contents.length > 0
         )
         {
-            JSL_MEMCPY(path_buffer, path.data, path.length);
+            JSL_MEMCPY(path_buffer, path.data, (size_t) path.length);
             path_buffer[path.length] = '\0';
             got_path = true;
         }
@@ -5798,7 +5808,12 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     {
         struct JSL__FormatOutContext* context = (struct JSL__FormatOutContext*) user;
 
-        int64_t written = (int64_t) fwrite(buf, sizeof(uint8_t), len, context->out);
+        int64_t written = (int64_t) fwrite(
+            buf,
+            sizeof(uint8_t),
+            (size_t) len,
+            context->out
+        );
         if (written == len)
         {
             return context->buffer;

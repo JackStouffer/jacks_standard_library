@@ -78,7 +78,7 @@ void test_jsl_fatptr_from_cstr(void)
 
     TEST_BOOL((void*) str.data == (void*) c_str);
     TEST_BOOL((int64_t) str.length == (int64_t) length);
-    TEST_BOOL(memcmp(c_str, str.data, str.length) == 0);
+    TEST_BOOL(memcmp(c_str, str.data, (size_t) str.length) == 0);
 }
 
 void test_jsl_fatptr_cstr_memory_copy(void)
@@ -95,7 +95,7 @@ void test_jsl_fatptr_cstr_memory_copy(void)
     TEST_BOOL(writer.length == 1024 - length);
     TEST_BOOL((int64_t) buffer.length == (int64_t) 1024);
 
-    TEST_BOOL(memcmp(str, buffer.data, length) == 0);
+    TEST_BOOL(memcmp(str, buffer.data, (size_t) length) == 0);
 }
 
 void test_jsl_load_file_contents(void)
@@ -117,7 +117,7 @@ void test_jsl_load_file_contents(void)
         TEST_BOOL(file_size > 0);
         rewind(file);
 
-        size_t res = fread(stack_buffer, file_size, 1, file);
+        size_t res = fread(stack_buffer, (size_t) file_size, 1, file);
         assert(res > 0);
     }
 
@@ -133,7 +133,7 @@ void test_jsl_load_file_contents(void)
     );
 
     TEST_BOOL(res == JSL_FILE_LOAD_SUCCESS);
-    TEST_BUFFERS_EQUAL(stack_buffer, contents.data, file_size);
+    TEST_BUFFERS_EQUAL(stack_buffer, contents.data, (size_t) file_size);
 }
 
 void test_jsl_load_file_contents_buffer(void)
@@ -150,7 +150,7 @@ void test_jsl_load_file_contents_buffer(void)
         TEST_BOOL(file_size > 0);
         rewind(file);
 
-        size_t res = fread(stack_buffer, file_size, 1, file);
+        size_t res = fread(stack_buffer, (size_t) file_size, 1, file);
         assert(res > 0);
     }
 
@@ -164,7 +164,7 @@ void test_jsl_load_file_contents_buffer(void)
     );
 
     TEST_BOOL(res == JSL_FILE_LOAD_SUCCESS);
-    TEST_BOOL(memcmp(stack_buffer, buffer.data, file_size) == 0);
+    TEST_BOOL(memcmp(stack_buffer, buffer.data, (size_t) file_size) == 0);
 }
 
 void test_jsl_fatptr_memory_compare(void)

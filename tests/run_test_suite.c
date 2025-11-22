@@ -65,7 +65,7 @@ typedef struct CompilerConfig {
 
 static CompilerConfig clang_configs[] = {
     {
-        "clang_debug_c11_pointers64_",
+        "clang_debug_c11_",
         (char*[]) {
             "-O0",
             "-glldb",
@@ -75,7 +75,6 @@ static CompilerConfig clang_configs[] = {
             "-fsanitize=address",
             "-fsanitize=undefined",
             "-std=c11",
-            "-m64",
             "-Isrc/",
             "-Wall",
             "-Wextra",
@@ -84,26 +83,7 @@ static CompilerConfig clang_configs[] = {
         }
     },
     {
-        "clang_debug_c11_pointers32_",
-        (char*[]) {
-            "-O0",
-            "-glldb",
-            "-fno-omit-frame-pointer",
-            "-fno-optimize-sibling-calls",
-            "-DJSL_DEBUG",
-            "-fsanitize=address",
-            "-fsanitize=undefined",
-            "-std=c11",
-            "-m32",
-            "-Isrc/",
-            "-Wall",
-            "-Wextra",
-            "-pedantic",
-            NULL
-        }
-    },
-    {
-        "clang_debug_c23_pointers64_",
+        "clang_debug_c23_",
         (char*[]) {
             "-O0",
             "-glldb",
@@ -113,7 +93,6 @@ static CompilerConfig clang_configs[] = {
             "-fsanitize=address",
             "-fsanitize=undefined",
             "-std=c23",
-            "-m64",
             "-Isrc/",
             "-Wall",
             "-Wextra",
@@ -122,33 +101,13 @@ static CompilerConfig clang_configs[] = {
         }
     },
     {
-        "clang_debug_c23_pointers32_",
-        (char*[]) {
-            "-O0",
-            "-glldb",
-            "-fno-omit-frame-pointer",
-            "-fno-optimize-sibling-calls",
-            "-DJSL_DEBUG",
-            "-fsanitize=address",
-            "-fsanitize=undefined",
-            "-std=c23",
-            "-m32",
-            "-Isrc/",
-            "-Wall",
-            "-Wextra",
-            "-pedantic",
-            NULL
-        }
-    },
-    {
-        "clang_opt_level3_native_pointers64_c11_",
+        "clang_opt_level3_native_c11_",
         (char*[]) {
             "-O3",
             "-glldb",
             "-march=native",
             "-Isrc/",
             "-std=c11",
-            "-m64",
             "-Wall",
             "-Wextra",
             "-pedantic",
@@ -156,44 +115,33 @@ static CompilerConfig clang_configs[] = {
         }
     },
     {
-        "clang_opt_level3_native_pointers32_c11_",
+        "clang_opt_level3_native_c23_",
         (char*[]) {
             "-O3",
             "-glldb",
             "-march=native",
+            "-Isrc/",
+            "-std=c23",
+            "-Wall",
+            "-Wextra",
+            "-pedantic",
+            NULL
+        }
+    },
+    {
+        "clang_hardended_c11_",
+        (char*[]) {
+            "-O2",
+            "-D_FORTIFY_SOURCE=2",
+            "-fstack-protector-strong",
+            "-fsanitize=shadow-call-stack",
+            #if JSL_IS_POSIX
+            "-fPIE",
+            "-pie",
+            #endif
+            "-glldb",
             "-Isrc/",
             "-std=c11",
-            "-m32",
-            "-Wall",
-            "-Wextra",
-            "-pedantic",
-            NULL
-        }
-    },
-    {
-        "clang_opt_level3_native_pointers64_c23_",
-        (char*[]) {
-            "-O3",
-            "-glldb",
-            "-march=native",
-            "-Isrc/",
-            "-std=c23",
-            "-m64",
-            "-Wall",
-            "-Wextra",
-            "-pedantic",
-            NULL
-        }
-    },
-    {
-        "clang_opt_level3_native_pointers32_c23_",
-        (char*[]) {
-            "-O3",
-            "-glldb",
-            "-march=native",
-            "-Isrc/",
-            "-std=c23",
-            "-m32",
             "-Wall",
             "-Wextra",
             "-Wconversion",
@@ -203,81 +151,19 @@ static CompilerConfig clang_configs[] = {
         }
     },
     {
-        "clang_hardended_native_pointers64_c11_",
+        "clang_hardended_c23_",
         (char*[]) {
             "-O2",
             "-D_FORTIFY_SOURCE=2",
             "-fstack-protector-strong",
             "-fsanitize=shadow-call-stack",
+            #if JSL_IS_POSIX
             "-fPIE",
             "-pie",
-            "-glldb",
-            "-Isrc/",
-            "-std=c11",
-            "-m64",
-            "-Wall",
-            "-Wextra",
-            "-Wconversion",
-            "-Wshadow",
-            "-pedantic",
-            NULL
-        }
-    },
-    {
-        "clang_hardended_native_pointers32_c11_",
-        (char*[]) {
-            "-O2",
-            "-D_FORTIFY_SOURCE=2",
-            "-fstack-protector-strong",
-            "-fsanitize=shadow-call-stack",
-            "-fPIE",
-            "-pie",
-            "-glldb",
-            "-Isrc/",
-            "-std=c11",
-            "-m32",
-            "-Wall",
-            "-Wextra",
-            "-Wconversion",
-            "-Wshadow",
-            "-pedantic",
-            NULL
-        }
-    },
-    {
-        "clang_hardended_native_pointers64_c23_",
-        (char*[]) {
-            "-O2",
-            "-D_FORTIFY_SOURCE=2",
-            "-fstack-protector-strong",
-            "-fsanitize=shadow-call-stack",
-            "-fPIE",
-            "-pie",
+            #endif
             "-glldb",
             "-Isrc/",
             "-std=c23",
-            "-m64",
-            "-Wall",
-            "-Wextra",
-            "-Wconversion",
-            "-Wshadow",
-            "-pedantic",
-            NULL
-        }
-    },
-    {
-        "clang_hardended_native_pointers32_c23_",
-        (char*[]) {
-            "-O2",
-            "-D_FORTIFY_SOURCE=2",
-            "-fstack-protector-strong",
-            "-fsanitize=shadow-call-stack",
-            "-fPIE",
-            "-pie",
-            "-glldb",
-            "-Isrc/",
-            "-std=c23",
-            "-m32",
             "-Wall",
             "-Wextra",
             "-Wconversion",
@@ -290,30 +176,32 @@ static CompilerConfig clang_configs[] = {
 
 static CompilerConfig msvc_configs[] = {
     {
-        "debug_msvc_",
+        "msvc_debug_",
         (char*[]) {
             "/nologo",
             "/DJSL_DEBUG",
             "/Isrc",
             "/TC",
             "/Od",
-            "/Zi",
+            "/Zi", // debug info
             "/W4",
-            "/WX",
+            "/WX", // warnings as errors
             "/std:c11",
+            "/FS", // allow concurrent PDB writes
             NULL
         }
     },
     {
-        "opt_msvc_",
+        "msvc_opt_",
         (char*[]) {
             "/nologo",
             "/Isrc",
             "/TC",
             "/O2",
             "/W4",
-            "/WX",
+            "/WX", // warnings as errors
             "/std:c11",
+            "/FS", // allow concurrent PDB writes
             NULL
         }
     },
@@ -569,8 +457,20 @@ int32_t main(int32_t argc, char **argv)
     {
         UnitTestDecl* unit_test = &unit_test_declarations[i];
 
+        /**
+         * Loop over the clang configs creating compile commands for each.
+         * 
+         * Also insert the exe name into the list of executables to be run
+         * later.
+         */
+
+        int32_t clang_config_count = sizeof(clang_configs) / sizeof(CompilerConfig);
+        for (int32_t i = 0; i < clang_config_count; ++i)
         {
-            char exe_name[256] = "tests/bin/debug_clang_";
+            CompilerConfig* compiler_config = &clang_configs[i];
+
+            char exe_name[256] = "tests/bin/";
+            strcat(exe_name, compiler_config->prefix);
             strcat(exe_name, unit_test->executable_name);
 
             #if JSL_IS_WINDOWS
@@ -579,24 +479,22 @@ int32_t main(int32_t argc, char **argv)
                 strcat(exe_name, ".out");
             #endif
 
-            Nob_Cmd clang_debug_compile_command = {0};
+            Nob_Cmd compile_command = {0};
             nob_cmd_append(
-                &clang_debug_compile_command,
+                &compile_command,
                 "clang",
-                "-O0",
-                "-glldb",
-                "-fno-omit-frame-pointer",
-                "-fno-optimize-sibling-calls",
-                "-DJSL_DEBUG",
-                "-fsanitize=address",
-                "-fsanitize=undefined",
-                "-std=c11",
-                "-Isrc/",
-                "-Wall",
-                "-Wextra",
-                "-pedantic",
                 "-o", exe_name
             );
+
+            // add compiler flags from config
+            for (int32_t flag_idx = 0;; ++flag_idx)
+            {
+                char* flag = compiler_config->flags[flag_idx];
+                if (flag == NULL)
+                    break;
+                    
+                nob_cmd_append(&compile_command, flag);
+            }
 
             for (int32_t source_file_idx = 0;; ++source_file_idx)
             {
@@ -604,154 +502,87 @@ int32_t main(int32_t argc, char **argv)
                 if (source_file == NULL)
                     break;
                     
-                nob_cmd_append(&clang_debug_compile_command, source_file);
+                nob_cmd_append(&compile_command, source_file);
             }
 
-            if (!nob_cmd_run(&clang_debug_compile_command, .async = &compile_procs)) return 1;
-
-            cstring_array_insert(&executables, exe_name);
-        }
-
-        {
-            char exe_name[256] = "tests/bin/opt_clang_";
-            strcat(exe_name, unit_test->executable_name);
-
-            #if JSL_IS_WINDOWS
-                strcat(exe_name, ".exe");
-            #else
-                strcat(exe_name, ".out");
-            #endif
-
-            Nob_Cmd clang_optimized_compile_command = {0};
-            nob_cmd_append(
-                &clang_optimized_compile_command,
-                "clang",
-                "-O3",
-                "-glldb",
-                "-march=native",
-                "-Isrc/",
-                "-std=c11",
-                "-Wall",
-                "-Wextra",
-                "-pedantic",
-                "-o", exe_name
-            );
-
-            for (int32_t source_file_idx = 0;; ++source_file_idx)
-            {
-                char* source_file = unit_test->files[source_file_idx];
-                if (source_file == NULL)
-                    break;
-                    
-                nob_cmd_append(&clang_optimized_compile_command, source_file);
-            }
-
-            if (!nob_cmd_run(&clang_optimized_compile_command, .async = &compile_procs)) return 1;
+            if (!nob_cmd_run(&compile_command)) return 1;
+            // if (!nob_cmd_run(&compile_command, .async = &compile_procs)) return 1;
 
             cstring_array_insert(&executables, exe_name);
         }
 
         #if JSL_IS_WINDOWS
 
-            {
-                char exe_output_param[256] = "/Fe";
-                char exe_name[256] = "tests\\bin\\debug_msvc_";
-                char obj_output_param[256] = "/Fo";
-                char obj_dir[256] = "tests\\bin\\debug_msvc_";
-                char pdb_output_param[256] = "/Fd";
-                char pdb_name[256] = "tests\\bin\\debug_msvc_";
+            /**
+             * Loop over the MSVC configs creating compile commands for each.
+             * 
+             * Also insert the exe name into the list of executables to be run
+             * later.
+             */
 
+            int32_t msvc_config_count = sizeof(msvc_configs) / sizeof(CompilerConfig);
+            for (int32_t i = 0; i < msvc_config_count; ++i)
+            {
+                CompilerConfig* compiler_config = &msvc_configs[i];
+
+                char exe_output_param[256] = "/Fe";
+                char exe_name[256] = "tests\\bin\\";
+                char obj_output_param[256] = "/Fo";
+                char obj_dir[256] = "tests\\bin\\";
+                char pdb_output_param[256] = "/Fd";
+                char pdb_name[256] = "tests\\bin\\";
+
+                strcat(exe_name, compiler_config->prefix);
                 strcat(exe_name, unit_test->executable_name);
                 strcat(exe_name, ".exe");
+
                 strcat(exe_output_param, exe_name);
+
+                strcat(obj_dir, compiler_config->prefix);
                 strcat(obj_dir, unit_test->executable_name);
                 strcat(obj_dir, "_obj\\");
+
                 if (!nob_mkdir_if_not_exists(obj_dir)) return 1;
+
                 strcat(obj_output_param, obj_dir);
+
+                strcat(pdb_name, compiler_config->prefix);
                 strcat(pdb_name, unit_test->executable_name);
                 strcat(pdb_name, ".pdb");
                 strcat(pdb_output_param, pdb_name);
 
-                Nob_Cmd msvc_debug_compile_command = {0};
+                Nob_Cmd compile_command = {0};
+                nob_cmd_append(&compile_command, "cl.exe");
+
+                // add compiler flags from config
+                for (int32_t flag_idx = 0;; ++flag_idx)
+                {
+                    char* flag = compiler_config->flags[flag_idx];
+                    if (flag == NULL)
+                        break;
+                        
+                    nob_cmd_append(&compile_command, flag);
+                }
+
                 nob_cmd_append(
-                    &msvc_debug_compile_command,
-                    "cl.exe",
-                    "/nologo",
-                    "/DJSL_DEBUG",
-                    "/Isrc",
-                    "/TC",
-                    "/Od",
-                    "/Zi",
-                    "/W4",
-                    "/WX",
-                    "/std:c11",
-                    "/FS", // allow concurrent PDB writes
+                    &compile_command,
                     pdb_output_param,
                     obj_output_param,
                     exe_output_param
                 );
 
+                // add source files
                 for (int32_t source_file_idx = 0;; ++source_file_idx)
                 {
                     char* source_file = unit_test->files[source_file_idx];
                     if (source_file == NULL)
                         break;
                         
-                    nob_cmd_append(&msvc_debug_compile_command, source_file);
+                    nob_cmd_append(&compile_command, source_file);
                 }
 
-                if (!nob_cmd_run(&msvc_debug_compile_command, .async = &compile_procs)) return 1;
+                if (!nob_cmd_run(&compile_command, .async = &compile_procs)) return 1;
 
-                cstring_array_insert(&executables, exe_name);
-            }
-
-            {
-                char exe_output_param[256] = "/Fe";
-                char exe_name[256] = "tests\\bin\\opt_msvc_";
-                char obj_output_param[256] = "/Fo";
-                char obj_dir[256] = "tests\\bin\\opt_msvc_";
-                char pdb_output_param[256] = "/Fd";
-                char pdb_name[256] = "tests\\bin\\opt_msvc_";
-
-                strcat(exe_name, unit_test->executable_name);
-                strcat(exe_name, ".exe");
-                strcat(exe_output_param, exe_name);
-                strcat(obj_dir, unit_test->executable_name);
-                strcat(obj_dir, "_obj\\");
-                if (!nob_mkdir_if_not_exists(obj_dir)) return 1;
-                strcat(obj_output_param, obj_dir);
-                strcat(pdb_name, unit_test->executable_name);
-                strcat(pdb_name, ".pdb");
-                strcat(pdb_output_param, pdb_name);
-
-                Nob_Cmd msvc_optimized_compile_command = {0};
-                nob_cmd_append(
-                    &msvc_optimized_compile_command,
-                    "cl.exe",
-                    "/nologo",
-                    "/Isrc",
-                    "/TC",
-                    "/O2",
-                    "/W4",
-                    "/WX",
-                    "/std:c11",
-                    "/FS", // allow concurrent PDB writes
-                    pdb_output_param,
-                    obj_output_param,
-                    exe_output_param
-                );
-
-                for (int32_t source_file_idx = 0;; ++source_file_idx)
-                {
-                    char* source_file = unit_test->files[source_file_idx];
-                    if (source_file == NULL)
-                        break;
-                        
-                    nob_cmd_append(&msvc_optimized_compile_command, source_file);
-                }
-
-                if (!nob_cmd_run(&msvc_optimized_compile_command, .async = &compile_procs)) return 1;
-        
                 cstring_array_insert(&executables, exe_name);
             }
 
