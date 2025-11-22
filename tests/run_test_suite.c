@@ -505,8 +505,8 @@ int32_t main(int32_t argc, char **argv)
                 nob_cmd_append(&compile_command, source_file);
             }
 
-            if (!nob_cmd_run(&compile_command)) return 1;
-            // if (!nob_cmd_run(&compile_command, .async = &compile_procs)) return 1;
+            // if (!nob_cmd_run(&compile_command)) return 1;
+            if (!nob_cmd_run(&compile_command, .async = &compile_procs)) return 1;
 
             cstring_array_insert(&executables, exe_name);
         }
