@@ -51,7 +51,6 @@ SOFTWARE.
 
 #include "minctest.h"
 
-#define JSL_INCLUDE_FILE_UTILS
 #define JSL_IMPLEMENTATION
 #include "../src/jacks_standard_library.h"
 

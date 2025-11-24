@@ -5457,14 +5457,14 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         char path_buffer[FILENAME_MAX + 1];
 
         JSLGetFileSizeResultEnum result = JSL_GET_FILE_SIZE_BAD_PARAMETERS;
-        bool good_params = true;
+        bool good_params = false;
 
-        if (path.data == NULL || path.length < 1 || out_size == NULL)
+        if (path.data != NULL && path.length > 0 && out_size != NULL)
         {
             // File system APIs require a null terminated string
             JSL_MEMCPY(path_buffer, path.data, (size_t) path.length);
             path_buffer[path.length] = '\0';
-            good_params = false;
+            good_params = true;
         }
 
         #if JSL_IS_WINDOWS

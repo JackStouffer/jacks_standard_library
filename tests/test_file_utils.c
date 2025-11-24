@@ -73,6 +73,47 @@ void test_jsl_load_file_contents(void)
     TEST_BUFFERS_EQUAL(stack_buffer, contents.data, (size_t) file_size);
 }
 
+void test_jsl_get_file_size(void)
+{
+    #if JSL_IS_WINDOWS
+        char* path = "tests\\example.txt";
+    #else
+        char* path = "./tests/example.txt";
+    #endif
+
+    int64_t size = -1;
+    int32_t os_error = 0;
+    JSLGetFileSizeResultEnum res = jsl_get_file_size(
+        jsl_fatptr_from_cstr(NULL),
+        &size,
+        &os_error
+    );
+    TEST_INT32_EQUAL(res, JSL_GET_FILE_SIZE_BAD_PARAMETERS);
+
+    FILE* file = fopen(path, "rb");
+    TEST_BOOL(file != NULL);
+    if (file == NULL)
+        return;
+
+    int32_t fseek_res = fseek(file, 0, SEEK_END);
+    TEST_INT32_EQUAL(fseek_res, 0);
+    int64_t expected_size = (int64_t) ftell(file);
+    TEST_BOOL(expected_size > 0);
+    fclose(file);
+
+    size = -1;
+    os_error = 0;
+    res = jsl_get_file_size(
+        jsl_fatptr_from_cstr(path),
+        &size,
+        &os_error
+    );
+
+    TEST_INT32_EQUAL(res, JSL_GET_FILE_SIZE_OK);
+    TEST_INT32_EQUAL(os_error, 0);
+    TEST_INT64_EQUAL(size, (int64_t) expected_size);
+}
+
 void test_jsl_load_file_contents_buffer(void)
 {
     char* path = "./tests/example.txt";
@@ -302,6 +343,7 @@ int main(void)
     #endif
 
     RUN_TEST_FUNCTION("Test jsl_fatptr_load_file_contents", test_jsl_load_file_contents);
+    RUN_TEST_FUNCTION("Test jsl_get_file_size", test_jsl_get_file_size);
     RUN_TEST_FUNCTION("Test jsl_fatptr_load_file_contents_buffer", test_jsl_load_file_contents_buffer);
 
     RUN_TEST_FUNCTION("Test jsl_format_file formats and writes output", test_jsl_format_file_formats_and_writes_output);
