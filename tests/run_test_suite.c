@@ -1,40 +1,40 @@
 /**
  * # Test Suite
- * 
+ *
  * This file runs the test suite using a meta-program style of build system.
- * 
+ *
  * Each test file is compiled and many, many times, with a list of different
  * configurations for each compiler. On Windows the compilers are MSVC and
  * clang, on everything else it's gcc and clang. This means each test file
  * is compiled and run upwards of a dozen times.
- * 
+ *
  * This may seem excessive but this is the trade off of C being so versatile
  * for so many platforms/use-cases: there is a combinatoric explosion in
  * possible command line configurations. If you want to make a library which
  * is broadly usable you need to test that it actually works in all of these
  * scenarios.
- * 
+ *
  * ## Running
- * 
+ *
  * The program needs a one time bootstrap from your chosen C compiler.
- * 
+ *
  * On POSIX
- * 
+ *
  * ```bash
- * cc -o run_test_suite tests/run_test_suite.c 
+ * cc -o run_test_suite tests/run_test_suite.c
  * ```
- * 
+ *
  * On Windows
- * 
+ *
  * ```
- * cl /Ferun_test_suite.exe tests\run_test_suite.c 
+ * cl /Ferun_test_suite.exe tests\run_test_suite.c
  * ```
- * 
+ *
  * Then run your executable. Every time afterwards when you run the test
  * program it will check if there have been changes to the test file. If
  * there have been it will rebuild itself using the program you used to
  * build it in the first place. if there have been changes to the test
- * file, so no need to 
+ * file, so no need to
  */
 
 #define NOB_IMPLEMENTATION
@@ -48,17 +48,17 @@
 #define JSL_IMPLEMENTATION
 #include "../src/jacks_standard_library.h"
 
-typedef struct HashMapDecl { 
+typedef struct HashMapDecl {
     char *name, *prefix, *key_type, *value_type, *impl_type;
     char** headers;
 } HashMapDecl;
 
-typedef struct UnitTestDecl { 
+typedef struct UnitTestDecl {
     char* executable_name;
     char** files;
 } UnitTestDecl;
 
-typedef struct CompilerConfig { 
+typedef struct CompilerConfig {
     char* prefix;
     char** flags;
 } CompilerConfig;
@@ -134,11 +134,15 @@ static CompilerConfig clang_configs[] = {
             "-O2",
             "-D_FORTIFY_SOURCE=2",
             "-fstack-protector-strong",
-            "-fsanitize=shadow-call-stack",
-            #if JSL_IS_POSIX
-            "-fPIE",
-            "-pie",
+
+            #if !defined(__APPLE__)
+                "-fsanitize=shadow-call-stack",
             #endif
+
+            #if JSL_IS_POSIX
+                "-fPIE",
+            #endif
+
             "-glldb",
             "-Isrc/",
             "-std=c11",
@@ -156,11 +160,15 @@ static CompilerConfig clang_configs[] = {
             "-O2",
             "-D_FORTIFY_SOURCE=2",
             "-fstack-protector-strong",
-            "-fsanitize=shadow-call-stack",
-            #if JSL_IS_POSIX
-            "-fPIE",
-            "-pie",
+
+            #if !defined(__APPLE__)
+                "-fsanitize=shadow-call-stack",
             #endif
+
+            #if JSL_IS_POSIX
+                "-fPIE",
+            #endif
+
             "-glldb",
             "-Isrc/",
             "-std=c23",
@@ -213,7 +221,7 @@ static UnitTestDecl unit_test_declarations[] = {
     { "test_string_builder", (char*[]) {"tests/test_string_builder.c", NULL} },
     { "test_intrinsics", (char*[]) {"tests/test_intrinsics.c", NULL} },
     {
-        "test_hash_map", 
+        "test_hash_map",
         (char*[]) {
             "tests/test_hash_map.c",
             "tests/hash_maps/comp2_to_int_map.c",
@@ -317,10 +325,10 @@ int32_t main(int32_t argc, char **argv)
 
     /**
      *
-     * 
+     *
      *              HASH MAPS
-     * 
-     *  
+     *
+     *
      */
 
     nob_log(NOB_INFO, "Compiling generate hash map program");
@@ -379,7 +387,7 @@ int32_t main(int32_t argc, char **argv)
                 break;
             if (decl->headers[header_idx] == NULL)
                 break;
-            
+
             nob_cmd_append(
                 &write_hash_map_header,
                 "--add-header",
@@ -415,7 +423,7 @@ int32_t main(int32_t argc, char **argv)
                 break;
             if (decl->headers[header_idx] == NULL)
                 break;
-            
+
             nob_cmd_append(
                 &write_hash_map_source,
                 "--add-header",
@@ -441,10 +449,10 @@ int32_t main(int32_t argc, char **argv)
 
     /**
      *
-     * 
+     *
      *              UNIT TESTS
-     * 
-     *  
+     *
+     *
      */
 
     CStringArray executables;
@@ -459,7 +467,7 @@ int32_t main(int32_t argc, char **argv)
 
         /**
          * Loop over the clang configs creating compile commands for each.
-         * 
+         *
          * Also insert the exe name into the list of executables to be run
          * later.
          */
@@ -492,7 +500,7 @@ int32_t main(int32_t argc, char **argv)
                 char* flag = compiler_config->flags[flag_idx];
                 if (flag == NULL)
                     break;
-                    
+
                 nob_cmd_append(&compile_command, flag);
             }
 
@@ -501,7 +509,7 @@ int32_t main(int32_t argc, char **argv)
                 char* source_file = unit_test->files[source_file_idx];
                 if (source_file == NULL)
                     break;
-                    
+
                 nob_cmd_append(&compile_command, source_file);
             }
 
@@ -515,7 +523,7 @@ int32_t main(int32_t argc, char **argv)
 
             /**
              * Loop over the MSVC configs creating compile commands for each.
-             * 
+             *
              * Also insert the exe name into the list of executables to be run
              * later.
              */
@@ -560,7 +568,7 @@ int32_t main(int32_t argc, char **argv)
                     char* flag = compiler_config->flags[flag_idx];
                     if (flag == NULL)
                         break;
-                        
+
                     nob_cmd_append(&compile_command, flag);
                 }
 
@@ -577,7 +585,7 @@ int32_t main(int32_t argc, char **argv)
                     char* source_file = unit_test->files[source_file_idx];
                     if (source_file == NULL)
                         break;
-                        
+
                     nob_cmd_append(&compile_command, source_file);
                 }
 
@@ -616,12 +624,12 @@ int32_t main(int32_t argc, char **argv)
                     char* source_file = unit_test->files[source_file_idx];
                     if (source_file == NULL)
                         break;
-                        
+
                     nob_cmd_append(&gcc_debug_compile_command, source_file);
                 }
 
                 if (!nob_cmd_run(&gcc_debug_compile_command, .async = &compile_procs)) return 1;
-        
+
                 cstring_array_insert(&executables, exe_name);
             }
 
@@ -650,15 +658,15 @@ int32_t main(int32_t argc, char **argv)
                     char* source_file = unit_test->files[source_file_idx];
                     if (source_file == NULL)
                         break;
-                        
+
                     nob_cmd_append(&gcc_optimized_compile_command, source_file);
                 }
 
                 if (!nob_cmd_run(&gcc_optimized_compile_command, .async = &compile_procs)) return 1;
-        
+
                 cstring_array_insert(&executables, exe_name);
             }
-        
+
         #else
             #error "Unrecognized platform. Only windows and POSIX platforms are supported."
         #endif
@@ -685,6 +693,6 @@ int32_t main(int32_t argc, char **argv)
 
         #endif
     }
-    
+
     return 0;
 }

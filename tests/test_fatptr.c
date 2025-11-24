@@ -461,45 +461,45 @@ void test_jsl_fatptr_to_lowercase_ascii(void)
     JSLArena arena;
     jsl_arena_init(&arena, malloc(1024), 1024);
 
-    JSLFatPtr buffer1 = jsl_arena_cstr_to_fatptr(&arena, "10023");
+    JSLFatPtr buffer1 = jsl_cstr_to_fatptr(&arena, "10023");
     jsl_fatptr_to_lowercase_ascii(buffer1);
     TEST_BOOL(jsl_fatptr_cstr_compare(buffer1, "10023"));
 
     jsl_arena_reset(&arena);
 
-    JSLFatPtr buffer2 = jsl_arena_cstr_to_fatptr(&arena, "hello!@#$@*()");
+    JSLFatPtr buffer2 = jsl_cstr_to_fatptr(&arena, "hello!@#$@*()");
     jsl_fatptr_to_lowercase_ascii(buffer2);
     TEST_BOOL(jsl_fatptr_cstr_compare(buffer2, "hello!@#$@*()"));
 
     jsl_arena_reset(&arena);
 
-    JSLFatPtr buffer3 = jsl_arena_cstr_to_fatptr(&arena, "Population");
+    JSLFatPtr buffer3 = jsl_cstr_to_fatptr(&arena, "Population");
     jsl_fatptr_to_lowercase_ascii(buffer3);
     TEST_BOOL(jsl_fatptr_cstr_compare(buffer3, "population"));
 
     jsl_arena_reset(&arena);
 
-    JSLFatPtr buffer4 = jsl_arena_cstr_to_fatptr(&arena, "ENTRUSTED");
+    JSLFatPtr buffer4 = jsl_cstr_to_fatptr(&arena, "ENTRUSTED");
     jsl_fatptr_to_lowercase_ascii(buffer4);
     TEST_BOOL(jsl_fatptr_cstr_compare(buffer4, "entrusted"));
 
     jsl_arena_reset(&arena);
 
-    JSLFatPtr buffer5 = jsl_arena_cstr_to_fatptr(&arena, u8"Footnotes Ω≈ç√∫");
+    JSLFatPtr buffer5 = jsl_cstr_to_fatptr(&arena, (char*) u8"Footnotes Ω≈ç√∫");
     jsl_fatptr_to_lowercase_ascii(buffer5);
-    TEST_BOOL(jsl_fatptr_cstr_compare(buffer5, u8"footnotes Ω≈ç√∫"));
+    TEST_BOOL(jsl_fatptr_cstr_compare(buffer5, (char*) u8"footnotes Ω≈ç√∫"));
 
     jsl_arena_reset(&arena);
 
-    JSLFatPtr buffer6 = jsl_arena_cstr_to_fatptr(&arena, u8"Ω≈ç√∫");
+    JSLFatPtr buffer6 = jsl_cstr_to_fatptr(&arena, (char*) u8"Ω≈ç√∫");
     jsl_fatptr_to_lowercase_ascii(buffer6);
-    TEST_BOOL(jsl_fatptr_cstr_compare(buffer6, u8"Ω≈ç√∫"));
+    TEST_BOOL(jsl_fatptr_cstr_compare(buffer6, (char*) u8"Ω≈ç√∫"));
 
     jsl_arena_reset(&arena);
 
-    JSLFatPtr buffer7 = jsl_arena_cstr_to_fatptr(&arena, u8"Ω≈ç√∫ ENTRUSTED this is a longer string to activate the SIMD path!");
+    JSLFatPtr buffer7 = jsl_cstr_to_fatptr(&arena, (char*) u8"Ω≈ç√∫ ENTRUSTED this is a longer string to activate the SIMD path!");
     jsl_fatptr_to_lowercase_ascii(buffer7);
-    TEST_BOOL(jsl_fatptr_cstr_compare(buffer7, u8"Ω≈ç√∫ entrusted this is a longer string to activate the simd path!"));
+    TEST_BOOL(jsl_fatptr_cstr_compare(buffer7, (char*) u8"Ω≈ç√∫ entrusted this is a longer string to activate the simd path!"));
 
     jsl_arena_reset(&arena);
 }
@@ -749,6 +749,34 @@ void test_jsl_fatptr_count(void)
     }
 }
 
+void test_jsl_fatptr_to_cstr(void)
+{
+    JSLArena arena;
+    jsl_arena_init(&arena, malloc(1024), 1024);
+
+    {
+        JSLFatPtr fatptr = {0};
+        char* cstr = jsl_fatptr_to_cstr(&arena, fatptr);
+        TEST_BOOL(cstr == NULL);
+    }
+
+    jsl_arena_reset(&arena);
+
+    {
+        JSLFatPtr fatptr = JSL_FATPTR_INITIALIZER("10023");
+        char* cstr = jsl_fatptr_to_cstr(&arena, fatptr);
+        TEST_BOOL(jsl_fatptr_cstr_compare(fatptr, cstr));
+    }
+
+    jsl_arena_reset(&arena);
+
+    {
+        JSLFatPtr fatptr = JSL_FATPTR_INITIALIZER(u8"Ω≈ç√∫");
+        char* cstr = jsl_fatptr_to_cstr(&arena, fatptr);
+        TEST_BOOL(jsl_fatptr_cstr_compare(fatptr, cstr));
+    }
+}
+
 int main(void)
 {
     RUN_TEST_FUNCTION("Test jsl_fatptr_from_cstr", test_jsl_fatptr_from_cstr);
@@ -764,6 +792,7 @@ int main(void)
     RUN_TEST_FUNCTION("Test jsl_fatptr_ends_with", test_jsl_fatptr_ends_with);
     RUN_TEST_FUNCTION("Test jsl_fatptr_compare_ascii_insensitive", test_jsl_fatptr_compare_ascii_insensitive);
     RUN_TEST_FUNCTION("Test jsl_fatptr_count", test_jsl_fatptr_count);
+    RUN_TEST_FUNCTION("Test jsl_fatptr_to_cstr", test_jsl_fatptr_to_cstr);
 
     RUN_TEST_FUNCTION("Test jsl_fatptr_load_file_contents", test_jsl_load_file_contents);
     RUN_TEST_FUNCTION("Test jsl_fatptr_load_file_contents_buffer", test_jsl_load_file_contents_buffer);

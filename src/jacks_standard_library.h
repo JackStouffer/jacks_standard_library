@@ -346,7 +346,7 @@ extern "C" {
 #ifndef JSL_ASSERT
     #include <assert.h>
     void jsl__assert(int condition, char* file, int line);
-    
+
     /**
      * Assertion function definition. By default this will use `assert.h`.
      * If you wish to override it, it must be a function which takes three parameters, a int
@@ -354,7 +354,7 @@ extern "C" {
      * empty function if you just want to turn off asserts altogether; this is not
      * recommended. The small speed boost you get is from avoiding a branch is generally not
      * worth the loss of memory protection.
-     * 
+     *
      * Define this as a macro before importing the library to override this.
      */
     #define JSL_ASSERT(condition) jsl__assert(condition, __FILE__, __LINE__)
@@ -362,11 +362,11 @@ extern "C" {
 
 #ifndef JSL_MEMCPY
     #include <string.h>
-    
+
     /**
      * Controls memcpy calls in the library. By default this will include
      * `string.h` and be an alias to C's `memcpy`.
-     * 
+     *
      * Define this as a macro before importing the library to override this.
      */
     #define JSL_MEMCPY memcpy
@@ -374,11 +374,11 @@ extern "C" {
 
 #ifndef JSL_MEMCMP
     #include <string.h>
-    
+
     /**
      * Controls memcmp calls in the library. By default this will include
      * `string.h` and be an alias to C's `memcmp`.
-     * 
+     *
      * Define this as a macro before importing the library to override this.
      */
     #define JSL_MEMCMP memcmp
@@ -386,11 +386,11 @@ extern "C" {
 
 #ifndef JSL_MEMSET
     #include <string.h>
-    
+
     /**
      * Controls memset calls in the library. By default this will include
      * `string.h` and be an alias to C's `memset`.
-     * 
+     *
      * Define this as a macro before importing the library to override this.
      */
     #define JSL_MEMSET memset
@@ -398,11 +398,11 @@ extern "C" {
 
 #ifndef JSL_STRLEN
     #include <string.h>
-    
+
     /**
      * Controls strlen calls in the library. By default this will include
      * `string.h` and be an alias to C's `strlen`.
-     * 
+     *
      * Define this as a macro before importing the library to override this.
      */
     #define JSL_STRLEN strlen
@@ -494,7 +494,7 @@ extern "C" {
 #ifndef JSL_DEFAULT_ALLOCATION_ALIGNMENT
     /**
      * Sets the alignment of allocations that aren't explicitly set. Defaults to 8 bytes.
-     * 
+     *
      * Define this as a macro before importing the library to override this.
      */
     #define JSL_DEFAULT_ALLOCATION_ALIGNMENT 8
@@ -804,13 +804,13 @@ extern "C" {
 /**
  * Round x up to the next power of two. If x is a power of two it returns
  * the same value.
- * 
+ *
  * This function is designed to be used in tight loops and other performance
  * critical areas. Therefore, both zero and values greater than 2^31 not special
  * cased. The return values for these cases are compiler, OS, and ISA specific.
  * If you need consistent behavior, then you can easily call this function like
  * so:
- * 
+ *
  * ```
  * jsl_next_power_of_two_u32(
  *      JSL_BETWEEN(1u, x, 0x80000000u)
@@ -825,13 +825,13 @@ uint32_t jsl_next_power_of_two_u32(uint32_t x);
 /**
  * Round x up to the next power of two. If x is a power of two it returns
  * the same value.
- * 
+ *
  * This function is designed to be used in tight loops and other performance
  * critical areas. Therefore, both zero and values greater than 2^63 not special
  * cased. The return values for these cases are compiler, OS, and ISA specific.
  * If you need consistent behavior, then you can easily call this function like
  * so:
- * 
+ *
  * ```
  * jsl_next_power_of_two_u64(
  *      JSL_BETWEEN(1ull, x, 0x8000000000000000ull)
@@ -846,12 +846,12 @@ uint64_t jsl_next_power_of_two_u64(uint64_t x);
 /**
  * Round x down to the previous power of two. If x is a power of two it returns
  * the same value.
- * 
+ *
  * This function is designed to be used in tight loops and other performance
  * critical areas. Therefore, zero is not special cased. The return value is
  * compiler, OS, and ISA specific. If you need consistent behavior, then you
  * can easily call this function like so:
- * 
+ *
  * ```
  * jsl_previous_power_of_two_u32(
  *      JSL_MAX(1, x)
@@ -866,12 +866,12 @@ uint32_t jsl_previous_power_of_two_u32(uint32_t x);
 /**
  * Round x down to the previous power of two. If x is a power of two it returns
  * the same value.
- * 
+ *
  * This function is designed to be used in tight loops and other performance
  * critical areas. Therefore, zero is not special cased. The return value is
  * compiler, OS, and ISA specific. If you need consistent behavior, then you
  * can easily call this function like so:
- * 
+ *
  * ```
  * jsl_previous_power_of_two_u64(
  *      JSL_MAX(1UL, x)
@@ -1438,7 +1438,8 @@ JSL_DEF bool jsl_fatptr_memory_compare(JSLFatPtr a, JSLFatPtr b);
 /**
  * Element by element comparison of the contents of a fat pointer and a null terminated
  * string. If the fat pointer has a null data value or a zero length, or if cstr is null,
- * then this function will return false.
+ * then this function will return false. This is true even when both pointers are
+ * NULL.
  *
  * @note Do not use this to compare Unicode strings when grapheme based equality is
  * desired. Use this only when absolute byte equality is desired. See the note at the
@@ -1613,19 +1614,19 @@ JSL_DEF void jsl_arena_load_restore_point(JSLArena* arena, uint8_t* restore_poin
  * Allocate a new buffer from the arena and copy the contents of a fat pointer with
  * a null terminator.
  */
-JSL_DEF char* jsl_arena_fatptr_to_cstr(JSLArena* arena, JSLFatPtr str);
+JSL_DEF char* jsl_fatptr_to_cstr(JSLArena* arena, JSLFatPtr str);
 
 /**
  * Allocate and copy the contents of a fat pointer with a null terminator.
  *
  * @note Use `jsl_fatptr_from_cstr` to make a fat pointer without copying.
  */
-JSL_DEF JSLFatPtr jsl_arena_cstr_to_fatptr(JSLArena* arena, char* str);
+JSL_DEF JSLFatPtr jsl_cstr_to_fatptr(JSLArena* arena, char* str);
 
 /**
  * Allocate space for, and copy the contents of a fat pointer.
  *
- * @note Use `jsl_arena_cstr_to_fatptr` to copy a c string into a fatptr.
+ * @note Use `jsl_cstr_to_fatptr` to copy a c string into a fatptr.
  */
 JSL_DEF JSLFatPtr jsl_fatptr_duplicate(JSLArena* arena, JSLFatPtr str);
 
@@ -2703,11 +2704,20 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
                 while (i < string.length - 16)
                 {
-                    const uint8x16_t chunk = vld1q_u8(str.data + i);
+                    const uint8x16_t chunk = vld1q_u8(string.data + i);
                     const uint8x16_t cmp = vceqq_u8(chunk, needle);
-                    const uint8_t horizontal_maximum0 = vmaxvq_u8(cmp);
+                    const uint8_t horizontal_maximum = vmaxvq_u8(cmp);
 
-                    i += 16;
+                    if (horizontal_maximum == 0)
+                    {
+                        i += 16;
+                    }
+                    else
+                    {
+                        const uint32_t mask = jsl__neon_movemask(cmp);
+                        uint32_t bit_position = JSL_PLATFORM_COUNT_TRAILING_ZEROS(mask);
+                        return i + bit_position;
+                    }
                 }
 
             #endif
@@ -2946,7 +2956,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         return ret;
     }
 
-    char* jsl_arena_fatptr_to_cstr(JSLArena* arena, JSLFatPtr str)
+    char* jsl_fatptr_to_cstr(JSLArena* arena, JSLFatPtr str)
     {
         if (arena == NULL || str.data == NULL || str.length < 1)
             return NULL;
@@ -2962,7 +2972,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         return (char*) allocation.data;
     }
 
-    JSLFatPtr jsl_arena_cstr_to_fatptr(JSLArena* arena, char* str)
+    JSLFatPtr jsl_cstr_to_fatptr(JSLArena* arena, char* str)
     {
         JSLFatPtr ret = {0};
         if (arena == NULL || str == NULL)
@@ -3875,7 +3885,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                         const uint32_t mask1 = jsl__neon_movemask(percent_cmp1);
                         const uint32_t mask  = mask0 | (mask1 << 16);
 
-                        const int special_pos = JSL_PLATFORM_COUNT_TRAILING_ZEROS(mask);
+                        const int32_t special_pos = (int32_t) JSL_PLATFORM_COUNT_TRAILING_ZEROS(mask);
                         stbsp__chk_cb_buf(special_pos);
                         JSL_MEMCPY(buffer_cursor, f.data, special_pos);
 
@@ -4114,7 +4124,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     {
                         // get the length, limited to desired precision
                         // always limit to ~0u chars since our counts are 32b
-                        l = (precision >= 0) 
+                        l = (precision >= 0)
                             ? stbsp__strlen_limited(string, (uint32_t) precision)
                             : (uint32_t) JSL_STRLEN(string);
                     }
@@ -5533,7 +5543,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             #if JSL_IS_WINDOWS
                 read_res = (int64_t) _read(file_descriptor, allocation.data, (unsigned int) file_size);
             #elif JSL_IS_POSIX
-                read_res = (int64_t) read(file_descriptor, allocation.data, file_size);
+                read_res = (int64_t) read(file_descriptor, allocation.data, (size_t) file_size);
             #else
                 #error "Unsupported platform"
             #endif
@@ -5654,7 +5664,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             #if JSL_IS_WINDOWS
                 read_res = (int64_t) _read(file_descriptor, buffer->data, (unsigned int) read_size);
             #elif JSL_IS_POSIX
-                read_res = (int64_t) read(file_descriptor, buffer->data, read_size);
+                read_res = (int64_t) read(file_descriptor, buffer->data, (size_t) read_size);
             #else
                 #error "Unsupported platform"
             #endif
