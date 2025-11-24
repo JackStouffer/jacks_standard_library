@@ -1904,7 +1904,16 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     typedef enum
     {
-        // zero should always be an error condition!
+        JSL_GET_FILE_SIZE_BAD_PARAMETERS = 0,
+        JSL_GET_FILE_SIZE_OK,
+        JSL_GET_FILE_SIZE_NOT_FOUND,
+        JSL_GET_FILE_SIZE_NOT_REGULAR_FILE,
+
+        JSL_GET_FILE_SIZE_ENUM_COUNT
+    } JSLGetFileSizeResultEnum;
+
+    typedef enum
+    {
         JSL_FILE_LOAD_BAD_PARAMETERS,
         JSL_FILE_LOAD_SUCCESS,
         JSL_FILE_LOAD_COULD_NOT_OPEN,
@@ -1919,8 +1928,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     typedef enum
     {
-        // zero should always be an error condition!
-        JSL_FILE_WRITE_BAD_PARAMETERS,
+        JSL_FILE_WRITE_BAD_PARAMETERS = 0,
         JSL_FILE_WRITE_SUCCESS,
         JSL_FILE_WRITE_COULD_NOT_OPEN,
         JSL_FILE_WRITE_COULD_NOT_WRITE,
@@ -1941,6 +1949,20 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
         JSL_FILE_TYPE_COUNT
     } JSLFileTypeEnum;
+
+    /**
+     * Get the file size in bytes from the file at `path`. 
+     * 
+     * @param path The file system path
+     * @param out_size Pointer where the resulting size will be stored, must not be null
+     * @param out_os_error_code Pointer where an error code will be stored when applicable. Can be null
+     * @returns An enum which denotes success or failure
+     */
+    JSL_WARN_UNUSED JSLGetFileSizeResultEnum jsl_get_file_size(
+        JSLFatPtr path,
+        int64_t* out_size,
+        int32_t* out_os_error_code
+    );
 
     /**
      * Load the contents of the file at `path` into a newly allocated buffer
@@ -5426,12 +5448,103 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     #ifdef JSL_INCLUDE_FILE_UTILS
 
-    static int64_t jsl__get_file_size_from_fileno(int32_t file_descriptor)
+    JSLGetFileSizeResultEnum jsl_get_file_size(
+        JSLFatPtr path,
+        int64_t* out_size,
+        int32_t* out_os_error_code
+    )
+    {
+        char path_buffer[FILENAME_MAX + 1];
+
+        JSLGetFileSizeResultEnum result = JSL_GET_FILE_SIZE_BAD_PARAMETERS;
+        bool good_params = true;
+
+        if (path.data == NULL || path.length < 1 || out_size == NULL)
+        {
+            // File system APIs require a null terminated string
+            JSL_MEMCPY(path_buffer, path.data, (size_t) path.length);
+            path_buffer[path.length] = '\0';
+            good_params = false;
+        }
+
+        #if JSL_IS_WINDOWS
+
+            struct _stat64 st_win = {0};
+            int stat_ret = -1;
+
+            if (good_params)
+            {
+                stat_ret = _stat64(path_buffer, &st_win);
+            }
+
+            bool is_regular = false;
+            if (stat_ret == 0)
+            {
+                is_regular = JSL_IS_BITFLAG_SET(st_win.st_mode, _S_IFREG);
+            }
+            else
+            {
+                result = JSL_GET_FILE_SIZE_NOT_FOUND;
+                if (out_os_error_code != NULL)
+                    *out_os_error_code = errno;
+            }
+
+            if (is_regular)
+            {
+                *out_size = (int64_t) st_win.st_size;
+                result = JSL_GET_FILE_SIZE_OK;
+            }
+            else if (!is_regular && stat_ret == 0)
+            {
+                result = JSL_GET_FILE_SIZE_NOT_REGULAR_FILE;
+            }
+
+        #elif JSL_IS_POSIX
+
+            struct stat st_posix;
+            int stat_ret = -1;
+
+            if (good_params)
+            {
+                stat_ret = stat(path_buffer, &st_posix);
+            }
+
+            bool is_regular = false;
+            if (stat_ret == 0)
+            {
+                is_regular = (sb.st_mode & S_IFMT) == S_IFREG;
+            }
+            else
+            {
+                result = JSL_GET_FILE_SIZE_NOT_FOUND;
+                if (out_os_error_code != NULL)
+                    *out_os_error_code = errno;
+            }
+
+            if (is_regular)
+            {
+                *out_size = (int64_t) st_posix.st_size;
+                result = JSL_GET_FILE_SIZE_OK;
+            }
+            else if (stat_ret == 0 && !is_regular)
+            {
+                result = JSL_GET_FILE_SIZE_NOT_REGULAR_FILE;
+            }
+
+        #else
+            JSL_ASSERT(0 && "File utils only work on Windows or POSIX platforms.");
+        #endif
+
+        return result;
+    }
+
+    static inline int64_t jsl__get_file_size_from_fileno(int32_t file_descriptor)
     {
         int64_t result_size = -1;
         bool stat_success = false;
 
         #if JSL_IS_WINDOWS
+
             struct _stat64 file_info;
             int stat_result = _fstat64(file_descriptor, &file_info);
             if (stat_result == 0)

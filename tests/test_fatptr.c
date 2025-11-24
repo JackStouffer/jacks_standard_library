@@ -30,7 +30,6 @@
 #include <stdlib.h>
 
 #define JSL_IMPLEMENTATION
-#define JSL_INCLUDE_FILE_UTILS
 #include "../src/jacks_standard_library.h"
 
 #include "minctest.h"
@@ -96,75 +95,6 @@ void test_jsl_fatptr_cstr_memory_copy(void)
     TEST_BOOL((int64_t) buffer.length == (int64_t) 1024);
 
     TEST_BOOL(memcmp(str, buffer.data, (size_t) length) == 0);
-}
-
-void test_jsl_load_file_contents(void)
-{
-    #if defined(_WIN32)
-        char* path = "tests\\example.txt";
-    #else
-        char* path = "./tests/example.txt";
-    #endif
-
-    char stack_buffer[4*1024] = {0};
-    int64_t file_size;
-
-    // Load the comparison using libc
-    {
-        FILE* file = fopen(path, "rb");
-        fseek(file, 0, SEEK_END);
-        file_size = ftell(file);
-        TEST_BOOL(file_size > 0);
-        rewind(file);
-
-        size_t res = fread(stack_buffer, (size_t) file_size, 1, file);
-        assert(res > 0);
-    }
-
-    JSLArena arena;
-    jsl_arena_init(&arena, malloc(4*1024), 4*1024);
-
-    JSLFatPtr contents;
-    JSLLoadFileResultEnum res = jsl_load_file_contents(
-        &arena,
-        jsl_fatptr_from_cstr(path),
-        &contents,
-        NULL
-    );
-
-    TEST_BOOL(res == JSL_FILE_LOAD_SUCCESS);
-    TEST_BUFFERS_EQUAL(stack_buffer, contents.data, (size_t) file_size);
-}
-
-void test_jsl_load_file_contents_buffer(void)
-{
-    char* path = "./tests/example.txt";
-    char stack_buffer[4*1024];
-    int64_t file_size;
-
-    // Load the comparison using libc
-    {
-        FILE* file = fopen(path, "rb");
-        fseek(file, 0, SEEK_END);
-        file_size = ftell(file);
-        TEST_BOOL(file_size > 0);
-        rewind(file);
-
-        size_t res = fread(stack_buffer, (size_t) file_size, 1, file);
-        assert(res > 0);
-    }
-
-    JSLFatPtr buffer = jsl_fatptr_init(malloc(4*1024), 4*1024);
-    JSLFatPtr writer = buffer;
-
-    JSLLoadFileResultEnum res = jsl_load_file_contents_buffer(
-        &writer,
-        JSL_FATPTR_EXPRESSION("./tests/example.txt"),
-        NULL
-    );
-
-    TEST_BOOL(res == JSL_FILE_LOAD_SUCCESS);
-    TEST_BOOL(memcmp(stack_buffer, buffer.data, (size_t) file_size) == 0);
 }
 
 void test_jsl_fatptr_memory_compare(void)
@@ -793,9 +723,6 @@ int main(void)
     RUN_TEST_FUNCTION("Test jsl_fatptr_compare_ascii_insensitive", test_jsl_fatptr_compare_ascii_insensitive);
     RUN_TEST_FUNCTION("Test jsl_fatptr_count", test_jsl_fatptr_count);
     RUN_TEST_FUNCTION("Test jsl_fatptr_to_cstr", test_jsl_fatptr_to_cstr);
-
-    RUN_TEST_FUNCTION("Test jsl_fatptr_load_file_contents", test_jsl_load_file_contents);
-    RUN_TEST_FUNCTION("Test jsl_fatptr_load_file_contents_buffer", test_jsl_load_file_contents_buffer);
 
     TEST_RESULTS();
     return lfails != 0;

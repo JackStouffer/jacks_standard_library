@@ -220,6 +220,7 @@ static UnitTestDecl unit_test_declarations[] = {
     { "test_format", (char*[]) {"tests/test_format.c", NULL} },
     { "test_string_builder", (char*[]) {"tests/test_string_builder.c", NULL} },
     { "test_intrinsics", (char*[]) {"tests/test_intrinsics.c", NULL} },
+    { "test_file_utils", (char*[]) {"tests/test_file_utils.c", NULL} },
     {
         "test_hash_map",
         (char*[]) {
