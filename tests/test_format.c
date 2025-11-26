@@ -131,7 +131,7 @@ SOFTWARE.
 }
 
 
-void test_integers(void)
+static void test_integers(void)
 {
     uint8_t _buf[1024];
     JSLFatPtr buffer = jsl_fatptr_init(_buf, 1024);
@@ -155,7 +155,7 @@ void test_integers(void)
     CHECK2("9888777666", "%llu", 9888777666llu);
 }
 
-void test_floating_point(void)
+static void test_floating_point(void)
 {
     uint8_t _buf[1024];
     JSLFatPtr buffer = jsl_fatptr_init(_buf, 1024);
@@ -196,7 +196,7 @@ void test_floating_point(void)
     CHECK2("N", "%.1g", positive_nan);
 }
 
-void test_n(void)
+static void test_n(void)
 {
     uint8_t _buf[1024];
     JSLFatPtr buffer = jsl_fatptr_init(_buf, 1024);
@@ -206,7 +206,7 @@ void test_n(void)
     assert(n == 4);
 }
 
-void test_hex_floats(void)
+static void test_hex_floats(void)
 {
     uint8_t _buf[1024];
     JSLFatPtr buffer = jsl_fatptr_init(_buf, 1024);
@@ -218,7 +218,7 @@ void test_hex_floats(void)
     CHECK2("-0x1.AB0P-5", "%.3A", -0x1.abp-5);
 }
 
-void test_pointer(void)
+static void test_pointer(void)
 {
     uint8_t _buf[1024];
     JSLFatPtr buffer = jsl_fatptr_init(_buf, 1024);
@@ -226,7 +226,7 @@ void test_pointer(void)
     CHECK2("0000000000000000", "%p", (void*) NULL);
 }
 
-void test_fatptr_format(void)
+static void test_fatptr_format(void)
 {
     uint8_t _buf[4096];
     JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(_buf);
@@ -273,7 +273,7 @@ void test_fatptr_format(void)
     );
 }
 
-void test_quote_modifier(void)
+static void test_quote_modifier(void)
 {
     uint8_t _buf[1024];
     JSLFatPtr buffer = jsl_fatptr_init(_buf, 1024);
@@ -287,7 +287,7 @@ void test_quote_modifier(void)
     CHECK2("000,001,200,000", "%'015d", 1200000);
 }
 
-void test_nonstandard(void)
+static void test_nonstandard(void)
 {
     uint8_t _buf[1024];
     JSLFatPtr buffer = jsl_fatptr_init(_buf, 1024);
@@ -301,7 +301,7 @@ void test_nonstandard(void)
     CHECK3("2.42 Mi 2.4 M", "%$$.2d %$$$d", 2536000, 2536000);
 }
 
-void test_separators(void)
+static void test_separators(void)
 {
     uint8_t _buf[1024];
     JSLFatPtr buffer = jsl_fatptr_init(_buf, 1024);

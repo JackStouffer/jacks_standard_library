@@ -35,7 +35,7 @@
 
 #include "minctest.h"
 
-void test_jsl_load_file_contents(void)
+static void test_jsl_load_file_contents(void)
 {
     #if JSL_IS_WINDOWS
         char* path = "tests\\example.txt";
@@ -73,7 +73,7 @@ void test_jsl_load_file_contents(void)
     TEST_BUFFERS_EQUAL(stack_buffer, contents.data, (size_t) file_size);
 }
 
-void test_jsl_get_file_size(void)
+static void test_jsl_get_file_size(void)
 {
     #if JSL_IS_WINDOWS
         char* path = "tests\\example.txt";
@@ -114,7 +114,7 @@ void test_jsl_get_file_size(void)
     TEST_INT64_EQUAL(size, (int64_t) expected_size);
 }
 
-void test_jsl_load_file_contents_buffer(void)
+static void test_jsl_load_file_contents_buffer(void)
 {
     char* path = "./tests/example.txt";
     char stack_buffer[4*1024];
@@ -199,7 +199,7 @@ static FILE* jsl__open_failing_stream(void)
 }
 
 
-void test_jsl_format_file_formats_and_writes_output(void)
+static void test_jsl_format_file_formats_and_writes_output(void)
 {
     FILE* file = tmpfile();
     TEST_BOOL(file != NULL);
@@ -226,7 +226,7 @@ void test_jsl_format_file_formats_and_writes_output(void)
     fclose(file);
 }
 
-void test_jsl_format_file_accepts_empty_format(void)
+static void test_jsl_format_file_accepts_empty_format(void)
 {
     FILE* file = tmpfile();
     TEST_BOOL(file != NULL);
@@ -244,13 +244,13 @@ void test_jsl_format_file_accepts_empty_format(void)
     fclose(file);
 }
 
-void test_jsl_format_file_null_out_parameter(void)
+static void test_jsl_format_file_null_out_parameter(void)
 {
     bool res = jsl_format_file(NULL, JSL_FATPTR_EXPRESSION("Hello"));
     TEST_BOOL(!res);
 }
 
-void test_jsl_format_file_null_format_pointer(void)
+static void test_jsl_format_file_null_format_pointer(void)
 {
     JSLFatPtr fmt = {
         .data = NULL,
@@ -261,7 +261,7 @@ void test_jsl_format_file_null_format_pointer(void)
     TEST_BOOL(!res);
 }
 
-void test_jsl_format_file_negative_length(void)
+static void test_jsl_format_file_negative_length(void)
 {
     JSLFatPtr fmt = {
         .data = (uint8_t*)"Hello",
@@ -272,7 +272,7 @@ void test_jsl_format_file_negative_length(void)
     TEST_BOOL(!res);
 }
 
-void test_jsl_format_file_write_failure(void)
+static void test_jsl_format_file_write_failure(void)
 {
 #if defined(__unix__) || defined(__APPLE__) || defined(__linux__)
     int pipe_fds[2];

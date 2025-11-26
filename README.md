@@ -160,10 +160,14 @@ faster for comparable operations.
 In 99% of cases you shouldn't turn off assertions by using the `NDEBUG` macro
 or by defining an empty `JSL_ASSERT` function. 
 
-This library uses assertions for things like `NULL` checks and Automatic Bounds
-Checking (ABC). These checks prevent your program from entering an invalid state
-which may corrupt user data, leak memory, or allow buffer overflow attacks. If
-you have good 
+This library uses assertions for things like Automatic Bounds Checking (ABC).
+These checks prevent your program from entering an invalid state which may
+corrupt user data, leak memory, or allow buffer overflow attacks.
+
+The main purported reason for turning off assertions or ABC is performance.
+This is "fake optimization" most of the time, i.e. following a dogma rather
+than using a profiler to see if an assertion is a noticeable cost in a critical
+path.
 
 ### Unicode
 

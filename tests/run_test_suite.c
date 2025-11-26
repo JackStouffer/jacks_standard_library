@@ -63,6 +63,26 @@ typedef struct CompilerConfig {
     char** flags;
 } CompilerConfig;
 
+static char* clang_warning_flags[] = {
+    "-Wall",
+    "-Wextra",
+    "-Wconversion",
+    "-Wsign-conversion",
+    "-Wshadow",
+    "-Wconditional-uninitialized",
+    "-Wcomma",
+    "-Widiomatic-parentheses",
+    "-Wpointer-arith",
+    "-Wassign-enum",
+    "-Wswitch-enum",
+    "-Wimplicit-fallthrough",
+    "-Wnull-dereference",
+    "-Wmissing-prototypes",
+    "-Wundef",
+    "-pedantic",
+    NULL
+};
+
 static CompilerConfig clang_configs[] = {
     {
         "clang_debug_c11_",
@@ -76,9 +96,6 @@ static CompilerConfig clang_configs[] = {
             "-fsanitize=undefined",
             "-std=c11",
             "-Isrc/",
-            "-Wall",
-            "-Wextra",
-            "-pedantic",
             NULL
         }
     },
@@ -94,9 +111,6 @@ static CompilerConfig clang_configs[] = {
             "-fsanitize=undefined",
             "-std=c23",
             "-Isrc/",
-            "-Wall",
-            "-Wextra",
-            "-pedantic",
             NULL
         }
     },
@@ -108,9 +122,6 @@ static CompilerConfig clang_configs[] = {
             "-march=native",
             "-Isrc/",
             "-std=c11",
-            "-Wall",
-            "-Wextra",
-            "-pedantic",
             NULL
         }
     },
@@ -122,9 +133,6 @@ static CompilerConfig clang_configs[] = {
             "-march=native",
             "-Isrc/",
             "-std=c23",
-            "-Wall",
-            "-Wextra",
-            "-pedantic",
             NULL
         }
     },
@@ -146,11 +154,6 @@ static CompilerConfig clang_configs[] = {
             "-glldb",
             "-Isrc/",
             "-std=c11",
-            "-Wall",
-            "-Wextra",
-            "-Wconversion",
-            "-Wshadow",
-            "-pedantic",
             NULL
         }
     },
@@ -172,11 +175,6 @@ static CompilerConfig clang_configs[] = {
             "-glldb",
             "-Isrc/",
             "-std=c23",
-            "-Wall",
-            "-Wextra",
-            "-Wconversion",
-            "-Wshadow",
-            "-pedantic",
             NULL
         }
     }
@@ -505,6 +503,16 @@ int32_t main(int32_t argc, char **argv)
                 nob_cmd_append(&compile_command, flag);
             }
 
+            // add clang warnings
+            for (int32_t flag_idx = 0;; ++flag_idx)
+            {
+                char* flag = clang_warning_flags[flag_idx];
+                if (flag == NULL)
+                    break;
+
+                nob_cmd_append(&compile_command, flag);
+            }
+
             for (int32_t source_file_idx = 0;; ++source_file_idx)
             {
                 char* source_file = unit_test->files[source_file_idx];
@@ -514,8 +522,8 @@ int32_t main(int32_t argc, char **argv)
                 nob_cmd_append(&compile_command, source_file);
             }
 
-            // if (!nob_cmd_run(&compile_command)) return 1;
-            if (!nob_cmd_run(&compile_command, .async = &compile_procs)) return 1;
+            if (!nob_cmd_run(&compile_command)) return 1;
+            // if (!nob_cmd_run(&compile_command, .async = &compile_procs)) return 1;
 
             cstring_array_insert(&executables, exe_name);
         }
@@ -590,7 +598,8 @@ int32_t main(int32_t argc, char **argv)
                     nob_cmd_append(&compile_command, source_file);
                 }
 
-                if (!nob_cmd_run(&compile_command, .async = &compile_procs)) return 1;
+                if (!nob_cmd_run(&compile_command)) return 1;
+                // if (!nob_cmd_run(&compile_command, .async = &compile_procs)) return 1;
 
                 cstring_array_insert(&executables, exe_name);
             }

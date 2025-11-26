@@ -68,7 +68,7 @@ JSLFatPtr long_str = JSL_FATPTR_INITIALIZER(
     "risus et rutrum."
 );
 
-void test_jsl_fatptr_from_cstr(void)
+static void test_jsl_fatptr_from_cstr(void)
 {
     char* c_str = "This is a test string!";
     size_t length = strlen(c_str);
@@ -80,7 +80,7 @@ void test_jsl_fatptr_from_cstr(void)
     TEST_BOOL(memcmp(c_str, str.data, (size_t) str.length) == 0);
 }
 
-void test_jsl_fatptr_cstr_memory_copy(void)
+static void test_jsl_fatptr_cstr_memory_copy(void)
 {
     JSLFatPtr buffer = jsl_fatptr_init(malloc(1024), 1024);
     TEST_BOOL((int64_t) buffer.length == (int64_t) 1024);
@@ -97,7 +97,7 @@ void test_jsl_fatptr_cstr_memory_copy(void)
     TEST_BOOL(memcmp(str, buffer.data, (size_t) length) == 0);
 }
 
-void test_jsl_fatptr_memory_compare(void)
+static void test_jsl_fatptr_memory_compare(void)
 {
     JSLFatPtr buffer1 = jsl_fatptr_init(malloc(13), 13);
     JSLFatPtr buffer2 = jsl_fatptr_init(malloc(13), 13);
@@ -120,7 +120,7 @@ void test_jsl_fatptr_memory_compare(void)
     TEST_BOOL(!jsl_fatptr_memory_compare(buffer1, buffer4));
 }
 
-void test_jsl_fatptr_slice(void)
+static void test_jsl_fatptr_slice(void)
 {
     JSLFatPtr buffer1 = jsl_fatptr_init(malloc(13), 13);
 
@@ -151,7 +151,7 @@ void test_jsl_fatptr_slice(void)
     }
 }
 
-void test_jsl_fatptr_substring_search(void)
+static void test_jsl_fatptr_substring_search(void)
 {
     {
         JSLFatPtr string = JSL_FATPTR_INITIALIZER("");
@@ -289,7 +289,7 @@ void test_jsl_fatptr_substring_search(void)
     }
 }
 
-void test_jsl_fatptr_index_of(void)
+static void test_jsl_fatptr_index_of(void)
 {
     JSLFatPtr buffer1 = JSL_FATPTR_INITIALIZER("");
     int64_t res1 = jsl_fatptr_index_of(buffer1, '3');
@@ -324,7 +324,7 @@ void test_jsl_fatptr_index_of(void)
     TEST_BOOL(res8 == 117);
 }
 
-void test_jsl_fatptr_index_of_reverse(void)
+static void test_jsl_fatptr_index_of_reverse(void)
 {
     JSLFatPtr buffer1 = JSL_FATPTR_INITIALIZER("");
     int64_t res1 = jsl_fatptr_index_of_reverse(buffer1, '3');
@@ -359,11 +359,11 @@ void test_jsl_fatptr_index_of_reverse(void)
     TEST_BOOL(res8 == 150);
 }
 
-void test_jsl_fatptr_get_file_extension(void)
+static void test_jsl_fatptr_get_file_extension(void)
 {
     JSLFatPtr buffer1 = JSL_FATPTR_INITIALIZER("");
     JSLFatPtr res1 = jsl_fatptr_get_file_extension(buffer1);
-    TEST_BOOL(jsl_fatptr_cstr_compare(res1, ""));
+    TEST_BOOL(res1.data == NULL);
 
     JSLFatPtr buffer2 = JSL_FATPTR_INITIALIZER(".");
     JSLFatPtr res2 = jsl_fatptr_get_file_extension(buffer2);
@@ -386,7 +386,7 @@ void test_jsl_fatptr_get_file_extension(void)
     TEST_BOOL(jsl_fatptr_cstr_compare(res6, "css"));
 }
 
-void test_jsl_fatptr_to_lowercase_ascii(void)
+static void test_jsl_fatptr_to_lowercase_ascii(void)
 {
     JSLArena arena;
     jsl_arena_init(&arena, malloc(1024), 1024);
@@ -434,7 +434,7 @@ void test_jsl_fatptr_to_lowercase_ascii(void)
     jsl_arena_reset(&arena);
 }
 
-void test_jsl_fatptr_to_int32(void)
+static void test_jsl_fatptr_to_int32(void)
 {
     int32_t result;
 
@@ -479,7 +479,7 @@ void test_jsl_fatptr_to_int32(void)
     TEST_BOOL(result == 488);
 }
 
-void test_jsl_fatptr_starts_with(void)
+static void test_jsl_fatptr_starts_with(void)
 {
     JSLFatPtr buffer1 = JSL_FATPTR_INITIALIZER("Hello, World!");
     JSLFatPtr prefix1 = JSL_FATPTR_INITIALIZER("Hello, World!");
@@ -510,7 +510,7 @@ void test_jsl_fatptr_starts_with(void)
     TEST_BOOL(jsl_fatptr_starts_with(buffer7, prefix7) == false);
 }
 
-void test_jsl_fatptr_ends_with(void)
+static void test_jsl_fatptr_ends_with(void)
 {
     JSLFatPtr buffer1 = JSL_FATPTR_INITIALIZER("Hello, World!");
     JSLFatPtr postfix1 = JSL_FATPTR_INITIALIZER("Hello, World!");
@@ -549,7 +549,7 @@ void test_jsl_fatptr_ends_with(void)
     TEST_BOOL(jsl_fatptr_ends_with(buffer9, postfix9));
 }
 
-void test_jsl_fatptr_compare_ascii_insensitive(void)
+static void test_jsl_fatptr_compare_ascii_insensitive(void)
 {
     {
         JSLFatPtr buffer1 = {
@@ -626,7 +626,7 @@ void test_jsl_fatptr_compare_ascii_insensitive(void)
     }
 }
 
-void test_jsl_fatptr_count(void)
+static void test_jsl_fatptr_count(void)
 {
     {
         JSLFatPtr buffer = JSL_FATPTR_INITIALIZER("");
@@ -679,7 +679,7 @@ void test_jsl_fatptr_count(void)
     }
 }
 
-void test_jsl_fatptr_to_cstr(void)
+static void test_jsl_fatptr_to_cstr(void)
 {
     JSLArena arena;
     jsl_arena_init(&arena, malloc(1024), 1024);
@@ -723,6 +723,7 @@ int main(void)
     RUN_TEST_FUNCTION("Test jsl_fatptr_compare_ascii_insensitive", test_jsl_fatptr_compare_ascii_insensitive);
     RUN_TEST_FUNCTION("Test jsl_fatptr_count", test_jsl_fatptr_count);
     RUN_TEST_FUNCTION("Test jsl_fatptr_to_cstr", test_jsl_fatptr_to_cstr);
+    RUN_TEST_FUNCTION("Test jsl_fatptr_get_file_extension", test_jsl_fatptr_get_file_extension);
 
     TEST_RESULTS();
     return lfails != 0;

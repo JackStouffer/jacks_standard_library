@@ -39,10 +39,10 @@
 #include "hash_maps/int32_to_comp1_map.h"
 #include "hash_maps/int32_to_int32_map.h"
 
-const int64_t arena_size = 2 * 1024 * 1024;
+const int64_t arena_size = JSL_MEGABYTES(2);
 JSLArena arena;
 
-void test_insert(void)
+static void test_insert(void)
 {
     jsl_arena_reset(&arena);
 
@@ -115,7 +115,7 @@ void test_insert(void)
     jsl_arena_reset(&arena);
 }
 
-void test_get(void)
+static void test_get(void)
 {
     jsl_arena_reset(&arena);
 
@@ -212,7 +212,7 @@ void test_get(void)
     jsl_arena_reset(&arena);
 }
 
-void test_delete(void)
+static void test_delete(void)
 {
     jsl_arena_reset(&arena);
 
@@ -440,7 +440,7 @@ void test_delete(void)
     jsl_arena_reset(&arena);
 }
 
-void test_iterator(void)
+static void test_iterator(void)
 {
     jsl_arena_reset(&arena);
 

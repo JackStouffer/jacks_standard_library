@@ -83,14 +83,6 @@ extern "C" {
 
 #endif
 
-#ifndef JSL_VERSION
-    #define JSL_VERSION 0x010000  /* 1.0.0 */
-#else
-    #if JSL_VERSION != 0x010000
-        #error "ERROR: Conflicting versions of jacks_standard_library.h included in the same translation unit!"
-    #endif
-#endif
-
 /**
  *
  *  Platform Detection Macros
@@ -197,9 +189,9 @@ extern "C" {
 #ifndef JSL_DEBUG
     #ifndef JSL__FORCE_INLINE
 
-        #if JSL_IS_MSVC
+        #if JSL__IS_MSVC_VAL
             #define JSL__FORCE_INLINE __forceinline
-        #elif JSL_IS_CLANG || JSL_IS_GCC
+        #elif JSL__IS_CLANG_VAL || JSL__IS_GCC_VAL
             #define JSL__FORCE_INLINE inline __attribute__((__always_inline__))
         #else
             #define JSL__FORCE_INLINE
@@ -212,7 +204,7 @@ extern "C" {
 
 #ifndef JSL__LIKELY
 
-    #if JSL_IS_CLANG || JSL_IS_GCC
+    #if JSL__IS_CLANG_VAL || JSL__IS_GCC_VAL
         #define JSL__LIKELY(x) __builtin_expect(!!(x), 1)
     #else
         #define JSL__LIKELY(x) (x)
@@ -222,7 +214,7 @@ extern "C" {
 
 #ifndef JSL__UNLIKELY
 
-    #if JSL_IS_CLANG || JSL_IS_GCC
+    #if JSL__IS_CLANG_VAL || JSL__IS_GCC_VAL
         #define JSL__UNLIKELY(x) __builtin_expect(!!(x), 0)
     #else
         #define JSL__UNLIKELY(x) (x)
@@ -237,7 +229,7 @@ extern "C" {
     #define ASAN_UNPOISON_MEMORY_REGION(ptr, len)
 #endif
 
-#if JSL_IS_CLANG || JSL_IS_GCC
+#if JSL__IS_CLANG_VAL || JSL__IS_GCC_VAL
     #if defined(__SANITIZE_ADDRESS__) && __SANITIZE_ADDRESS__
         #define JSL__ASAN_OFF __attribute__((__no_sanitize_address__))
     #endif
@@ -250,12 +242,20 @@ extern "C" {
 
 /**
  *
- *  Built Ins Macros For MSVC Compatibility
+ *  Built-Ins Macros For MSVC Compatibility
  *
  */
 
+int32_t jsl__count_trailing_zeros_u32(uint32_t x);
+int32_t jsl__count_trailing_zeros_u64(uint64_t x);
+int32_t jsl__count_leading_zeros_u32(uint32_t x);
+int32_t jsl__count_leading_zeros_u64(uint64_t x);
+int32_t jsl__population_count_u32(uint32_t x);
+int32_t jsl__population_count_u64(uint64_t x);
+int32_t jsl__find_first_set_u32(uint32_t x);
+int32_t jsl__find_first_set_u64(uint64_t x);
 
-#if JSL_IS_GCC || JSL_IS_CLANG
+#if JSL__IS_GCC_VAL || JSL__IS_CLANG_VAL
     #define JSL__COUNT_TRAILING_ZEROS_IMPL(x) __builtin_ctz(x)
 
     #if UINT64_MAX == ULLONG_MAX
@@ -289,12 +289,7 @@ extern "C" {
         #define JSL__FIND_FIRST_SET_IMPL64(x) __builtin_ffsl(x)
     #endif
 
-#elif JSL_IS_MSVC
-
-    uint32_t jsl__count_trailing_zeros_u32(uint32_t x);
-    uint32_t jsl__count_trailing_zeros_u64(uint64_t x);
-    uint32_t jsl__find_first_set_u32(uint32_t x);
-    uint32_t jsl__find_first_set_u64(uint64_t x);
+#elif JSL__IS_MSVC_VAL
 
     #define JSL__COUNT_TRAILING_ZEROS_IMPL(x) jsl__count_trailing_zeros_u32(x)
     #define JSL__COUNT_TRAILING_ZEROS_IMPL64(x) jsl__count_trailing_zeros_u64(x)
@@ -306,15 +301,6 @@ extern "C" {
     #define JSL__FIND_FIRST_SET_IMPL64(x) jsl__find_first_set_u64(x)
 
 #else
-
-    uint32_t jsl__count_trailing_zeros_u32(uint32_t x);
-    uint32_t jsl__count_trailing_zeros_u64(uint64_t x);
-    uint32_t jsl__count_leading_zeros_u32(uint32_t x);
-    uint32_t jsl__count_leading_zeros_u64(uint64_t x);
-    uint32_t jsl__population_count_u32(uint32_t x);
-    uint32_t jsl__population_count_u64(uint64_t x);
-    uint32_t jsl__find_first_set_u32(uint32_t x);
-    uint32_t jsl__find_first_set_u64(uint64_t x);
 
     #define JSL__COUNT_TRAILING_ZEROS_IMPL(x) jsl__count_trailing_zeros_u32(x)
     #define JSL__COUNT_TRAILING_ZEROS_IMPL64(x) jsl__count_trailing_zeros_u64(x)
@@ -336,6 +322,24 @@ extern "C" {
  *
  */
 
+
+#ifndef JSL_VERSION
+    #define JSL_VERSION 0x010000  /* 1.0.0 */
+#else
+    #if JSL_VERSION != 0x010000
+        #error "ERROR: Conflicting versions of jacks_standard_library.h included in the same translation unit!"
+    #endif
+#endif
+
+#if defined(__has_attribute)
+    #if __has_attribute(fallthrough)
+        #define JSL_SWITCH_FALLTHROUGH __attribute__((fallthrough))
+    #endif
+#endif
+
+#ifndef JSL_SWITCH_FALLTHROUGH
+    #define JSL_SWITCH_FALLTHROUGH do { } while (0)
+#endif
 
 /**
  *
@@ -368,6 +372,11 @@ extern "C" {
      * `string.h` and be an alias to C's `memcpy`.
      *
      * Define this as a macro before importing the library to override this.
+     * Your macro must follow the libc `memcpy` signature of
+     * 
+     * ```
+     * void your_memcpy(void*, const void*, size_t);
+     * ```
      */
     #define JSL_MEMCPY memcpy
 #endif
@@ -380,6 +389,11 @@ extern "C" {
      * `string.h` and be an alias to C's `memcmp`.
      *
      * Define this as a macro before importing the library to override this.
+     * Your macro must follow the libc `memcmp` signature of
+     * 
+     * ```
+     * int your_memcmp(const void*, const void*, size_t);
+     * ```
      */
     #define JSL_MEMCMP memcmp
 #endif
@@ -392,6 +406,11 @@ extern "C" {
      * `string.h` and be an alias to C's `memset`.
      *
      * Define this as a macro before importing the library to override this.
+     * Your macro must follow the libc `memset` signature of
+     * 
+     * ```
+     * void your_memset(void*, int, size_t);
+     * ```
      */
     #define JSL_MEMSET memset
 #endif
@@ -404,6 +423,11 @@ extern "C" {
      * `string.h` and be an alias to C's `strlen`.
      *
      * Define this as a macro before importing the library to override this.
+     * Your macro must follow the libc `strlen` signature of
+     * 
+     * ```
+     * size_t your_strlen(const char*);
+     * ```
      */
     #define JSL_STRLEN strlen
 #endif
@@ -806,14 +830,14 @@ extern "C" {
  * the same value.
  *
  * This function is designed to be used in tight loops and other performance
- * critical areas. Therefore, both zero and values greater than 2^31 not special
+ * critical areas. Therefore, both zero, one, and values greater than 2^31 not special
  * cased. The return values for these cases are compiler, OS, and ISA specific.
  * If you need consistent behavior, then you can easily call this function like
  * so:
  *
  * ```
  * jsl_next_power_of_two_u32(
- *      JSL_BETWEEN(1u, x, 0x80000000u)
+ *      JSL_BETWEEN(2u, x, 0x80000000u)
  * );
  * ```
  *
@@ -1535,7 +1559,7 @@ JSL_DEF JSLFatPtr jsl_arena_allocate_aligned(JSLArena* arena, int64_t bytes, int
  * struct MyStruct* thing = JSL_ARENA_TYPED_ALLOCATE(struct MyStruct, arena);
  * @endcode
  */
-#define JSL_ARENA_TYPED_ALLOCATE(T, arena) (T*) jsl_arena_allocate(arena, sizeof(T), false).data
+#define JSL_ARENA_TYPED_ALLOCATE(T, arena) (T*) jsl_arena_allocate_aligned(arena, sizeof(T), _Alignof(T), false).data
 
 /**
  * Resize the allocation if it was the last allocation, otherwise, allocate a new
@@ -2089,14 +2113,14 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         assert(condition);
     }
 
-    JSL__FORCE_INLINE uint32_t jsl__count_trailing_zeros_u32(uint32_t x)
+    JSL__FORCE_INLINE int32_t jsl__count_trailing_zeros_u32(uint32_t x)
     {
         #if JSL_IS_MSVC
             unsigned long index;
             _BitScanForward(&index, x);
-            return (uint32_t) index;
+            return (int32_t) index;
         #else
-            uint32_t n = 0;
+            int32_t n = 0;
             while ((x & 1u) == 0)
             {
                 x >>= 1;
@@ -2106,14 +2130,14 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         #endif
     }
 
-    JSL__FORCE_INLINE uint32_t jsl__count_trailing_zeros_u64(uint64_t x)
+    JSL__FORCE_INLINE int32_t jsl__count_trailing_zeros_u64(uint64_t x)
     {
         #if JSL_IS_MSVC
             unsigned long index;
             _BitScanForward64(&index, x);
-            return (uint32_t) index;
+            return (int32_t) index;
         #else
-            uint32_t n = 0;
+            int32_t n = 0;
             while ((x & 1u) == 0)
             {
                 x >>= 1;
@@ -2123,10 +2147,10 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         #endif
     }
 
-    JSL__FORCE_INLINE uint32_t jsl__count_leading_zeros_u32(uint32_t x)
+    JSL__FORCE_INLINE int32_t jsl__count_leading_zeros_u32(uint32_t x)
     {
         if (x == 0) return 32;
-        uint32_t n = 0;
+        int32_t n = 0;
         if ((x & 0xFFFF0000) == 0) { n += 16; x <<= 16; }
         if ((x & 0xFF000000) == 0) { n += 8;  x <<= 8;  }
         if ((x & 0xF0000000) == 0) { n += 4;  x <<= 4;  }
@@ -2135,10 +2159,10 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         return n;
     }
 
-    JSL__FORCE_INLINE uint32_t jsl__count_leading_zeros_u64(uint64_t x)
+    JSL__FORCE_INLINE int32_t jsl__count_leading_zeros_u64(uint64_t x)
     {
         if (x == 0) return 64;
-        uint32_t n = 0;
+        int32_t n = 0;
         if ((x & 0xFFFFFFFF00000000ULL) == 0) { n += 32; x <<= 32; }
         if ((x & 0xFFFF000000000000ULL) == 0) { n += 16; x <<= 16; }
         if ((x & 0xFF00000000000000ULL) == 0) { n += 8;  x <<= 8;  }
@@ -2148,16 +2172,16 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         return n;
     }
 
-    JSL__FORCE_INLINE uint32_t jsl__find_first_set_u32(uint32_t x)
+    JSL__FORCE_INLINE int32_t jsl__find_first_set_u32(uint32_t x)
     {
         #if JSL_IS_MSVC
             unsigned long index;
             _BitScanForward(&index, x);
-            return (uint32_t) (index + 1);
+            return (int32_t) (index + 1);
         #else
             if (x == 0) return 0;
 
-            uint32_t n = 1;
+            int32_t n = 1;
             if ((x & 0xFFFF) == 0) { x >>= 16; n += 16; }
             if ((x & 0xFF) == 0)   { x >>= 8;  n += 8;  }
             if ((x & 0xF) == 0)    { x >>= 4;  n += 4;  }
@@ -2168,7 +2192,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         #endif
     }
 
-    JSL__FORCE_INLINE uint32_t jsl__find_first_set_u64(uint64_t x)
+    JSL__FORCE_INLINE int32_t jsl__find_first_set_u64(uint64_t x)
     {
         #if JSL_IS_MSVC
             unsigned long index;
@@ -2177,7 +2201,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         #else
             if (x == 0) return 0;
 
-            uint32_t n = 1;
+            int32_t n = 1;
             if ((x & 0xFFFFFFFFULL) == 0) { x >>= 32; n += 32; }
             if ((x & 0xFFFFULL) == 0)     { x >>= 16; n += 16; }
             if ((x & 0xFFULL) == 0)       { x >>= 8;  n += 8;  }
@@ -2189,7 +2213,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         #endif
     }
 
-    JSL__FORCE_INLINE uint32_t jsl__population_count_u32(uint32_t x)
+    JSL__FORCE_INLINE int32_t jsl__population_count_u32(uint32_t x)
     {
         // Branchless SWAR
         x = x - ((x >> 1) & 0x55555555u);
@@ -2200,7 +2224,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         return x & 0x3Fu;
     }
 
-    JSL__FORCE_INLINE uint32_t jsl__population_count_u64(uint64_t x)
+    JSL__FORCE_INLINE int32_t jsl__population_count_u64(uint64_t x)
     {
         x = x - ((x >> 1) & 0x5555555555555555ULL);
         x = (x & 0x3333333333333333ULL) + ((x >> 2) & 0x3333333333333333ULL);
@@ -2215,16 +2239,16 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     {
         #if JSL_IS_CLANG || JSL_IS_GCC
 
-            return 1u << (32 - JSL_PLATFORM_COUNT_LEADING_ZEROS(x - 1));
+            return 1u << (32u - (uint32_t) JSL_PLATFORM_COUNT_LEADING_ZEROS(x - 1u));
 
         #else
 
             x--;
-            x |= x >> 1;
-            x |= x >> 2;
-            x |= x >> 4;
-            x |= x >> 8;
-            x |= x >> 16;
+            x |= x >> 1u;
+            x |= x >> 2u;
+            x |= x >> 4u;
+            x |= x >> 8u;
+            x |= x >> 16u;
             x++;
             return x;
 
@@ -2235,17 +2259,17 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     {
         #if JSL_IS_CLANG || JSL_IS_GCC
 
-            return ((uint64_t) 1u) << (((uint64_t) 64u) - JSL_PLATFORM_COUNT_LEADING_ZEROS64(x - 1));
+            return ((uint64_t) 1u) << (((uint64_t) 64u) - (uint64_t) JSL_PLATFORM_COUNT_LEADING_ZEROS64(x - 1));
 
         #else
 
             x--;
-            x |= x >> 1;
-            x |= x >> 2;
-            x |= x >> 4;
-            x |= x >> 8;
-            x |= x >> 16;
-            x |= x >> 32;
+            x |= x >> 1u;
+            x |= x >> 2u;
+            x |= x >> 4u;
+            x |= x >> 8u;
+            x |= x >> 16u;
+            x |= x >> 32u;
             x++;
             return x;
 
@@ -2256,7 +2280,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     {
         #if JSL_IS_CLANG || JSL_IS_GCC
 
-            return 1u << (31u - JSL_PLATFORM_COUNT_LEADING_ZEROS(x));
+            return 1u << (31u - (uint32_t) JSL_PLATFORM_COUNT_LEADING_ZEROS(x));
 
         #else
 
@@ -2274,7 +2298,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     {
         #if JSL_IS_CLANG || JSL_IS_GCC
 
-            return ((uint64_t) 1u) << (((uint64_t) 63u) - JSL_PLATFORM_COUNT_LEADING_ZEROS64(x));
+            return ((uint64_t) 1u) << (((uint64_t) 63u) - (uint64_t) JSL_PLATFORM_COUNT_LEADING_ZEROS64(x));
 
         #else
 
@@ -2473,8 +2497,8 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             int64_t i = 0;
             int64_t substring_end_index = substring.length - 1;
 
-            __m256i first = _mm256_set1_epi8(substring.data[0]);
-            __m256i last  = _mm256_set1_epi8(substring.data[substring_end_index]);
+            __m256i first = _mm256_set1_epi8((char) substring.data[0]);
+            __m256i last  = _mm256_set1_epi8((char) substring.data[substring_end_index]);
 
             int64_t stopping_point = string.length - substring_end_index - 64;
             for (; i <= stopping_point; i += 64)
@@ -2491,15 +2515,20 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                 __m256i eq_first2 = _mm256_cmpeq_epi8(first, block_first2);
                 __m256i eq_last2  = _mm256_cmpeq_epi8(last, block_last2);
 
-                uint32_t mask1 = _mm256_movemask_epi8(_mm256_and_si256(eq_first1, eq_last1));
-                uint32_t mask2 = _mm256_movemask_epi8(_mm256_and_si256(eq_first2, eq_last2));
+                uint32_t mask1 = (uint32_t) _mm256_movemask_epi8(_mm256_and_si256(eq_first1, eq_last1));
+                uint32_t mask2 = (uint32_t) _mm256_movemask_epi8(_mm256_and_si256(eq_first2, eq_last2));
                 uint64_t mask = mask1 | ((uint64_t) mask2 << 32);
 
                 while (mask != 0)
                 {
                     int32_t bit_position = JSL_PLATFORM_COUNT_TRAILING_ZEROS64(mask);
 
-                    if (JSL_MEMCMP(string.data + i + bit_position + 1, substring.data + 1, substring.length - 2) == 0)
+                    int32_t memcmp_res = JSL_MEMCMP(
+                        string.data + i + bit_position + 1,
+                        substring.data + 1,
+                        (size_t) (substring.length - 2)
+                    );
+                    if (memcmp_res == 0)
                     {
                         return i + bit_position;
                     }
@@ -2517,9 +2546,13 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                 {
                     if (substring.length <= 2)
                         return i;
-                    if (JSL_MEMCMP(string.data + i + 1,
-                                substring.data + 1,
-                                substring.length - 2) == 0)
+
+                    int32_t memcmp_res = JSL_MEMCMP(
+                        string.data + i + 1,
+                        substring.data + 1,
+                        (size_t) (substring.length - 2)
+                    );
+                    if (memcmp_res == 0)
                         return i;
                 }
             }
@@ -2704,14 +2737,14 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             int64_t i = 0;
 
             #ifdef __AVX2__
-                __m256i needle = _mm256_set1_epi8(item);
+                __m256i needle = _mm256_set1_epi8((char) item);
 
                 while (i < string.length - 32)
                 {
                     __m256i elements = _mm256_loadu_si256((__m256i*) (string.data + i));
                     __m256i eq_needle = _mm256_cmpeq_epi8(elements, needle);
 
-                    uint32_t mask = _mm256_movemask_epi8(eq_needle);
+                    uint32_t mask = (uint32_t) _mm256_movemask_epi8(eq_needle);
 
                     if (mask != 0)
                     {
@@ -2762,13 +2795,13 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
         #ifdef JSL_IS_X86
             #ifdef __AVX2__
-                __m256i item_wide_avx = _mm256_set1_epi8(item);
+                __m256i item_wide_avx = _mm256_set1_epi8((char) item);
 
                 while (str.length >= 32)
                 {
                     __m256i chunk = _mm256_loadu_si256((__m256i*) str.data);
                     __m256i cmp = _mm256_cmpeq_epi8(chunk, item_wide_avx);
-                    int mask = _mm256_movemask_epi8(cmp);
+                    uint32_t mask = (uint32_t) _mm256_movemask_epi8(cmp);
 
                     count += JSL_PLATFORM_POPULATION_COUNT(mask);
 
@@ -2777,13 +2810,13 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             #endif
 
             #ifdef __SSE3__
-                __m128i item_wide_sse = _mm_set1_epi8(item);
+                __m128i item_wide_sse = _mm_set1_epi8((char) item);
 
                 while (str.length >= 16)
                 {
                     __m128i chunk = _mm_loadu_si128((__m128i*) str.data);
                     __m128i cmp = _mm_cmpeq_epi8(chunk, item_wide_sse);
-                    int mask = _mm_movemask_epi8(cmp);
+                    uint32_t mask = (uint32_t) _mm_movemask_epi8(cmp);
 
                     count += JSL_PLATFORM_POPULATION_COUNT(mask);
 
@@ -2842,14 +2875,14 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             else
             {
                 int64_t i = string.length - 32;
-                __m256i needle = _mm256_set1_epi8(item);
+                __m256i needle = _mm256_set1_epi8((char) item);
 
                 while (i >= 32)
                 {
                     __m256i elements = _mm256_loadu_si256((__m256i*) (string.data + i));
                     __m256i eq_needle = _mm256_cmpeq_epi8(elements, needle);
 
-                    uint32_t mask = _mm256_movemask_epi8(eq_needle);
+                    uint32_t mask = (uint32_t) _mm256_movemask_epi8(eq_needle);
 
                     if (mask != 0)
                     {
@@ -3566,7 +3599,11 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                 );
 
                 #ifdef JSL_DEBUG
-                    JSL_MEMSET((void*) original_allocation.data, 0xfeeefeee, original_allocation.length);
+                    JSL_MEMSET(
+                        (void*) original_allocation.data,
+                        (int32_t) 0xfeeefeee,
+                        (size_t) original_allocation.length
+                    );
                 #endif
 
                 ASAN_POISON_MEMORY_REGION(original_allocation.data, original_allocation.length);
@@ -3581,7 +3618,11 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         ASAN_UNPOISON_MEMORY_REGION(arena->start, arena->end - arena->start);
 
         #ifdef JSL_DEBUG
-            JSL_MEMSET((void*) arena->start, 0xfeeefeee, arena->current - arena->start);
+            JSL_MEMSET(
+                (void*) arena->start,
+                (int32_t) 0xfeeefeee,
+                (size_t) (arena->current - arena->start)
+            );
         #endif
 
         arena->current = arena->start;
@@ -3602,7 +3643,11 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         ASAN_UNPOISON_MEMORY_REGION(restore_point, arena->current - restore_point);
 
         #ifdef JSL_DEBUG
-            JSL_MEMSET((void*) restore_point, 0xfeeefeee, arena->current - restore_point);
+            JSL_MEMSET(
+                (void*) restore_point,
+                (int32_t) 0xfeeefeee,
+                (size_t) (arena->current - restore_point)
+            );
         #endif
 
         ASAN_POISON_MEMORY_REGION(restore_point, arena->current - restore_point);
@@ -3690,6 +3735,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                 __m256i data = _mm256_load_si256(source_wide);
                 __m256i null_terminator_mask = _mm256_cmpeq_epi8(data, zero_wide);
                 int mask = _mm256_movemask_epi8(null_terminator_mask);
+
                 if (mask == 0)
                 {
                     source_ptr += 32;
@@ -3699,7 +3745,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                 {
                     int null_pos = JSL_PLATFORM_FIND_FIRST_SET(mask) - 1;
                     source_ptr += null_pos;
-                    limit -= null_pos;
+                    limit -= (uint32_t) null_pos;
                     break;
                 }
             }
@@ -3834,7 +3880,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
                     __m256i data = _mm256_load_si256(source_wide);
                     __m256i percent_mask = _mm256_cmpeq_epi8(data, percent_wide);
-                    int mask = _mm256_movemask_epi8(percent_mask);
+                    uint32_t mask = (uint32_t) _mm256_movemask_epi8(percent_mask);
 
                     if (mask == 0)
                     {
@@ -3849,7 +3895,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                         int special_pos = JSL_PLATFORM_COUNT_TRAILING_ZEROS(mask);
                         stbsp__chk_cb_buf(special_pos);
 
-                        JSL_MEMCPY(buffer_cursor, f.data, special_pos);
+                        JSL_MEMCPY(buffer_cursor, f.data, (size_t) special_pos);
                         JSL_FATPTR_ADVANCE(f, special_pos);
                         buffer_cursor += special_pos;
 
@@ -4559,6 +4605,8 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
                     formatting_flags &= (uint32_t) ~STBSP__LEADINGZERO; // 'p' only prints the pointer with zeros
                                                 // fall through - to X
 
+                    JSL_SWITCH_FALLTHROUGH;
+
                 case 'X': // upper hex
                 case 'x': // lower hex
                     h = (f.data[0] == 'X') ? hexu : hex;
@@ -5183,7 +5231,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     #define stbsp__ddmulthi(oh, ol, xh, yh)                             \
     {                                                                   \
         double ahi = 0, alo, bhi = 0, blo;                              \
-        int64_t bt;                                                     \
+        int64_t bt = 0;                                                 \
         oh = xh * yh;                                                   \
         STBSP__COPYFP(bt, xh);                                          \
         bt &= ((~(uint64_t)0) << 27);                                   \
@@ -5455,85 +5503,81 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     )
     {
         char path_buffer[FILENAME_MAX + 1];
+        int64_t temp_size = 0;
+        bool proceed = false;
 
-        JSLGetFileSizeResultEnum result = JSL_GET_FILE_SIZE_BAD_PARAMETERS;
-        bool good_params = false;
-
-        if (path.data != NULL && path.length > 0 && out_size != NULL)
-        {
-            // File system APIs require a null terminated string
-            JSL_MEMCPY(path_buffer, path.data, (size_t) path.length);
-            path_buffer[path.length] = '\0';
-            good_params = true;
-        }
+        proceed = (path.data != NULL && path.length > 0 && out_size != NULL);
+        JSLGetFileSizeResultEnum result = proceed
+            ? JSL_GET_FILE_SIZE_OK : JSL_GET_FILE_SIZE_BAD_PARAMETERS;
 
         #if JSL_IS_WINDOWS
 
             struct _stat64 st_win = {0};
-            int stat_ret = -1;
-
-            if (good_params)
-            {
-                stat_ret = _stat64(path_buffer, &st_win);
-            }
-
+            int32_t stat_ret = -1;
+            bool stat_ok = false;
             bool is_regular = false;
-            if (stat_ret == 0)
+
+            if (proceed)
             {
-                is_regular = JSL_IS_BITFLAG_SET(st_win.st_mode, _S_IFREG);
-            }
-            else
-            {
-                result = JSL_GET_FILE_SIZE_NOT_FOUND;
-                if (out_os_error_code != NULL)
-                    *out_os_error_code = errno;
+                JSL_MEMCPY(path_buffer, path.data, (size_t) path.length);
+                path_buffer[path.length] = '\0';
+
+                stat_ret = _stat64(path_buffer, &st_win);
+                stat_ok = (stat_ret == 0);
+                proceed = stat_ok;
+                result = stat_ok ? JSL_GET_FILE_SIZE_OK : JSL_GET_FILE_SIZE_NOT_FOUND;
             }
 
-            if (is_regular)
+            if (!proceed && out_os_error_code != NULL)
             {
-                *out_size = (int64_t) st_win.st_size;
-                result = JSL_GET_FILE_SIZE_OK;
+                *out_os_error_code = errno;
             }
-            else if (!is_regular && stat_ret == 0)
+
+            if (proceed)
             {
-                result = JSL_GET_FILE_SIZE_NOT_REGULAR_FILE;
+                is_regular = (st_win.st_mode & _S_IFREG) != 0;
+                temp_size = (int64_t) st_win.st_size;
+                result = is_regular ? JSL_GET_FILE_SIZE_OK : JSL_GET_FILE_SIZE_NOT_REGULAR_FILE;
             }
 
         #elif JSL_IS_POSIX
 
             struct stat st_posix;
-            int stat_ret = -1;
+            int32_t stat_ret = -1;
+            bool stat_ok = false;
+            bool is_regular = false;
 
-            if (good_params)
+            if (proceed)
             {
-                stat_ret = stat(path_buffer, &st_posix);
+                JSL_MEMCPY(path_buffer, path.data, (size_t) path.length);
+                path_buffer[path.length] = '\0';
+
+                stat_ret = stat(path, &st_posix);
+                stat_ok = (stat_ret == 0);
+                proceed = stat_ok;
+                result = stat_ok ? JSL_GET_FILE_SIZE_OK : JSL_GET_FILE_SIZE_NOT_FOUND;
             }
 
-            bool is_regular = false;
-            if (stat_ret == 0)
+            if (!proceed && out_os_error_code != NULL)
+            {
+                *out_os_error_code = errno;
+            }
+
+            if (proceed)
             {
                 is_regular = (sb.st_mode & S_IFMT) == S_IFREG;
-            }
-            else
-            {
-                result = JSL_GET_FILE_SIZE_NOT_FOUND;
-                if (out_os_error_code != NULL)
-                    *out_os_error_code = errno;
-            }
-
-            if (is_regular)
-            {
-                *out_size = (int64_t) st_posix.st_size;
-                result = JSL_GET_FILE_SIZE_OK;
-            }
-            else if (stat_ret == 0 && !is_regular)
-            {
-                result = JSL_GET_FILE_SIZE_NOT_REGULAR_FILE;
+                temp_size = (int64_t) st_posix.st_size;
+                result = is_regular ? JSL_GET_FILE_SIZE_OK : JSL_GET_FILE_SIZE_NOT_REGULAR_FILE;
             }
 
         #else
             JSL_ASSERT(0 && "File utils only work on Windows or POSIX platforms.");
         #endif
+
+        if (result == JSL_GET_FILE_SIZE_OK)
+        {
+            *out_size = temp_size;
+        }
 
         return result;
     }

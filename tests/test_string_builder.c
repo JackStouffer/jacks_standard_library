@@ -51,7 +51,7 @@ static void debug_concatenate_builder(JSLStringBuilder* builder, JSLFatPtr* writ
     }
 }
 
-void test_jsl_string_builder_init(void)
+static void test_jsl_string_builder_init(void)
 {
     JSLStringBuilder builder;
     bool ok = jsl_string_builder_init(&builder, &global_arena);
@@ -66,7 +66,7 @@ void test_jsl_string_builder_init(void)
     TEST_BOOL(builder.head->buffer.data == builder.head->writer.data);
 }
 
-void test_jsl_string_builder_init2(void)
+static void test_jsl_string_builder_init2(void)
 {
     JSLStringBuilder builder;
 
@@ -82,7 +82,7 @@ void test_jsl_string_builder_init2(void)
     TEST_BOOL(builder.head->writer.length == chunk_size);
 }
 
-void test_jsl_string_builder_init_invalid_arguments(void)
+static void test_jsl_string_builder_init_invalid_arguments(void)
 {
     JSLStringBuilder builder;
 
@@ -92,7 +92,7 @@ void test_jsl_string_builder_init_invalid_arguments(void)
     TEST_BOOL(!jsl_string_builder_init2(&builder, &global_arena, 16, 0));
 }
 
-void test_jsl_string_builder_insert_char_basic(void)
+static void test_jsl_string_builder_insert_char_basic(void)
 {
     JSLStringBuilder builder;
     bool ok = jsl_string_builder_init(&builder, &global_arena);
@@ -117,7 +117,7 @@ void test_jsl_string_builder_insert_char_basic(void)
     TEST_BOOL(!jsl_string_builder_insert_char(&uninitialized, 'Z'));
 }
 
-void test_jsl_string_builder_insert_char_grows_chunks(void)
+static void test_jsl_string_builder_insert_char_grows_chunks(void)
 {
     JSLStringBuilder builder;
     bool ok = jsl_string_builder_init2(&builder, &global_arena, 2, 2);
@@ -144,7 +144,7 @@ void test_jsl_string_builder_insert_char_grows_chunks(void)
     TEST_BOOL(done.length == 0);
 }
 
-void test_jsl_string_builder_insert_uint8_t_binary(void)
+static void test_jsl_string_builder_insert_uint8_t_binary(void)
 {
     JSLStringBuilder builder;
     bool ok = jsl_string_builder_init2(&builder, &global_arena, 8, 4);
@@ -168,7 +168,7 @@ void test_jsl_string_builder_insert_uint8_t_binary(void)
     TEST_BOOL(!jsl_string_builder_insert_uint8_t(&uninitialized, 0xAA));
 }
 
-void test_jsl_string_builder_insert_fatptr_multi_chunk(void)
+static void test_jsl_string_builder_insert_fatptr_multi_chunk(void)
 {
     JSLStringBuilder builder;
     bool ok = jsl_string_builder_init2(&builder, &global_arena, 4, 4);
@@ -202,7 +202,7 @@ void test_jsl_string_builder_insert_fatptr_multi_chunk(void)
     TEST_BUFFERS_EQUAL(third.data, "ij", 2);
 }
 
-void test_jsl_string_builder_insert_fatptr_edge_cases(void)
+static void test_jsl_string_builder_insert_fatptr_edge_cases(void)
 {
     JSLStringBuilder builder;
     bool ok = jsl_string_builder_init2(&builder, &global_arena, 8, 8);
@@ -234,7 +234,7 @@ void test_jsl_string_builder_insert_fatptr_edge_cases(void)
     TEST_BOOL(!jsl_string_builder_insert_fatptr(&uninitialized, binary_ptr));
 }
 
-void test_jsl_string_builder_iterator_behavior(void)
+static void test_jsl_string_builder_iterator_behavior(void)
 {
     JSLStringBuilder builder;
     bool ok = jsl_string_builder_init2(&builder, &global_arena, 6, 2);
@@ -271,7 +271,7 @@ void test_jsl_string_builder_iterator_behavior(void)
     TEST_INT64_EQUAL(invalid_slice.length, (int64_t) 0);
 }
 
-void test_jsl_string_builder_format_success(void)
+static void test_jsl_string_builder_format_success(void)
 {
     JSLStringBuilder builder;
     bool ok = jsl_string_builder_init2(&builder, &global_arena, 32, 8);
@@ -291,7 +291,7 @@ void test_jsl_string_builder_format_success(void)
     TEST_BUFFERS_EQUAL(actual, "alpha-42:AB", len);
 }
 
-void test_jsl_string_builder_format_needs_multiple_chunks(void)
+static void test_jsl_string_builder_format_needs_multiple_chunks(void)
 {
     uint8_t arena_buffer[256];
     JSLArena arena = JSL_ARENA_FROM_STACK(arena_buffer);
@@ -314,7 +314,7 @@ void test_jsl_string_builder_format_needs_multiple_chunks(void)
     TEST_BOOL(builder.head != builder.tail);
 }
 
-void test_jsl_string_builder_format_invalid_builder(void)
+static void test_jsl_string_builder_format_invalid_builder(void)
 {
     JSLStringBuilder builder = {0};
     TEST_BOOL(!jsl_string_builder_format(&builder, jsl_fatptr_from_cstr("abc")));
