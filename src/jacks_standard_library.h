@@ -202,27 +202,31 @@ extern "C" {
     #define JSL__FORCE_INLINE
 #endif
 
-#ifndef JSL__LIKELY
-
-    #if JSL__IS_CLANG_VAL || JSL__IS_GCC_VAL
-        #define JSL__LIKELY(x) __builtin_expect(!!(x), 1)
-    #else
-        #define JSL__LIKELY(x) (x)
-    #endif
-
+#if JSL__IS_CLANG_VAL || JSL__IS_GCC_VAL
+    #define JSL__LIKELY(x) __builtin_expect(!!(x), 1)
+#else
+    #define JSL__LIKELY(x) (x)
 #endif
 
-#ifndef JSL__UNLIKELY
-
-    #if JSL__IS_CLANG_VAL || JSL__IS_GCC_VAL
-        #define JSL__UNLIKELY(x) __builtin_expect(!!(x), 0)
-    #else
-        #define JSL__UNLIKELY(x) (x)
-    #endif
-
+#if JSL__IS_CLANG_VAL || JSL__IS_GCC_VAL
+    #define JSL__UNLIKELY(x) __builtin_expect(!!(x), 0)
+#else
+    #define JSL__UNLIKELY(x) (x)
 #endif
 
 #if defined(__SANITIZE_ADDRESS__) && __SANITIZE_ADDRESS__
+    #define JSL__HAS_ASAN 1
+#elif defined(__has_feature)
+    #if __has_feature(address_sanitizer)
+        #define JSL__HAS_ASAN 1
+    #endif
+#endif
+
+#ifndef JSL__HAS_ASAN
+    #define JSL__HAS_ASAN 0
+#endif
+
+#if JSL__HAS_ASAN
     #include <sanitizer/asan_interface.h>
 #else
     #define ASAN_POISON_MEMORY_REGION(ptr, len)
@@ -230,14 +234,22 @@ extern "C" {
 #endif
 
 #if JSL__IS_CLANG_VAL || JSL__IS_GCC_VAL
-    #if defined(__SANITIZE_ADDRESS__) && __SANITIZE_ADDRESS__
-        #define JSL__ASAN_OFF __attribute__((__no_sanitize_address__))
+    #if JSL__HAS_ASAN
+        #if defined(__has_attribute)
+            #if __has_attribute(no_sanitize_address)
+                #define JSL__ASAN_OFF __attribute__((__no_sanitize_address__))
+            #endif
+        #elif JSL__IS_GCC_VAL
+            #define JSL__ASAN_OFF __attribute__((__no_sanitize_address__))
+        #endif
     #endif
 #endif
 
 #ifndef JSL__ASAN_OFF
     #define JSL__ASAN_OFF
 #endif
+
+#define JSL__ASAN_GUARD_SIZE 8
 
 
 /**
@@ -1060,6 +1072,19 @@ typedef struct JSLArena
     uint8_t* end;
 } JSLArena;
 
+static inline JSLArena jsl__arena_from_stack_internal(void* buf, size_t len)
+{
+    JSLArena arena = {
+        (uint8_t*) buf,
+        (uint8_t*) buf,
+        (uint8_t*) (buf + len)
+    };
+
+    ASAN_POISON_MEMORY_REGION(buf, len);
+
+    return arena;
+}
+
 /**
  * Creates an arena from stack memory.
  *
@@ -1078,23 +1103,23 @@ typedef struct JSLArena
  * ```
  * void some_func(void)
  * {
- *      uint8_t buffer[16 * 1024];
+ *      uint8_t buffer[JSL_KILOBYTES(16)];
  *      JSLArena stack_arena = JSL_ARENA_FROM_STACK(buffer);
  *
  *      // example hash map, not real
  *      IntToStrMap map = int_to_str_ctor(&arena);
  *      int_to_str_add(&map, 64, JSL_FATPTR_INITIALIZER("This is my string data!"));
  *
- *      // hash map cleaned up automatically
+ *      my_hash_map_calculations(&map);
+ * 
+ *      // All hash map memory goes out of scope automatically,
+ *      // no need for any destructor
  * }
  * ```
  *
  * Fast, cheap, easy automatic memory management!
- *
- * @warning This macro only works for variable initializers and cannot be used as a
- * normal rvalue.
  */
-#define JSL_ARENA_FROM_STACK(buf) { (uint8_t *)(buf), (uint8_t *)(buf), (uint8_t *)(buf) + sizeof(buf) }
+#define JSL_ARENA_FROM_STACK(buf) jsl__arena_from_stack_internal((buf), sizeof(buf))
 
 /**
  * A string builder is a container for building large strings. It's specialized for
@@ -3533,17 +3558,25 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         uint8_t* aligned_current = align_ptr_upwards(arena->current, alignment);
         uint8_t* potential_end = aligned_current + bytes;
 
-        if (potential_end <= arena->end)
+        #if JSL__HAS_ASAN
+            int32_t guard_size = JSL__ASAN_GUARD_SIZE;
+        #else
+            int32_t guard_size = 0;
+        #endif
+
+        uint8_t* next_current = potential_end + guard_size;
+
+        if (next_current <= arena->end)
         {
             res.data = aligned_current;
             res.length = bytes;
 
-            #if defined(__SANITIZE_ADDRESS__)
-                // Add 8 to leave "guard" zones between allocations
-                arena->current = potential_end + 8;
+            #if JSL__HAS_ASAN
+                // Leave poisoned guard zones between allocations
+                arena->current = next_current;
                 ASAN_UNPOISON_MEMORY_REGION(res.data, res.length);
             #else
-                arena->current = potential_end;
+                arena->current = next_current;
             #endif
 
             if (zeroed)
@@ -3574,18 +3607,34 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         uint8_t* aligned_current = align_ptr_upwards(arena->current, align);
         uint8_t* potential_end = aligned_current + new_num_bytes;
 
+        #if JSL__HAS_ASAN
+            int32_t guard_size = JSL__ASAN_GUARD_SIZE;
+        #else
+            int32_t guard_size = 0;
+        #endif
+
+        uint8_t* next_current = potential_end + guard_size;
+
         // Only resize if this given allocation was the last thing alloc-ed
         bool same_pointer =
             (arena->current - original_allocation.length) == original_allocation.data;
-        bool is_space_left = potential_end <= arena->end;
+        bool is_space_left = next_current <= arena->end;
 
         if (same_pointer && is_space_left)
         {
             res.data = original_allocation.data;
             res.length = new_num_bytes;
-            arena->current = original_allocation.data + new_num_bytes;
+            arena->current = next_current;
 
             ASAN_UNPOISON_MEMORY_REGION(res.data, res.length);
+
+            if (new_num_bytes < original_allocation.length)
+            {
+                ASAN_POISON_MEMORY_REGION(
+                    res.data + new_num_bytes,
+                    original_allocation.length - new_num_bytes
+                );
+            }
         }
         else
         {
