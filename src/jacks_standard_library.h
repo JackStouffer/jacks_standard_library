@@ -1077,7 +1077,7 @@ static inline JSLArena jsl__arena_from_stack_internal(void* buf, size_t len)
     JSLArena arena = {
         (uint8_t*) buf,
         (uint8_t*) buf,
-        (uint8_t*) (buf + len)
+        ((uint8_t*) buf) + len
     };
 
     ASAN_POISON_MEMORY_REGION(buf, len);

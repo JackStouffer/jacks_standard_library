@@ -1,6 +1,7 @@
 .vscode/
 .zed/
 *.exe
+*.exp
 *.ilk
 *.pdb
 *.o

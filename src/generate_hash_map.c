@@ -843,7 +843,7 @@ void write_hash_map_source(
         hash_map_name,
         hash_map_name,
         key_type_name,
-        value_type_name,
+        key_type_name,
         value_type_name,
         value_type_name
     );
