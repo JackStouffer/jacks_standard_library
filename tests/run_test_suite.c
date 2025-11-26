@@ -223,10 +223,10 @@ static UnitTestDecl unit_test_declarations[] = {
         "test_hash_map",
         (char*[]) {
             "tests/test_hash_map.c",
-            "tests/hash_maps/comp2_to_int_map.c",
-            "tests/hash_maps/comp3_to_comp2_map.c",
-            "tests/hash_maps/int32_to_comp1_map.c",
-            "tests/hash_maps/int32_to_int32_map.c",
+            "tests/hash_maps/static_comp2_to_int_map.c",
+            "tests/hash_maps/static_comp3_to_comp2_map.c",
+            "tests/hash_maps/static_int32_to_comp1_map.c",
+            "tests/hash_maps/static_int32_to_int32_map.c",
             NULL
         }
     }
@@ -234,46 +234,46 @@ static UnitTestDecl unit_test_declarations[] = {
 
 static HashMapDecl hash_map_declarations[] = {
     {
-        "IntToIntMap",
-        "int32_to_int32_map",
+        "StaticIntToIntMap",
+        "static_int32_to_int32_map",
         "int32_t",
         "int32_t",
         "--static",
         (char*[]) {
-            "../tests/hash_maps/int32_to_int32_map.h",
+            "../tests/hash_maps/static_int32_to_int32_map.h",
             "../tests/test_hash_map_types.h", NULL
         }
     },
     {
-        "IntToCompositeType1Map",
-        "int32_to_comp1_map",
+        "StaticIntToCompositeType1Map",
+        "static_int32_to_comp1_map",
         "int32_t",
         "CompositeType1",
         "--static",
         (char*[]) {
-            "../tests/hash_maps/int32_to_comp1_map.h",
+            "../tests/hash_maps/static_int32_to_comp1_map.h",
             "../tests/test_hash_map_types.h", NULL
         }
     },
     {
-        "CompositeType2ToIntMap",
-        "comp2_to_int_map",
+        "StaticCompositeType2ToIntMap",
+        "static_comp2_to_int_map",
         "CompositeType2",
         "int32_t",
         "--static",
         (char*[]) {
-            "../tests/hash_maps/comp2_to_int_map.h",
+            "../tests/hash_maps/static_comp2_to_int_map.h",
             "../tests/test_hash_map_types.h", NULL
         }
     },
     {
-        "CompositeType3ToCompositeType2Map",
-        "comp3_to_comp2_map",
+        "StaticCompositeType3ToCompositeType2Map",
+        "static_comp3_to_comp2_map",
         "CompositeType3",
         "CompositeType2",
         "--static",
         (char*[]) {
-            "../tests/hash_maps/comp3_to_comp2_map.h",
+            "../tests/hash_maps/static_comp3_to_comp2_map.h",
             "../tests/test_hash_map_types.h", NULL
         }
     }
@@ -522,8 +522,8 @@ int32_t main(int32_t argc, char **argv)
                 nob_cmd_append(&compile_command, source_file);
             }
 
-            if (!nob_cmd_run(&compile_command)) return 1;
-            // if (!nob_cmd_run(&compile_command, .async = &compile_procs)) return 1;
+            // if (!nob_cmd_run(&compile_command)) return 1;
+            if (!nob_cmd_run(&compile_command, .async = &compile_procs)) return 1;
 
             cstring_array_insert(&executables, exe_name);
         }
@@ -598,8 +598,8 @@ int32_t main(int32_t argc, char **argv)
                     nob_cmd_append(&compile_command, source_file);
                 }
 
-                if (!nob_cmd_run(&compile_command)) return 1;
-                // if (!nob_cmd_run(&compile_command, .async = &compile_procs)) return 1;
+                // if (!nob_cmd_run(&compile_command)) return 1;
+                if (!nob_cmd_run(&compile_command, .async = &compile_procs)) return 1;
 
                 cstring_array_insert(&executables, exe_name);
             }

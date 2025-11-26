@@ -265,18 +265,24 @@ JSLFatPtr static_init_function_code = JSL_FATPTR_INITIALIZER(""
 "\n"
 "    hash_map->seed = seed;\n"
 "    hash_map->max_item_count = max_item_count;\n"
-"    hash_map->arrays_length = (int64_t) jsl_next_power_of_two_u64((uint64_t) (max_item_count + 1));\n"
+"    hash_map->arrays_length = (int64_t) jsl_next_power_of_two_u64((uint64_t) (max_item_count + 2));\n"
 "    hash_map->arrays_length = JSL_MAX(hash_map->arrays_length, 32);\n"
 "    hash_map->is_set_flags_array_length = hash_map->arrays_length >> 5L;\n"
 "\n"
-"    hash_map->keys_array = (%y*) jsl_arena_allocate(\n"
-"        arena, ((int64_t) sizeof(%y)) * hash_map->arrays_length, false\n"
+"    hash_map->keys_array = (%y*) jsl_arena_allocate_aligned(\n"
+"       arena,\n"
+"       ((int64_t) sizeof(%y)) * hash_map->arrays_length,\n"
+"       (int32_t) _Alignof(%y),\n"
+"       false\n"
 "    ).data;\n"
 "    if (hash_map->keys_array == NULL)\n"
 "        return false;\n"
 "\n"
-"    hash_map->items_array = (%y*) jsl_arena_allocate(\n"
-"        arena, ((int64_t) sizeof(%y)) * hash_map->arrays_length, false\n"
+"    hash_map->items_array = (%y*) jsl_arena_allocate_aligned(\n"
+"        arena,\n"
+"        ((int64_t) sizeof(%y)) * hash_map->arrays_length,\n"
+"        (int32_t) _Alignof(%y),\n"
+"        false\n"
 "    ).data;\n"
 "    if (hash_map->items_array == NULL)\n"
 "        return false;\n"
@@ -384,6 +390,7 @@ JSLFatPtr static_insert_function_code = JSL_FATPTR_INITIALIZER(""
 "        || hash_map->items_array == NULL\n"
 "        || hash_map->keys_array == NULL\n"
 "        || hash_map->is_set_flags_array == NULL\n"
+"        || hash_map->item_count == hash_map->max_item_count\n"
 "    )\n"
 "        return insert_success;\n"
 "\n"
@@ -844,6 +851,8 @@ void write_hash_map_source(
         hash_map_name,
         key_type_name,
         key_type_name,
+        key_type_name,
+        value_type_name,
         value_type_name,
         value_type_name
     );
