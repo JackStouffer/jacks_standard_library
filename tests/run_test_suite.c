@@ -349,13 +349,25 @@ int32_t main(int32_t argc, char **argv)
         "-DINCLUDE_MAIN",
         "-O0",
         "-glldb",
-        "-std=c11",
-        "-Wall",
-        "-Wextra",
-        "-pedantic",
+        "-std=c11"
+    );
+
+    // add clang warnings
+    for (int32_t flag_idx = 0;; ++flag_idx)
+    {
+        char* flag = clang_warning_flags[flag_idx];
+        if (flag == NULL)
+            break;
+
+        nob_cmd_append(&generate_hash_map_compile_command, flag);
+    }
+
+    nob_cmd_append(
+        &generate_hash_map_compile_command,
         "-o", generate_hash_map_exe_name,
         "cli/generate_hash_map.c"
     );
+
     if (!nob_cmd_run(&generate_hash_map_compile_command)) return 1;
 
     int32_t hash_map_test_count = sizeof(hash_map_declarations) / sizeof(HashMapDecl);
