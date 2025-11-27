@@ -28,8 +28,8 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define JSL_IMPLEMENTATION
-#include "../src/jacks_standard_library.h"
+#define JSL_CORE_IMPLEMENTATION
+#include "../src/jsl_core.h"
 
 #include "minctest.h"
 

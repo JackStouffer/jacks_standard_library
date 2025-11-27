@@ -45,8 +45,8 @@
 #include <string.h>
 #include <ctype.h>
 
-#define JSL_IMPLEMENTATION
-#include "../src/jacks_standard_library.h"
+#define JSL_CORE_IMPLEMENTATION
+#include "../src/jsl_core.h"
 
 typedef struct HashMapDecl {
     char *name, *prefix, *key_type, *value_type, *impl_type;
@@ -354,7 +354,7 @@ int32_t main(int32_t argc, char **argv)
         "-Wextra",
         "-pedantic",
         "-o", generate_hash_map_exe_name,
-        "src/generate_hash_map.c"
+        "cli/generate_hash_map.c"
     );
     if (!nob_cmd_run(&generate_hash_map_compile_command)) return 1;
 

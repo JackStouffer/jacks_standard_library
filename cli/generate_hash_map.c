@@ -30,13 +30,13 @@
 #include <stdarg.h>
 
 #ifdef INCLUDE_MAIN
-    #define JSL_IMPLEMENTATION
-
+    #define JSL_CORE_IMPLEMENTATION
+    #define JSL_FILES_IMPLEMENTATION
     #define _CRT_SECURE_NO_WARNINGS
 #endif
 
-#define JSL_INCLUDE_FILE_UTILS
-#include "jacks_standard_library.h"
+#include "../src/jsl_core.h"
+#include "../src/jsl_files.h"
 
 #include "generate_hash_map.h"
 
@@ -690,7 +690,7 @@ void write_hash_map_header(
 
     jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#pragma once\n\n"));
     jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include <stdint.h>\n"));
-    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include \"jacks_hash_map.h\"\n\n"));
+    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include \"jsl_hash_map.h\"\n\n"));
 
     for (int32_t i = 0; i < include_header_count; ++i)
     {
@@ -824,11 +824,11 @@ void write_hash_map_source(
     );
     jsl_string_builder_insert_fatptr(
         builder,
-        JSL_FATPTR_EXPRESSION("#include \"jacks_standard_library.h\"\n")
+        JSL_FATPTR_EXPRESSION("#include \"jsl_core.h\"\n")
     );
     jsl_string_builder_insert_fatptr(
         builder,
-        JSL_FATPTR_EXPRESSION("#include \"jacks_hash_map.h\"\n\n")
+        JSL_FATPTR_EXPRESSION("#include \"jsl_hash_map.h\"\n\n")
     );
 
     jsl_string_builder_insert_fatptr(

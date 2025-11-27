@@ -2,7 +2,7 @@
 
 #include <stdint.h>
 
-#include "jacks_standard_library.h"
+#include "../src/jsl_core.h"
 
 typedef enum {
     IMPL_ERROR,
