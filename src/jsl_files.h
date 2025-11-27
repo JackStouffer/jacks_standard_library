@@ -1,8 +1,7 @@
 /**
  * # Jack's Standard Library File Utilities
  *
- * Include the file loading and writing utilities. These
- * require linking the standard library.
+ * File loading and writing utilities. These require linking the standard library.
  *
  * See README.md for a detailed intro.
  *

@@ -2,8 +2,8 @@ not finished yet
 
 # Jack's Standard Library
 
-A collection of types and functions designed to replace usage of the
-C Standard Library with more modern, safe, and simple alternatives
+A collection of single header file libraries designed to replace usage
+of the C Standard Library with more modern, safe, and simple alternatives
 for C11/C23.
 
 ## Why
@@ -12,6 +12,11 @@ See the DESIGN.md file for more info.
 
 ## What's Included
 
+### Jack's Standard Library Core
+
+`jsl_core.h`
+
+* All other libraries within this project require the core
 * Common macros
    * Target platform information, e.g. OS, ISA, pointer size, and host compiler
    * min, max, between
@@ -32,20 +37,37 @@ See the DESIGN.md file for more info.
    * works directly with fat pointers
    * Removes all compiler specific weirdness
 * A string builder container type
+
+### Jack's Standard Library File Utilities
+
+`jsl_files.h`
+
+* Requires the standard library at link time, as they use OS level calls
+    * Linux is the only OS to have a robust syscall API
+* Simple, cross platform file I/O
+    * Intended for scripts or getting things going at the start of the project
+    * In serious code, you would use I/O more tailored to your specific use case
+      e.g. atomic, package formats, async, etc.
+* Contains
+    * file reading, writing, and get file size
+    * mkdir
+    * a `fprintf` replacement
+
+### Jack's Standard Library Unicode
+
+`jsl_unicode.h`
+
+### Jack's Standard Library Templates
+
+`cli/`
+
 * Type safe, generated containers
-   * Unlike a lot of C containers, these are built with "before compile" code generation.
-     Each container instance generates code with your value types rather than using `void*`
-     plus length everywhere
-   * Built with arenas in mind
-   * dynamic array
-   * hash map
-   * hash set
-* File Utilities
-   * Simple, cross platform file I/O
-   * Intended for scripts or getting things going at the start of the project
-   * In serious code, you would use I/O more tailored to your specific use case
-   * Separated out from the main code since they require the standard
-     library at link time, as they use OS level calls
+* Unlike a lot of C containers, these are built with "before compile" code generation.
+* Each container instance generates code with your value types rather than using `void*` plus length everywhere
+* Built with arenas in mind
+* dynamic array
+* hash map
+* hash set
 
 ## What's Not Included
 

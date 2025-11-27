@@ -23,6 +23,10 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#ifdef INCLUDE_MAIN
+    #define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -31,13 +35,11 @@
 
 #ifdef INCLUDE_MAIN
     #define JSL_CORE_IMPLEMENTATION
-    #define _CRT_SECURE_NO_WARNINGS
 #endif
-
 #include "../src/jsl_core.h"
 
 #ifdef INCLUDE_MAIN
-#define JSL_FILES_IMPLEMENTATION
+    #define JSL_FILES_IMPLEMENTATION
 #endif
 #include "../src/jsl_files.h"
 
