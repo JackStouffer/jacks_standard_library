@@ -1098,7 +1098,7 @@ static inline JSLArena jsl__arena_from_stack_internal(void* buf, size_t len)
  * This incredibly useful for getting a dynamic allocator for things which will only
  * last the lifetime of the current function. For example, if the current function
  * needs a hash map, you can use this macro and then there's no cleanup at the end
- * because the stack pointer will be reset at the end of the function.
+ * because the stack pointer will be reset.
  *
  * ```
  * void some_func(void)

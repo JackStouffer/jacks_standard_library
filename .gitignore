@@ -19,3 +19,4 @@ generate_hash_map
 *.old
 tests/hash_maps
 .DS_Store
+experiments/
