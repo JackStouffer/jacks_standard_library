@@ -1,6 +1,6 @@
 /**
  * Copyright (c) 2025 Jack Stouffer
- * 
+ *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the “Software”),
  * to deal in the Software without restriction, including without limitation
@@ -29,8 +29,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define JSL_IMPLEMENTATION
-#include "../src/jacks_standard_library.h"
+#define JSL_CORE_IMPLEMENTATION
+#include "../src/jsl_core.h"
 
 #include "minctest.h"
 #include "test_hash_map_types.h"
@@ -60,7 +60,7 @@ static void test_static_insert(void)
         {
             static_int32_to_int32_map_insert(&hashmap, i, 999);
         }
-        
+
         TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 256);
     }
 
@@ -83,7 +83,7 @@ static void test_static_insert(void)
         {
             static_int32_to_comp1_map_insert(&hashmap, i, value);
         }
-        
+
         TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 256);
     }
 
@@ -111,7 +111,7 @@ static void test_static_insert(void)
             key1.c = true;
             static_comp2_to_int_map_insert(&hashmap, key1, 849594759);
         }
-        
+
         TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 256);
     }
 
@@ -153,7 +153,7 @@ static void test_static_insert(void)
             };
             static_comp3_to_comp2_map_insert(&hashmap, key1, value);
         }
-        
+
         TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 256);
     }
 
@@ -468,7 +468,7 @@ static void test_static_delete(void)
         StaticCompositeType3ToCompositeType2MapIterator iter;
         CompositeType3 iter_key;
         CompositeType2 iter_value;
-    
+
         bool iter_ok = static_comp3_to_comp2_map_iterator_start(&hashmap, &iter);
         TEST_BOOL(iter_ok == true);
 

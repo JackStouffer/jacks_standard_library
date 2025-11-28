@@ -23,6 +23,10 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#ifdef INCLUDE_MAIN
+    #define _CRT_SECURE_NO_WARNINGS
+#endif
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -30,13 +34,14 @@
 #include <stdarg.h>
 
 #ifdef INCLUDE_MAIN
-    #define JSL_IMPLEMENTATION
-
-    #define _CRT_SECURE_NO_WARNINGS
+    #define JSL_CORE_IMPLEMENTATION
 #endif
+#include "../src/jsl_core.h"
 
-#define JSL_INCLUDE_FILE_UTILS
-#include "jacks_standard_library.h"
+#ifdef INCLUDE_MAIN
+    #define JSL_FILES_IMPLEMENTATION
+#endif
+#include "../src/jsl_files.h"
 
 #include "generate_hash_map.h"
 
@@ -690,7 +695,7 @@ void write_hash_map_header(
 
     jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#pragma once\n\n"));
     jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include <stdint.h>\n"));
-    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include \"jacks_hash_map.h\"\n\n"));
+    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include \"jsl_hash_map.h\"\n\n"));
 
     for (int32_t i = 0; i < include_header_count; ++i)
     {
@@ -824,11 +829,11 @@ void write_hash_map_source(
     );
     jsl_string_builder_insert_fatptr(
         builder,
-        JSL_FATPTR_EXPRESSION("#include \"jacks_standard_library.h\"\n")
+        JSL_FATPTR_EXPRESSION("#include \"jsl_core.h\"\n")
     );
     jsl_string_builder_insert_fatptr(
         builder,
-        JSL_FATPTR_EXPRESSION("#include \"jacks_hash_map.h\"\n\n")
+        JSL_FATPTR_EXPRESSION("#include \"jsl_hash_map.h\"\n\n")
     );
 
     jsl_string_builder_insert_fatptr(
@@ -1106,13 +1111,19 @@ int32_t main(int32_t argc, char** argv)
             JSLFatPtr header = jsl_fatptr_slice_to_end(arg, 13);
 
             ++header_includes_count;
-            header_includes = realloc(header_includes, sizeof(JSLFatPtr) * header_includes_count);
+            header_includes = realloc(
+                header_includes,
+                sizeof(JSLFatPtr) * (size_t) header_includes_count
+            );
             header_includes[header_includes_count - 1] = header;
         }
         else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--add-header")))
         {
             ++header_includes_count;
-            header_includes = realloc(header_includes, sizeof(JSLFatPtr) * header_includes_count);
+            header_includes = realloc(
+                header_includes,
+                sizeof(JSLFatPtr) * (size_t) header_includes_count
+            );
             header_includes[header_includes_count - 1] = jsl_fatptr_from_cstr(argv[++i]);
         }
         else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--custom-hash=")))

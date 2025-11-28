@@ -51,8 +51,8 @@ SOFTWARE.
 
 #include "minctest.h"
 
-#define JSL_IMPLEMENTATION
-#include "../src/jacks_standard_library.h"
+#define JSL_CORE_IMPLEMENTATION
+#include "../src/jsl_core.h"
 
 #define CHECK_END(str)                                                              \
     JSLFatPtr written = jsl_fatptr_slice(buffer, 0, ret);                           \

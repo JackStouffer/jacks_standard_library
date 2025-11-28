@@ -45,8 +45,8 @@
 #include <string.h>
 #include <ctype.h>
 
-#define JSL_IMPLEMENTATION
-#include "../src/jacks_standard_library.h"
+#define JSL_CORE_IMPLEMENTATION
+#include "../src/jsl_core.h"
 
 typedef struct HashMapDecl {
     char *name, *prefix, *key_type, *value_type, *impl_type;
@@ -219,6 +219,7 @@ static UnitTestDecl unit_test_declarations[] = {
     { "test_string_builder", (char*[]) {"tests/test_string_builder.c", NULL} },
     { "test_intrinsics", (char*[]) {"tests/test_intrinsics.c", NULL} },
     { "test_file_utils", (char*[]) {"tests/test_file_utils.c", NULL} },
+    { "test_unicode", (char*[]) {"tests/test_unicode.c", NULL} },
     {
         "test_hash_map",
         (char*[]) {
@@ -349,13 +350,25 @@ int32_t main(int32_t argc, char **argv)
         "-DINCLUDE_MAIN",
         "-O0",
         "-glldb",
-        "-std=c11",
-        "-Wall",
-        "-Wextra",
-        "-pedantic",
-        "-o", generate_hash_map_exe_name,
-        "src/generate_hash_map.c"
+        "-std=c11"
     );
+
+    // add clang warnings
+    for (int32_t flag_idx = 0;; ++flag_idx)
+    {
+        char* flag = clang_warning_flags[flag_idx];
+        if (flag == NULL)
+            break;
+
+        nob_cmd_append(&generate_hash_map_compile_command, flag);
+    }
+
+    nob_cmd_append(
+        &generate_hash_map_compile_command,
+        "-o", generate_hash_map_exe_name,
+        "cli/generate_hash_map.c"
+    );
+
     if (!nob_cmd_run(&generate_hash_map_compile_command)) return 1;
 
     int32_t hash_map_test_count = sizeof(hash_map_declarations) / sizeof(HashMapDecl);
