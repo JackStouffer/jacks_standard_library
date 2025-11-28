@@ -57,6 +57,9 @@ See the DESIGN.md file for more info.
 
 `jsl_unicode.h`
 
+**WARNING** On MSVC you must pass `/utf-8` or else MSVC will silently give you
+incorrect code generation!
+
 ### Jack's Standard Library Templates
 
 `cli/`

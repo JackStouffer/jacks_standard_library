@@ -185,6 +185,7 @@ static CompilerConfig msvc_configs[] = {
         "msvc_debug_",
         (char*[]) {
             "/nologo",
+            "/utf-8",
             "/DJSL_DEBUG",
             "/Isrc",
             "/TC",
@@ -201,6 +202,7 @@ static CompilerConfig msvc_configs[] = {
         "msvc_opt_",
         (char*[]) {
             "/nologo",
+            "/utf-8",
             "/Isrc",
             "/TC",
             "/O2",
