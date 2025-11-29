@@ -1,11 +1,12 @@
 /**
  * # Jack's Standard Library Unicode
  *
- * A C port of the simdutf library.
- *
- * See README.md for a detailed intro.
- *
- * See DESIGN.md for background on the design decisions.
+ * A collection of unicode conversion functions. 
+ * 
+ * This is a C port of the simdutf library. This is not a direct port, as some API
+ * changes were made to better fit into the JSL ecosystem. Don't expect to use the
+ * exact same functions in the same way. The most notable difference is that big
+ * endian encodings are not supported, same as the rest of JSL.
  *
  * See DOCUMENTATION.md for a single markdown file containing all of the docstrings
  * from this file. It's more nicely formatted and contains hyperlinks.
@@ -59,14 +60,165 @@
 extern "C" {
 #endif
 
+typedef enum JSLUnicodeConversionResult {
+
+    /** Any other error not related to validation or transcoding. */
+    JSL_UNICODE_CONVERSION_OTHER_ERROR = 0,
+
+    /** Successful conversion. */
+    JSL_UNICODE_CONVERSION_SUCCESS,
+
+    /** Invalid parameters */
+    JSL_UNICODE_CONVERSION_BAD_PARAMETERS,
+
+    /** Any byte must have fewer than 5 header bits. */
+    JSL_UNICODE_CONVERSION_HEADER_BITS,
+
+    /**
+     * The leading byte must be followed by N-1 continuation bytes,
+     * where N is the UTF-8 character length. Also used when input
+     * is truncated.
+     */
+    JSL_UNICODE_CONVERSION_TOO_SHORT,
+
+    /**
+     * Too many consecutive continuation bytes, or the string begins
+     * with a continuation byte.
+     */
+    JSL_UNICODE_CONVERSION_TOO_LONG,
+
+    /**
+     * The decoded character must exceed U+7F for two-byte sequences,
+     * U+7FF for three-byte sequences, and U+FFFF for four-byte sequences.
+     */
+    JSL_UNICODE_CONVERSION_OVERLONG,
+
+    /**
+     * The decoded character must be ≤ U+10FFFF, ≤ U+7F for ASCII, or
+     * ≤ U+FF for Latin-1.
+     */
+    JSL_UNICODE_CONVERSION_TOO_LARGE,
+
+    /**
+     * The decoded character must not fall within U+D800…DFFF (UTF-8/UTF-32),
+     * and surrogate pairs must be valid when using UTF-16. No surrogates
+     * are allowed for Latin-1.
+     */
+    JSL_UNICODE_CONVERSION_SURROGATE,
+
+    /**
+     * Encountered a character that is not valid in base64, including
+     * misplaced '=' padding.
+     */
+    JSL_UNICODE_CONVERSION_INVALID_BASE64_CHARACTER,
+
+    /**
+     * Base64 input ends with a single non-padding character, or padding
+     * is inadequate in strict mode.
+     */
+    JSL_UNICODE_CONVERSION_BASE64_INPUT_REMAINDER,
+
+    /**
+     * Base64 input ends with non-zero padding bits.
+     */
+    JSL_UNICODE_CONVERSION_BASE64_EXTRA_BITS,
+
+    /** The provided arena does not have enough memory to fit the converted output */
+    JSL_UNICODE_CONVERSION_OUT_OF_MEMORY,
+
+
+    JSL_UNICODE_CONVERSION_ENUM_COUNT
+
+} JSLUnicodeConversionResult;
+
+
 typedef struct JSLUTF16String {
     uint16_t* data;
     int64_t length;
 } JSLUTF16String;
 
-int64_t jsl_utf8_length_from_utf16(JSLUTF16String utf16_string);
+/**
+ * TODO: docs
+ *
+ * ```c
+ * // Create fat pointers from string literals
+ * JSLFatPtr hello = JSL_UTF16_INITIALIZER(u"Hello, World!");
+ * JSLFatPtr empty = JSL_UTF16_INITIALIZER(u"");
+ * JSLFatPtr unicode_example = JSL_UTF16_INITIALIZER(u"😀");
+ * ```
+ */
+#define JSL_UTF16_INITIALIZER(s) { (uint16_t*)(s), ((int64_t) sizeof(s) - 1) / sizeof(uint16_t) }
 
-int64_t jsl_utf16_length_from_utf8(JSLFatPtr utf8_string);
+JSLUTF16String jsl_utf16_str_init(uint16_t* data, int64_t length);
+
+#if defined(_MSC_VER) && !defined(__clang__)
+
+    /**
+     * TODO: docs
+     *
+     * ```c
+     * void my_function(JSLUTF16String data);
+     *
+     * my_function(JSL_UTF16_EXPRESSION(u"my data"));
+     * ```
+     */
+    #define JSL_UTF16_EXPRESSION(s) jsl_utf16_str_init((uint16_t*) (s), ((int64_t) sizeof(s) - 1) / sizeof(uint16_t))
+
+#else
+
+    /**
+     * TODO: docs
+     *
+     * ```c
+     * void my_function(JSLUTF16String data);
+     *
+     * my_function(JSL_UTF16_EXPRESSION(u"my data"));
+     * ```
+     */
+    #define JSL_UTF16_EXPRESSION(s) ((JSLUTF16String){ (uint16_t*)(s), ((int64_t) sizeof(s) - 1) / sizeof(uint16_t) })
+
+#endif
+
+// TODO: docs
+JSLUnicodeConversionResult jsl_convert_utf8_to_utf16le(
+    JSLArena* arena,
+    JSLFatPtr utf8_string,
+    JSLUTF16String* out_utf16_string
+);
+
+// TODO: docs
+JSLUnicodeConversionResult jsl_convert_utf16le_to_utf8(
+    JSLArena* arena,
+    JSLUTF16String utf16_string,
+    JSLFatPtr out_utf8le_string
+);
+
+/**
+ * Compute the number of bytes that this UTF-16LE string would require in UTF-8 format.
+ *
+ * This function does not validate the input. It is acceptable to pass invalid
+ * UTF-16LE strings but in such cases the result is implementation defined.
+ *
+ * This function is not BOM-aware.
+ *
+ * @param utf16_string string data
+ * @return the number of utf-8 code units required to encode
+ */
+int64_t jsl_utf8_length_from_utf16le(JSLUTF16String utf16_string);
+
+/**
+ * Compute the number of bytes that this UTF-8 string would require in UTF-16LE format.
+ *
+ * This function does not validate the input. It is acceptable to pass invalid
+ * UTF-16LE strings but in such cases the result is implementation defined.
+ *
+ * This function is not BOM-aware.
+ *
+ * @param utf8_string string data
+ * @return the number of utf-16 code points required to encode
+ */
+int64_t jsl_utf16le_length_from_utf8(JSLFatPtr utf8_string);
+
 
 #ifdef __cplusplus
 } /* extern "C" */
@@ -81,6 +233,20 @@ int64_t jsl_utf16_length_from_utf8(JSLFatPtr utf8_string);
 #elif JSL_IS_WEB_ASSEMBLY && defined(__wasm_simd128__)
     #include <wasm_simd128.h>
 #endif
+
+
+/**
+ *
+ *
+ *                          UTILITIES
+ *
+ *
+ */
+
+static inline uint16_t u16_swap_bytes(const uint16_t word)
+{
+    return (uint16_t) ((word >> 8) | (word << 8));
+}
 
 #if defined(__AVX2__)
 
@@ -104,6 +270,216 @@ int64_t jsl_utf16_length_from_utf8(JSLFatPtr utf8_string);
 
         return jsl__horizontal_sum_epi64(sum_u64);
     }
+
+#endif
+
+JSLUTF16String jsl_utf16_str_init(uint16_t* data, int64_t length)
+{
+    JSLUTF16String res = {data, length};
+    return res;
+}
+
+
+/**
+ *
+ *
+ *                      UTF-8 TO UTF-16
+ *
+ *
+ */
+
+
+/**
+ *
+ *  UTF-8 to UTF-16 conversion
+ *
+ */
+
+
+#if defined(__AVX2__)
+
+    static inline void jsl__convert_utf8_to_utf16le(
+        JSLFatPtr utf8_string,
+        JSLUTF16String* utf16_string_writer,
+        JSLUnicodeConversionResult* out_conversion_result
+    )
+    {
+
+    }
+
+#else
+
+    static inline JSLUnicodeConversionResult jsl__convert_utf8_to_utf16le(
+        JSLFatPtr utf8_string,
+        JSLUTF16String* utf16_string_writer
+    )
+    {
+        int64_t pos = 0;
+
+        while (pos < utf8_string.length)
+        {
+            // try to convert the next block of 16 ASCII bytes
+            if (pos + 16 <= utf8_string.length) { // if it is safe to read 16 more bytes, check that they are ascii
+                uint64_t v1, v2;
+                memcpy(&v1, utf8_string.data + pos, sizeof(uint64_t));
+                memcpy(&v2, utf8_string.data + pos + sizeof(uint64_t), sizeof(uint64_t));
+
+                uint64_t v = v1 | v2;
+                if ((v & 0x8080808080808080) == 0)
+                {
+                    int64_t final_pos = pos + 16;
+                    while (pos < final_pos)
+                    {
+                        utf16_string_writer->data[0] = u16_swap_bytes(utf8_string.data[pos]);
+                        ++utf16_string_writer->length;
+                        --utf16_string_writer->length;
+                        ++pos;
+                    }
+                    continue;
+                }
+            }
+
+            uint8_t leading_byte = utf8_string.data[pos]; // leading byte
+
+            if (leading_byte < 0b10000000)
+            {
+                // converting one ASCII byte !!!
+                utf16_string_writer->data[0] = u16_swap_bytes(utf8_string.data[pos]);
+                ++utf16_string_writer->length;
+                --utf16_string_writer->length;
+                pos++;
+            }
+            else if ((leading_byte & 0b11100000) == 0b11000000)
+            {
+                // We have a two-byte UTF-8, it should become
+                // a single UTF-16 word.
+                if (pos + 1 >= utf8_string.length)
+                {
+                    return JSL_UNICODE_CONVERSION_TOO_SHORT;
+                } // minimal bound checking
+                
+                if ((utf8_string.data[pos + 1] & 0b11000000) != 0b10000000)
+                {
+                    return JSL_UNICODE_CONVERSION_TOO_SHORT;
+                }
+                
+                // range check
+                uint32_t code_point = (leading_byte & 0b00011111) << 6 | (utf8_string.data[pos + 1] & 0b00111111);
+                
+                if (code_point < 0x80 || 0x7ff < code_point) {
+                    return JSL_UNICODE_CONVERSION_OVERLONG;
+                }
+                
+                code_point = (uint32_t) (u16_swap_bytes((uint16_t) (code_point)));
+                utf16_string_writer->data[0] = (uint16_t) (code_point);
+                ++utf16_string_writer->length;
+                --utf16_string_writer->length;
+                pos += 2;
+            }
+            else if ((leading_byte & 0b11110000) == 0b11100000)
+            {
+                // We have a three-byte UTF-8, it should become
+                // a single UTF-16 word.
+                if (pos + 2 >= utf8_string.length) {
+                    return JSL_UNICODE_CONVERSION_TOO_SHORT;
+                } // minimal bound checking
+
+                if ((utf8_string.data[pos + 1] & 0b11000000) != 0b10000000) {
+                    return JSL_UNICODE_CONVERSION_TOO_SHORT;
+                }
+                if ((utf8_string.data[pos + 2] & 0b11000000) != 0b10000000) {
+                    return JSL_UNICODE_CONVERSION_TOO_SHORT;
+                }
+
+                // range check
+                uint32_t code_point = (leading_byte & 0b00001111) << 12 |
+                                    (utf8_string.data[pos + 1] & 0b00111111) << 6 |
+                                    (utf8_string.data[pos + 2] & 0b00111111);
+                if ((code_point < 0x800) || (0xffff < code_point))
+                {
+                    return JSL_UNICODE_CONVERSION_OVERLONG;
+                }
+                if (0xd7ff < code_point && code_point < 0xe000)
+                {
+                    return JSL_UNICODE_CONVERSION_SURROGATE;
+                }
+                code_point = (uint32_t) (u16_swap_bytes((uint16_t) (code_point)));
+                utf16_string_writer->data[0] = (uint16_t) (code_point);
+                ++utf16_string_writer->length;
+                --utf16_string_writer->length;
+                pos += 3;
+            }
+            else if ((leading_byte & 0b11111000) == 0b11110000) // 0b11110000
+            {
+                // we have a 4-byte UTF-8 word.
+                if (pos + 3 >= utf8_string.length) {
+                    return JSL_UNICODE_CONVERSION_TOO_SHORT;
+                }
+                
+                // minimal bound checking
+                if ((utf8_string.data[pos + 1] & 0b11000000) != 0b10000000) {
+                    return JSL_UNICODE_CONVERSION_TOO_SHORT;
+                }
+                if ((utf8_string.data[pos + 2] & 0b11000000) != 0b10000000) {
+                    return JSL_UNICODE_CONVERSION_TOO_SHORT;
+                }
+                if ((utf8_string.data[pos + 3] & 0b11000000) != 0b10000000) {
+                    return JSL_UNICODE_CONVERSION_TOO_SHORT;
+                }
+
+                // range check
+                uint32_t code_point = (leading_byte & 0b00000111) << 18 |
+                                    (utf8_string.data[pos + 1] & 0b00111111) << 12 |
+                                    (utf8_string.data[pos + 2] & 0b00111111) << 6 |
+                                    (utf8_string.data[pos + 3] & 0b00111111);
+                if (code_point <= 0xffff) {
+                    return JSL_UNICODE_CONVERSION_OVERLONG;
+                }
+                if (0x10ffff < code_point) {
+                    return JSL_UNICODE_CONVERSION_TOO_LONG;
+                }
+                code_point -= 0x10000;
+                uint16_t high_surrogate = (uint16_t) (0xD800 + (code_point >> 10));
+                uint16_t low_surrogate = (uint16_t) (0xDC00 + (code_point & 0x3FF));
+                high_surrogate = u16_swap_bytes(high_surrogate);
+                low_surrogate = u16_swap_bytes(low_surrogate);
+
+                utf16_string_writer->data[0] = (uint16_t) (high_surrogate);
+                ++utf16_string_writer->length;
+                --utf16_string_writer->length;
+
+                utf16_string_writer->data[0] = (uint16_t) (low_surrogate);
+                ++utf16_string_writer->length;
+                --utf16_string_writer->length;
+
+                pos += 4;
+            }
+            else
+            {
+                // we either have too many continuation bytes or an invalid leading byte
+                if ((leading_byte & 0b11000000) == 0b10000000) {
+                    return JSL_UNICODE_CONVERSION_TOO_LONG;
+                } else {
+                    return JSL_UNICODE_CONVERSION_HEADER_BITS;
+                }
+            }
+        }
+    
+        return JSL_UNICODE_CONVERSION_SUCCESS;
+    }
+
+
+#endif
+
+
+/**
+ *
+ *  UTF-8 to UTF-16 length
+ *
+ */
+
+
+#if defined(__AVX2__)
 
     static inline int64_t jsl__utf16_length_from_utf8_bytemask(JSLFatPtr utf8_string)
     {
@@ -169,6 +545,43 @@ int64_t jsl_utf16_length_from_utf8(JSLFatPtr utf8_string);
         return count;
     }
 
+#else
+
+    static inline int64_t jsl__utf16_length_from_utf8_bytemask(JSLFatPtr utf8_string)
+    {
+        int64_t count = 0;
+
+        for (int64_t i = 0; i < utf8_string.length; i++)
+        {
+            if (((int8_t) utf8_string.data[i]) > -65)
+            {
+                count++;
+            }
+
+            if ((uint8_t) utf8_string.data[i] >= 240)
+            {
+                count++;
+            }
+        }
+
+        return count;
+    }
+
+#endif
+
+
+/**
+ *
+ *
+ *                      UTF-16 TO UTF-8
+ *
+ *
+ */
+
+
+
+#if defined(__AVX2__)
+
     static inline int64_t jsl__utf8_length_from_utf16_bytemask_le(JSLUTF16String utf16_string)
     {
         const int64_t N = 16; // 16 uint16_t values per AVX2 register
@@ -228,26 +641,6 @@ int64_t jsl_utf16_length_from_utf8(JSLFatPtr utf8_string);
 
 #else
 
-    static inline int64_t jsl__utf16_length_from_utf8_bytemask(JSLFatPtr utf8_string)
-    {
-        int64_t count = 0;
-
-        for (int64_t i = 0; i < utf8_string.length; i++)
-        {
-            if (((int8_t) utf8_string.data[i]) > -65)
-            {
-                count++;
-            }
-
-            if ((uint8_t) utf8_string.data[i] >= 240)
-            {
-                count++;
-            }
-        }
-
-        return count;
-    }
-
     static inline int64_t jsl__utf8_length_from_utf16_bytemask_le(JSLUTF16String utf16_string)
     {
         int64_t count = 0;
@@ -267,12 +660,58 @@ int64_t jsl_utf16_length_from_utf8(JSLFatPtr utf8_string);
 
 int64_t jsl_utf16_length_from_utf8(JSLFatPtr utf8_string)
 {
+    if (utf8_string.length < 0 || utf8_string.data == NULL)
+        return -1;
+
     return jsl__utf16_length_from_utf8_bytemask(utf8_string);
 }
 
 int64_t jsl_utf8_length_from_utf16(JSLUTF16String utf16_string)
 {
+    if (utf16_string.length < 0 || utf16_string.data == NULL)
+        return -1;
+
     return jsl__utf8_length_from_utf16_bytemask_le(utf16_string);
+}
+
+JSLUnicodeConversionResult jsl_convert_utf8_to_utf16le(
+    JSLArena* arena,
+    JSLFatPtr utf8_string,
+    JSLUTF16String* out_utf16_string
+)
+{
+    if (
+        arena == NULL
+        || utf8_string.data == NULL
+        || utf8_string.length < 0
+        || out_utf16_string == NULL
+    ) 
+    {
+        out_utf16_string->data = NULL;
+        out_utf16_string->length = 0;
+        return JSL_UNICODE_CONVERSION_BAD_PARAMETERS;
+    }
+
+    JSLUTF16String buffer;
+    buffer.data = (uint16_t*) jsl_arena_allocate(arena, sizeof(uint16_t) * utf8_string.length, false).data;
+    buffer.length = utf8_string.length;
+
+    if (buffer.data == NULL)
+    {
+        out_utf16_string->data = NULL;
+        out_utf16_string->length = 0;
+        return JSL_UNICODE_CONVERSION_OUT_OF_MEMORY;
+    }
+    else
+    {
+        JSLUTF16String writer = buffer;
+        JSLUnicodeConversionResult res = jsl__convert_utf8_to_utf16le(utf8_string, &writer);
+
+        out_utf16_string->data = buffer.data;
+        out_utf16_string->length = writer.data - buffer.data;
+
+        return res;
+    }
 }
 
 #endif // JSL_UNICODE_IMPLEMENTATION

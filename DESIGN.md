@@ -8,6 +8,7 @@ These are general notes on design decisions.
 - [Assertions](#assertions)
 - [Graceful Degradation](#graceful-degradation)
 - [Why do you use signed 64 bit ints for sizes and not `size_t`?](#why-do-you-use-signed-64-bit-ints-for-sizes-and-not-size_t)
+- [Multiple Return Values](#multiple-return-values)
 - [Fat Pointers](#fat-pointers)
   - [Writing](#writing)
   - [Slicing](#slicing)
@@ -147,12 +148,32 @@ And it turns out, underflows can happen quite a lot. I've gotten fed up with it.
 I've switched to signed for all size storage, and I've never had an `int64_t`
 overflow on me.
 
+## Multiple Return Values
+
+In C, there are three general ways to write functions which return multiple values:
+
+```c
+// Option 1
+MyStatusEnum function(void* input, int64_t* output);
+
+// Option 2
+void function(void* input, MyStatusEnum* output_one, int64_t* output_two);
+
+// Option 3
+struct MyOutput { MyStatusEnum output_one, int64_t output_two };
+
+struct MyOutput void function(void* input);
+```
+
+They each have benefits, but these libraries use option one. The main reason is that
+this makes it way easier to integrate with foreign function interfaces. For example
+calling the function that's in a WebAssembly module from JavaScript becomes very simple
+as each parameter maps directly to a JavaScript type.
+
 ## Fat Pointers
 
 A fat pointer is JSL's representation of a contiguous range of virtual address
-space represented as bytes.
-
-A fat pointer is defined as
+space represented as bytes. A fat pointer is defined as
 
 ```c
 struct {
@@ -161,7 +182,16 @@ struct {
 };
 ```
 
-Also, `uint8_t` is important because it helps be more clear when using UTF-8.
+Fat pointers are used in JSL to represent memory, binary data, and utf-8 string
+values.
+
+Fat pointers are analogous to D's, Go's, Odin's slices, but for memory specifically.
+JSL does not have a generic slice construct. In the aforementioned languages,
+each slice is a silent template; the compiler inserts the struct definition whenever
+you use one. Such a construct isn't possible in C. Each slice would need to be a
+macro invocation. Functions which would want to use of a generic slice as a
+parameter or return value would themselves need to be macros and you can't have macros
+inside of macros in C.
 
 ### Writing
 

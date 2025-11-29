@@ -2230,6 +2230,9 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     JSLFatPtr jsl_fatptr_auto_slice(JSLFatPtr original_fatptr, JSLFatPtr writer_fatptr)
     {
+        // TODO: add an assertion here which checks that writer pointer points
+        // to a section of the original fat pointer
+
         int64_t write_length = jsl_fatptr_total_write_length(original_fatptr, writer_fatptr);
         return jsl_fatptr_slice(
             original_fatptr,
