@@ -1219,9 +1219,12 @@ JSL_DEF JSLFatPtr jsl_fatptr_slice_to_end(JSLFatPtr fatptr, int64_t start);
  * Utility function to get the total amount of bytes written to the original
  * fat pointer when compared to a writer fat pointer. See jsl_fatptr_auto_slice
  * to get a slice of the written portion.
- *
- * This function checks for NULL and checks that `writer_fatptr` points to data
- * in `original_fatptr`. If either of these checks fail, then `-1` is returned.
+ * 
+ * This function asserts on the following conditions
+ * 
+ *      * Either fatptr has a null data field
+ *      * Either fatptr has a negative length
+ *      * The writer_fatptr does not point to the memory of original_fatptr
  *
  * ```
  * JSLFatPtr original = jsl_arena_allocate(arena, 128 * 1024 * 1024);
@@ -1239,10 +1242,13 @@ JSL_DEF int64_t jsl_fatptr_total_write_length(JSLFatPtr original_fatptr, JSLFatP
 
 /**
  * Returns the slice in `original_fatptr` that represents the written to portion, given
- * the size and pointer in `writer_fatptr`. If either parameter has a NULL data
- * field, has a negative length, or if the writer does not point to a portion
- * of the original allocation, this function will return a fat pointer with a
- * `NULL` data pointer.
+ * the size and pointer in `writer_fatptr`.
+ * 
+ * This function asserts on the following conditions
+ * 
+ *      * Either fatptr has a null data field
+ *      * Either fatptr has a negative length
+ *      * The writer_fatptr does not point to the memory of original_fatptr
  *
  * Example:
  *
@@ -2214,18 +2220,21 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     int64_t jsl_fatptr_total_write_length(JSLFatPtr original_fatptr, JSLFatPtr writer_fatptr)
     {
-        int64_t res = -1;
+        uintptr_t orig = (uintptr_t) original_fatptr.data;
+        uintptr_t writer = (uintptr_t) writer_fatptr.data;
 
-        if (original_fatptr.data != NULL && writer_fatptr.data != NULL)
-        {
-            int64_t length_written = writer_fatptr.data - original_fatptr.data;
-            if (length_written > -1 && length_written <= original_fatptr.length)
-            {
-                res = length_written;
-            }
-        }
+        JSL_ASSERT(
+            original_fatptr.data != NULL &&
+            writer_fatptr.data != NULL &&
+            original_fatptr.length > -1 &&
+            writer_fatptr.length > -1 &&
+            (uint64_t) original_fatptr.length <= UINTPTR_MAX - orig && // avoid wrap
+            writer >= orig &&
+            writer - orig <= (uintptr_t) original_fatptr.length
+        );
 
-        return res;
+        int64_t length_written = writer_fatptr.data - original_fatptr.data;
+        return length_written;
     }
 
     JSLFatPtr jsl_fatptr_auto_slice(JSLFatPtr original_fatptr, JSLFatPtr writer_fatptr)
@@ -2236,8 +2245,8 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         JSL_ASSERT(
             original_fatptr.data != NULL &&
             writer_fatptr.data != NULL &&
-            original_fatptr.length >= 0 &&
-            writer_fatptr.length >= 0 &&
+            original_fatptr.length > -1 &&
+            writer_fatptr.length > -1 &&
             (uint64_t) original_fatptr.length <= UINTPTR_MAX - orig && // avoid wrap
             writer >= orig &&
             writer - orig <= (uintptr_t) original_fatptr.length
