@@ -2230,15 +2230,22 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     JSLFatPtr jsl_fatptr_auto_slice(JSLFatPtr original_fatptr, JSLFatPtr writer_fatptr)
     {
-        // TODO: add an assertion here which checks that writer pointer points
-        // to a section of the original fat pointer
+        uintptr_t orig = (uintptr_t) original_fatptr.data;
+        uintptr_t writer = (uintptr_t) writer_fatptr.data;
 
-        int64_t write_length = jsl_fatptr_total_write_length(original_fatptr, writer_fatptr);
-        return jsl_fatptr_slice(
-            original_fatptr,
-            0,
-            write_length
+        JSL_ASSERT(
+            original_fatptr.data != NULL &&
+            writer_fatptr.data != NULL &&
+            original_fatptr.length >= 0 &&
+            writer_fatptr.length >= 0 &&
+            (uint64_t) original_fatptr.length <= UINTPTR_MAX - orig && // avoid wrap
+            writer >= orig &&
+            writer - orig <= (uintptr_t) original_fatptr.length
         );
+
+        int64_t write_length = (int64_t)(writer - orig);
+        original_fatptr.length = write_length;
+        return original_fatptr;
     }
 
     JSLFatPtr jsl_fatptr_from_cstr(char* str)

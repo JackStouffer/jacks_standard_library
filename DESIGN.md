@@ -43,14 +43,18 @@ This library provides all of the functionality I need in a base utility layer.
 
 ## Assertions
 
-At the moment, JSL only uses assertions for bounds checking. Other assertions may be
-added in the future for similar security measures. Otherwise, all other failure
-cases will simply be treated as a normal operation of the program and will result in
-an error return value from the function. This includes passing in null pointers for
-pointer parameters, failure to allocate, etc.
+At the moment, JSL only uses assertions for two things: bounds checking and making sure
+that user provided alignment is a valid power of two. Other assertions may be
+added in the future for similar security measures or cases where the user input makes no
+sense and the program cannot continue.
+
+Otherwise, all other failure cases will simply be treated as a normal operation of the
+program and will result in an error return value from the function. This includes passing
+in null pointers for pointer parameters, failure to allocate, etc.
 
 Over use of assertions encourages laziness. The vast, vast majority of errors are
-recoverable. Errors should not be given special treatment and should instead be treated like any other possible program state. 
+recoverable. Errors should not be given special treatment and should instead be treated
+like any other possible program state. 
 
 ## Graceful Degradation
 
