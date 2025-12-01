@@ -47,7 +47,8 @@ static void debug_concatenate_builder(JSLStringBuilder* builder, JSLFatPtr* writ
         if (slice.data == NULL)
             break;
 
-        jsl_fatptr_memory_copy(writer, slice);
+        int64_t memcpy_res = jsl_fatptr_memory_copy(writer, slice);
+        TEST_INT64_EQUAL(memcpy_res, slice.length);
     }
 }
 

@@ -136,6 +136,31 @@ headers `stddef.h`, `stdint.h`, and `stdbool.h` (if using < C23). You'll also ha
 define the replacement functions for the C standard library functions like `assert` and
 `memcmp`. See the "Preprocessor Switches" section for more information.
 
+### Note On Compile Flags
+
+In an attempt to be as compatible with as many projects as possible, these libraries
+are verified with a very strict warning subset and with many clang/gcc runtime sanitizers.
+
+The following shows the most restrictive, verified set of flags tested for each compiler.
+
+MSVC:
+
+```
+/W4 /WX /std:c11
+```
+
+clang:
+
+```
+-std=c11 -Wall -Wextra -Wconversion -Wsign-conversion -Wshadow -Wconditional-uninitialized -Wcomma -Widiomatic-parentheses -Wpointer-arith -Wassign-enum -Wswitch-enum -Wimplicit-fallthrough -Wnull-dereference -Wmissing-prototypes -Wundef -pedantic -fsanitize=address -fsanitize-address-use-after-scope -fsanitize=undefined -fsanitize=pointer-compare,pointer-subtract -fsanitize=alignment -fsanitize=unreachable,return -fsanitize=signed-integer-overflow,shift,shift-base,shift-exponent -fno-sanitize-recover=all
+```
+
+gcc:
+
+```
+
+```
+
 ## Testing
 
 Each test file is compiled and run many times. For example, Clang is used to build once

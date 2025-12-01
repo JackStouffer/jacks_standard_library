@@ -53,8 +53,13 @@ program and will result in an error return value from the function. This include
 in null pointers for pointer parameters, failure to allocate, etc.
 
 Over use of assertions encourages laziness. The vast, vast majority of errors are
-recoverable. Errors should not be given special treatment and should instead be treated
-like any other possible program state. 
+recoverable. Most errors should not be given special treatment and should instead
+be treated like any other possible program state.
+
+That being said, **it's a very bad idea to turn off assertions!**. Using `-DNDEBUG`
+will net you 3-10% performance boost in many cases. It is absolutely not worth
+it. If one of the assertions that would have fired is turned off then you're
+risking data corruption or secure info leaks.
 
 ## Graceful Degradation
 

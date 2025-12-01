@@ -1280,14 +1280,22 @@ JSL_DEF JSLFatPtr jsl_fatptr_from_cstr(char* str);
 /**
  * Copy the contents of `source` into `destination`.
  *
- * This function is bounds checked, meaning a max of `destination->length` bytes
- * will be copied into `destination`. This function also checks for overlapping
- * buffers, null pointers in either `destination` or `source`, and negative lengths.
- * In all these cases, -1 will be returned.
- *
  * `destination` is modified to point to the remaining data in the buffer. I.E.
  * if the entire buffer was used then `destination->length` will be `0` and
  * `destination->data` will be pointing to the end of the buffer.
+ *
+ * This function is bounds checked, meaning a max of `destination->length` bytes
+ * will be copied into `destination`. 
+ * 
+ * This function also checks for
+ *
+ *      * overlapping buffers
+ *      * null pointers in either `destination` or `source`
+ *      * negative lengths.
+ *      * If either `destination` or `source` would overflow if their
+ *        length was added to the pointer
+ * 
+ * In all these cases, -1 will be returned.
  *
  * @return Number of bytes written or `-1` if the above error conditions were present.
  */
@@ -2266,7 +2274,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         return ret;
     }
 
-    int64_t jsl_fatptr_memory_copy(JSLFatPtr* destination, JSLFatPtr source)
+    JSL_WARN_UNUSED int64_t jsl_fatptr_memory_copy(JSLFatPtr* destination, JSLFatPtr source)
     {
         if (
             source.length < 0
@@ -2276,16 +2284,22 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         )
             return -1;
 
-        // Check for overlapping buffers
-        if (
-            (source.data < destination->data + destination->length && source.data + source.length > destination->data)
-            || (destination->data < source.data + source.length && destination->data + destination->length > source.data)
-        )
-        {
+        // Check for overflows, e.g. if source.data + source.length is
+        // greater than UINTPTR_MAX
+        const bool source_would_overflow = (uint64_t) source.length > UINTPTR_MAX - (uintptr_t) source.data;
+        const bool destination_would_overflow = (uint64_t) destination->length > UINTPTR_MAX - (uintptr_t) destination->data;
+        if (source_would_overflow || destination_would_overflow)
             return -1;
-        }
 
-        int64_t memcpy_length = JSL_MIN(source.length, destination->length);
+        // Check for overlapping buffers
+        const uintptr_t source_start = (uintptr_t) source.data;
+        const uintptr_t source_end = source_start + (uintptr_t) source.length;
+        const uintptr_t dest_start = (uintptr_t) destination->data;
+        const uintptr_t dest_end = dest_start + (uintptr_t) destination->length;
+        if (source_start < dest_end && source_end > dest_start)
+            return -1;
+
+        const int64_t memcpy_length = JSL_MIN(source.length, destination->length);
         JSL_MEMCPY(destination->data, source.data, (size_t) memcpy_length);
 
         destination->data += memcpy_length;
@@ -3412,28 +3426,42 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         );
 
         JSLFatPtr res = {0};
-        uint8_t* aligned_current = align_ptr_upwards(arena->current, alignment);
-        uint8_t* potential_end = aligned_current + bytes;
 
+        if (bytes < 0)
+            return res;
+
+        uintptr_t arena_end = (uintptr_t) arena->end;
+        uintptr_t aligned_current_addr = (uintptr_t) align_ptr_upwards(arena->current, alignment);
+
+        if (aligned_current_addr > arena_end)
+            return res;
+
+        // When ASAN is enabled, we leave poisoned guard
+        // zones between allocations to catch buffer overflows
         #if JSL__HAS_ASAN
-            int32_t guard_size = JSL__ASAN_GUARD_SIZE;
+            uintptr_t guard_size = (uintptr_t) JSL__ASAN_GUARD_SIZE;
         #else
-            int32_t guard_size = 0;
+            uintptr_t guard_size = 0;
         #endif
 
-        uint8_t* next_current = potential_end + guard_size;
+        if ((uint64_t) bytes > UINTPTR_MAX - aligned_current_addr)
+            return res;
 
-        if (next_current <= arena->end)
+        uintptr_t potential_end = aligned_current_addr + (uintptr_t) bytes;
+        uintptr_t next_current_addr = potential_end + guard_size;
+
+        if (next_current_addr <= arena_end)
         {
+            uint8_t* aligned_current = (uint8_t*) aligned_current_addr;
+
             res.data = aligned_current;
             res.length = bytes;
 
             #if JSL__HAS_ASAN
-                // Leave poisoned guard zones between allocations
-                arena->current = next_current;
+                arena->current = (uint8_t*) next_current_addr;
                 ASAN_UNPOISON_MEMORY_REGION(res.data, res.length);
             #else
-                arena->current = next_current;
+                arena->current = (uint8_t*) next_current_addr;
             #endif
 
             if (zeroed)
@@ -3457,31 +3485,65 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         int32_t align
     )
     {
-        JSL_ASSERT(align > 0);
-        JSL_ASSERT(jsl__is_power_of_two(align));
+        JSL_ASSERT(align > 0 && jsl__is_power_of_two(align));
 
         JSLFatPtr res = {0};
-        uint8_t* aligned_current = align_ptr_upwards(arena->current, align);
-        uint8_t* potential_end = aligned_current + new_num_bytes;
+
+        if (new_num_bytes < 0 || original_allocation.length < 0)
+            return res;
+
+        const uintptr_t arena_start = (uintptr_t) arena->start;
+        const uintptr_t arena_current = (uintptr_t) arena->current;
+        const uintptr_t arena_end = (uintptr_t) arena->end;
+
+        const uintptr_t aligned_current_addr = (uintptr_t) align_ptr_upwards(
+            arena->current,
+            align
+        );
+
+        if (aligned_current_addr > arena_end)
+            return res;
 
         #if JSL__HAS_ASAN
-            int32_t guard_size = JSL__ASAN_GUARD_SIZE;
+            const uintptr_t guard_size = (uintptr_t) JSL__ASAN_GUARD_SIZE;
         #else
-            int32_t guard_size = 0;
+            const uintptr_t guard_size = 0;
         #endif
 
-        uint8_t* next_current = potential_end + guard_size;
+        bool can_hold_bytes = (uint64_t) new_num_bytes <= UINTPTR_MAX - aligned_current_addr;
+        uintptr_t potential_end = can_hold_bytes 
+            ? aligned_current_addr + (uintptr_t) new_num_bytes 
+            : 0;
+
+        uintptr_t next_current_addr = 0;
+        bool is_space_left = false;
+
+        bool guard_overflow = !can_hold_bytes || guard_size > UINTPTR_MAX - potential_end;
+        if (!guard_overflow)
+        {
+            next_current_addr = potential_end + guard_size;
+            is_space_left = next_current_addr <= arena_end;
+        }
 
         // Only resize if this given allocation was the last thing alloc-ed
-        bool same_pointer =
-            (arena->current - original_allocation.length) == original_allocation.data;
-        bool is_space_left = next_current <= arena->end;
+        uintptr_t original_data_addr = (uintptr_t) original_allocation.data;
+        bool same_pointer = false;
+
+        if (
+            original_data_addr >= arena_start
+            && original_data_addr <= arena_end
+            && (uint64_t) original_allocation.length <= UINTPTR_MAX - original_data_addr
+        )
+        {
+            uintptr_t original_end_addr = original_data_addr + (uintptr_t) original_allocation.length;
+            same_pointer = (arena_current == original_end_addr);
+        }
 
         if (same_pointer && is_space_left)
         {
-            res.data = original_allocation.data;
+            res.data = (uint8_t*) original_data_addr;
             res.length = new_num_bytes;
-            arena->current = next_current;
+            arena->current = (uint8_t*) next_current_addr;
 
             ASAN_UNPOISON_MEMORY_REGION(res.data, res.length);
 
@@ -3543,20 +3605,38 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     void jsl_arena_load_restore_point(JSLArena* arena, uint8_t* restore_point)
     {
-        JSL_ASSERT(restore_point >= arena->start);
-        JSL_ASSERT(restore_point <= arena->end);
+        uintptr_t restore_addr = (uintptr_t) restore_point;
+        uintptr_t start_addr = (uintptr_t) arena->start;
+        uintptr_t end_addr = (uintptr_t) arena->end;
+        uintptr_t current_addr = (uintptr_t) arena->current;
 
-        ASAN_UNPOISON_MEMORY_REGION(restore_point, arena->current - restore_point);
+        bool in_bounds = restore_addr >= start_addr && restore_addr <= end_addr;
+        bool before_current = restore_addr <= current_addr;
+
+        JSL_ASSERT(in_bounds);
+        JSL_ASSERT(before_current);
+
+        // in case assertions are turned off
+        if (!in_bounds || !before_current)
+            return;
+
+        ASAN_UNPOISON_MEMORY_REGION(
+            restore_point,
+            (size_t) (current_addr - restore_addr)
+        );
 
         #ifdef JSL_DEBUG
             JSL_MEMSET(
                 (void*) restore_point,
                 (int32_t) 0xfeeefeee,
-                (size_t) (arena->current - restore_point)
+                (size_t) (current_addr - restore_addr)
             );
         #endif
 
-        ASAN_POISON_MEMORY_REGION(restore_point, arena->current - restore_point);
+        ASAN_POISON_MEMORY_REGION(
+            restore_point,
+            (size_t) (current_addr - restore_addr)
+        );
 
         arena->current = restore_point;
     }
