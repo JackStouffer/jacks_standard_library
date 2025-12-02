@@ -2831,30 +2831,72 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     bool jsl_fatptr_starts_with(JSLFatPtr str, JSLFatPtr prefix)
     {
-        // TODO, cleanup: Think of a way to refactor this to single return
+        bool result = false;
 
-        if (str.data != NULL
-            && prefix.data != NULL
-            && prefix.length <= str.length)
+        if (str.data != NULL && prefix.data != NULL && prefix.length <= str.length)
         {
-            // TODO, speed: SIMD
-            while (prefix.length > 0 && str.length > 0)
+            if (prefix.length == 0)
             {
-                if (*str.data != *prefix.data)
-                {
-                    return false;
-                }
-
-                ++str.data;
-                --str.length;
-                ++prefix.data;
-                --prefix.length;
+                result = true;
             }
+            else
+            {
+                const uint8_t* str_ptr = str.data;
+                const uint8_t* pre_ptr = prefix.data;
+                int64_t remaining = prefix.length;
+                bool match = true;
 
-            return true;
+                #ifdef __AVX2__
+                    while (remaining >= 32)
+                    {
+                        __m256i a = _mm256_loadu_si256((__m256i*) str_ptr);
+                        __m256i b = _mm256_loadu_si256((__m256i*) pre_ptr);
+                        __m256i cmp = _mm256_cmpeq_epi8(a, b);
+                        uint32_t mask = (uint32_t) _mm256_movemask_epi8(cmp);
+
+                        if (mask != 0xFFFFFFFFu)
+                        {
+                            match = false;
+                            break;
+                        }
+
+                        str_ptr += 32;
+                        pre_ptr += 32;
+                        remaining -= 32;
+                    }
+                #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
+                    while (remaining >= 16)
+                    {
+                        uint8x16_t a = vld1q_u8(str_ptr);
+                        uint8x16_t b = vld1q_u8(pre_ptr);
+                        uint8x16_t cmp = vceqq_u8(a, b);
+                        uint8_t min_mask = vminvq_u8(cmp);
+
+                        if (min_mask != 0xFFu)
+                        {
+                            match = false;
+                            break;
+                        }
+
+                        str_ptr += 16;
+                        pre_ptr += 16;
+                        remaining -= 16;
+                    }
+                #endif
+
+                if (match)
+                {
+                    if (remaining > 0)
+                    {
+                        match = JSL_MEMCMP(str_ptr, pre_ptr, (size_t) remaining) == 0;
+                    }
+
+                    result = match;
+                }
+            }
         }
 
-        return false;
+        return result;
     }
 
     bool jsl_fatptr_ends_with(JSLFatPtr str, JSLFatPtr postfix)

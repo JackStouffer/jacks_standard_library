@@ -587,6 +587,10 @@ static void test_jsl_fatptr_starts_with(void)
     JSLFatPtr buffer7 = JSL_FATPTR_INITIALIZER("HHHHHHHHHHHHHHHH");
     JSLFatPtr prefix7 = JSL_FATPTR_INITIALIZER("HHHHHHHHHHHHHHHHH");
     TEST_BOOL(jsl_fatptr_starts_with(buffer7, prefix7) == false);
+
+    JSLFatPtr buffer8 = JSL_FATPTR_INITIALIZER("This is a string example that will span multiple AVX2 chunks so that we can test if the loop is working properly.");
+    JSLFatPtr prefix8 = JSL_FATPTR_INITIALIZER("This is a string example that will ");
+    TEST_BOOL(jsl_fatptr_starts_with(buffer8, prefix8));
 }
 
 static void test_jsl_fatptr_ends_with(void)
@@ -623,9 +627,8 @@ static void test_jsl_fatptr_ends_with(void)
     JSLFatPtr postfix8 = JSL_FATPTR_INITIALIZER("!");
     TEST_BOOL(jsl_fatptr_ends_with(buffer8, postfix8) == true);
 
-    JSLFatPtr buffer9 = JSL_FATPTR_INITIALIZER("This is a string example that will span multiple AVX2 chunks so that we can test if the loop is working properly.");
-    JSLFatPtr postfix9 = JSL_FATPTR_INITIALIZER("properly.");
-    TEST_BOOL(jsl_fatptr_ends_with(buffer9, postfix9));
+    JSLFatPtr postfix9 = JSL_FATPTR_INITIALIZER(" are since we're using ASCII/UTF-8.");
+    TEST_BOOL(jsl_fatptr_ends_with(medium_str, postfix9));
 }
 
 static void test_jsl_fatptr_compare_ascii_insensitive(void)
