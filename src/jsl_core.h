@@ -2829,146 +2829,96 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         #endif
     }
 
+    static inline bool jsl__fatptr_small_prefix_match(const uint8_t* str_ptr, const uint8_t* pre_ptr, int64_t len)
+    {
+        if (len <= 3)
+        {
+            if (len == 1)
+                return str_ptr[0] == pre_ptr[0];
+
+            if (len == 2)
+                return (str_ptr[0] == pre_ptr[0]) && (str_ptr[1] == pre_ptr[1]);
+
+            return (str_ptr[0] == pre_ptr[0]) && (str_ptr[1] == pre_ptr[1]) && (str_ptr[2] == pre_ptr[2]);
+        }
+        else if (len <= 8)
+        {
+            uint32_t head_a = 0;
+            uint32_t head_b = 0;
+            uint32_t tail_a = 0;
+            uint32_t tail_b = 0;
+
+            JSL_MEMCPY(&head_a, str_ptr, 4);
+            JSL_MEMCPY(&head_b, pre_ptr, 4);
+            JSL_MEMCPY(&tail_a, str_ptr + 4, (size_t) (len - 4));
+            JSL_MEMCPY(&tail_b, pre_ptr + 4, (size_t) (len - 4));
+
+            return (head_a ^ head_b) == 0 && (tail_a ^ tail_b) == 0;
+        }
+        else
+        {
+            uint64_t head_a = 0;
+            uint64_t head_b = 0;
+            uint64_t tail_a = 0;
+            uint64_t tail_b = 0;
+
+            JSL_MEMCPY(&head_a, str_ptr, 8);
+            JSL_MEMCPY(&head_b, pre_ptr, 8);
+            JSL_MEMCPY(&tail_a, str_ptr + 8, (size_t) (len - 8));
+            JSL_MEMCPY(&tail_b, pre_ptr + 8, (size_t) (len - 8));
+
+            return (head_a ^ head_b) == 0 && (tail_a ^ tail_b) == 0;
+        }
+    }
+
+    #ifdef __AVX2__
+        static inline bool jsl__fatptr_compare_upto_32(const uint8_t* str_ptr, const uint8_t* pre_ptr, int64_t len)
+        {
+            if (len <= 16)
+            {
+                return jsl__fatptr_small_prefix_match(str_ptr, pre_ptr, len);
+            }
+
+            __m128i head = _mm_loadu_si128((__m128i*) str_ptr);
+            __m128i head_pre = _mm_loadu_si128((__m128i*) pre_ptr);
+            __m128i tail = _mm_loadu_si128((__m128i*) (str_ptr + len - 16));
+            __m128i tail_pre = _mm_loadu_si128((__m128i*) (pre_ptr + len - 16));
+
+            uint32_t head_mask = (uint32_t) _mm_movemask_epi8(_mm_cmpeq_epi8(head, head_pre));
+            uint32_t tail_mask = (uint32_t) _mm_movemask_epi8(_mm_cmpeq_epi8(tail, tail_pre));
+
+            return head_mask == 0xFFFFu && tail_mask == 0xFFFFu;
+        }
+    #endif
+
     bool jsl_fatptr_starts_with(JSLFatPtr str, JSLFatPtr prefix)
     {
-        bool result = false;
+        if (JSL__UNLIKELY(str.data == NULL || prefix.data == NULL))
+            return false;
 
-        if (str.data != NULL && prefix.data != NULL && prefix.length <= str.length)
-        {
-            if (prefix.length == 0)
-            {
-                result = true;
-            }
-            else
-            {
-                const uint8_t* str_ptr = str.data;
-                const uint8_t* pre_ptr = prefix.data;
-                int64_t remaining = prefix.length;
-                bool match = true;
+        if (prefix.length == 0)
+            return true;
 
-                #ifdef __AVX2__
-                    while (remaining >= 32)
-                    {
-                        __m256i a = _mm256_loadu_si256((__m256i*) str_ptr);
-                        __m256i b = _mm256_loadu_si256((__m256i*) pre_ptr);
-                        __m256i cmp = _mm256_cmpeq_epi8(a, b);
-                        uint32_t mask = (uint32_t) _mm256_movemask_epi8(cmp);
+        if (JSL__UNLIKELY(prefix.length > str.length))
+            return false;
 
-                        if (mask != 0xFFFFFFFFu)
-                        {
-                            match = false;
-                            break;
-                        }
-
-                        str_ptr += 32;
-                        pre_ptr += 32;
-                        remaining -= 32;
-                    }
-                #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
-                    while (remaining >= 16)
-                    {
-                        uint8x16_t a = vld1q_u8(str_ptr);
-                        uint8x16_t b = vld1q_u8(pre_ptr);
-                        uint8x16_t cmp = vceqq_u8(a, b);
-                        uint8_t min_mask = vminvq_u8(cmp);
-
-                        if (min_mask != 0xFFu)
-                        {
-                            match = false;
-                            break;
-                        }
-
-                        str_ptr += 16;
-                        pre_ptr += 16;
-                        remaining -= 16;
-                    }
-                #endif
-
-                if (match)
-                {
-                    if (remaining > 0)
-                    {
-                        match = JSL_MEMCMP(str_ptr, pre_ptr, (size_t) remaining) == 0;
-                    }
-
-                    result = match;
-                }
-            }
-        }
-
-        return result;
+        return JSL_MEMCMP(str.data, prefix.data, (size_t) prefix.length) == 0;
     }
 
     bool jsl_fatptr_ends_with(JSLFatPtr str, JSLFatPtr postfix)
     {
-        bool result = true;
+        if (JSL__UNLIKELY(str.data == NULL || postfix.data == NULL))
+            return false;
 
-        if (str.data == NULL || postfix.data == NULL)
-        {
-            result = false;
-        }
-        else if (postfix.length > str.length)
-        {
-            result = false;
-        }
-        else if (postfix.length > 0)
-        {
-            const uint8_t* str_suffix = str.data + (str.length - postfix.length);
-            const uint8_t* postfix_ptr = postfix.data;
-            int64_t remaining = postfix.length;
+        if (postfix.length == 0)
+            return true;
 
-            #ifdef __AVX2__
-                while (result && remaining >= 32)
-                {
-                    __m256i str_block = _mm256_loadu_si256((__m256i*) str_suffix);
-                    __m256i postfix_block = _mm256_loadu_si256((__m256i*) postfix_ptr);
-                    __m256i cmp = _mm256_cmpeq_epi8(str_block, postfix_block);
+        if (JSL__UNLIKELY(postfix.length > str.length))
+            return false;
 
-                    uint32_t mask = (uint32_t) _mm256_movemask_epi8(cmp);
-                    if (mask != 0xFFFFFFFFu)
-                    {
-                        result = false;
-                        break;
-                    }
+        JSL_FATPTR_ADVANCE(str, str.length - postfix.length);
 
-                    str_suffix += 32;
-                    postfix_ptr += 32;
-                    remaining -= 32;
-                }
-            #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
-                while (result && remaining >= 16)
-                {
-                    uint8x16_t str_block = vld1q_u8(str_suffix);
-                    uint8x16_t postfix_block = vld1q_u8(postfix_ptr);
-                    uint8x16_t cmp = vceqq_u8(str_block, postfix_block);
-
-                    if (jsl__neon_movemask(cmp) != 0xFFFF)
-                    {
-                        result = false;
-                        break;
-                    }
-
-                    str_suffix += 16;
-                    postfix_ptr += 16;
-                    remaining -= 16;
-                }
-            #endif
-
-            while (result && remaining > 0)
-            {
-                if (*str_suffix != *postfix_ptr)
-                {
-                    result = false;
-                    break;
-                }
-
-                ++str_suffix;
-                ++postfix_ptr;
-                --remaining;
-            }
-        }
-
-        return result;
+        return JSL_MEMCMP(str.data, postfix.data, (size_t) postfix.length) == 0;
     }
 
     JSLFatPtr jsl_fatptr_get_file_extension(JSLFatPtr filename)
