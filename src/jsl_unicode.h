@@ -341,7 +341,7 @@ JSLUTF16String jsl_utf16_str_init(uint16_t* data, int64_t length)
 
             uint8_t leading_byte = utf8_string.data[pos]; // leading byte
 
-            if (leading_byte < 0b10000000)
+            if (leading_byte < 0x80) // 0b10000000
             {
                 // converting one ASCII byte !!!
                 utf16_string_writer->data[0] = u16_swap_bytes(utf8_string.data[pos]);
@@ -349,7 +349,7 @@ JSLUTF16String jsl_utf16_str_init(uint16_t* data, int64_t length)
                 --utf16_string_writer->length;
                 pos++;
             }
-            else if ((leading_byte & 0b11100000) == 0b11000000)
+            else if ((leading_byte & 0xE0) == 0xC0) // 0b11100000 == 0b11000000
             {
                 // We have a two-byte UTF-8, it should become
                 // a single UTF-16 word.
@@ -358,13 +358,14 @@ JSLUTF16String jsl_utf16_str_init(uint16_t* data, int64_t length)
                     return JSL_UNICODE_CONVERSION_TOO_SHORT;
                 } // minimal bound checking
                 
-                if ((utf8_string.data[pos + 1] & 0b11000000) != 0b10000000)
+                if ((utf8_string.data[pos + 1] & 0xC0) != 0x80) // 0b11000000 != 0b10000000
                 {
                     return JSL_UNICODE_CONVERSION_TOO_SHORT;
                 }
                 
                 // range check
-                uint32_t code_point = (leading_byte & 0b00011111) << 6 | (utf8_string.data[pos + 1] & 0b00111111);
+                uint32_t code_point = (leading_byte & 0x1Fu) << 6u
+                    | (utf8_string.data[pos + 1] & 0x3F); // 0b00011111, 0b00111111
                 
                 if (code_point < 0x80 || 0x7ff < code_point) {
                     return JSL_UNICODE_CONVERSION_OVERLONG;
@@ -376,7 +377,7 @@ JSLUTF16String jsl_utf16_str_init(uint16_t* data, int64_t length)
                 --utf16_string_writer->length;
                 pos += 2;
             }
-            else if ((leading_byte & 0b11110000) == 0b11100000)
+            else if ((leading_byte & 0xF0u) == 0xE0u) // 0b11110000 == 0b11100000
             {
                 // We have a three-byte UTF-8, it should become
                 // a single UTF-16 word.
@@ -384,22 +385,22 @@ JSLUTF16String jsl_utf16_str_init(uint16_t* data, int64_t length)
                     return JSL_UNICODE_CONVERSION_TOO_SHORT;
                 } // minimal bound checking
 
-                if ((utf8_string.data[pos + 1] & 0b11000000) != 0b10000000) {
+                if ((utf8_string.data[pos + 1] & 0xC0u) != 0x80u) { // 0b11000000 != 0b10000000
                     return JSL_UNICODE_CONVERSION_TOO_SHORT;
                 }
-                if ((utf8_string.data[pos + 2] & 0b11000000) != 0b10000000) {
+                if ((utf8_string.data[pos + 2] & 0xC0u) != 0x80u) { // 0b11000000 != 0b10000000
                     return JSL_UNICODE_CONVERSION_TOO_SHORT;
                 }
 
                 // range check
-                uint32_t code_point = (leading_byte & 0b00001111) << 12 |
-                                    (utf8_string.data[pos + 1] & 0b00111111) << 6 |
-                                    (utf8_string.data[pos + 2] & 0b00111111);
-                if ((code_point < 0x800) || (0xffff < code_point))
+                uint32_t code_point = (leading_byte & 0x0Fu) << 12u | // 0b00001111
+                                    (utf8_string.data[pos + 1] & 0x3Fu) << 6u | // 0b00111111
+                                    (utf8_string.data[pos + 2] & 0x3Fu); // 0b00111111
+                if ((code_point < 0x800u) || (0xffffu < code_point))
                 {
                     return JSL_UNICODE_CONVERSION_OVERLONG;
                 }
-                if (0xd7ff < code_point && code_point < 0xe000)
+                if (0xd7ffu < code_point && code_point < 0xe000u)
                 {
                     return JSL_UNICODE_CONVERSION_SURROGATE;
                 }
@@ -409,7 +410,7 @@ JSLUTF16String jsl_utf16_str_init(uint16_t* data, int64_t length)
                 --utf16_string_writer->length;
                 pos += 3;
             }
-            else if ((leading_byte & 0b11111000) == 0b11110000) // 0b11110000
+            else if ((leading_byte & 0xF8u) == 0xF0u) // 0b11111000 == 0b11110000
             {
                 // we have a 4-byte UTF-8 word.
                 if (pos + 3 >= utf8_string.length) {
@@ -417,30 +418,30 @@ JSLUTF16String jsl_utf16_str_init(uint16_t* data, int64_t length)
                 }
                 
                 // minimal bound checking
-                if ((utf8_string.data[pos + 1] & 0b11000000) != 0b10000000) {
+                if ((utf8_string.data[pos + 1] & 0xC0u) != 0x80u) { // 0b11000000 != 0b10000000
                     return JSL_UNICODE_CONVERSION_TOO_SHORT;
                 }
-                if ((utf8_string.data[pos + 2] & 0b11000000) != 0b10000000) {
+                if ((utf8_string.data[pos + 2] & 0xC0u) != 0x80u) { // 0b11000000 != 0b10000000
                     return JSL_UNICODE_CONVERSION_TOO_SHORT;
                 }
-                if ((utf8_string.data[pos + 3] & 0b11000000) != 0b10000000) {
+                if ((utf8_string.data[pos + 3] & 0xC0u) != 0x80u) { // 0b11000000 != 0b10000000
                     return JSL_UNICODE_CONVERSION_TOO_SHORT;
                 }
 
                 // range check
-                uint32_t code_point = (leading_byte & 0b00000111) << 18 |
-                                    (utf8_string.data[pos + 1] & 0b00111111) << 12 |
-                                    (utf8_string.data[pos + 2] & 0b00111111) << 6 |
-                                    (utf8_string.data[pos + 3] & 0b00111111);
-                if (code_point <= 0xffff) {
+                uint32_t code_point = (leading_byte & 0x07u) << 18u | // 0b00000111
+                                    (utf8_string.data[pos + 1] & 0x3Fu) << 12u | // 0b00111111
+                                    (utf8_string.data[pos + 2] & 0x3Fu) << 6u | // 0b00111111
+                                    (utf8_string.data[pos + 3] & 0x3Fu); // 0b00111111
+                if (code_point <= 0xffffu) {
                     return JSL_UNICODE_CONVERSION_OVERLONG;
                 }
-                if (0x10ffff < code_point) {
+                if (0x10ffffu < code_point) {
                     return JSL_UNICODE_CONVERSION_TOO_LONG;
                 }
                 code_point -= 0x10000;
-                uint16_t high_surrogate = (uint16_t) (0xD800 + (code_point >> 10));
-                uint16_t low_surrogate = (uint16_t) (0xDC00 + (code_point & 0x3FF));
+                uint16_t high_surrogate = (uint16_t) (0xD800u + (code_point >> 10u));
+                uint16_t low_surrogate = (uint16_t) (0xDC00u + (code_point & 0x3FFu));
                 high_surrogate = u16_swap_bytes(high_surrogate);
                 low_surrogate = u16_swap_bytes(low_surrogate);
 
@@ -457,7 +458,7 @@ JSLUTF16String jsl_utf16_str_init(uint16_t* data, int64_t length)
             else
             {
                 // we either have too many continuation bytes or an invalid leading byte
-                if ((leading_byte & 0b11000000) == 0b10000000) {
+                if ((leading_byte & 0xC0) == 0x80) { // 0b11000000 == 0b10000000
                     return JSL_UNICODE_CONVERSION_TOO_LONG;
                 } else {
                     return JSL_UNICODE_CONVERSION_HEADER_BITS;
@@ -658,7 +659,7 @@ JSLUTF16String jsl_utf16_str_init(uint16_t* data, int64_t length)
 
 #endif
 
-int64_t jsl_utf16_length_from_utf8(JSLFatPtr utf8_string)
+int64_t jsl_utf16le_length_from_utf8(JSLFatPtr utf8_string)
 {
     if (utf8_string.length < 0 || utf8_string.data == NULL)
         return -1;
@@ -666,7 +667,7 @@ int64_t jsl_utf16_length_from_utf8(JSLFatPtr utf8_string)
     return jsl__utf16_length_from_utf8_bytemask(utf8_string);
 }
 
-int64_t jsl_utf8_length_from_utf16(JSLUTF16String utf16_string)
+int64_t jsl_utf8_length_from_utf16le(JSLUTF16String utf16_string)
 {
     if (utf16_string.length < 0 || utf16_string.data == NULL)
         return -1;
@@ -693,7 +694,7 @@ JSLUnicodeConversionResult jsl_convert_utf8_to_utf16le(
     }
 
     JSLUTF16String buffer;
-    buffer.data = (uint16_t*) jsl_arena_allocate(arena, sizeof(uint16_t) * utf8_string.length, false).data;
+    buffer.data = JSL_ARENA_TYPED_ARRAY_ALLOCATE(uint16_t, arena, utf8_string.length);
     buffer.length = utf8_string.length;
 
     if (buffer.data == NULL)

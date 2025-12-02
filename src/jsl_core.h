@@ -1590,12 +1590,26 @@ JSL_DEF JSLFatPtr jsl_arena_allocate_aligned(JSLArena* arena, int64_t bytes, int
  * @param arena Arena to allocate from; must be initialized.
  * @return Pointer to the allocated object or `NULL` on failure.
  *
- * @code
+ * ```
  * struct MyStruct { uint64_t the_data; };
  * struct MyStruct* thing = JSL_ARENA_TYPED_ALLOCATE(struct MyStruct, arena);
- * @endcode
+ * ```
  */
 #define JSL_ARENA_TYPED_ALLOCATE(T, arena) (T*) jsl_arena_allocate_aligned(arena, sizeof(T), _Alignof(T), false).data
+
+/**
+ * Macro to make it easier to allocate an array of `T` within an arena.
+ *
+ * @param T Type to allocate.
+ * @param arena Arena to allocate from; must be initialized.
+ * @return Pointer to the allocated object or `NULL` on failure.
+ *
+ * @code
+ * struct MyStruct { uint64_t the_data; };
+ * struct MyStruct* thing_array = JSL_ARENA_TYPED_ALLOCATE(struct MyStruct, arena, 42);
+ * @endcode
+ */
+#define JSL_ARENA_TYPED_ARRAY_ALLOCATE(T, arena, length) (T*) jsl_arena_allocate_aligned(arena, (int64_t) sizeof(T) * length, _Alignof(T), false).data
 
 /**
  * Resize the allocation if it was the last allocation, otherwise, allocate a new
@@ -2308,7 +2322,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         return memcpy_length;
     }
 
-    int64_t jsl_fatptr_cstr_memory_copy(JSLFatPtr* destination, char* cstring, bool include_null_terminator)
+    JSL_WARN_UNUSED int64_t jsl_fatptr_cstr_memory_copy(JSLFatPtr* destination, char* cstring, bool include_null_terminator)
     {
         if (
             cstring == NULL
@@ -2458,6 +2472,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
 
+        // TODO: incomplete
 
     #endif
 
@@ -2844,28 +2859,74 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     bool jsl_fatptr_ends_with(JSLFatPtr str, JSLFatPtr postfix)
     {
-        // TODO, cleanup: Think of a way to refactor this to single return
+        bool result = true;
 
-        if (str.data != NULL
-            && postfix.data != NULL
-            && postfix.length <= str.length)
+        if (str.data == NULL || postfix.data == NULL)
         {
-            // TODO, speed: SIMD
-            for (int64_t i = 1; i < postfix.length; ++i)
-            {
-                uint8_t str_item = str.data[str.length - i];
-                uint8_t postfix_item = postfix.data[postfix.length - i];
+            result = false;
+        }
+        else if (postfix.length > str.length)
+        {
+            result = false;
+        }
+        else if (postfix.length > 0)
+        {
+            const uint8_t* str_suffix = str.data + (str.length - postfix.length);
+            const uint8_t* postfix_ptr = postfix.data;
+            int64_t remaining = postfix.length;
 
-                if (str_item != postfix_item)
+            #ifdef __AVX2__
+                while (result && remaining >= 32)
                 {
-                    return false;
-                }
-            }
+                    __m256i str_block = _mm256_loadu_si256((__m256i*) str_suffix);
+                    __m256i postfix_block = _mm256_loadu_si256((__m256i*) postfix_ptr);
+                    __m256i cmp = _mm256_cmpeq_epi8(str_block, postfix_block);
 
-            return true;
+                    uint32_t mask = (uint32_t) _mm256_movemask_epi8(cmp);
+                    if (mask != 0xFFFFFFFFu)
+                    {
+                        result = false;
+                        break;
+                    }
+
+                    str_suffix += 32;
+                    postfix_ptr += 32;
+                    remaining -= 32;
+                }
+            #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
+                while (result && remaining >= 16)
+                {
+                    uint8x16_t str_block = vld1q_u8(str_suffix);
+                    uint8x16_t postfix_block = vld1q_u8(postfix_ptr);
+                    uint8x16_t cmp = vceqq_u8(str_block, postfix_block);
+
+                    if (jsl__neon_movemask(cmp) != 0xFFFF)
+                    {
+                        result = false;
+                        break;
+                    }
+
+                    str_suffix += 16;
+                    postfix_ptr += 16;
+                    remaining -= 16;
+                }
+            #endif
+
+            while (result && remaining > 0)
+            {
+                if (*str_suffix != *postfix_ptr)
+                {
+                    result = false;
+                    break;
+                }
+
+                ++str_suffix;
+                ++postfix_ptr;
+                --remaining;
+            }
         }
 
-        return false;
+        return result;
     }
 
     JSLFatPtr jsl_fatptr_get_file_extension(JSLFatPtr filename)

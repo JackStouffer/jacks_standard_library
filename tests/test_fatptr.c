@@ -88,7 +88,8 @@ static void test_jsl_fatptr_cstr_memory_copy(void)
     JSLFatPtr writer = buffer;
     char* str = "This is a test string!";
     int64_t length = (int64_t) strlen(str);
-    jsl_fatptr_cstr_memory_copy(&writer, str, false);
+    int64_t memcpy_res = jsl_fatptr_cstr_memory_copy(&writer, str, false);
+    TEST_INT64_EQUAL(memcpy_res, (int64_t) 22);
 
     TEST_BOOL(writer.data == buffer.data + length);
     TEST_BOOL(writer.length == 1024 - length);
@@ -109,10 +110,14 @@ static void test_jsl_fatptr_memory_compare(void)
     JSLFatPtr writer3 = buffer3;
     JSLFatPtr writer4 = buffer4;
 
-    jsl_fatptr_cstr_memory_copy(&writer1, "Hello, World!", false);
-    jsl_fatptr_cstr_memory_copy(&writer2, "Hello, Owrld!", false);
-    jsl_fatptr_cstr_memory_copy(&writer3, "Hello, World!", false);
-    jsl_fatptr_cstr_memory_copy(&writer4, "Hello, World!", false);
+    int64_t memcpy_res = jsl_fatptr_cstr_memory_copy(&writer1, "Hello, World!", false);
+    TEST_INT64_EQUAL(memcpy_res, (int64_t) 13);
+    memcpy_res = jsl_fatptr_cstr_memory_copy(&writer2, "Hello, Owrld!", false);
+    TEST_INT64_EQUAL(memcpy_res, (int64_t) 13);
+    memcpy_res = jsl_fatptr_cstr_memory_copy(&writer3, "Hello, World!", false);
+    TEST_INT64_EQUAL(memcpy_res, (int64_t) 13);
+    memcpy_res = jsl_fatptr_cstr_memory_copy(&writer4, "Hello, World!", false);
+    TEST_INT64_EQUAL(memcpy_res, (int64_t) 13);
 
     TEST_BOOL( jsl_fatptr_memory_compare(buffer1, buffer1));
     TEST_BOOL(!jsl_fatptr_memory_compare(buffer1, buffer2));
@@ -126,7 +131,8 @@ static void test_jsl_fatptr_slice(void)
 
     {
         JSLFatPtr writer1 = buffer1;
-        jsl_fatptr_cstr_memory_copy(&writer1, "Hello, World!", false);
+        int64_t memcpy_res = jsl_fatptr_cstr_memory_copy(&writer1, "Hello, World!", false);
+        TEST_INT64_EQUAL(memcpy_res, (int64_t) 13);
 
         JSLFatPtr slice1 = jsl_fatptr_slice(buffer1, 0, buffer1.length);
         TEST_BOOL(jsl_fatptr_memory_compare(buffer1, slice1));
@@ -135,7 +141,8 @@ static void test_jsl_fatptr_slice(void)
     {
         JSLFatPtr buffer2 = jsl_fatptr_init(malloc(10), 10);
         JSLFatPtr writer2 = buffer2;
-        jsl_fatptr_cstr_memory_copy(&writer2, "Hello, Wor", false);
+        int64_t memcpy_res = jsl_fatptr_cstr_memory_copy(&writer2, "Hello, Wor", false);
+        TEST_INT64_EQUAL(memcpy_res, (int64_t) 10);
 
         JSLFatPtr slice2 = jsl_fatptr_slice(buffer1, 0, 10);
         TEST_BOOL(jsl_fatptr_memory_compare(buffer2, slice2));
@@ -144,7 +151,8 @@ static void test_jsl_fatptr_slice(void)
     {
         JSLFatPtr buffer3 = jsl_fatptr_init(malloc(5), 5);
         JSLFatPtr writer3 = buffer3;
-        jsl_fatptr_cstr_memory_copy(&writer3, "lo, W", false);
+        int64_t memcpy_res = jsl_fatptr_cstr_memory_copy(&writer3, "lo, W", false);
+        TEST_INT64_EQUAL(memcpy_res, (int64_t) 5);
 
         JSLFatPtr slice3 = jsl_fatptr_slice(buffer1, 3, 8);
         TEST_BOOL(jsl_fatptr_memory_compare(buffer3, slice3));
@@ -158,8 +166,10 @@ static void test_jsl_fatptr_total_write_length(void)
         JSLFatPtr original = JSL_FATPTR_FROM_STACK(buffer);
         JSLFatPtr writer = original;
 
-        jsl_fatptr_cstr_memory_copy(&writer, "abc", false);
-        jsl_fatptr_cstr_memory_copy(&writer, "defg", false);
+        int64_t memcpy_res = jsl_fatptr_cstr_memory_copy(&writer, "abc", false);
+        TEST_INT64_EQUAL(memcpy_res, (int64_t) 3);
+        memcpy_res = jsl_fatptr_cstr_memory_copy(&writer, "defg", false);
+        TEST_INT64_EQUAL(memcpy_res, (int64_t) 4);
 
         int64_t length_written = jsl_fatptr_total_write_length(original, writer);
         TEST_INT64_EQUAL(length_written, (int64_t) 7);
@@ -187,8 +197,10 @@ static void test_jsl_fatptr_auto_slice(void)
         JSLFatPtr original = JSL_FATPTR_FROM_STACK(buffer);
         JSLFatPtr writer = original;
 
-        jsl_fatptr_cstr_memory_copy(&writer, "Hello", false);
-        jsl_fatptr_cstr_memory_copy(&writer, "World", false);
+        int64_t memcpy_res = jsl_fatptr_cstr_memory_copy(&writer, "Hello", false);
+        TEST_INT64_EQUAL(memcpy_res, (int64_t) 5);
+        memcpy_res = jsl_fatptr_cstr_memory_copy(&writer, "World", false);
+        TEST_INT64_EQUAL(memcpy_res, (int64_t) 5);
 
         JSLFatPtr slice = jsl_fatptr_auto_slice(original, writer);
         TEST_INT64_EQUAL(slice.length, (int64_t) 10);

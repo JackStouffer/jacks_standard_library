@@ -104,100 +104,100 @@ JSLUTF16String long_str_u16 = JSL_UTF16_INITIALIZER(
     u"risus et rutrum. 🇺🇸"
 );
 
-static void test_jsl_utf16_length_from_utf8(void)
+static void test_jsl_utf16le_length_from_utf8(void)
 {
     {
         JSLFatPtr empty = {NULL, 0};
-        TEST_INT64_EQUAL(jsl_utf16_length_from_utf8(empty), (int64_t) -1);
+        TEST_INT64_EQUAL(jsl_utf16le_length_from_utf8(empty), (int64_t) -1);
     }
 
     {
         JSLFatPtr empty = JSL_FATPTR_INITIALIZER("");
-        TEST_INT64_EQUAL(jsl_utf16_length_from_utf8(empty), (int64_t) 0);
+        TEST_INT64_EQUAL(jsl_utf16le_length_from_utf8(empty), (int64_t) 0);
     }
 
     {
         JSLFatPtr ascii = JSL_FATPTR_INITIALIZER("Plain ASCII");
-        TEST_INT64_EQUAL(jsl_utf16_length_from_utf8(ascii), ascii.length);
+        TEST_INT64_EQUAL(jsl_utf16le_length_from_utf8(ascii), ascii.length);
     }
 
     {
         JSLFatPtr two_byte = JSL_FATPTR_INITIALIZER(u8"¢£¥");
-        TEST_INT64_EQUAL(jsl_utf16_length_from_utf8(two_byte), (int64_t) 3);
+        TEST_INT64_EQUAL(jsl_utf16le_length_from_utf8(two_byte), (int64_t) 3);
     }
 
     {
         JSLFatPtr three_byte = JSL_FATPTR_INITIALIZER(u8"你好");
-        TEST_INT64_EQUAL(jsl_utf16_length_from_utf8(three_byte), (int64_t) 2);
+        TEST_INT64_EQUAL(jsl_utf16le_length_from_utf8(three_byte), (int64_t) 2);
     }
 
     {
         JSLFatPtr four_byte = JSL_FATPTR_INITIALIZER(u8"😀😃");
-        TEST_INT64_EQUAL(jsl_utf16_length_from_utf8(four_byte), (int64_t) 4);
+        TEST_INT64_EQUAL(jsl_utf16le_length_from_utf8(four_byte), (int64_t) 4);
     }
 
     {
         JSLFatPtr mixed = JSL_FATPTR_INITIALIZER(u8"A¢€你好😀B");
-        TEST_INT64_EQUAL(jsl_utf16_length_from_utf8(mixed), (int64_t) 8);
+        TEST_INT64_EQUAL(jsl_utf16le_length_from_utf8(mixed), (int64_t) 8);
     }
 
     {
         uint8_t data[] = { 'A', '\0', 0xC2, 0xA2 };
         JSLFatPtr with_nul = jsl_fatptr_init(data, 4);
-        TEST_INT64_EQUAL(jsl_utf16_length_from_utf8(with_nul), (int64_t) 3);
+        TEST_INT64_EQUAL(jsl_utf16le_length_from_utf8(with_nul), (int64_t) 3);
     }
 
     {
-        TEST_INT64_EQUAL(jsl_utf16_length_from_utf8(medium_str), (int64_t) 186);
+        TEST_INT64_EQUAL(jsl_utf16le_length_from_utf8(medium_str), (int64_t) 186);
     }
 
     {
-        TEST_INT64_EQUAL(jsl_utf16_length_from_utf8(long_str), (int64_t) 1562);
+        TEST_INT64_EQUAL(jsl_utf16le_length_from_utf8(long_str), (int64_t) 1562);
     }
 
 }
 
-static void test_jsl_utf8_length_from_utf16(void)
+static void test_jsl_utf8_length_from_utf16le(void)
 {
     {
         JSLUTF16String empty = { NULL, 0 };
-        TEST_INT64_EQUAL(jsl_utf8_length_from_utf16(empty), (int64_t) -1);
+        TEST_INT64_EQUAL(jsl_utf8_length_from_utf16le(empty), (int64_t) -1);
     }
 
     {
         uint16_t ascii[] = { 'P', 'l', 'a', 'i', 'n', ' ', 'A', 'S', 'C', 'I', 'I' };
         JSLUTF16String ascii_str = { ascii, (int64_t) (sizeof(ascii) / sizeof(ascii[0])) };
-        TEST_INT64_EQUAL(jsl_utf8_length_from_utf16(ascii_str), (int64_t) 11);
+        TEST_INT64_EQUAL(jsl_utf8_length_from_utf16le(ascii_str), (int64_t) 11);
     }
 
     {
         uint16_t two_byte[] = { 0x00A2, 0x00A3, 0x00A5 };
         JSLUTF16String two_byte_str = { two_byte, (int64_t) (sizeof(two_byte) / sizeof(two_byte[0])) };
-        TEST_INT64_EQUAL(jsl_utf8_length_from_utf16(two_byte_str), (int64_t) 6);
+        TEST_INT64_EQUAL(jsl_utf8_length_from_utf16le(two_byte_str), (int64_t) 6);
     }
 
     {
         uint16_t three_byte[] = { 0x4F60, 0x597D };
         JSLUTF16String three_byte_str = { three_byte, (int64_t) (sizeof(three_byte) / sizeof(three_byte[0])) };
-        TEST_INT64_EQUAL(jsl_utf8_length_from_utf16(three_byte_str), (int64_t) 6);
+        TEST_INT64_EQUAL(jsl_utf8_length_from_utf16le(three_byte_str), (int64_t) 6);
     }
 
     {
         uint16_t surrogate_pairs[] = { 0xD83D, 0xDE00, 0xD83D, 0xDE03 };
         JSLUTF16String emoji = { surrogate_pairs, (int64_t) (sizeof(surrogate_pairs) / sizeof(surrogate_pairs[0])) };
-        TEST_INT64_EQUAL(jsl_utf8_length_from_utf16(emoji), (int64_t) 8);
+        TEST_INT64_EQUAL(jsl_utf8_length_from_utf16le(emoji), (int64_t) 8);
     }
 
     {
         uint16_t mixed[] = { 'A', 0x00A2, 0x20AC, 0x4F60, 0x597D, 0xD83D, 0xDE00, 'B' };
         JSLUTF16String mixed_str = { mixed, (int64_t) (sizeof(mixed) / sizeof(mixed[0])) };
-        TEST_INT64_EQUAL(jsl_utf8_length_from_utf16(mixed_str), (int64_t) 17);
+        TEST_INT64_EQUAL(jsl_utf8_length_from_utf16le(mixed_str), (int64_t) 17);
     }
 
     {
         uint16_t with_nul[] = { 'A', 0x0000, 0xD83D, 0xDE00 };
         JSLUTF16String nul_str = { with_nul, (int64_t) (sizeof(with_nul) / sizeof(with_nul[0])) };
-        TEST_INT64_EQUAL(jsl_utf8_length_from_utf16(nul_str), (int64_t) 6);
+        TEST_INT64_EQUAL(jsl_utf8_length_from_utf16le(nul_str), (int64_t) 6);
     }
 
     {
@@ -208,15 +208,15 @@ static void test_jsl_utf8_length_from_utf16(void)
         }
 
         JSLUTF16String long_ascii = { ascii_block, 64 };
-        TEST_INT64_EQUAL(jsl_utf8_length_from_utf16(long_ascii), (int64_t) 64);
+        TEST_INT64_EQUAL(jsl_utf8_length_from_utf16le(long_ascii), (int64_t) 64);
     }
 
     {
-        TEST_INT64_EQUAL(jsl_utf8_length_from_utf16(medium_str_u16), (int64_t) 198);
+        TEST_INT64_EQUAL(jsl_utf8_length_from_utf16le(medium_str_u16), (int64_t) 198);
     }
 
     {
-        TEST_INT64_EQUAL(jsl_utf8_length_from_utf16(long_str_u16), (int64_t) 1570);
+        TEST_INT64_EQUAL(jsl_utf8_length_from_utf16le(long_str_u16), (int64_t) 1570);
     }
 
 }
@@ -229,8 +229,8 @@ int main(void)
         setvbuf(stdout, NULL, _IONBF, 0);
     #endif
 
-    RUN_TEST_FUNCTION("Test jsl_utf16_length_from_utf8", test_jsl_utf16_length_from_utf8);
-    RUN_TEST_FUNCTION("Test jsl_utf8_length_from_utf16", test_jsl_utf8_length_from_utf16);
+    RUN_TEST_FUNCTION("Test jsl_utf16le_length_from_utf8", test_jsl_utf16le_length_from_utf8);
+    RUN_TEST_FUNCTION("Test jsl_utf8_length_from_utf16le", test_jsl_utf8_length_from_utf16le);
 
     TEST_RESULTS();
     return lfails != 0;
