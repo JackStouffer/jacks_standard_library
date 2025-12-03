@@ -110,11 +110,27 @@ static void test_jsl_convert_utf8_to_utf16le(void)
 {
     {
         JSLUTF16String result_str = {0};
-        JSLUnicodeConversionResult result_code = jsl_convert_utf8_to_utf16le(&global_arena, medium_str, &result_str);
+        JSLUnicodeConversionResult result_code = jsl_convert_utf8_to_utf16le(
+            &global_arena, medium_str, &result_str
+        );
 
         TEST_INT32_EQUAL(result_code, JSL_UNICODE_CONVERSION_SUCCESS);
         TEST_BUFFERS_EQUAL(result_str.data, medium_str_u16.data, (size_t) medium_str_u16.length);
     }
+
+    jsl_arena_reset(&global_arena);
+
+    {
+        JSLUTF16String result_str = {0};
+        JSLUnicodeConversionResult result_code = jsl_convert_utf8_to_utf16le(
+            &global_arena, medium_str, &result_str
+        );
+
+        TEST_INT32_EQUAL(result_code, JSL_UNICODE_CONVERSION_SUCCESS);
+        TEST_BUFFERS_EQUAL(result_str.data, long_str_u16.data, (size_t) long_str_u16.length);
+    }
+
+    jsl_arena_reset(&global_arena);
 
 }
 

@@ -316,7 +316,7 @@ JSLUTF16String jsl_utf16_str_init(uint16_t* data, int64_t length)
     {
         int64_t pos = 0;
 
-        while (pos < utf8_string.length)
+        for (; pos < utf8_string.length && utf16_string_writer->length > 0;)
         {
             // try to convert the next block of 16 ASCII bytes
             if (pos + 16 <= utf8_string.length)
@@ -405,7 +405,7 @@ JSLUTF16String jsl_utf16_str_init(uint16_t* data, int64_t length)
                     return JSL_UNICODE_CONVERSION_SURROGATE;
                 }
                 utf16_string_writer->data[0] = (uint16_t) (code_point);
-                ++utf16_string_writer->length;
+                ++utf16_string_writer->data;
                 --utf16_string_writer->length;
                 pos += 3;
             }
@@ -436,7 +436,7 @@ JSLUTF16String jsl_utf16_str_init(uint16_t* data, int64_t length)
                     return JSL_UNICODE_CONVERSION_OVERLONG;
                 }
                 if (0x10ffffu < code_point) {
-                    return JSL_UNICODE_CONVERSION_TOO_LONG;
+                    return JSL_UNICODE_CONVERSION_TOO_LARGE;
                 }
                 code_point -= 0x10000;
                 uint16_t high_surrogate = (uint16_t) (0xD800u + (code_point >> 10u));
