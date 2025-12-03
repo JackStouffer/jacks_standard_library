@@ -36,6 +36,8 @@
 
 #include "minctest.h"
 
+JSLArena global_arena;
+
 JSLFatPtr medium_str = JSL_FATPTR_INITIALIZER(
     u8"✋🏻 This is a very long 吟味 string that is going to trigger SIMD code, "
     u8"as it's longer than a single AVX2 register when using 8-bit 😀😃 "
@@ -103,6 +105,18 @@ JSLUTF16String long_str_u16 = JSL_UTF16_INITIALIZER(
     u"risus felis, vitae dapibus orci lobortis ut. Donec tincidunt eu "
     u"risus et rutrum. 🇺🇸"
 );
+
+static void test_jsl_convert_utf8_to_utf16le(void)
+{
+    {
+        JSLUTF16String result_str = {0};
+        JSLUnicodeConversionResult result_code = jsl_convert_utf8_to_utf16le(&global_arena, medium_str, &result_str);
+
+        TEST_INT32_EQUAL(result_code, JSL_UNICODE_CONVERSION_SUCCESS);
+        TEST_BUFFERS_EQUAL(result_str.data, medium_str_u16.data, (size_t) medium_str_u16.length);
+    }
+
+}
 
 static void test_jsl_utf16le_length_from_utf8(void)
 {
@@ -229,6 +243,9 @@ int main(void)
         setvbuf(stdout, NULL, _IONBF, 0);
     #endif
 
+    jsl_arena_init(&global_arena, malloc(JSL_MEGABYTES(2)), JSL_MEGABYTES(2));
+
+    RUN_TEST_FUNCTION("Test jsl_convert_utf8_to_utf16le", test_jsl_convert_utf8_to_utf16le);
     RUN_TEST_FUNCTION("Test jsl_utf16le_length_from_utf8", test_jsl_utf16le_length_from_utf8);
     RUN_TEST_FUNCTION("Test jsl_utf8_length_from_utf16le", test_jsl_utf8_length_from_utf16le);
 

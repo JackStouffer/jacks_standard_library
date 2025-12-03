@@ -2916,9 +2916,11 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         if (JSL__UNLIKELY(postfix.length > str.length))
             return false;
 
-        JSL_FATPTR_ADVANCE(str, str.length - postfix.length);
-
-        return JSL_MEMCMP(str.data, postfix.data, (size_t) postfix.length) == 0;
+        return JSL_MEMCMP(
+            &str.data[str.length - postfix.length],
+            postfix.data,
+            (size_t) postfix.length
+        ) == 0;
     }
 
     JSLFatPtr jsl_fatptr_get_file_extension(JSLFatPtr filename)

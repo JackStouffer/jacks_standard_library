@@ -296,18 +296,18 @@ JSLUTF16String jsl_utf16_str_init(uint16_t* data, int64_t length)
  */
 
 
-#if defined(__AVX2__)
+// #if defined(__AVX2__)
 
-    static inline void jsl__convert_utf8_to_utf16le(
-        JSLFatPtr utf8_string,
-        JSLUTF16String* utf16_string_writer,
-        JSLUnicodeConversionResult* out_conversion_result
-    )
-    {
+//     static inline void jsl__convert_utf8_to_utf16le(
+//         JSLFatPtr utf8_string,
+//         JSLUTF16String* utf16_string_writer,
+//         JSLUnicodeConversionResult* out_conversion_result
+//     )
+//     {
 
-    }
+//     }
 
-#else
+// #else
 
     static inline JSLUnicodeConversionResult jsl__convert_utf8_to_utf16le(
         JSLFatPtr utf8_string,
@@ -319,7 +319,8 @@ JSLUTF16String jsl_utf16_str_init(uint16_t* data, int64_t length)
         while (pos < utf8_string.length)
         {
             // try to convert the next block of 16 ASCII bytes
-            if (pos + 16 <= utf8_string.length) { // if it is safe to read 16 more bytes, check that they are ascii
+            if (pos + 16 <= utf8_string.length)
+            { // if it is safe to read 16 more bytes, check that they are ascii
                 uint64_t v1, v2;
                 memcpy(&v1, utf8_string.data + pos, sizeof(uint64_t));
                 memcpy(&v2, utf8_string.data + pos + sizeof(uint64_t), sizeof(uint64_t));
@@ -330,8 +331,8 @@ JSLUTF16String jsl_utf16_str_init(uint16_t* data, int64_t length)
                     int64_t final_pos = pos + 16;
                     while (pos < final_pos)
                     {
-                        utf16_string_writer->data[0] = u16_swap_bytes(utf8_string.data[pos]);
-                        ++utf16_string_writer->length;
+                        utf16_string_writer->data[0] = utf8_string.data[pos];
+                        ++utf16_string_writer->data;
                         --utf16_string_writer->length;
                         ++pos;
                     }
@@ -344,8 +345,8 @@ JSLUTF16String jsl_utf16_str_init(uint16_t* data, int64_t length)
             if (leading_byte < 0x80) // 0b10000000
             {
                 // converting one ASCII byte !!!
-                utf16_string_writer->data[0] = u16_swap_bytes(utf8_string.data[pos]);
-                ++utf16_string_writer->length;
+                utf16_string_writer->data[0] = utf8_string.data[pos];
+                ++utf16_string_writer->data;
                 --utf16_string_writer->length;
                 pos++;
             }
@@ -371,9 +372,8 @@ JSLUTF16String jsl_utf16_str_init(uint16_t* data, int64_t length)
                     return JSL_UNICODE_CONVERSION_OVERLONG;
                 }
                 
-                code_point = (uint32_t) (u16_swap_bytes((uint16_t) (code_point)));
                 utf16_string_writer->data[0] = (uint16_t) (code_point);
-                ++utf16_string_writer->length;
+                ++utf16_string_writer->data;
                 --utf16_string_writer->length;
                 pos += 2;
             }
@@ -404,7 +404,6 @@ JSLUTF16String jsl_utf16_str_init(uint16_t* data, int64_t length)
                 {
                     return JSL_UNICODE_CONVERSION_SURROGATE;
                 }
-                code_point = (uint32_t) (u16_swap_bytes((uint16_t) (code_point)));
                 utf16_string_writer->data[0] = (uint16_t) (code_point);
                 ++utf16_string_writer->length;
                 --utf16_string_writer->length;
@@ -442,15 +441,13 @@ JSLUTF16String jsl_utf16_str_init(uint16_t* data, int64_t length)
                 code_point -= 0x10000;
                 uint16_t high_surrogate = (uint16_t) (0xD800u + (code_point >> 10u));
                 uint16_t low_surrogate = (uint16_t) (0xDC00u + (code_point & 0x3FFu));
-                high_surrogate = u16_swap_bytes(high_surrogate);
-                low_surrogate = u16_swap_bytes(low_surrogate);
 
                 utf16_string_writer->data[0] = (uint16_t) (high_surrogate);
-                ++utf16_string_writer->length;
+                ++utf16_string_writer->data;
                 --utf16_string_writer->length;
 
                 utf16_string_writer->data[0] = (uint16_t) (low_surrogate);
-                ++utf16_string_writer->length;
+                ++utf16_string_writer->data;
                 --utf16_string_writer->length;
 
                 pos += 4;
@@ -470,7 +467,7 @@ JSLUTF16String jsl_utf16_str_init(uint16_t* data, int64_t length)
     }
 
 
-#endif
+// #endif
 
 
 /**
