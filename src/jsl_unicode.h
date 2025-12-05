@@ -3,10 +3,11 @@
  *
  * A collection of unicode conversion functions. 
  * 
- * This is a C port of the simdutf library. This is not a direct port, as some API
- * changes were made to better fit into the JSL ecosystem. Don't expect to use the
- * exact same functions in the same way. The most notable difference is that big
- * endian encodings are not supported, same as the rest of JSL.
+ * The conversion functions are a C port of the simdutf library. This is not a
+ * direct port, as some API changes were made to better fit into the JSL ecosystem:
+ * 
+ *  * big endian encodings are not supported, same as the rest of JSL
+ *  * Converting without error checking is not supported.
  *
  * See DOCUMENTATION.md for a single markdown file containing all of the docstrings
  * from this file. It's more nicely formatted and contains hyperlinks.
@@ -243,11 +244,6 @@ int64_t jsl_utf16le_length_from_utf8(JSLFatPtr utf8_string);
  *
  */
 
-static inline uint16_t u16_swap_bytes(const uint16_t word)
-{
-    return (uint16_t) ((word >> 8) | (word << 8));
-}
-
 #if defined(__AVX2__)
 
     static inline int64_t jsl__horizontal_sum_epi64(__m256i v)
@@ -296,178 +292,435 @@ JSLUTF16String jsl_utf16_str_init(uint16_t* data, int64_t length)
  */
 
 
-// #if defined(__AVX2__)
+static inline JSLUnicodeConversionResult jsl__convert_utf8_to_utf16le_scalar(
+    JSLFatPtr utf8_string,
+    JSLUTF16String* utf16_string_writer
+)
+{
+    int64_t pos = 0;
 
-//     static inline void jsl__convert_utf8_to_utf16le(
-//         JSLFatPtr utf8_string,
-//         JSLUTF16String* utf16_string_writer,
-//         JSLUnicodeConversionResult* out_conversion_result
-//     )
-//     {
+    for (; pos < utf8_string.length && utf16_string_writer->length > 0;)
+    {
+        // try to convert the next block of 16 ASCII bytes
+        if (pos + 16 <= utf8_string.length)
+        { // if it is safe to read 16 more bytes, check that they are ascii
+            uint64_t v1, v2;
+            memcpy(&v1, utf8_string.data + pos, sizeof(uint64_t));
+            memcpy(&v2, utf8_string.data + pos + sizeof(uint64_t), sizeof(uint64_t));
 
-//     }
+            uint64_t v = v1 | v2;
+            if ((v & 0x8080808080808080) == 0)
+            {
+                int64_t final_pos = pos + 16;
+                while (pos < final_pos)
+                {
+                    utf16_string_writer->data[0] = utf8_string.data[pos];
+                    ++utf16_string_writer->data;
+                    --utf16_string_writer->length;
+                    ++pos;
+                }
+                continue;
+            }
+        }
 
-// #else
+        uint8_t leading_byte = utf8_string.data[pos]; // leading byte
+
+        if (leading_byte < 0x80) // 0b10000000
+        {
+            // converting one ASCII byte !!!
+            utf16_string_writer->data[0] = utf8_string.data[pos];
+            ++utf16_string_writer->data;
+            --utf16_string_writer->length;
+            pos++;
+        }
+        else if ((leading_byte & 0xE0) == 0xC0) // 0b11100000 == 0b11000000
+        {
+            // We have a two-byte UTF-8, it should become
+            // a single UTF-16 word.
+            if (pos + 1 >= utf8_string.length)
+            {
+                return JSL_UNICODE_CONVERSION_TOO_SHORT;
+            } // minimal bound checking
+            
+            if ((utf8_string.data[pos + 1] & 0xC0) != 0x80) // 0b11000000 != 0b10000000
+            {
+                return JSL_UNICODE_CONVERSION_TOO_SHORT;
+            }
+            
+            // range check
+            uint32_t code_point = (leading_byte & 0x1Fu) << 6u
+                | (utf8_string.data[pos + 1] & 0x3F); // 0b00011111, 0b00111111
+            
+            if (code_point < 0x80 || 0x7ff < code_point) {
+                return JSL_UNICODE_CONVERSION_OVERLONG;
+            }
+            
+            utf16_string_writer->data[0] = (uint16_t) (code_point);
+            ++utf16_string_writer->data;
+            --utf16_string_writer->length;
+            pos += 2;
+        }
+        else if ((leading_byte & 0xF0u) == 0xE0u) // 0b11110000 == 0b11100000
+        {
+            // We have a three-byte UTF-8, it should become
+            // a single UTF-16 word.
+            if (pos + 2 >= utf8_string.length) {
+                return JSL_UNICODE_CONVERSION_TOO_SHORT;
+            } // minimal bound checking
+
+            if ((utf8_string.data[pos + 1] & 0xC0u) != 0x80u) { // 0b11000000 != 0b10000000
+                return JSL_UNICODE_CONVERSION_TOO_SHORT;
+            }
+            if ((utf8_string.data[pos + 2] & 0xC0u) != 0x80u) { // 0b11000000 != 0b10000000
+                return JSL_UNICODE_CONVERSION_TOO_SHORT;
+            }
+
+            // range check
+            uint32_t code_point = (leading_byte & 0x0Fu) << 12u | // 0b00001111
+                                (utf8_string.data[pos + 1] & 0x3Fu) << 6u | // 0b00111111
+                                (utf8_string.data[pos + 2] & 0x3Fu); // 0b00111111
+            if ((code_point < 0x800u) || (0xffffu < code_point))
+            {
+                return JSL_UNICODE_CONVERSION_OVERLONG;
+            }
+            if (0xd7ffu < code_point && code_point < 0xe000u)
+            {
+                return JSL_UNICODE_CONVERSION_SURROGATE;
+            }
+            utf16_string_writer->data[0] = (uint16_t) (code_point);
+            ++utf16_string_writer->data;
+            --utf16_string_writer->length;
+            pos += 3;
+        }
+        else if ((leading_byte & 0xF8u) == 0xF0u) // 0b11111000 == 0b11110000
+        {
+            // we have a 4-byte UTF-8 word.
+            if (pos + 3 >= utf8_string.length) {
+                return JSL_UNICODE_CONVERSION_TOO_SHORT;
+            }
+            
+            // minimal bound checking
+            if ((utf8_string.data[pos + 1] & 0xC0u) != 0x80u) { // 0b11000000 != 0b10000000
+                return JSL_UNICODE_CONVERSION_TOO_SHORT;
+            }
+            if ((utf8_string.data[pos + 2] & 0xC0u) != 0x80u) { // 0b11000000 != 0b10000000
+                return JSL_UNICODE_CONVERSION_TOO_SHORT;
+            }
+            if ((utf8_string.data[pos + 3] & 0xC0u) != 0x80u) { // 0b11000000 != 0b10000000
+                return JSL_UNICODE_CONVERSION_TOO_SHORT;
+            }
+
+            // range check
+            uint32_t code_point = (leading_byte & 0x07u) << 18u | // 0b00000111
+                                (utf8_string.data[pos + 1] & 0x3Fu) << 12u | // 0b00111111
+                                (utf8_string.data[pos + 2] & 0x3Fu) << 6u | // 0b00111111
+                                (utf8_string.data[pos + 3] & 0x3Fu); // 0b00111111
+            if (code_point <= 0xffffu) {
+                return JSL_UNICODE_CONVERSION_OVERLONG;
+            }
+            if (0x10ffffu < code_point) {
+                return JSL_UNICODE_CONVERSION_TOO_LARGE;
+            }
+            code_point -= 0x10000;
+            uint16_t high_surrogate = (uint16_t) (0xD800u + (code_point >> 10u));
+            uint16_t low_surrogate = (uint16_t) (0xDC00u + (code_point & 0x3FFu));
+
+            utf16_string_writer->data[0] = (uint16_t) (high_surrogate);
+            ++utf16_string_writer->data;
+            --utf16_string_writer->length;
+
+            utf16_string_writer->data[0] = (uint16_t) (low_surrogate);
+            ++utf16_string_writer->data;
+            --utf16_string_writer->length;
+
+            pos += 4;
+        }
+        else
+        {
+            // we either have too many continuation bytes or an invalid leading byte
+            if ((leading_byte & 0xC0) == 0x80) { // 0b11000000 == 0b10000000
+                return JSL_UNICODE_CONVERSION_TOO_LONG;
+            } else {
+                return JSL_UNICODE_CONVERSION_HEADER_BITS;
+            }
+        }
+    }
+
+    return JSL_UNICODE_CONVERSION_SUCCESS;
+}
+
+
+static inline JSLUnicodeConversionResult jsl__convert_utf8_codepoint_to_utf16le(
+    JSLFatPtr utf8_string,
+    int64_t* pos,
+    JSLUTF16String* utf16_string_writer
+)
+{
+    if (*pos >= utf8_string.length)
+    {
+        return JSL_UNICODE_CONVERSION_SUCCESS;
+    }
+
+    if (utf16_string_writer->length <= 0)
+    {
+        return JSL_UNICODE_CONVERSION_OUT_OF_MEMORY;
+    }
+
+    uint8_t leading_byte = utf8_string.data[*pos];
+
+    if (leading_byte < 0x80)
+    {
+        utf16_string_writer->data[0] = leading_byte;
+        ++utf16_string_writer->data;
+        --utf16_string_writer->length;
+        *pos += 1;
+        return JSL_UNICODE_CONVERSION_SUCCESS;
+    }
+    else if ((leading_byte & 0xE0) == 0xC0)
+    {
+        if (*pos + 1 >= utf8_string.length)
+        {
+            return JSL_UNICODE_CONVERSION_TOO_SHORT;
+        }
+
+        if ((utf8_string.data[*pos + 1] & 0xC0) != 0x80)
+        {
+            return JSL_UNICODE_CONVERSION_TOO_SHORT;
+        }
+
+        uint32_t code_point = (leading_byte & 0x1Fu) << 6u
+            | (utf8_string.data[*pos + 1] & 0x3F);
+
+        if (code_point < 0x80 || 0x7ff < code_point)
+        {
+            return JSL_UNICODE_CONVERSION_OVERLONG;
+        }
+
+        utf16_string_writer->data[0] = (uint16_t) code_point;
+        ++utf16_string_writer->data;
+        --utf16_string_writer->length;
+        *pos += 2;
+        return JSL_UNICODE_CONVERSION_SUCCESS;
+    }
+    else if ((leading_byte & 0xF0u) == 0xE0u)
+    {
+        if (*pos + 2 >= utf8_string.length)
+        {
+            return JSL_UNICODE_CONVERSION_TOO_SHORT;
+        }
+
+        if ((utf8_string.data[*pos + 1] & 0xC0u) != 0x80u)
+        {
+            return JSL_UNICODE_CONVERSION_TOO_SHORT;
+        }
+        if ((utf8_string.data[*pos + 2] & 0xC0u) != 0x80u)
+        {
+            return JSL_UNICODE_CONVERSION_TOO_SHORT;
+        }
+
+        uint32_t code_point = (leading_byte & 0x0Fu) << 12u |
+            (utf8_string.data[*pos + 1] & 0x3Fu) << 6u |
+            (utf8_string.data[*pos + 2] & 0x3Fu);
+
+        if (code_point < 0x800u || 0xffffu < code_point)
+        {
+            return JSL_UNICODE_CONVERSION_OVERLONG;
+        }
+        if (0xd7ffu < code_point && code_point < 0xe000u)
+        {
+            return JSL_UNICODE_CONVERSION_SURROGATE;
+        }
+
+        utf16_string_writer->data[0] = (uint16_t) code_point;
+        ++utf16_string_writer->data;
+        --utf16_string_writer->length;
+        *pos += 3;
+        return JSL_UNICODE_CONVERSION_SUCCESS;
+    }
+    else if ((leading_byte & 0xF8u) == 0xF0u)
+    {
+        if (*pos + 3 >= utf8_string.length)
+        {
+            return JSL_UNICODE_CONVERSION_TOO_SHORT;
+        }
+
+        if ((utf8_string.data[*pos + 1] & 0xC0u) != 0x80u)
+        {
+            return JSL_UNICODE_CONVERSION_TOO_SHORT;
+        }
+        if ((utf8_string.data[*pos + 2] & 0xC0u) != 0x80u)
+        {
+            return JSL_UNICODE_CONVERSION_TOO_SHORT;
+        }
+        if ((utf8_string.data[*pos + 3] & 0xC0u) != 0x80u)
+        {
+            return JSL_UNICODE_CONVERSION_TOO_SHORT;
+        }
+
+        uint32_t code_point = (leading_byte & 0x07u) << 18u |
+            (utf8_string.data[*pos + 1] & 0x3Fu) << 12u |
+            (utf8_string.data[*pos + 2] & 0x3Fu) << 6u |
+            (utf8_string.data[*pos + 3] & 0x3Fu);
+
+        if (code_point <= 0xffffu)
+        {
+            return JSL_UNICODE_CONVERSION_OVERLONG;
+        }
+        if (0x10ffffu < code_point)
+        {
+            return JSL_UNICODE_CONVERSION_TOO_LARGE;
+        }
+
+        if (utf16_string_writer->length < 2)
+        {
+            return JSL_UNICODE_CONVERSION_OUT_OF_MEMORY;
+        }
+
+        code_point -= 0x10000;
+        uint16_t high_surrogate = (uint16_t) (0xD800u + (code_point >> 10u));
+        uint16_t low_surrogate = (uint16_t) (0xDC00u + (code_point & 0x3FFu));
+
+        utf16_string_writer->data[0] = high_surrogate;
+        utf16_string_writer->data[1] = low_surrogate;
+        utf16_string_writer->data += 2;
+        utf16_string_writer->length -= 2;
+        *pos += 4;
+        return JSL_UNICODE_CONVERSION_SUCCESS;
+    }
+    else
+    {
+        if ((leading_byte & 0xC0u) == 0x80u)
+        {
+            return JSL_UNICODE_CONVERSION_TOO_LONG;
+        }
+        else
+        {
+            return JSL_UNICODE_CONVERSION_HEADER_BITS;
+        }
+    }
+}
+
+
+static inline JSLUnicodeConversionResult jsl__rewind_and_convert_utf8_to_utf16le(
+    int64_t prior_bytes,
+    const uint8_t* buf,
+    int64_t len,
+    JSLUTF16String* utf16_string_writer
+)
+{
+    if (len <= 0)
+    {
+        return JSL_UNICODE_CONVERSION_SUCCESS;
+    }
+
+    int64_t how_far_back = prior_bytes;
+    if (how_far_back > 3)
+    {
+        how_far_back = 3;
+    }
+
+    int found_leading = 0;
+    int64_t extra_len = 0;
+
+    for (int64_t i = 0; i <= how_far_back; i++)
+    {
+        uint8_t byte = buf[-i];
+        if ((byte & 0xC0u) != 0x80u)
+        {
+            if (i > 0 && byte < 0x80u)
+            {
+                return JSL_UNICODE_CONVERSION_TOO_LONG;
+            }
+            buf -= i;
+            len += i;
+            extra_len = i;
+            found_leading = 1;
+            break;
+        }
+    }
+
+    if (!found_leading)
+    {
+        return JSL_UNICODE_CONVERSION_TOO_LONG;
+    }
+
+    (void) extra_len;
+
+    JSLFatPtr slice = {(uint8_t *)buf, len};
+    return jsl__convert_utf8_to_utf16le_scalar(slice, utf16_string_writer);
+}
+
+
+#if defined(__AVX2__)
 
     static inline JSLUnicodeConversionResult jsl__convert_utf8_to_utf16le(
         JSLFatPtr utf8_string,
         JSLUTF16String* utf16_string_writer
     )
     {
+        const uint8_t* data = utf8_string.data;
+        int64_t length = utf8_string.length;
         int64_t pos = 0;
 
-        for (; pos < utf8_string.length && utf16_string_writer->length > 0;)
+        do
         {
-            // try to convert the next block of 16 ASCII bytes
-            if (pos + 16 <= utf8_string.length)
-            { // if it is safe to read 16 more bytes, check that they are ascii
-                uint64_t v1, v2;
-                memcpy(&v1, utf8_string.data + pos, sizeof(uint64_t));
-                memcpy(&v2, utf8_string.data + pos + sizeof(uint64_t), sizeof(uint64_t));
+            __asm__ __volatile__("" : : "g"(pos) : "memory");
+        }
+        while (0);
 
-                uint64_t v = v1 | v2;
-                if ((v & 0x8080808080808080) == 0)
+        while (pos < length && utf16_string_writer->length > 0)
+        {
+            if (pos + 32 <= length && utf16_string_writer->length >= 32)
+            {
+                __m256i bytes = _mm256_loadu_si256((const __m256i *)(data + pos));
+                const int32_t mask = _mm256_movemask_epi8(bytes);
+                if (mask == 0)
                 {
-                    int64_t final_pos = pos + 16;
-                    while (pos < final_pos)
-                    {
-                        utf16_string_writer->data[0] = utf8_string.data[pos];
-                        ++utf16_string_writer->data;
-                        --utf16_string_writer->length;
-                        ++pos;
-                    }
+                    __m128i lo = _mm256_castsi256_si128(bytes);
+                    __m128i hi = _mm256_extracti128_si256(bytes, 1);
+
+                    __m256i utf16_lo = _mm256_cvtepu8_epi16(lo);
+                    __m256i utf16_hi = _mm256_cvtepu8_epi16(hi);
+
+                    _mm256_storeu_si256((__m256i *)(void *)utf16_string_writer->data, utf16_lo);
+                    _mm256_storeu_si256((__m256i *)(void *)(utf16_string_writer->data + 16), utf16_hi);
+
+                    utf16_string_writer->data += 32;
+                    utf16_string_writer->length -= 32;
+                    pos += 32;
                     continue;
                 }
             }
 
-            uint8_t leading_byte = utf8_string.data[pos]; // leading byte
+            JSLUnicodeConversionResult step_res = jsl__convert_utf8_codepoint_to_utf16le(
+                utf8_string, &pos, utf16_string_writer
+            );
 
-            if (leading_byte < 0x80) // 0b10000000
+            if (step_res != JSL_UNICODE_CONVERSION_SUCCESS)
             {
-                // converting one ASCII byte !!!
-                utf16_string_writer->data[0] = utf8_string.data[pos];
-                ++utf16_string_writer->data;
-                --utf16_string_writer->length;
-                pos++;
-            }
-            else if ((leading_byte & 0xE0) == 0xC0) // 0b11100000 == 0b11000000
-            {
-                // We have a two-byte UTF-8, it should become
-                // a single UTF-16 word.
-                if (pos + 1 >= utf8_string.length)
-                {
-                    return JSL_UNICODE_CONVERSION_TOO_SHORT;
-                } // minimal bound checking
-                
-                if ((utf8_string.data[pos + 1] & 0xC0) != 0x80) // 0b11000000 != 0b10000000
-                {
-                    return JSL_UNICODE_CONVERSION_TOO_SHORT;
-                }
-                
-                // range check
-                uint32_t code_point = (leading_byte & 0x1Fu) << 6u
-                    | (utf8_string.data[pos + 1] & 0x3F); // 0b00011111, 0b00111111
-                
-                if (code_point < 0x80 || 0x7ff < code_point) {
-                    return JSL_UNICODE_CONVERSION_OVERLONG;
-                }
-                
-                utf16_string_writer->data[0] = (uint16_t) (code_point);
-                ++utf16_string_writer->data;
-                --utf16_string_writer->length;
-                pos += 2;
-            }
-            else if ((leading_byte & 0xF0u) == 0xE0u) // 0b11110000 == 0b11100000
-            {
-                // We have a three-byte UTF-8, it should become
-                // a single UTF-16 word.
-                if (pos + 2 >= utf8_string.length) {
-                    return JSL_UNICODE_CONVERSION_TOO_SHORT;
-                } // minimal bound checking
-
-                if ((utf8_string.data[pos + 1] & 0xC0u) != 0x80u) { // 0b11000000 != 0b10000000
-                    return JSL_UNICODE_CONVERSION_TOO_SHORT;
-                }
-                if ((utf8_string.data[pos + 2] & 0xC0u) != 0x80u) { // 0b11000000 != 0b10000000
-                    return JSL_UNICODE_CONVERSION_TOO_SHORT;
-                }
-
-                // range check
-                uint32_t code_point = (leading_byte & 0x0Fu) << 12u | // 0b00001111
-                                    (utf8_string.data[pos + 1] & 0x3Fu) << 6u | // 0b00111111
-                                    (utf8_string.data[pos + 2] & 0x3Fu); // 0b00111111
-                if ((code_point < 0x800u) || (0xffffu < code_point))
-                {
-                    return JSL_UNICODE_CONVERSION_OVERLONG;
-                }
-                if (0xd7ffu < code_point && code_point < 0xe000u)
-                {
-                    return JSL_UNICODE_CONVERSION_SURROGATE;
-                }
-                utf16_string_writer->data[0] = (uint16_t) (code_point);
-                ++utf16_string_writer->data;
-                --utf16_string_writer->length;
-                pos += 3;
-            }
-            else if ((leading_byte & 0xF8u) == 0xF0u) // 0b11111000 == 0b11110000
-            {
-                // we have a 4-byte UTF-8 word.
-                if (pos + 3 >= utf8_string.length) {
-                    return JSL_UNICODE_CONVERSION_TOO_SHORT;
-                }
-                
-                // minimal bound checking
-                if ((utf8_string.data[pos + 1] & 0xC0u) != 0x80u) { // 0b11000000 != 0b10000000
-                    return JSL_UNICODE_CONVERSION_TOO_SHORT;
-                }
-                if ((utf8_string.data[pos + 2] & 0xC0u) != 0x80u) { // 0b11000000 != 0b10000000
-                    return JSL_UNICODE_CONVERSION_TOO_SHORT;
-                }
-                if ((utf8_string.data[pos + 3] & 0xC0u) != 0x80u) { // 0b11000000 != 0b10000000
-                    return JSL_UNICODE_CONVERSION_TOO_SHORT;
-                }
-
-                // range check
-                uint32_t code_point = (leading_byte & 0x07u) << 18u | // 0b00000111
-                                    (utf8_string.data[pos + 1] & 0x3Fu) << 12u | // 0b00111111
-                                    (utf8_string.data[pos + 2] & 0x3Fu) << 6u | // 0b00111111
-                                    (utf8_string.data[pos + 3] & 0x3Fu); // 0b00111111
-                if (code_point <= 0xffffu) {
-                    return JSL_UNICODE_CONVERSION_OVERLONG;
-                }
-                if (0x10ffffu < code_point) {
-                    return JSL_UNICODE_CONVERSION_TOO_LARGE;
-                }
-                code_point -= 0x10000;
-                uint16_t high_surrogate = (uint16_t) (0xD800u + (code_point >> 10u));
-                uint16_t low_surrogate = (uint16_t) (0xDC00u + (code_point & 0x3FFu));
-
-                utf16_string_writer->data[0] = (uint16_t) (high_surrogate);
-                ++utf16_string_writer->data;
-                --utf16_string_writer->length;
-
-                utf16_string_writer->data[0] = (uint16_t) (low_surrogate);
-                ++utf16_string_writer->data;
-                --utf16_string_writer->length;
-
-                pos += 4;
-            }
-            else
-            {
-                // we either have too many continuation bytes or an invalid leading byte
-                if ((leading_byte & 0xC0) == 0x80) { // 0b11000000 == 0b10000000
-                    return JSL_UNICODE_CONVERSION_TOO_LONG;
-                } else {
-                    return JSL_UNICODE_CONVERSION_HEADER_BITS;
-                }
+                return step_res;
             }
         }
-    
+
+        if (pos < length)
+        {
+            return JSL_UNICODE_CONVERSION_OUT_OF_MEMORY;
+        }
+
         return JSL_UNICODE_CONVERSION_SUCCESS;
     }
 
+#else
 
-// #endif
+    static inline JSLUnicodeConversionResult jsl__convert_utf8_to_utf16le(
+        JSLFatPtr utf8_string,
+        JSLUTF16String* utf16_string_writer
+    )
+    {
+        return jsl__convert_utf8_to_utf16le_scalar(utf8_string, utf16_string_writer);
+    }
+
+#endif
 
 
 /**
@@ -683,7 +936,7 @@ JSLUnicodeConversionResult jsl_convert_utf8_to_utf16le(
         || utf8_string.data == NULL
         || utf8_string.length < 0
         || out_utf16_string == NULL
-    ) 
+    )
     {
         out_utf16_string->data = NULL;
         out_utf16_string->length = 0;

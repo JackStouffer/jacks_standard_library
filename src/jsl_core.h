@@ -1681,6 +1681,9 @@ JSL_DEF uint8_t* jsl_arena_save_restore_point(JSLArena* arena);
  *
  * In debug mode, jsl_arena_load_restore_point function will set all of the memory
  * that was allocated to `0xfeeefeee` to help detect use after free bugs.
+ * 
+ * This function will assert if you attempt to use a different restore point from an
+ * arena different that the one passed in as the parameter.
  */
 JSL_DEF void jsl_arena_load_restore_point(JSLArena* arena, uint8_t* restore_point);
 
@@ -2222,6 +2225,18 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             && end <= fatptr.length
         );
 
+        #ifdef NDEBUG
+            if (fatptr.data == NULL
+                || start < 0
+                || start > end
+                || end > fatptr.length)
+            {
+                fatptr.data = NULL;
+                fatptr.length = 0;
+                return fatptr;
+            }
+        #endif
+
         fatptr.data += start;
         fatptr.length = end - start;
         return fatptr;
@@ -2235,6 +2250,17 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             && start <= fatptr.length
         );
 
+        #ifdef NDEBUG
+            if (fatptr.data == NULL
+                || start < 0
+                || start > fatptr.length)
+            {
+                fatptr.data = NULL;
+                fatptr.length = 0;
+                return fatptr;
+            }
+        #endif
+
         fatptr.data += start;
         fatptr.length -= start;
         return fatptr;
@@ -2246,14 +2272,29 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         uintptr_t writer = (uintptr_t) writer_fatptr.data;
 
         JSL_ASSERT(
-            original_fatptr.data != NULL &&
-            writer_fatptr.data != NULL &&
-            original_fatptr.length > -1 &&
-            writer_fatptr.length > -1 &&
-            (uint64_t) original_fatptr.length <= UINTPTR_MAX - orig && // avoid wrap
-            writer >= orig &&
-            writer - orig <= (uintptr_t) original_fatptr.length
+            original_fatptr.data != NULL
+            && writer_fatptr.data != NULL
+            && original_fatptr.length > -1
+            && writer_fatptr.length > -1
+            && (uint64_t) original_fatptr.length <= UINTPTR_MAX - orig // avoid wrap
+            && writer >= orig
+            && writer - orig <= (uintptr_t) original_fatptr.length
         );
+
+        #ifdef NDEBUG
+            if (
+                original_fatptr.data == NULL
+                || writer_fatptr.data == NULL
+                || original_fatptr.length < 0
+                || writer_fatptr.length < 0
+                || (uint64_t) original_fatptr.length > UINTPTR_MAX - orig
+                || writer < orig
+                || writer - orig > (uintptr_t) original_fatptr.length
+            )
+            {
+                return -1;
+            }
+        #endif
 
         int64_t length_written = writer_fatptr.data - original_fatptr.data;
         return length_written;
@@ -2265,14 +2306,29 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         uintptr_t writer = (uintptr_t) writer_fatptr.data;
 
         JSL_ASSERT(
-            original_fatptr.data != NULL &&
-            writer_fatptr.data != NULL &&
-            original_fatptr.length > -1 &&
-            writer_fatptr.length > -1 &&
-            (uint64_t) original_fatptr.length <= UINTPTR_MAX - orig && // avoid wrap
-            writer >= orig &&
-            writer - orig <= (uintptr_t) original_fatptr.length
+            original_fatptr.data != NULL
+            && writer_fatptr.data != NULL
+            && original_fatptr.length > -1
+            && writer_fatptr.length > -1
+            && (uint64_t) original_fatptr.length <= UINTPTR_MAX - orig // avoid wrap
+            && writer >= orig
+            && writer - orig <= (uintptr_t) original_fatptr.length
         );
+
+        #ifdef NDEBUG
+            if (
+                original_fatptr.data == NULL
+                || writer_fatptr.data == NULL
+                || original_fatptr.length < 0
+                || writer_fatptr.length < 0
+                || (uint64_t) original_fatptr.length > UINTPTR_MAX - orig
+                || writer < orig
+                || writer - orig > (uintptr_t) original_fatptr.length
+            )
+            {
+                return -1;
+            }
+        #endif
 
         int64_t write_length = (int64_t)(writer - orig);
         original_fatptr.length = write_length;
@@ -3482,6 +3538,13 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
         JSLFatPtr res = {0};
 
+        #ifdef NDEBUG
+            if (alignment < 1 || !jsl__is_power_of_two(alignment))
+            {
+                return res;
+            }
+        #endif
+
         if (bytes < 0)
             return res;
 
@@ -3541,6 +3604,13 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     )
     {
         JSL_ASSERT(align > 0 && jsl__is_power_of_two(align));
+
+        #ifdef NDEBUG
+            if (alignment < 1 || !jsl__is_power_of_two(alignment))
+            {
+                return res;
+            }
+        #endif
 
         JSLFatPtr res = {0};
 
@@ -3660,20 +3730,19 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     void jsl_arena_load_restore_point(JSLArena* arena, uint8_t* restore_point)
     {
-        uintptr_t restore_addr = (uintptr_t) restore_point;
-        uintptr_t start_addr = (uintptr_t) arena->start;
-        uintptr_t end_addr = (uintptr_t) arena->end;
-        uintptr_t current_addr = (uintptr_t) arena->current;
+        const uintptr_t restore_addr = (uintptr_t) restore_point;
+        const uintptr_t start_addr = (uintptr_t) arena->start;
+        const uintptr_t end_addr = (uintptr_t) arena->end;
+        const uintptr_t current_addr = (uintptr_t) arena->current;
 
-        bool in_bounds = restore_addr >= start_addr && restore_addr <= end_addr;
-        bool before_current = restore_addr <= current_addr;
+        const bool in_bounds = restore_addr >= start_addr && restore_addr <= end_addr;
+        const bool before_current = restore_addr <= current_addr;
 
-        JSL_ASSERT(in_bounds);
-        JSL_ASSERT(before_current);
-
-        // in case assertions are turned off
-        if (!in_bounds || !before_current)
-            return;
+        JSL_ASSERT(in_bounds && before_current);
+        #ifdef NDEBUG
+            if (!in_bounds || !before_current)
+                return;
+        #endif
 
         ASAN_UNPOISON_MEMORY_REGION(
             restore_point,

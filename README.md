@@ -47,7 +47,7 @@ See the DESIGN.md file for more info.
 * Simple, cross platform file I/O
     * Intended for scripts or getting things going at the start of the project
     * In serious code, you would use I/O more tailored to your specific use case
-      e.g. atomic, package formats, async, etc.
+    * e.g. atomic, package formats, async, etc.
 * Contains
     * file reading, writing, and get file size
     * mkdir
@@ -59,6 +59,9 @@ See the DESIGN.md file for more info.
 
 **WARNING** On MSVC you must pass `/utf-8` or else MSVC will silently give you
 incorrect code generation!
+
+* utf-8 to utf-16 conversion
+* utf-16 to utf-8 conversion
 
 ### Jack's Standard Library Templates
 
@@ -205,6 +208,11 @@ This library is slow for ARM as I haven't gotten around to writing the NEON
 versions of the SIMD code for many of the functions. glibc will be significantly
 faster for comparable operations.
 
+### AVX512
+
+I don't own a AVX512 compatible CPU, currently. So everything is written for
+AVX2 on x64.
+
 ### Notes on Safety
 
 In 99% of cases you shouldn't turn off assertions by using the `NDEBUG` macro
@@ -212,12 +220,18 @@ or by defining an empty `JSL_ASSERT` function.
 
 This library uses assertions for things like Automatic Bounds Checking (ABC).
 These checks prevent your program from entering an invalid state which may
-corrupt user data, leak memory, or allow buffer overflow attacks.
+corrupt user data, leak memory, or allow buffer overflow attacks. 
+
+It is far, far better to crash the program rather than allow these things to
+happen. Obviously in a perfect world programmers would never allow a bug
+which could lead to a ABC assertion. But we cannot rely on perfection.
 
 The main purported reason for turning off assertions or ABC is performance.
 This is "fake optimization" most of the time, i.e. following a dogma rather
 than using a profiler to see if an assertion is a noticeable cost in a critical
-path.
+path. Even if an assertion is dropping speed in a hot path, think long and
+hard about how bad a 20% performance loss is vs the possibility of leaking
+user data.
 
 ### Unicode
 

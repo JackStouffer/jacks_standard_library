@@ -109,13 +109,207 @@ JSLUTF16String long_str_u16 = JSL_UTF16_INITIALIZER(
 static void test_jsl_convert_utf8_to_utf16le(void)
 {
     {
+        JSLFatPtr ascii = JSL_FATPTR_INITIALIZER(u8"ASCII");
+        JSLUTF16String expected = JSL_UTF16_INITIALIZER(u"ASCII");
         JSLUTF16String result_str = {0};
+
         JSLUnicodeConversionResult result_code = jsl_convert_utf8_to_utf16le(
-            &global_arena, medium_str, &result_str
+            &global_arena, ascii, &result_str
         );
 
         TEST_INT32_EQUAL(result_code, JSL_UNICODE_CONVERSION_SUCCESS);
-        TEST_BUFFERS_EQUAL(result_str.data, medium_str_u16.data, (size_t) medium_str_u16.length);
+        TEST_INT64_EQUAL(result_str.length, expected.length);
+        TEST_BUFFERS_EQUAL(result_str.data, expected.data, expected.length);
+    }
+
+    jsl_arena_reset(&global_arena);
+
+    {
+        JSLFatPtr emoji = JSL_FATPTR_INITIALIZER(u8"😀");
+        JSLUTF16String expected = JSL_UTF16_INITIALIZER(u"😀");
+        JSLUTF16String result_str = {0};
+
+        JSLUnicodeConversionResult result_code = jsl_convert_utf8_to_utf16le(
+            &global_arena, emoji, &result_str
+        );
+
+        TEST_INT32_EQUAL(result_code, JSL_UNICODE_CONVERSION_SUCCESS);
+        TEST_INT64_EQUAL(result_str.length, expected.length);
+        TEST_BUFFERS_EQUAL(result_str.data, expected.data, expected.length);
+    }
+
+    jsl_arena_reset(&global_arena);
+
+    {
+        JSLUTF16String expected = { NULL, 0 };
+        JSLUTF16String result_str = { (uint16_t*) medium_str.data, 42 };
+        JSLUnicodeConversionResult result_code = jsl_convert_utf8_to_utf16le(
+            NULL, medium_str, &result_str
+        );
+
+        TEST_INT32_EQUAL(result_code, JSL_UNICODE_CONVERSION_BAD_PARAMETERS);
+        TEST_BOOL(result_str.data == expected.data);
+        TEST_INT64_EQUAL(result_str.length, expected.length);
+    }
+
+    jsl_arena_reset(&global_arena);
+
+    {
+        JSLUTF16String expected = { NULL, 0 };
+        JSLUTF16String result_str = { (uint16_t*) medium_str.data, 42 };
+        JSLFatPtr null_input = { NULL, (int64_t) 5 };
+        JSLUnicodeConversionResult result_code = jsl_convert_utf8_to_utf16le(
+            &global_arena, null_input, &result_str
+        );
+
+        TEST_INT32_EQUAL(result_code, JSL_UNICODE_CONVERSION_BAD_PARAMETERS);
+        TEST_BOOL(result_str.data == expected.data);
+        TEST_INT64_EQUAL(result_str.length, expected.length);
+    }
+
+    jsl_arena_reset(&global_arena);
+
+    {
+        JSLUTF16String expected = { NULL, 0 };
+        JSLUTF16String result_str = { (uint16_t*) medium_str.data, 42 };
+        JSLFatPtr negative_length = { medium_str.data, (int64_t) -1 };
+        JSLUnicodeConversionResult result_code = jsl_convert_utf8_to_utf16le(
+            &global_arena, negative_length, &result_str
+        );
+
+        TEST_INT32_EQUAL(result_code, JSL_UNICODE_CONVERSION_BAD_PARAMETERS);
+        TEST_BOOL(result_str.data == expected.data);
+        TEST_INT64_EQUAL(result_str.length, expected.length);
+    }
+
+    jsl_arena_reset(&global_arena);
+
+    {
+        uint8_t data[] = { 0xC2 };
+        JSLUTF16String expected = { NULL, 0 };
+        JSLUTF16String result_str = {0};
+        JSLUnicodeConversionResult result_code = jsl_convert_utf8_to_utf16le(
+            &global_arena, jsl_fatptr_init(data, (int64_t) sizeof(data)), &result_str
+        );
+
+        TEST_INT32_EQUAL(result_code, JSL_UNICODE_CONVERSION_TOO_SHORT);
+        TEST_INT64_EQUAL(result_str.length, expected.length);
+    }
+
+    jsl_arena_reset(&global_arena);
+
+    {
+        uint8_t data[] = { 0xC2, 0x41 };
+        JSLUTF16String expected = { NULL, 0 };
+        JSLUTF16String result_str = {0};
+        JSLUnicodeConversionResult result_code = jsl_convert_utf8_to_utf16le(
+            &global_arena, jsl_fatptr_init(data, (int64_t) sizeof(data)), &result_str
+        );
+
+        TEST_INT32_EQUAL(result_code, JSL_UNICODE_CONVERSION_TOO_SHORT);
+        TEST_INT64_EQUAL(result_str.length, expected.length);
+    }
+
+    jsl_arena_reset(&global_arena);
+
+    {
+        uint8_t data[] = { 0x80 };
+        JSLUTF16String expected = { NULL, 0 };
+        JSLUTF16String result_str = {0};
+        JSLUnicodeConversionResult result_code = jsl_convert_utf8_to_utf16le(
+            &global_arena, jsl_fatptr_init(data, (int64_t) sizeof(data)), &result_str
+        );
+
+        TEST_INT32_EQUAL(result_code, JSL_UNICODE_CONVERSION_TOO_LONG);
+        TEST_INT64_EQUAL(result_str.length, expected.length);
+    }
+
+    jsl_arena_reset(&global_arena);
+
+    {
+        uint8_t data[] = { 0xC0, 0xAF };
+        JSLUTF16String expected = { NULL, 0 };
+        JSLUTF16String result_str = {0};
+        JSLUnicodeConversionResult result_code = jsl_convert_utf8_to_utf16le(
+            &global_arena, jsl_fatptr_init(data, (int64_t) sizeof(data)), &result_str
+        );
+
+        TEST_INT32_EQUAL(result_code, JSL_UNICODE_CONVERSION_OVERLONG);
+        TEST_INT64_EQUAL(result_str.length, expected.length);
+    }
+
+    jsl_arena_reset(&global_arena);
+
+    {
+        uint8_t data[] = { 0xF0, 0x8F, 0xBF, 0xBF }; // U+FFFF encoded with four bytes
+        JSLUTF16String expected = { NULL, 0 };
+        JSLUTF16String result_str = {0};
+        JSLUnicodeConversionResult result_code = jsl_convert_utf8_to_utf16le(
+            &global_arena, jsl_fatptr_init(data, (int64_t) sizeof(data)), &result_str
+        );
+
+        TEST_INT32_EQUAL(result_code, JSL_UNICODE_CONVERSION_OVERLONG);
+        TEST_INT64_EQUAL(result_str.length, expected.length);
+    }
+
+    jsl_arena_reset(&global_arena);
+
+    {
+        uint8_t data[] = { 0xED, 0xA0, 0x80 }; // U+D800 surrogate encoded directly
+        JSLUTF16String expected = { NULL, 0 };
+        JSLUTF16String result_str = {0};
+        JSLUnicodeConversionResult result_code = jsl_convert_utf8_to_utf16le(
+            &global_arena, jsl_fatptr_init(data, (int64_t) sizeof(data)), &result_str
+        );
+
+        TEST_INT32_EQUAL(result_code, JSL_UNICODE_CONVERSION_SURROGATE);
+        TEST_INT64_EQUAL(result_str.length, expected.length);
+    }
+
+    jsl_arena_reset(&global_arena);
+
+    {
+        uint8_t data[] = { 0xF4, 0x90, 0x80, 0x80 }; // U+110000
+        JSLUTF16String expected = { NULL, 0 };
+        JSLUTF16String result_str = {0};
+        JSLUnicodeConversionResult result_code = jsl_convert_utf8_to_utf16le(
+            &global_arena, jsl_fatptr_init(data, (int64_t) sizeof(data)), &result_str
+        );
+
+        TEST_INT32_EQUAL(result_code, JSL_UNICODE_CONVERSION_TOO_LARGE);
+        TEST_INT64_EQUAL(result_str.length, expected.length);
+    }
+
+    jsl_arena_reset(&global_arena);
+
+    {
+        uint8_t data[] = { 0xFF };
+        JSLUTF16String expected = { NULL, 0 };
+        JSLUTF16String result_str = {0};
+        JSLUnicodeConversionResult result_code = jsl_convert_utf8_to_utf16le(
+            &global_arena, jsl_fatptr_init(data, (int64_t) sizeof(data)), &result_str
+        );
+
+        TEST_INT32_EQUAL(result_code, JSL_UNICODE_CONVERSION_HEADER_BITS);
+        TEST_INT64_EQUAL(result_str.length, expected.length);
+    }
+
+    jsl_arena_reset(&global_arena);
+
+    {
+        JSLUTF16String expected = { NULL, 0 };
+        char buffer[1];
+        JSLArena arena;
+        jsl_arena_init(&arena, buffer, 0);
+
+        JSLUTF16String result_str = {0};
+        JSLUnicodeConversionResult result_code = jsl_convert_utf8_to_utf16le(
+            &arena, medium_str, &result_str
+        );
+
+        TEST_INT32_EQUAL(result_code, JSL_UNICODE_CONVERSION_OUT_OF_MEMORY);
+        TEST_BOOL(result_str.data == expected.data);
+        TEST_INT64_EQUAL(result_str.length, expected.length);
     }
 
     jsl_arena_reset(&global_arena);
@@ -127,11 +321,22 @@ static void test_jsl_convert_utf8_to_utf16le(void)
         );
 
         TEST_INT32_EQUAL(result_code, JSL_UNICODE_CONVERSION_SUCCESS);
-        TEST_BUFFERS_EQUAL(result_str.data, long_str_u16.data, (size_t) long_str_u16.length);
+        TEST_INT64_EQUAL(result_str.length, medium_str_u16.length);
+        TEST_BUFFERS_EQUAL(result_str.data, medium_str_u16.data, medium_str_u16.length);
     }
 
     jsl_arena_reset(&global_arena);
 
+    {
+        JSLUTF16String result_str = {0};
+        JSLUnicodeConversionResult result_code = jsl_convert_utf8_to_utf16le(
+            &global_arena, long_str, &result_str
+        );
+
+        TEST_INT32_EQUAL(result_code, JSL_UNICODE_CONVERSION_SUCCESS);
+        TEST_INT64_EQUAL(result_str.length, long_str_u16.length);
+        TEST_BUFFERS_EQUAL(result_str.data, long_str_u16.data, long_str_u16.length);
+    }
 }
 
 static void test_jsl_utf16le_length_from_utf8(void)
