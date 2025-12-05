@@ -233,7 +233,15 @@ static UnitTestDecl unit_test_declarations[] = {
     { "test_string_builder", (char*[]) {"tests/test_string_builder.c", NULL} },
     { "test_intrinsics", (char*[]) {"tests/test_intrinsics.c", NULL} },
     { "test_file_utils", (char*[]) {"tests/test_file_utils.c", NULL} },
-    { "test_unicode", (char*[]) {"tests/test_unicode.c", NULL} },
+    {
+        "test_simd_wrapper",
+        (char*[]) {
+            "tests/test_simd_wrapper.c",
+            "tests/bin/simdutf.o",
+            "tests/bin/jsl_simdutf_wrapper.o" ,
+            NULL
+        } 
+    },
     {
         "test_hash_map",
         (char*[]) {
@@ -471,7 +479,52 @@ int32_t main(int32_t argc, char **argv)
     if (!nob_procs_wait(hash_map_procs)) return 1;
     nob_da_free(hash_map_procs);
 
-    nob_log(NOB_INFO, "Running unit test suite");
+    /**
+     *
+     *
+     *         SIMDUTF SPECIAL CASE
+     *
+     *
+     */
+
+    const char* simdutf_source[] = { "src/simdutf.cpp" };
+    if (nob_needs_rebuild("tests/bin/simdutf.o", simdutf_source, 1))
+    {
+        nob_log(NOB_INFO, "Building simdutf");
+        Nob_Cmd sqlite_cmd = {0};
+        nob_cmd_append(&sqlite_cmd,
+            "clang",
+            "-O3",
+            "-march=native",
+            "-o", "tests/bin/simdutf.o",
+            "-c",
+            "src/simdutf.cpp"
+        );
+        if (!nob_cmd_run_sync(sqlite_cmd)) return 1;
+    }
+    else
+    {
+        nob_log(NOB_INFO, "simdutf already built");
+    }
+
+    const char* wrapper_source[] = { "src/jsl_simdutf_wrapper.cpp" };
+    if (nob_needs_rebuild("tests/bin/jsl_simdutf_wrapper.o", wrapper_source, 1))
+    {
+        nob_log(NOB_INFO, "Building jsl_simdutf_wrapper");
+        Nob_Cmd sqlite_cmd = {0};
+        nob_cmd_append(&sqlite_cmd,
+            "clang",
+            "-o", "tests/bin/jsl_simdutf_wrapper.o",
+            "-c",
+            "src/jsl_simdutf_wrapper.cpp"
+        );
+        if (!nob_cmd_run_sync(sqlite_cmd)) return 1;
+    }
+    else
+    {
+        nob_log(NOB_INFO, "jsl_simdutf_wrapper already built");
+    }
+    
 
     /**
      *
@@ -480,6 +533,8 @@ int32_t main(int32_t argc, char **argv)
      *
      *
      */
+
+    nob_log(NOB_INFO, "Running unit test suite");
 
     CStringArray executables;
     cstring_array_init(&executables);
