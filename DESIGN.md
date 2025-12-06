@@ -248,21 +248,25 @@ int64_t load_file(JSLFatPtr* writer, char* filename)
 
     return read_result;
 }
-
-
-JSLFatPtr memory = jsl_arena_allocate(arena, 1024 * 1024, false);
-JSLFatPtr writer = memory;
-
-int64_t bytes_read = load_file(&writer, "file.txt");
-JSLFatPtr file_contents = jsl_fatptr_auto_slice(memory, writer);
 ```
 
 By using a fat pointer here, we're able to very easily constrain the write to the
-buffer by `read`-ing to just the space we have available.
+buffer by `read`-ing to just the space we have available. And  after the function
+call the writer would then point to the empty space remaining in the original
+allocation. This makes it really easy to use multiple functions to write to the
+same buffer.
 
-After the function call the writer now points to the empty space remaining in
-the original allocation. This makes it really easy to use multiple functions
-to write to the same buffer.
+Then here's how you would use that function to make a very simple `cat` program.
+
+```c
+JSLFatPtr memory = jsl_arena_allocate(arena, JSL_MEGABYTES(2), false);
+JSLFatPtr writer = memory;
+
+load_file(&writer, "file1.txt");
+load_file(&writer, "file2.txt");
+JSLFatPtr cat = jsl_fat_ptr_auto_slice(memory, writer);
+jsl_format_file(stdout, cat);
+```
 
 ### Slicing
 

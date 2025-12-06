@@ -22,6 +22,7 @@ See the DESIGN.md file for more info.
    * min, max, between
    * bitflag checks
    * Alias macros for different intrinsic names on different compilers
+   * including portable C fallbacks for missing intrinsics on MSVC
 * A buffer type called a fat pointer
    * used everywhere
    * standardizes that pointers should carry their length
@@ -57,8 +58,7 @@ See the DESIGN.md file for more info.
 
 `jsl_unicode.h`
 
-**WARNING** On MSVC you must pass `/utf-8` or else MSVC will silently give you
-incorrect code generation!
+**WARNING** On MSVC you must pass `/utf-8` or else you will get incorrect code generation!
 
 * utf-8 to utf-16 conversion
 * utf-16 to utf-8 conversion
