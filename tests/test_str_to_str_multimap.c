@@ -38,12 +38,435 @@
 
 JSLArena global_arena;
 
+typedef struct ExpectedPair {
+    JSLFatPtr key;
+    JSLFatPtr value;
+    bool seen;
+} ExpectedPair;
+
+static bool fatptrs_equal(JSLFatPtr a, JSLFatPtr b)
+{
+    return jsl_fatptr_memory_compare(a, b);
+}
+
+static void test_jsl_str_to_str_multimap_init_success(void)
+{
+    JSLStrToStrMultimap map = {0};
+    bool ok = jsl_str_to_str_multimap_init(&map, &global_arena, 8, 0xDEADBEEFUL, 0.5f);
+    TEST_BOOL(ok);
+    TEST_BOOL(map.arena == &global_arena);
+}
+
+static void test_jsl_str_to_str_multimap_init_invalid_arguments(void)
+{
+    JSLStrToStrMultimap map = {0};
+
+    TEST_BOOL(!jsl_str_to_str_multimap_init(NULL, &global_arena, 4, 0, 0.5f));
+    TEST_BOOL(!jsl_str_to_str_multimap_init(&map, NULL, 4, 0, 0.5f));
+    TEST_BOOL(!jsl_str_to_str_multimap_init(&map, &global_arena, 0, 0, 0.5f));
+    TEST_BOOL(!jsl_str_to_str_multimap_init(&map, &global_arena, -4, 0, 0.5f));
+    TEST_BOOL(!jsl_str_to_str_multimap_init(&map, &global_arena, 4, 0, 0.0f));
+    TEST_BOOL(!jsl_str_to_str_multimap_init(&map, &global_arena, 4, 0, 1.1f));
+}
+
+static void test_jsl_str_to_str_multimap_insert_and_get_value_count(void)
+{
+    JSLStrToStrMultimap map = {0};
+    bool ok = jsl_str_to_str_multimap_init(&map, &global_arena, 8, 42, 0.65f);
+    TEST_BOOL(ok);
+    if (!ok) return;
+
+    JSLFatPtr key1 = JSL_FATPTR_INITIALIZER("alpha");
+    JSLFatPtr key2 = JSL_FATPTR_INITIALIZER("beta");
+    JSLFatPtr missing = JSL_FATPTR_INITIALIZER("missing");
+
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, key1, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("one"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, key1, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("two"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, key2, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("three"), JSL_STRING_LIFETIME_STATIC));
+
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, key1), (int64_t) 2);
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, key2), (int64_t) 1);
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, missing), (int64_t) 0);
+
+    JSLStrToStrMultimap uninitialized = {0};
+    TEST_BOOL(!jsl_str_to_str_multimap_insert(&uninitialized, key1, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("value"), JSL_STRING_LIFETIME_STATIC));
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&uninitialized, key1), (int64_t) -1);
+}
+
+static void test_jsl_str_to_str_multimap_duplicate_values_allowed(void)
+{
+    JSLStrToStrMultimap map = {0};
+    bool ok = jsl_str_to_str_multimap_init(&map, &global_arena, 4, 7, 0.5f);
+    TEST_BOOL(ok);
+    if (!ok) return;
+
+    JSLFatPtr key = JSL_FATPTR_INITIALIZER("dup-key");
+    JSLFatPtr value = JSL_FATPTR_INITIALIZER("repeat");
+
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, key, JSL_STRING_LIFETIME_STATIC, value, JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, key, JSL_STRING_LIFETIME_STATIC, value, JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, key, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("unique"), JSL_STRING_LIFETIME_STATIC));
+
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, key), (int64_t) 3);
+
+    JSLStrToStrMultimapGetValueIter iter;
+    jsl_str_to_str_multimap_get_key_iterator_init(&map, &iter, key);
+
+    int32_t repeat_seen = 0;
+    int32_t unique_seen = 0;
+    while (true)
+    {
+        JSLFatPtr val = jsl_str_to_str_multimap_get_key_iterator_next(&iter);
+        if (val.data == NULL)
+            break;
+
+        if (fatptrs_equal(val, value))
+            repeat_seen++;
+        else if (fatptrs_equal(val, JSL_FATPTR_EXPRESSION("unique")))
+            unique_seen++;
+    }
+
+    TEST_INT32_EQUAL(repeat_seen, 2);
+    TEST_INT32_EQUAL(unique_seen, 1);
+}
+
+static void test_jsl_str_to_str_multimap_transient_lifetime_copies(void)
+{
+    JSLStrToStrMultimap map = {0};
+    bool ok = jsl_str_to_str_multimap_init(&map, &global_arena, 4, 123, 0.75f);
+    TEST_BOOL(ok);
+    if (!ok) return;
+
+    char key_buffer[] = "transient-key";
+    char value_buffer[] = "transient-value";
+    JSLFatPtr key = jsl_fatptr_from_cstr(key_buffer);
+    JSLFatPtr value = jsl_fatptr_from_cstr(value_buffer);
+
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, key, JSL_STRING_LIFETIME_TRANSIENT, value, JSL_STRING_LIFETIME_TRANSIENT));
+
+    key_buffer[0] = 'X';
+    value_buffer[0] = 'Z';
+
+    JSLStrToStrMultimapKeyValueIter iter;
+    jsl_str_to_str_multimap_key_value_iterator_init(&map, &iter);
+
+    bool found = false;
+    JSLFatPtr out_key = {0};
+    JSLFatPtr out_value = {0};
+    while (jsl_str_to_str_multimap_key_value_iterator_next(&iter, &out_key, &out_value))
+    {
+        if (fatptrs_equal(out_key, JSL_FATPTR_EXPRESSION("transient-key")))
+        {
+            found = true;
+            TEST_BOOL(fatptrs_equal(out_value, JSL_FATPTR_EXPRESSION("transient-value")));
+            TEST_BOOL(out_key.data != (uint8_t*) key_buffer);
+            TEST_BOOL(out_value.data != (uint8_t*) value_buffer);
+            break;
+        }
+    }
+
+    TEST_BOOL(found);
+}
+
+static void test_jsl_str_to_str_multimap_static_lifetime_no_copy(void)
+{
+    JSLStrToStrMultimap map = {0};
+    bool ok = jsl_str_to_str_multimap_init(&map, &global_arena, 4, 789, 0.5f);
+    TEST_BOOL(ok);
+    if (!ok) return;
+
+    JSLFatPtr key = JSL_FATPTR_INITIALIZER("static-key");
+    JSLFatPtr value = JSL_FATPTR_INITIALIZER("static-value");
+
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, key, JSL_STRING_LIFETIME_STATIC, value, JSL_STRING_LIFETIME_STATIC));
+
+    JSLStrToStrMultimapKeyValueIter iter;
+    jsl_str_to_str_multimap_key_value_iterator_init(&map, &iter);
+
+    JSLFatPtr out_key = {0};
+    JSLFatPtr out_value = {0};
+    bool found = jsl_str_to_str_multimap_key_value_iterator_next(&iter, &out_key, &out_value);
+    TEST_BOOL(found);
+    if (!found) return;
+
+    TEST_BOOL(out_key.data == key.data);
+    TEST_BOOL(out_value.data == value.data);
+    TEST_BOOL(fatptrs_equal(out_key, key));
+    TEST_BOOL(fatptrs_equal(out_value, value));
+}
+
+static void test_jsl_str_to_str_multimap_key_value_iterator_covers_all_pairs(void)
+{
+    JSLStrToStrMultimap map = {0};
+    bool ok = jsl_str_to_str_multimap_init(&map, &global_arena, 8, 555, 0.5f);
+    TEST_BOOL(ok);
+    if (!ok) return;
+
+    ExpectedPair expected[] = {
+        {JSL_FATPTR_INITIALIZER("a"), JSL_FATPTR_INITIALIZER("1"), false},
+        {JSL_FATPTR_INITIALIZER("b"), JSL_FATPTR_INITIALIZER("2"), false},
+        {JSL_FATPTR_INITIALIZER("a"), JSL_FATPTR_INITIALIZER("3"), false},
+        {JSL_FATPTR_INITIALIZER("c"), JSL_FATPTR_INITIALIZER("4"), false}
+    };
+
+    for (size_t i = 0; i < sizeof(expected) / sizeof(expected[0]); i++)
+    {
+        TEST_BOOL(jsl_str_to_str_multimap_insert(
+            &map,
+            expected[i].key,
+            JSL_STRING_LIFETIME_STATIC,
+            expected[i].value,
+            JSL_STRING_LIFETIME_STATIC
+        ));
+    }
+
+    JSLStrToStrMultimapKeyValueIter iter;
+    jsl_str_to_str_multimap_key_value_iterator_init(&map, &iter);
+
+    size_t seen = 0;
+    JSLFatPtr out_key = {0};
+    JSLFatPtr out_value = {0};
+    while (jsl_str_to_str_multimap_key_value_iterator_next(&iter, &out_key, &out_value))
+    {
+        bool matched = false;
+        for (size_t i = 0; i < sizeof(expected) / sizeof(expected[0]); i++)
+        {
+            if (!expected[i].seen && fatptrs_equal(out_key, expected[i].key) && fatptrs_equal(out_value, expected[i].value))
+            {
+                expected[i].seen = true;
+                matched = true;
+                seen++;
+                break;
+            }
+        }
+        TEST_BOOL(matched);
+    }
+
+    TEST_INT64_EQUAL((int64_t) seen, (int64_t)(sizeof(expected) / sizeof(expected[0])));
+    for (size_t i = 0; i < sizeof(expected) / sizeof(expected[0]); i++)
+    {
+        TEST_BOOL(expected[i].seen);
+    }
+
+    TEST_BOOL(!jsl_str_to_str_multimap_key_value_iterator_next(&iter, &out_key, &out_value));
+}
+
+static void test_jsl_str_to_str_multimap_get_key_iterator_filters_by_key(void)
+{
+    JSLStrToStrMultimap map = {0};
+    bool ok = jsl_str_to_str_multimap_init(&map, &global_arena, 6, 1010, 0.6f);
+    TEST_BOOL(ok);
+    if (!ok) return;
+
+    JSLFatPtr key = JSL_FATPTR_INITIALIZER("key");
+    JSLFatPtr other_key = JSL_FATPTR_INITIALIZER("other");
+
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, key, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("A"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, key, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("B"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, other_key, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("C"), JSL_STRING_LIFETIME_STATIC));
+
+    JSLStrToStrMultimapGetValueIter iter;
+    jsl_str_to_str_multimap_get_key_iterator_init(&map, &iter, key);
+
+    bool saw_a = false;
+    bool saw_b = false;
+    while (true)
+    {
+        JSLFatPtr val = jsl_str_to_str_multimap_get_key_iterator_next(&iter);
+        if (val.data == NULL)
+            break;
+
+        if (fatptrs_equal(val, JSL_FATPTR_EXPRESSION("A")))
+            saw_a = true;
+        else if (fatptrs_equal(val, JSL_FATPTR_EXPRESSION("B")))
+            saw_b = true;
+        else
+            TEST_BOOL(false);
+    }
+
+    TEST_BOOL(saw_a);
+    TEST_BOOL(saw_b);
+
+    jsl_str_to_str_multimap_get_key_iterator_init(&map, &iter, JSL_FATPTR_EXPRESSION("does-not-exist"));
+    JSLFatPtr empty = jsl_str_to_str_multimap_get_key_iterator_next(&iter);
+    TEST_BOOL(empty.data == NULL);
+    TEST_INT64_EQUAL(empty.length, (int64_t) 0);
+}
+
+static void test_jsl_str_to_str_multimap_handles_empty_and_binary_values(void)
+{
+    JSLStrToStrMultimap map = {0};
+    bool ok = jsl_str_to_str_multimap_init(&map, &global_arena, 4, 2020, 0.5f);
+    TEST_BOOL(ok);
+    if (!ok) return;
+
+    JSLFatPtr empty_key = JSL_FATPTR_INITIALIZER("");
+    JSLFatPtr empty_value = JSL_FATPTR_INITIALIZER("");
+    JSLFatPtr bin_key = JSL_FATPTR_INITIALIZER("bin");
+    uint8_t binary_value_buf[] = { 'A', 0x00, 'B', 0x7F };
+    JSLFatPtr binary_value = jsl_fatptr_init(binary_value_buf, 4);
+
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, empty_key, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("empty-key"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, bin_key, JSL_STRING_LIFETIME_STATIC, binary_value, JSL_STRING_LIFETIME_TRANSIENT));
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, bin_key, JSL_STRING_LIFETIME_STATIC, empty_value, JSL_STRING_LIFETIME_STATIC));
+
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, empty_key), (int64_t) 1);
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, bin_key), (int64_t) 2);
+
+    JSLStrToStrMultimapGetValueIter iter;
+    jsl_str_to_str_multimap_get_key_iterator_init(&map, &iter, empty_key);
+    JSLFatPtr value = jsl_str_to_str_multimap_get_key_iterator_next(&iter);
+    TEST_BOOL(fatptrs_equal(value, JSL_FATPTR_EXPRESSION("empty-key")));
+    TEST_BOOL(jsl_str_to_str_multimap_get_key_iterator_next(&iter).data == NULL);
+
+    jsl_str_to_str_multimap_get_key_iterator_init(&map, &iter, bin_key);
+    bool saw_binary = false;
+    bool saw_empty = false;
+    while (true)
+    {
+        value = jsl_str_to_str_multimap_get_key_iterator_next(&iter);
+        if (value.data == NULL)
+            break;
+
+        if (value.length == 4 && memcmp(value.data, binary_value_buf, 4) == 0)
+            saw_binary = true;
+        else if (value.length == 0)
+            saw_empty = true;
+    }
+
+    TEST_BOOL(saw_binary);
+    TEST_BOOL(saw_empty);
+}
+
+static void test_jsl_str_to_str_multimap_delete_value(void)
+{
+    JSLStrToStrMultimap map = {0};
+    bool ok = jsl_str_to_str_multimap_init(&map, &global_arena, 8, 3030, 0.55f);
+    TEST_BOOL(ok);
+    if (!ok) return;
+
+    JSLFatPtr key = JSL_FATPTR_INITIALIZER("numbers");
+    JSLFatPtr one = JSL_FATPTR_INITIALIZER("one");
+    JSLFatPtr two = JSL_FATPTR_INITIALIZER("two");
+
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, key, JSL_STRING_LIFETIME_STATIC, one, JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, key, JSL_STRING_LIFETIME_STATIC, two, JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, key, JSL_STRING_LIFETIME_STATIC, two, JSL_STRING_LIFETIME_STATIC));
+
+    TEST_BOOL(!jsl_str_to_str_multimap_delete_value(&map, JSL_FATPTR_EXPRESSION("missing"), one));
+    TEST_BOOL(!jsl_str_to_str_multimap_delete_value(&map, key, JSL_FATPTR_EXPRESSION("missing")));
+
+    TEST_BOOL(jsl_str_to_str_multimap_delete_value(&map, key, two));
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, key), (int64_t) 2);
+
+    TEST_BOOL(jsl_str_to_str_multimap_delete_value(&map, key, two));
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, key), (int64_t) 1);
+
+    TEST_BOOL(!jsl_str_to_str_multimap_delete_value(&map, key, two));
+    TEST_BOOL(jsl_str_to_str_multimap_delete_value(&map, key, one));
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, key), (int64_t) 0);
+    TEST_BOOL(!jsl_str_to_str_multimap_delete_value(&map, key, one));
+}
+
+static void test_jsl_str_to_str_multimap_delete_key(void)
+{
+    JSLStrToStrMultimap map = {0};
+    bool ok = jsl_str_to_str_multimap_init(&map, &global_arena, 6, 4040, 0.5f);
+    TEST_BOOL(ok);
+    if (!ok) return;
+
+    JSLFatPtr keep = JSL_FATPTR_INITIALIZER("keep");
+    JSLFatPtr drop = JSL_FATPTR_INITIALIZER("drop");
+
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, keep, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("1"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, drop, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("a"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, drop, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("b"), JSL_STRING_LIFETIME_STATIC));
+
+    TEST_BOOL(jsl_str_to_str_multimap_delete_key(&map, drop));
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, drop), (int64_t) 0);
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, keep), (int64_t) 1);
+
+    JSLStrToStrMultimapKeyValueIter iter;
+    jsl_str_to_str_multimap_key_value_iterator_init(&map, &iter);
+    JSLFatPtr out_key = {0};
+    JSLFatPtr out_val = {0};
+    int seen_keep = 0;
+    while (jsl_str_to_str_multimap_key_value_iterator_next(&iter, &out_key, &out_val))
+    {
+        TEST_BOOL(fatptrs_equal(out_key, keep));
+        seen_keep++;
+    }
+    TEST_INT64_EQUAL((int64_t) seen_keep, (int64_t) 1);
+
+    TEST_BOOL(!jsl_str_to_str_multimap_delete_key(&map, drop));
+    TEST_BOOL(!jsl_str_to_str_multimap_delete_key(&map, JSL_FATPTR_EXPRESSION("none")));
+}
+
+static void test_jsl_str_to_str_multimap_clear(void)
+{
+    JSLStrToStrMultimap map = {0};
+    bool ok = jsl_str_to_str_multimap_init(&map, &global_arena, 10, 5050, 0.5f);
+    TEST_BOOL(ok);
+    if (!ok) return;
+
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, JSL_FATPTR_EXPRESSION("x"), JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("1"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, JSL_FATPTR_EXPRESSION("y"), JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("2"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, JSL_FATPTR_EXPRESSION("y"), JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("3"), JSL_STRING_LIFETIME_STATIC));
+
+    jsl_str_to_str_multimap_clear(&map);
+
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, JSL_FATPTR_EXPRESSION("x")), (int64_t) 0);
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, JSL_FATPTR_EXPRESSION("y")), (int64_t) 0);
+
+    JSLStrToStrMultimapKeyValueIter iter;
+    jsl_str_to_str_multimap_key_value_iterator_init(&map, &iter);
+    JSLFatPtr out_key = {0};
+    JSLFatPtr out_value = {0};
+    TEST_BOOL(!jsl_str_to_str_multimap_key_value_iterator_next(&iter, &out_key, &out_value));
+
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, JSL_FATPTR_EXPRESSION("z"), JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("4"), JSL_STRING_LIFETIME_STATIC));
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, JSL_FATPTR_EXPRESSION("z")), (int64_t) 1);
+}
 
 int main(void)
 {
     jsl_arena_init(&global_arena, malloc(JSL_MEGABYTES(1)), JSL_MEGABYTES(1));
 
-    
+    RUN_TEST_FUNCTION("init success", test_jsl_str_to_str_multimap_init_success);
+    jsl_arena_reset(&global_arena);
+
+    RUN_TEST_FUNCTION("init invalid args", test_jsl_str_to_str_multimap_init_invalid_arguments);
+    jsl_arena_reset(&global_arena);
+
+    RUN_TEST_FUNCTION("insert and value count", test_jsl_str_to_str_multimap_insert_and_get_value_count);
+    jsl_arena_reset(&global_arena);
+
+    RUN_TEST_FUNCTION("duplicate values", test_jsl_str_to_str_multimap_duplicate_values_allowed);
+    jsl_arena_reset(&global_arena);
+
+    RUN_TEST_FUNCTION("transient lifetime copies data", test_jsl_str_to_str_multimap_transient_lifetime_copies);
+    jsl_arena_reset(&global_arena);
+
+    RUN_TEST_FUNCTION("static lifetime uses original pointers", test_jsl_str_to_str_multimap_static_lifetime_no_copy);
+    jsl_arena_reset(&global_arena);
+
+    RUN_TEST_FUNCTION("key/value iterator covers all", test_jsl_str_to_str_multimap_key_value_iterator_covers_all_pairs);
+    jsl_arena_reset(&global_arena);
+
+    RUN_TEST_FUNCTION("get-key iterator filters", test_jsl_str_to_str_multimap_get_key_iterator_filters_by_key);
+    jsl_arena_reset(&global_arena);
+
+    RUN_TEST_FUNCTION("empty strings and binary values", test_jsl_str_to_str_multimap_handles_empty_and_binary_values);
+    jsl_arena_reset(&global_arena);
+
+    RUN_TEST_FUNCTION("delete value behavior", test_jsl_str_to_str_multimap_delete_value);
+    jsl_arena_reset(&global_arena);
+
+    RUN_TEST_FUNCTION("delete key behavior", test_jsl_str_to_str_multimap_delete_key);
+    jsl_arena_reset(&global_arena);
+
+    RUN_TEST_FUNCTION("clear and reuse", test_jsl_str_to_str_multimap_clear);
+    jsl_arena_reset(&global_arena);
 
     TEST_RESULTS();
     return lfails != 0;

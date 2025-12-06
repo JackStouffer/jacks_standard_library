@@ -195,7 +195,7 @@
         (void) iterator;
         (void) out_key;
         (void) out_value;
-        return val;
+        return false;
     }
 
     JSL_STR_TO_STR_MULTIMAP_DEF void jsl_str_to_str_multimap_get_key_iterator_init(
