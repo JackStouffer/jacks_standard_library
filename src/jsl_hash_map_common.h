@@ -304,3 +304,10 @@ enum JSL__HashmapFlags
     JSL__HASHMAP_DUPLICATE_VALUES = JSL_MAKE_BITFLAG(3),
     JSL__HASHMAP_NULL_VALUE_SET = JSL_MAKE_BITFLAG(4)
 };
+
+typedef enum JSLStringLifeTime {
+    /// @brief The string's lifetime is less than the container
+    JSL_STRING_LIFETIME_TRANSIENT = 0,
+    /// @brief The string is in static storage or can be assumed to be longer than the container
+    JSL_STRING_LIFETIME_STATIC = 1
+} JSLStringLifeTime;

@@ -695,7 +695,7 @@ void write_hash_map_header(
 
     jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#pragma once\n\n"));
     jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include <stdint.h>\n"));
-    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include \"jsl_hash_map.h\"\n\n"));
+    jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include \"jsl_hash_map_common.h\"\n\n"));
 
     for (int32_t i = 0; i < include_header_count; ++i)
     {
@@ -833,7 +833,7 @@ void write_hash_map_source(
     );
     jsl_string_builder_insert_fatptr(
         builder,
-        JSL_FATPTR_EXPRESSION("#include \"jsl_hash_map.h\"\n\n")
+        JSL_FATPTR_EXPRESSION("#include \"jsl_hash_map_common.h\"\n\n")
     );
 
     jsl_string_builder_insert_fatptr(
@@ -1003,7 +1003,7 @@ JSLFatPtr help_message = JSL_FATPTR_INITIALIZER(
     "\t--custom-hash\t\tOverride the included hash call with the given function name\n"
 );
 
-int32_t main(int32_t argc, char** argv)
+static int32_t entrypoint(int32_t argc, char** argv)
 {
     bool show_help = false;
     bool print_header = false;
@@ -1238,5 +1238,21 @@ int32_t main(int32_t argc, char** argv)
 
     return EXIT_SUCCESS;
 }
+
+// #if JSL_WINDOWS
+
+//     int32_t wmain(int32_t argc, wchar_t** argv)
+//     {
+
+//     }
+
+// #else
+
+    int32_t main(int32_t argc, char** argv)
+    {
+        return entrypoint(argc, argv);
+    }
+
+// #endif // JSL_WINDOWS
 
 #endif // INCLUDE_MAIN
