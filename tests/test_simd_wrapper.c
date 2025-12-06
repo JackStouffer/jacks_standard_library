@@ -1,4 +1,7 @@
 /**
+ * Since this isn't our library, these tests just make sure that the library
+ * links correctly with C code and is callable.
+ * 
  * Copyright (c) 2025 Jack Stouffer
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -117,6 +120,22 @@ static void test(void)
 
         TEST_INT64_EQUAL((int64_t) writen, (int64_t) 186);
         TEST_BUFFERS_EQUAL(medium_str_u16, buffer, writen);
+    }
+
+    {
+        uint16_t* buffer = (uint16_t*) malloc(
+            sizeof(uint16_t)
+            * simdutf_utf16_length_from_utf8((char*) long_str.data, (size_t) long_str.length)
+        );
+
+        size_t writen = simdutf_convert_valid_utf8_to_utf16(
+            (char*) long_str.data,
+            (size_t) long_str.length,
+            buffer
+        );
+
+        TEST_INT64_EQUAL((int64_t) writen, (int64_t) 1562);
+        TEST_BUFFERS_EQUAL(long_str_u16, buffer, writen);
     }
 }
 

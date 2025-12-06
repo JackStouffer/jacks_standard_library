@@ -48,6 +48,11 @@
 #define JSL_CORE_IMPLEMENTATION
 #include "../src/jsl_core.h"
 
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__DragonFly__)
+#include <sys/types.h>
+#include <sys/sysctl.h>
+#endif
+
 typedef struct HashMapDecl {
     char *name, *prefix, *key_type, *value_type, *impl_type;
     char** headers;
@@ -194,13 +199,12 @@ static CompilerConfig clang_configs[] = {
 
 static CompilerConfig msvc_configs[] = {
     {
-        "msvc_debug_",
+        "msvc_debug_c11_",
         (char*[]) {
             "/nologo",
             "/utf-8",
             "/DJSL_DEBUG",
             "/Isrc",
-            "/TC",
             "/Od",
             "/Zi", // debug info
             "/W4",
@@ -211,12 +215,27 @@ static CompilerConfig msvc_configs[] = {
         }
     },
     {
-        "msvc_opt_",
+        "msvc_debug_c17_",
+        (char*[]) {
+            "/nologo",
+            "/utf-8",
+            "/DJSL_DEBUG",
+            "/Isrc",
+            "/Od",
+            "/Zi", // debug info
+            "/W4",
+            "/WX", // warnings as errors
+            "/std:c17",
+            "/FS", // allow concurrent PDB writes
+            NULL
+        }
+    },
+    {
+        "msvc_opt_c11_",
         (char*[]) {
             "/nologo",
             "/utf-8",
             "/Isrc",
-            "/TC",
             "/O2",
             "/W4",
             "/WX", // warnings as errors
@@ -225,6 +244,58 @@ static CompilerConfig msvc_configs[] = {
             NULL
         }
     },
+    {
+        "msvc_opt_c17_",
+        (char*[]) {
+            "/nologo",
+            "/utf-8",
+            "/Isrc",
+            "/O2",
+            "/W4",
+            "/WX", // warnings as errors
+            "/std:c17",
+            "/FS", // allow concurrent PDB writes
+            NULL
+        }
+    },
+    {
+        "msvc_debug_error_checks_c11_",
+        (char*[]) {
+            "/nologo",
+            "/utf-8",
+            "/Isrc",
+            "/Od",
+            "/W4",
+            "/WX", // warnings as errors
+            "/std:c11",
+            "/RTC1", // run time error checks
+            "/sdl", // extra compile time error checks
+            "/guard:cf",
+            "/Qspectre",
+            "/DYNAMICBASE",
+            "/FS", // allow concurrent PDB writes
+            NULL
+        }
+    },
+    {
+        "msvc_debug_error_checks_c17_",
+        (char*[]) {
+            "/nologo",
+            "/utf-8",
+            "/Isrc",
+            "/Od",
+            "/W4",
+            "/WX", // warnings as errors
+            "/std:c17",
+            "/RTC1", // run time error checks
+            "/sdl", // extra compile time error checks
+            "/guard:cf",
+            "/Qspectre",
+            "/DYNAMICBASE",
+            "/FS", // allow concurrent PDB writes
+            NULL
+        }
+    }
 };
 
 static UnitTestDecl unit_test_declarations[] = {
@@ -308,7 +379,7 @@ typedef struct CStringArray {
     int32_t capacity;
 } CStringArray;
 
-char* my_strdup(char* str)
+static char* my_strdup(char* str)
 {
     size_t len = strlen(str) + 1;
     char* ret = calloc(len, sizeof(char));
@@ -317,7 +388,7 @@ char* my_strdup(char* str)
     return ret;
 }
 
-void cstring_array_init(CStringArray* array)
+static void cstring_array_init(CStringArray* array)
 {
     memset(array, 0, sizeof(CStringArray));
     array->capacity = 32;
@@ -325,7 +396,7 @@ void cstring_array_init(CStringArray* array)
     assert(array->array != NULL);
 }
 
-void cstring_array_insert(CStringArray* array, char* string)
+static void cstring_array_insert(CStringArray* array, char* string)
 {
     if (array->length == array->capacity)
     {
@@ -336,6 +407,64 @@ void cstring_array_insert(CStringArray* array, char* string)
 
     array->array[array->length] = my_strdup(string);
     ++array->length;
+}
+
+static int32_t get_logical_processor_count(void)
+{
+    // Returns the number of logical (including SMT) processors available.
+    // Falls back to 1 if the platform APIs cannot provide a value.
+    #if JSL_IS_WINDOWS
+        DWORD logical_processors = 0;
+
+        #ifdef ALL_PROCESSOR_GROUPS
+            logical_processors = GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
+        #endif
+
+        if (logical_processors == 0)
+        {
+            SYSTEM_INFO info;
+            GetSystemInfo(&info);
+            logical_processors = info.dwNumberOfProcessors;
+        }
+
+    #elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__DragonFly__)
+        long logical_processors = sysconf(_SC_NPROCESSORS_ONLN);
+
+        if (logical_processors < 1)
+        {
+            int mib[2] = { CTL_HW, 0 };
+            int count = 0;
+            size_t size = sizeof(count);
+
+            #ifdef HW_AVAILCPU
+                mib[1] = HW_AVAILCPU;
+                if (sysctl(mib, 2, &count, &size, NULL, 0) == 0 && count > 0)
+                {
+                    logical_processors = count;
+                }
+            #endif
+
+            #ifdef HW_NCPU
+                if (logical_processors < 1)
+                {
+                    mib[1] = HW_NCPU;
+                    size = sizeof(count);
+                    if (sysctl(mib, 2, &count, &size, NULL, 0) == 0 && count > 0)
+                    {
+                        logical_processors = count;
+                    }
+                }
+            #endif
+        }
+
+    #endif
+
+    if (logical_processors < 1)
+        logical_processors = 1;
+    if (logical_processors > INT32_MAX)
+        logical_processors = 1;
+
+    return (int32_t) logical_processors;
 }
 
 int32_t main(int32_t argc, char **argv)
@@ -541,6 +670,8 @@ int32_t main(int32_t argc, char **argv)
 
     int32_t test_count = sizeof(unit_test_declarations) / sizeof(UnitTestDecl);
     Nob_Procs compile_procs = {0};
+    int32_t logical_processors = get_logical_processor_count();
+    nob_log(NOB_INFO, "Compiling unit tests with up to %d parallel jobs", logical_processors);
 
     for (int32_t i = 0; i < test_count; i++)
     {
@@ -605,7 +736,7 @@ int32_t main(int32_t argc, char **argv)
             }
 
             // if (!nob_cmd_run(&compile_command)) return 1;
-            if (!nob_cmd_run(&compile_command, .async = &compile_procs)) return 1;
+            if (!nob_cmd_run(&compile_command, .async = &compile_procs, .max_procs = (size_t)logical_processors)) return 1;
 
             cstring_array_insert(&executables, exe_name);
         }
@@ -681,7 +812,7 @@ int32_t main(int32_t argc, char **argv)
                 }
 
                 // if (!nob_cmd_run(&compile_command)) return 1;
-                if (!nob_cmd_run(&compile_command, .async = &compile_procs)) return 1;
+                if (!nob_cmd_run(&compile_command, .async = &compile_procs, .max_procs = (size_t)logical_processors)) return 1;
 
                 cstring_array_insert(&executables, exe_name);
             }
@@ -720,7 +851,7 @@ int32_t main(int32_t argc, char **argv)
                     nob_cmd_append(&gcc_debug_compile_command, source_file);
                 }
 
-                if (!nob_cmd_run(&gcc_debug_compile_command, .async = &compile_procs)) return 1;
+                if (!nob_cmd_run(&gcc_debug_compile_command, .async = &compile_procs, .max_procs = (size_t)logical_processors)) return 1;
 
                 cstring_array_insert(&executables, exe_name);
             }
@@ -754,7 +885,7 @@ int32_t main(int32_t argc, char **argv)
                     nob_cmd_append(&gcc_optimized_compile_command, source_file);
                 }
 
-                if (!nob_cmd_run(&gcc_optimized_compile_command, .async = &compile_procs)) return 1;
+                if (!nob_cmd_run(&gcc_optimized_compile_command, .async = &compile_procs, .max_procs = (size_t)logical_processors)) return 1;
 
                 cstring_array_insert(&executables, exe_name);
             }
