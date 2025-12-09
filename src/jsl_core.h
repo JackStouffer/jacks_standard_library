@@ -323,6 +323,45 @@ int32_t jsl__find_first_set_u64(uint64_t x);
 #endif
 
 
+#ifdef JSL_DEBUG
+
+    #if JSL__IS_GCC_VAL || JSL__IS_CLANG_VAL
+
+        #define JSL__DONT_OPTIMIZE_AWAY_IMPL(x)                 \
+            do                                                  \
+            {                                                   \
+                __asm__ __volatile__("" : : "g"(x) : "memory"); \
+            }                                                   \
+            while (0)
+
+    #elif JSL__IS_MSVC_VAL
+
+        __declspec(noinline) static inline void jsl__msvc_debug_sink(const void *p)
+        {
+            /* Pretend to use p in a way the optimizer can’t see through easily */
+            _ReadWriteBarrier();
+            (void) p;
+        }
+
+        #define JSL__DONT_OPTIMIZE_AWAY_IMPL(x)         \
+            do                                          \
+            {                                           \
+                jsl_msvc_debug_sink(&(x));              \
+            }                                           \
+            while (0)
+
+    #else
+
+        #define JSL__DONT_OPTIMIZE_AWAY_IMPL(x) do {} while (0)
+
+    #endif
+
+#else
+
+    #define JSL__DONT_OPTIMIZE_AWAY_IMPL(x) do {} while (0)
+
+#endif
+
 /**
  *
  *
@@ -833,6 +872,11 @@ int32_t jsl__find_first_set_u64(uint64_t x);
  * ```
  */
 #define JSL_TERABYTES(x) x * 1024 * 1024 * 1024 * 1024
+
+/**
+ * TODO: docs
+ */
+#define JSL_DEBUG_DONT_OPTIMIZE_AWAY(x) JSL__DONT_OPTIMIZE_AWAY_IMPL(x)
 
 /**
  * Round x up to the next power of two. If x is a power of two it returns
@@ -1598,7 +1642,7 @@ JSL_DEF JSLFatPtr jsl_arena_allocate_aligned(JSLArena* arena, int64_t bytes, int
 #define JSL_ARENA_TYPED_ALLOCATE(T, arena) (T*) jsl_arena_allocate_aligned(arena, sizeof(T), _Alignof(T), false).data
 
 /**
- * Macro to make it easier to allocate an array of `T` within an arena.
+ * Macro to make it easier to allocate a zero filled array of `T` within an arena.
  *
  * @param T Type to allocate.
  * @param arena Arena to allocate from; must be initialized.
@@ -1609,7 +1653,7 @@ JSL_DEF JSLFatPtr jsl_arena_allocate_aligned(JSLArena* arena, int64_t bytes, int
  * struct MyStruct* thing_array = JSL_ARENA_TYPED_ALLOCATE(struct MyStruct, arena, 42);
  * @endcode
  */
-#define JSL_ARENA_TYPED_ARRAY_ALLOCATE(T, arena, length) (T*) jsl_arena_allocate_aligned(arena, (int64_t) sizeof(T) * length, _Alignof(T), false).data
+#define JSL_ARENA_TYPED_ARRAY_ALLOCATE(T, arena, length) (T*) jsl_arena_allocate_aligned(arena, (int64_t) sizeof(T) * length, _Alignof(T), true).data
 
 /**
  * Resize the allocation if it was the last allocation, otherwise, allocate a new
