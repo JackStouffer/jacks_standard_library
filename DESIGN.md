@@ -444,7 +444,7 @@ void* response_buffer = my_heap_allocate(1024 * 1024);
 
 read_request(request_buffer);
 route_function(&heap, request_buffer, response_buffer);
-send_buffer(response_buffer);
+send_buffer_to_client(socket_file_descriptor, response_buffer);
 
 close(socket_file_descriptor);
 my_heap_free_all(&heap);

@@ -55,35 +55,38 @@
     extern "C" {
     #endif
 
-    
-    struct JSL__StrToStrMultimapValue {
-        JSLFatPtr value;
-        struct JSL__StrToStrMultimapValueNode* next;
-    };
-
     enum JSLStrToStrMultimapKeyState {
-        JSL__MULTIMAP_EMPTY = UINTPTR_MAX,
-        JSL__MULTIMAP_TOMBSTONE = UINTPTR_MAX - 1u
+        JSL__MULTIMAP_EMPTY = 1UL,
+        JSL__MULTIMAP_TOMBSTONE = 2UL
     };
 
-    struct JSL__StrToStrMultimapProbeResult {
-        int64_t lut_index;
-        // index of first tombstone seen, or -1
-        int64_t first_tombstone;
-        // bitpacking isn't really important here since this is a result struct
-        bool tombstone_seen;
-        bool found;
-    };
+    #define JSL__MULTIMAP_SSO_LENGTH 16
 
-    #define JSL__CHUNK_SIZE 32
-    // This is probably an unnecessary optimization but w/e
-    #define JSL__DIV_BY_32(x) x >> 5L
+    struct JSL__StrToStrMultimapValue {
+        uint8_t small_string_buffer[JSL__MULTIMAP_SSO_LENGTH];
+
+        JSLFatPtr value;
+        struct JSL__StrToStrMultimapValue* next;
+    };
 
     struct JSL__StrToStrMultimapEntry {
+        /// @brief small string optimization buffer to hold the key if len < 16
+        uint8_t small_string_buffer[JSL__MULTIMAP_SSO_LENGTH];
+
+        // TODO: docs
         JSLFatPtr key;
-        struct JSL__StrToStrMultimapValueNode* values_head;
+        // TODO: docs
         uint64_t hash;
-        enum JSLStrToStrMultimapKeyState state;
+
+        union {
+            /// @brief Used to store in the free list, ignored otherwise
+            struct JSL__StrToStrMultimapValue* next;
+            // TODO: docs
+            struct JSL__StrToStrMultimapValueNode* values_head;
+        };
+
+        // TODO: docs
+        int64_t value_count;
     };
 
     typedef struct JSLStrToStrMultimap {
@@ -92,11 +95,10 @@
         uintptr_t* entry_lookup_table;
         int64_t entry_lookup_table_length;
 
-        struct JSL__StrToStrMultimapChunk* chunks_list_head;
-        struct JSL__StrToStrMultimapChunk* chunks_list_tail;
-        int64_t chunks_count; // capacity
-        int64_t item_count;
+        int64_t key_count;
+        int64_t value_count;
 
+        struct JSL__StrToStrMultimapEntry* entry_free_list;
         struct JSL__StrToStrMultimapValue* value_free_list;
 
         uint64_t hash_seed;
@@ -118,6 +120,11 @@
         int64_t item_count_guess,
         uint64_t seed,
         float load_factor
+    );
+
+    JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_has_key(
+        JSLStrToStrMultimap* map,
+        JSLFatPtr key
     );
 
     JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_insert(
@@ -225,17 +232,87 @@
         return false;
     }
 
-    static void jsl__probe(
+    static bool jsl__str_to_str_multimap_add_key(
         JSLStrToStrMultimap* map,
         JSLFatPtr key,
-        struct JSL__StrToStrMultimapProbeResult* out_result
+        JSLStringLifeTime key_lifetime,
+        int64_t lut_index,
+        uint64_t hash
     )
     {
-        out_result->found = false;
-        out_result->tombstone_seen = false;
+        struct JSL__StrToStrMultimapEntry* entry = NULL;
 
-        uint64_t hash = jsl__rapidhash_withSeed(key.data, key.length, map->hash_seed);
-        int64_t lut_index = (int64_t) (hash & (map->entry_lookup_table_length - 1));
+        if (map->entry_free_list == NULL)
+        {
+            entry = JSL_ARENA_TYPED_ALLOCATE(struct JSL__StrToStrMultimapEntry, map->arena);
+        }
+        else
+        {
+            struct JSL__StrToStrMultimapEntry* next = map->entry_free_list->next;
+            entry = map->entry_free_list;
+            map->entry_free_list = next;
+        }
+
+        if (entry != NULL)
+        {
+            entry->value_count = 0;
+            entry->values_head = NULL;
+            entry->hash = hash;
+            ++map->key_count;
+        }
+
+        if (entry != NULL && key_lifetime == JSL_STRING_LIFETIME_STATIC)
+        {
+            entry->key = key;
+        }
+        else if (
+            entry != NULL
+            && key_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+            && key.length <= JSL__MULTIMAP_SSO_LENGTH
+        )
+        {
+            JSL_MEMCPY(entry->small_string_buffer, key.data, key.length);
+            entry->key.data = entry->small_string_buffer;
+            entry->key.length = key.length;
+        }
+        else if (
+            entry != NULL
+            && key_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+            && key.length > JSL__MULTIMAP_SSO_LENGTH
+        )
+        {
+            entry->key = jsl_fatptr_duplicate(map->arena, key);
+        }
+
+        return entry != NULL;
+    }
+
+    static bool jsl__str_to_str_multimap_add_value_to_key(
+        JSLStrToStrMultimap* map,
+        JSLFatPtr value,
+        JSLStringLifeTime value_lifetime,
+        int64_t lut_index
+    )
+    {
+
+    }
+
+    static inline void jsl__str_to_str_multimap_probe(
+        JSLStrToStrMultimap* map,
+        JSLFatPtr key,
+        int64_t* out_lut_index,
+        uint64_t* out_hash,
+        bool* out_found
+    )
+    {
+        *out_lut_index = -1;
+        *out_found = false;
+
+        int64_t first_tombstone = -1;
+        bool tombstone_seen = false;
+
+        *out_hash = jsl__rapidhash_withSeed(key.data, key.length, map->hash_seed);
+        int64_t lut_index = (int64_t) (*out_hash & (map->entry_lookup_table_length - 1));
 
         for (;;)
         {
@@ -243,21 +320,42 @@
 
             if (lut_res == JSL__MULTIMAP_EMPTY)
             {
-                out_result->lut_index = lut_index;
+                *out_lut_index = tombstone_seen ? first_tombstone : lut_index;
                 break;
             }
             else if (lut_res == JSL__MULTIMAP_TOMBSTONE)
             {
-                if (!out_result->tombstone_seen)
+                if (!tombstone_seen)
                 {
-                    out_result->first_tombstone = lut_index;
-                    out_result->tombstone_seen = true;
+                    first_tombstone = lut_index;
+                    tombstone_seen = true;
                 }
             }
             else
             {
+                struct JSL__StrToStrMultimapEntry* entry = (struct JSL__StrToStrMultimapEntry*) lut_res;
 
+                if (entry->in_use)
+                {
+                    if (hash == entry->hash && jsl_fatptr_memory_compare(key, entry->key))
+                    {
+                        *out_found = true;
+                        *out_lut_index = lut_index;
+                        break;
+                    }
+                }
+                else
+                {
+                    map->entry_lookup_table[lut_index] = JSL__MULTIMAP_TOMBSTONE;
+                    if (!tombstone_seen)
+                    {
+                        first_tombstone = lut_index;
+                        tombstone_seen = true;
+                    }
+                }
             }
+
+            ++lut_index;
         }
         
         return;
@@ -279,12 +377,10 @@
             || value.length < 0
         );
 
-        uint64_t capacity = (uint64_t) (map->chunks_count * JSL__CHUNK_SIZE);
-
         bool needs_rehash = false;
         if (res)
         {
-            float current_load_factor = (float) map->item_count / (float) capacity;
+            float current_load_factor = (float) map->key_count / (float) map->entry_lookup_table_length;
             needs_rehash = current_load_factor >= map->load_factor;
         }
 
@@ -293,13 +389,27 @@
             res = jsl__str_to_str_multimap_rehash(map);
         }
 
+        uint64_t hash;
+        int64_t lut_index = -1;
+        bool existing_found = false;
         if (res)
         {
+            jsl__str_to_str_multimap_probe(map, key, &lut_index, &hash, &existing_found);
         }
-
-        if (res)
+        
+        // insert into existing
+        if (lut_index > -1 && existing_found)
         {
-            ++map->item_count;
+            res = jsl__str_to_str_multimap_add_value_to_key(map, value, value_lifetime, lut_index);
+        }
+        // new key
+        else if (lut_index > -1 && !existing_found)
+        {
+            bool key_add_res = jsl__str_to_str_multimap_add_key(map, key, key_lifetime, lut_index, hash);
+            bool value_add_res = key_add_res ? 
+                jsl__str_to_str_multimap_add_value_to_key(map, value, value_lifetime, lut_index)
+                : false;
+            res = key_add_res && value_add_res;
         }
 
         return res;
