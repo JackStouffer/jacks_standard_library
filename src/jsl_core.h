@@ -899,6 +899,9 @@ int32_t jsl__find_first_set_u64(uint64_t x);
  */
 uint32_t jsl_next_power_of_two_u32(uint32_t x);
 
+// TODO: docs
+int64_t jsl_next_power_of_two_i64(int64_t x);
+
 /**
  * Round x up to the next power of two. If x is a power of two it returns
  * the same value.
@@ -2192,12 +2195,33 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
         #endif
     }
+    
+    int64_t jsl_next_power_of_two_i64(int64_t x)
+    {
+        #if JSL_IS_CLANG || JSL_IS_GCC
+
+            return ((int64_t) 1) << (((int64_t) 64) - (int64_t) JSL_PLATFORM_COUNT_LEADING_ZEROS64((uint64_t) x - 1));
+
+        #else
+
+            x--;
+            x |= x >> 1;
+            x |= x >> 2;
+            x |= x >> 4;
+            x |= x >> 8;
+            x |= x >> 16;
+            x |= x >> 32;
+            x++;
+            return x;
+
+        #endif
+    }
 
     uint64_t jsl_next_power_of_two_u64(uint64_t x)
     {
         #if JSL_IS_CLANG || JSL_IS_GCC
 
-            return ((uint64_t) 1u) << (((uint64_t) 64u) - (uint64_t) JSL_PLATFORM_COUNT_LEADING_ZEROS64(x - 1));
+            return ((uint64_t) 1u) << (((uint64_t) 64u) - (uint64_t) JSL_PLATFORM_COUNT_LEADING_ZEROS64(x - 1u));
 
         #else
 

@@ -11,7 +11,7 @@
 #include <stdbool.h>
 
 #if !defined(__cplusplus)
-  #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 201112L
+  #if __has_include(<uchar.h>)
     #include <uchar.h>
   #else
     typedef uint16_t char16_t;

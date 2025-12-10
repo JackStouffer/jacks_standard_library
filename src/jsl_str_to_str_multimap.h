@@ -55,6 +55,90 @@
     extern "C" {
     #endif
 
+    typedef struct JSL__StrToStrMultimapKeyValueIter JSLStrToStrMultimapKeyValueIter;
+
+    typedef struct JSL__StrToStrMultimapValueIter JSLStrToStrMultimapValueIter;
+
+    typedef struct JSL__StrToStrMultimap JSLStrToStrMultimap;
+
+    JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_init(
+        JSLStrToStrMultimap* map,
+        JSLArena* arena,
+        int64_t item_count_guess,
+        uint64_t seed,
+        float load_factor
+    );
+
+    JSL_STR_TO_STR_MULTIMAP_DEF int64_t jsl_str_to_str_multimap_get_key_count(
+        JSLStrToStrMultimap* map
+    );
+
+    JSL_STR_TO_STR_MULTIMAP_DEF int64_t jsl_str_to_str_multimap_get_value_count(
+        JSLStrToStrMultimap* map
+    );
+
+    JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_has_key(
+        JSLStrToStrMultimap* map,
+        JSLFatPtr key
+    );
+
+    JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_insert(
+        JSLStrToStrMultimap* map,
+        JSLFatPtr key,
+        JSLStringLifeTime key_lifetime,
+        JSLFatPtr value,
+        JSLStringLifeTime value_lifetime
+    );
+
+    JSL_STR_TO_STR_MULTIMAP_DEF int64_t jsl_str_to_str_multimap_get_value_count_for_key(
+        JSLStrToStrMultimap* map,
+        JSLFatPtr key
+    );
+
+    JSL_STR_TO_STR_MULTIMAP_DEF void jsl_str_to_str_multimap_key_value_iterator_init(
+        JSLStrToStrMultimap* map,
+        JSLStrToStrMultimapKeyValueIter* iterator
+    );
+
+    JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_key_value_iterator_next(
+        JSLStrToStrMultimapKeyValueIter* iterator,
+        JSLFatPtr* out_key,
+        JSLFatPtr* out_value
+    );
+
+    JSL_STR_TO_STR_MULTIMAP_DEF void jsl_str_to_str_multimap_get_key_iterator_init(
+        JSLStrToStrMultimap* map,
+        JSLStrToStrMultimapValueIter* iterator,
+        JSLFatPtr key
+    );
+
+    JSL_STR_TO_STR_MULTIMAP_DEF JSLFatPtr jsl_str_to_str_multimap_get_key_iterator_next(
+        JSLStrToStrMultimapValueIter* iterator
+    );
+
+    JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_delete_key(
+        JSLStrToStrMultimap* map,
+        JSLFatPtr key
+    );
+
+    JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_delete_value(
+        JSLStrToStrMultimap* map,
+        JSLFatPtr key,
+        JSLFatPtr value
+    );
+
+    JSL_STR_TO_STR_MULTIMAP_DEF void jsl_str_to_str_multimap_clear(
+        JSLStrToStrMultimap* map
+    );
+    
+    #ifdef __cplusplus
+    }
+    #endif
+    
+#endif /* JSL_STR_TO_STR_MULTIMAP_H_INCLUDED */
+
+#ifdef JSL_STR_TO_STR_MULTIMAP_IMPLEMENTATION
+
     enum JSLStrToStrMultimapKeyState {
         JSL__MULTIMAP_EMPTY = 1UL,
         JSL__MULTIMAP_TOMBSTONE = 2UL
@@ -80,16 +164,23 @@
 
         union {
             /// @brief Used to store in the free list, ignored otherwise
-            struct JSL__StrToStrMultimapValue* next;
+            struct JSL__StrToStrMultimapEntry* next;
             // TODO: docs
-            struct JSL__StrToStrMultimapValueNode* values_head;
+            struct JSL__StrToStrMultimapValue* values_head;
         };
 
-        // TODO: docs
         int64_t value_count;
     };
 
-    typedef struct JSLStrToStrMultimap {
+    struct JSL__StrToStrMultimapKeyValueIter {
+        JSLStrToStrMultimap* map;
+    };
+
+    struct JSL__StrToStrMultimapValueIter {
+        JSLStrToStrMultimap* map;
+    };
+
+    struct JSL__StrToStrMultimap {
         JSLArena* arena;
 
         uintptr_t* entry_lookup_table;
@@ -103,86 +194,7 @@
 
         uint64_t hash_seed;
         float load_factor;
-    } JSLStrToStrMultimap;
-
-    typedef struct JSLStrToStrMultimapKeyValueIter {
-        JSLStrToStrMultimap* map;
-    } JSLStrToStrMultimapKeyValueIter;
-
-    typedef struct JSLStrToStrMultimapGetValueIter {
-        JSLStrToStrMultimap* map;
-    } JSLStrToStrMultimapGetValueIter;
-
-
-    JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_init(
-        JSLStrToStrMultimap* map,
-        JSLArena* arena,
-        int64_t item_count_guess,
-        uint64_t seed,
-        float load_factor
-    );
-
-    JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_has_key(
-        JSLStrToStrMultimap* map,
-        JSLFatPtr key
-    );
-
-    JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_insert(
-        JSLStrToStrMultimap* map,
-        JSLFatPtr key,
-        JSLStringLifeTime key_lifetime,
-        JSLFatPtr value,
-        JSLStringLifeTime value_lifetime
-    );
-
-    JSL_STR_TO_STR_MULTIMAP_DEF int64_t jsl_str_to_str_multimap_get_value_count(
-        JSLStrToStrMultimap* map,
-        JSLFatPtr key
-    );
-
-    JSL_STR_TO_STR_MULTIMAP_DEF void jsl_str_to_str_multimap_key_value_iterator_init(
-        JSLStrToStrMultimap* map,
-        JSLStrToStrMultimapKeyValueIter* iterator
-    );
-
-    JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_key_value_iterator_next(
-        JSLStrToStrMultimapKeyValueIter* iterator,
-        JSLFatPtr* out_key,
-        JSLFatPtr* out_value
-    );
-
-    JSL_STR_TO_STR_MULTIMAP_DEF void jsl_str_to_str_multimap_get_key_iterator_init(
-        JSLStrToStrMultimap* map,
-        JSLStrToStrMultimapGetValueIter* iterator,
-        JSLFatPtr key
-    );
-
-    JSL_STR_TO_STR_MULTIMAP_DEF JSLFatPtr jsl_str_to_str_multimap_get_key_iterator_next(
-        JSLStrToStrMultimapGetValueIter* iterator
-    );
-
-    JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_delete_key(
-        JSLStrToStrMultimap* map,
-        JSLFatPtr key
-    );
-
-    JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_delete_value(
-        JSLStrToStrMultimap* map,
-        JSLFatPtr key,
-        JSLFatPtr value
-    );
-
-    JSL_STR_TO_STR_MULTIMAP_DEF void jsl_str_to_str_multimap_clear(
-        JSLStrToStrMultimap* map
-    );
-    
-    #ifdef __cplusplus
-    }
-    #endif
-    
-#endif /* JSL_STR_TO_STR_MULTIMAP_H_INCLUDED */
-
-#ifdef JSL_STR_TO_STR_MULTIMAP_IMPLEMENTATION
+    };
 
     JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_init(
         JSLStrToStrMultimap* map,
@@ -209,16 +221,20 @@
             map->load_factor = load_factor;
             map->hash_seed = seed;
 
-            item_count_guess = JSL_MAX(32, item_count_guess);
-            int64_t items = jsl_next_power_of_two_u64(item_count_guess + 1);
+            item_count_guess = JSL_MAX(32L, item_count_guess);
+            int64_t items = jsl_next_power_of_two_i64(item_count_guess + 1);
 
             map->entry_lookup_table = (uintptr_t*) jsl_arena_allocate_aligned(
                 arena,
-                (uintptr_t) sizeof(uintptr_t) * items,
+                (int64_t) sizeof(uintptr_t) * items,
                 _Alignof(uintptr_t),
                 false
             ).data;
-            JSL_MEMSET(map->entry_lookup_table, JSL__MULTIMAP_EMPTY, sizeof(uintptr_t) * items);
+            JSL_MEMSET(
+                map->entry_lookup_table,
+                JSL__MULTIMAP_EMPTY,
+                sizeof(uintptr_t) * ((size_t) items)
+            );
             map->entry_lookup_table_length = items;
         }
 
@@ -229,6 +245,7 @@
         JSLStrToStrMultimap* map
     )
     {
+        (void) map;
         return false;
     }
 
@@ -255,9 +272,11 @@
 
         if (entry != NULL)
         {
-            entry->value_count = 0;
             entry->values_head = NULL;
+            entry->value_count = 0;
             entry->hash = hash;
+            
+            map->entry_lookup_table[lut_index] = (uintptr_t) entry;
             ++map->key_count;
         }
 
@@ -271,7 +290,7 @@
             && key.length <= JSL__MULTIMAP_SSO_LENGTH
         )
         {
-            JSL_MEMCPY(entry->small_string_buffer, key.data, key.length);
+            JSL_MEMCPY(entry->small_string_buffer, key.data, (size_t) key.length);
             entry->key.data = entry->small_string_buffer;
             entry->key.length = key.length;
         }
@@ -294,7 +313,60 @@
         int64_t lut_index
     )
     {
+        struct JSL__StrToStrMultimapValue* value_record = NULL;
+        uintptr_t lut_res = map->entry_lookup_table[lut_index];
+        struct JSL__StrToStrMultimapEntry* entry = (struct JSL__StrToStrMultimapEntry*) lut_res;
 
+        bool values_ok = lut_res != 0
+            && lut_res != JSL__MULTIMAP_EMPTY
+            && lut_res != JSL__MULTIMAP_TOMBSTONE;
+
+        if (values_ok && map->value_free_list == NULL)
+        {
+            value_record = JSL_ARENA_TYPED_ALLOCATE(struct JSL__StrToStrMultimapValue, map->arena);
+        }
+        else if (values_ok)
+        {
+            struct JSL__StrToStrMultimapValue* next = map->value_free_list->next;
+            value_record = map->value_free_list;
+            map->value_free_list = next;
+        }
+
+        if (value_record != NULL)
+        {
+            ++entry->value_count;
+            ++map->value_count;
+            value_record->next = entry->values_head;
+            entry->values_head = value_record;
+        }
+
+        if (
+            value_record != NULL
+            && value_lifetime == JSL_STRING_LIFETIME_STATIC
+        )
+        {
+            value_record->value = value;
+        }
+        else if (
+            value_record != NULL
+            && value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+            && value.length <= JSL__MULTIMAP_SSO_LENGTH
+        )
+        {
+            JSL_MEMCPY(value_record->small_string_buffer, value.data, (size_t) value.length);
+            value_record->value.data = value_record->small_string_buffer;
+            value_record->value.length = value.length;
+        }
+        else if (
+            value_record != NULL
+            && value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+            && value.length > JSL__MULTIMAP_SSO_LENGTH
+        )
+        {
+            value_record->value = jsl_fatptr_duplicate(map->arena, value);
+        }
+
+        return value_record != NULL;
     }
 
     static inline void jsl__str_to_str_multimap_probe(
@@ -311,8 +383,8 @@
         int64_t first_tombstone = -1;
         bool tombstone_seen = false;
 
-        *out_hash = jsl__rapidhash_withSeed(key.data, key.length, map->hash_seed);
-        int64_t lut_index = (int64_t) (*out_hash & (map->entry_lookup_table_length - 1));
+        *out_hash = jsl__rapidhash_withSeed(key.data, (size_t) key.length, map->hash_seed);
+        int64_t lut_index = (int64_t) (*out_hash & ((uint64_t) map->entry_lookup_table_length - 1u));
 
         for (;;)
         {
@@ -335,9 +407,9 @@
             {
                 struct JSL__StrToStrMultimapEntry* entry = (struct JSL__StrToStrMultimapEntry*) lut_res;
 
-                if (entry->in_use)
+                if (entry->value_count > 0)
                 {
-                    if (hash == entry->hash && jsl_fatptr_memory_compare(key, entry->key))
+                    if (*out_hash == entry->hash && jsl_fatptr_memory_compare(key, entry->key))
                     {
                         *out_found = true;
                         *out_lut_index = lut_index;
@@ -389,7 +461,7 @@
             res = jsl__str_to_str_multimap_rehash(map);
         }
 
-        uint64_t hash;
+        uint64_t hash = 0;
         int64_t lut_index = -1;
         bool existing_found = false;
         if (res)
@@ -415,7 +487,33 @@
         return res;
     }
 
+    JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_has_key(
+        JSLStrToStrMultimap* map,
+        JSLFatPtr key
+    )
+    {
+        (void) map;
+        (void) key;
+        return false;
+    }
+
+    JSL_STR_TO_STR_MULTIMAP_DEF int64_t jsl_str_to_str_multimap_get_key_count(
+        JSLStrToStrMultimap* map
+    )
+    {
+        (void) map;
+        return -1;
+    }
+
     JSL_STR_TO_STR_MULTIMAP_DEF int64_t jsl_str_to_str_multimap_get_value_count(
+        JSLStrToStrMultimap* map
+    )
+    {
+        (void) map;
+        return -1;
+    }
+
+    JSL_STR_TO_STR_MULTIMAP_DEF int64_t jsl_str_to_str_multimap_get_value_count_for_key(
         JSLStrToStrMultimap* map,
         JSLFatPtr key
     )
@@ -449,7 +547,7 @@
 
     JSL_STR_TO_STR_MULTIMAP_DEF void jsl_str_to_str_multimap_get_key_iterator_init(
         JSLStrToStrMultimap* map,
-        JSLStrToStrMultimapGetValueIter* iterator,
+        JSLStrToStrMultimapValueIter* iterator,
         JSLFatPtr key
     )
     {
@@ -460,7 +558,7 @@
     }
 
     JSL_STR_TO_STR_MULTIMAP_DEF JSLFatPtr jsl_str_to_str_multimap_get_key_iterator_next(
-        JSLStrToStrMultimapGetValueIter* iterator
+        JSLStrToStrMultimapValueIter* iterator
     )
     {
         (void) iterator;

@@ -84,13 +84,13 @@ static void test_jsl_str_to_str_multimap_insert_and_get_value_count(void)
     TEST_BOOL(jsl_str_to_str_multimap_insert(&map, key1, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("two"), JSL_STRING_LIFETIME_STATIC));
     TEST_BOOL(jsl_str_to_str_multimap_insert(&map, key2, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("three"), JSL_STRING_LIFETIME_STATIC));
 
-    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, key1), (int64_t) 2);
-    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, key2), (int64_t) 1);
-    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, missing), (int64_t) 0);
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&map, key1), (int64_t) 2);
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&map, key2), (int64_t) 1);
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&map, missing), (int64_t) 0);
 
     JSLStrToStrMultimap uninitialized = {0};
     TEST_BOOL(!jsl_str_to_str_multimap_insert(&uninitialized, key1, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("value"), JSL_STRING_LIFETIME_STATIC));
-    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&uninitialized, key1), (int64_t) -1);
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&uninitialized, key1), (int64_t) -1);
 }
 
 static void test_jsl_str_to_str_multimap_duplicate_values_allowed(void)
@@ -107,9 +107,9 @@ static void test_jsl_str_to_str_multimap_duplicate_values_allowed(void)
     TEST_BOOL(jsl_str_to_str_multimap_insert(&map, key, JSL_STRING_LIFETIME_STATIC, value, JSL_STRING_LIFETIME_STATIC));
     TEST_BOOL(jsl_str_to_str_multimap_insert(&map, key, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("unique"), JSL_STRING_LIFETIME_STATIC));
 
-    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, key), (int64_t) 3);
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&map, key), (int64_t) 3);
 
-    JSLStrToStrMultimapGetValueIter iter;
+    JSLStrToStrMultimapValueIter iter;
     jsl_str_to_str_multimap_get_key_iterator_init(&map, &iter, key);
 
     int32_t repeat_seen = 0;
@@ -265,7 +265,7 @@ static void test_jsl_str_to_str_multimap_get_key_iterator_filters_by_key(void)
     TEST_BOOL(jsl_str_to_str_multimap_insert(&map, key, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("B"), JSL_STRING_LIFETIME_STATIC));
     TEST_BOOL(jsl_str_to_str_multimap_insert(&map, other_key, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("C"), JSL_STRING_LIFETIME_STATIC));
 
-    JSLStrToStrMultimapGetValueIter iter;
+    JSLStrToStrMultimapValueIter iter;
     jsl_str_to_str_multimap_get_key_iterator_init(&map, &iter, key);
 
     bool saw_a = false;
@@ -310,10 +310,10 @@ static void test_jsl_str_to_str_multimap_handles_empty_and_binary_values(void)
     TEST_BOOL(jsl_str_to_str_multimap_insert(&map, bin_key, JSL_STRING_LIFETIME_STATIC, binary_value, JSL_STRING_LIFETIME_TRANSIENT));
     TEST_BOOL(jsl_str_to_str_multimap_insert(&map, bin_key, JSL_STRING_LIFETIME_STATIC, empty_value, JSL_STRING_LIFETIME_STATIC));
 
-    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, empty_key), (int64_t) 1);
-    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, bin_key), (int64_t) 2);
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&map, empty_key), (int64_t) 1);
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&map, bin_key), (int64_t) 2);
 
-    JSLStrToStrMultimapGetValueIter iter;
+    JSLStrToStrMultimapValueIter iter;
     jsl_str_to_str_multimap_get_key_iterator_init(&map, &iter, empty_key);
     JSLFatPtr value = jsl_str_to_str_multimap_get_key_iterator_next(&iter);
     TEST_BOOL(fatptrs_equal(value, JSL_FATPTR_EXPRESSION("empty-key")));
@@ -357,15 +357,56 @@ static void test_jsl_str_to_str_multimap_delete_value(void)
     TEST_BOOL(!jsl_str_to_str_multimap_delete_value(&map, key, JSL_FATPTR_EXPRESSION("missing")));
 
     TEST_BOOL(jsl_str_to_str_multimap_delete_value(&map, key, two));
-    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, key), (int64_t) 2);
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&map, key), (int64_t) 2);
 
     TEST_BOOL(jsl_str_to_str_multimap_delete_value(&map, key, two));
-    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, key), (int64_t) 1);
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&map, key), (int64_t) 1);
 
     TEST_BOOL(!jsl_str_to_str_multimap_delete_value(&map, key, two));
     TEST_BOOL(jsl_str_to_str_multimap_delete_value(&map, key, one));
-    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, key), (int64_t) 0);
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&map, key), (int64_t) 0);
     TEST_BOOL(!jsl_str_to_str_multimap_delete_value(&map, key, one));
+}
+
+static void test_jsl_str_to_str_multimap_delete_value_removes_empty_key(void)
+{
+    JSLStrToStrMultimap map = {0};
+    bool ok = jsl_str_to_str_multimap_init(&map, &global_arena, 6, 6060, 0.5f);
+    TEST_BOOL(ok);
+    if (!ok) return;
+
+    JSLFatPtr key = JSL_FATPTR_INITIALIZER("letters");
+    JSLFatPtr a = JSL_FATPTR_INITIALIZER("a");
+    JSLFatPtr b = JSL_FATPTR_INITIALIZER("b");
+    JSLFatPtr other_key = JSL_FATPTR_INITIALIZER("other");
+    JSLFatPtr other_value = JSL_FATPTR_INITIALIZER("value");
+
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, key, JSL_STRING_LIFETIME_STATIC, a, JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, key, JSL_STRING_LIFETIME_STATIC, b, JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_multimap_insert(&map, other_key, JSL_STRING_LIFETIME_STATIC, other_value, JSL_STRING_LIFETIME_STATIC));
+
+    TEST_BOOL(jsl_str_to_str_multimap_has_key(&map, key));
+
+    TEST_BOOL(jsl_str_to_str_multimap_delete_value(&map, key, a));
+    TEST_BOOL(jsl_str_to_str_multimap_has_key(&map, key));
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&map, key), (int64_t) 1);
+
+    TEST_BOOL(jsl_str_to_str_multimap_delete_value(&map, key, b));
+    TEST_BOOL(!jsl_str_to_str_multimap_has_key(&map, key));
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&map, key), (int64_t) 0);
+
+    JSLStrToStrMultimapKeyValueIter iter;
+    jsl_str_to_str_multimap_key_value_iterator_init(&map, &iter);
+    JSLFatPtr out_key = {0};
+    JSLFatPtr out_val = {0};
+    bool saw_other = false;
+    while (jsl_str_to_str_multimap_key_value_iterator_next(&iter, &out_key, &out_val))
+    {
+        TEST_BOOL(fatptrs_equal(out_key, other_key));
+        TEST_BOOL(fatptrs_equal(out_val, other_value));
+        saw_other = true;
+    }
+    TEST_BOOL(saw_other);
 }
 
 static void test_jsl_str_to_str_multimap_delete_key(void)
@@ -383,8 +424,8 @@ static void test_jsl_str_to_str_multimap_delete_key(void)
     TEST_BOOL(jsl_str_to_str_multimap_insert(&map, drop, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("b"), JSL_STRING_LIFETIME_STATIC));
 
     TEST_BOOL(jsl_str_to_str_multimap_delete_key(&map, drop));
-    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, drop), (int64_t) 0);
-    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, keep), (int64_t) 1);
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&map, drop), (int64_t) 0);
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&map, keep), (int64_t) 1);
 
     JSLStrToStrMultimapKeyValueIter iter;
     jsl_str_to_str_multimap_key_value_iterator_init(&map, &iter);
@@ -415,8 +456,8 @@ static void test_jsl_str_to_str_multimap_clear(void)
 
     jsl_str_to_str_multimap_clear(&map);
 
-    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, JSL_FATPTR_EXPRESSION("x")), (int64_t) 0);
-    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, JSL_FATPTR_EXPRESSION("y")), (int64_t) 0);
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&map, JSL_FATPTR_EXPRESSION("x")), (int64_t) 0);
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&map, JSL_FATPTR_EXPRESSION("y")), (int64_t) 0);
 
     JSLStrToStrMultimapKeyValueIter iter;
     jsl_str_to_str_multimap_key_value_iterator_init(&map, &iter);
@@ -425,7 +466,7 @@ static void test_jsl_str_to_str_multimap_clear(void)
     TEST_BOOL(!jsl_str_to_str_multimap_key_value_iterator_next(&iter, &out_key, &out_value));
 
     TEST_BOOL(jsl_str_to_str_multimap_insert(&map, JSL_FATPTR_EXPRESSION("z"), JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("4"), JSL_STRING_LIFETIME_STATIC));
-    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count(&map, JSL_FATPTR_EXPRESSION("z")), (int64_t) 1);
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&map, JSL_FATPTR_EXPRESSION("z")), (int64_t) 1);
 }
 
 int main(void)
@@ -460,6 +501,9 @@ int main(void)
     jsl_arena_reset(&global_arena);
 
     RUN_TEST_FUNCTION("delete value behavior", test_jsl_str_to_str_multimap_delete_value);
+    jsl_arena_reset(&global_arena);
+
+    RUN_TEST_FUNCTION("delete value removes empty key", test_jsl_str_to_str_multimap_delete_value_removes_empty_key);
     jsl_arena_reset(&global_arena);
 
     RUN_TEST_FUNCTION("delete key behavior", test_jsl_str_to_str_multimap_delete_key);
