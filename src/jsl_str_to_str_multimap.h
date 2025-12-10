@@ -61,12 +61,14 @@
 
     typedef struct JSL__StrToStrMultimap JSLStrToStrMultimap;
 
+    // TODO: docs
     JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_init(
         JSLStrToStrMultimap* map,
         JSLArena* arena,
         uint64_t seed
     );
 
+    // TODO: docs
     JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_init2(
         JSLStrToStrMultimap* map,
         JSLArena* arena,
@@ -75,19 +77,23 @@
         float load_factor
     );
 
+    // TODO: docs
     JSL_STR_TO_STR_MULTIMAP_DEF int64_t jsl_str_to_str_multimap_get_key_count(
         JSLStrToStrMultimap* map
     );
 
+    // TODO: docs
     JSL_STR_TO_STR_MULTIMAP_DEF int64_t jsl_str_to_str_multimap_get_value_count(
         JSLStrToStrMultimap* map
     );
 
+    // TODO: docs
     JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_has_key(
         JSLStrToStrMultimap* map,
         JSLFatPtr key
     );
 
+    // TODO: docs
     JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_insert(
         JSLStrToStrMultimap* map,
         JSLFatPtr key,
@@ -96,43 +102,51 @@
         JSLStringLifeTime value_lifetime
     );
 
+    // TODO: docs
     JSL_STR_TO_STR_MULTIMAP_DEF int64_t jsl_str_to_str_multimap_get_value_count_for_key(
         JSLStrToStrMultimap* map,
         JSLFatPtr key
     );
 
+    // TODO: docs
     JSL_STR_TO_STR_MULTIMAP_DEF void jsl_str_to_str_multimap_key_value_iterator_init(
         JSLStrToStrMultimap* map,
         JSLStrToStrMultimapKeyValueIter* iterator
     );
 
+    // TODO: docs
     JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_key_value_iterator_next(
         JSLStrToStrMultimapKeyValueIter* iterator,
         JSLFatPtr* out_key,
         JSLFatPtr* out_value
     );
 
+    // TODO: docs
     JSL_STR_TO_STR_MULTIMAP_DEF void jsl_str_to_str_multimap_get_key_iterator_init(
         JSLStrToStrMultimap* map,
         JSLStrToStrMultimapValueIter* iterator,
         JSLFatPtr key
     );
 
+    // TODO: docs
     JSL_STR_TO_STR_MULTIMAP_DEF JSLFatPtr jsl_str_to_str_multimap_get_key_iterator_next(
         JSLStrToStrMultimapValueIter* iterator
     );
 
+    // TODO: docs
     JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_delete_key(
         JSLStrToStrMultimap* map,
         JSLFatPtr key
     );
 
+    // TODO: docs
     JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_delete_value(
         JSLStrToStrMultimap* map,
         JSLFatPtr key,
         JSLFatPtr value
     );
 
+    // TODO: docs
     JSL_STR_TO_STR_MULTIMAP_DEF void jsl_str_to_str_multimap_clear(
         JSLStrToStrMultimap* map
     );
@@ -202,6 +216,7 @@
 
         uint64_t hash_seed;
         float load_factor;
+        int32_t generational_id;
     };
 
     JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_init(
@@ -510,6 +525,11 @@
                 jsl__str_to_str_multimap_add_value_to_key(map, value, value_lifetime, lut_index)
                 : false;
             res = key_add_res && value_add_res;
+        }
+
+        if (res)
+        {
+            ++map->generational_id;
         }
 
         return res;
