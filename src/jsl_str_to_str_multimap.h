@@ -64,8 +64,14 @@
     JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_init(
         JSLStrToStrMultimap* map,
         JSLArena* arena,
-        int64_t item_count_guess,
+        uint64_t seed
+    );
+
+    JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_init2(
+        JSLStrToStrMultimap* map,
+        JSLArena* arena,
         uint64_t seed,
+        int64_t item_count_guess,
         float load_factor
     );
 
@@ -145,6 +151,7 @@
     };
 
     #define JSL__MULTIMAP_SSO_LENGTH 16
+    #define JSL__MULTIMAP_PRIVATE_SENTINEL 81284211UL
 
     struct JSL__StrToStrMultimapValue {
         uint8_t small_string_buffer[JSL__MULTIMAP_SSO_LENGTH];
@@ -162,12 +169,11 @@
         // TODO: docs
         uint64_t hash;
 
-        union {
-            /// @brief Used to store in the free list, ignored otherwise
-            struct JSL__StrToStrMultimapEntry* next;
-            // TODO: docs
-            struct JSL__StrToStrMultimapValue* values_head;
-        };
+        /// @brief Used to store in the free list, ignored otherwise
+        struct JSL__StrToStrMultimapEntry* next;
+
+        // TODO: docs
+        struct JSL__StrToStrMultimapValue* values_head;
 
         int64_t value_count;
     };
@@ -192,6 +198,8 @@
         struct JSL__StrToStrMultimapEntry* entry_free_list;
         struct JSL__StrToStrMultimapValue* value_free_list;
 
+        uint64_t sentinel;
+
         uint64_t hash_seed;
         float load_factor;
     };
@@ -199,8 +207,23 @@
     JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_init(
         JSLStrToStrMultimap* map,
         JSLArena* arena,
-        int64_t item_count_guess,
+        uint64_t seed
+    )
+    {
+        return jsl_str_to_str_multimap_init2(
+            map,
+            arena,
+            seed,
+            32,
+            0.75f
+        );
+    }
+
+    JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_init2(
+        JSLStrToStrMultimap* map,
+        JSLArena* arena,
         uint64_t seed,
+        int64_t item_count_guess,
         float load_factor
     )
     {
@@ -209,8 +232,9 @@
         if (
             map == NULL
             || arena == NULL
-            || item_count_guess < 0
-            || load_factor < 0.0f
+            || item_count_guess <= 0
+            || load_factor <= 0.0f
+            || load_factor >= 1.0f
         )
             res = false;
 
@@ -230,12 +254,15 @@
                 _Alignof(uintptr_t),
                 false
             ).data;
-            JSL_MEMSET(
-                map->entry_lookup_table,
-                JSL__MULTIMAP_EMPTY,
-                sizeof(uintptr_t) * ((size_t) items)
-            );
+
+            for (int64_t i = 0; i < items; i++)
+            {
+                map->entry_lookup_table[i] = JSL__MULTIMAP_EMPTY;
+            }
+            
             map->entry_lookup_table_length = items;
+
+            map->sentinel = JSL__MULTIMAP_PRIVATE_SENTINEL;
         }
 
         return res;
@@ -442,11 +469,12 @@
     )
     {
         bool res = (
-            map == NULL
-            || key.data == NULL 
-            || key.length < 0
-            || value.data == NULL
-            || value.length < 0
+            map != NULL
+            && map->sentinel == JSL__MULTIMAP_PRIVATE_SENTINEL
+            && key.data != NULL 
+            && key.length > -1
+            && value.data != NULL
+            && value.length > -1
         );
 
         bool needs_rehash = false;
@@ -501,16 +529,14 @@
         JSLStrToStrMultimap* map
     )
     {
-        (void) map;
-        return -1;
+        return map == NULL ? -1 : map->key_count;
     }
 
     JSL_STR_TO_STR_MULTIMAP_DEF int64_t jsl_str_to_str_multimap_get_value_count(
         JSLStrToStrMultimap* map
     )
     {
-        (void) map;
-        return -1;
+        return map == NULL ? -1 : map->value_count;
     }
 
     JSL_STR_TO_STR_MULTIMAP_DEF int64_t jsl_str_to_str_multimap_get_value_count_for_key(
@@ -518,9 +544,34 @@
         JSLFatPtr key
     )
     {
-        (void) map;
-        (void) key;
-        return -1;
+        int64_t res = -1;
+        bool proceed = false;
+
+        if (
+            map != NULL
+            && map->sentinel == JSL__MULTIMAP_PRIVATE_SENTINEL
+            && key.data != NULL
+            && key.length > -1
+        )
+            proceed = true;
+
+        uint64_t hash = 0;
+        int64_t lut_index = -1;
+        bool existing_found = false;
+        if (proceed)
+        {
+            jsl__str_to_str_multimap_probe(map, key, &lut_index, &hash, &existing_found);
+            proceed = lut_index > -1 && existing_found;
+        }
+
+        if (proceed)
+        {
+            struct JSL__StrToStrMultimapEntry* entry = (struct JSL__StrToStrMultimapEntry*) 
+                map->entry_lookup_table[lut_index];
+            res = entry->value_count;
+        }
+
+        return res;
     }
 
     JSL_STR_TO_STR_MULTIMAP_DEF void jsl_str_to_str_multimap_key_value_iterator_init(

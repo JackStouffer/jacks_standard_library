@@ -52,7 +52,7 @@ static bool fatptrs_equal(JSLFatPtr a, JSLFatPtr b)
 static void test_jsl_str_to_str_multimap_init_success(void)
 {
     JSLStrToStrMultimap map = {0};
-    bool ok = jsl_str_to_str_multimap_init(&map, &global_arena, 8, 0xDEADBEEFUL, 0.5f);
+    bool ok = jsl_str_to_str_multimap_init2(&map, &global_arena, 0xDEADBEEFUL, 8, 0.5f);
     TEST_BOOL(ok);
     TEST_BOOL(map.arena == &global_arena);
 }
@@ -61,18 +61,19 @@ static void test_jsl_str_to_str_multimap_init_invalid_arguments(void)
 {
     JSLStrToStrMultimap map = {0};
 
-    TEST_BOOL(!jsl_str_to_str_multimap_init(NULL, &global_arena, 4, 0, 0.5f));
-    TEST_BOOL(!jsl_str_to_str_multimap_init(&map, NULL, 4, 0, 0.5f));
-    TEST_BOOL(!jsl_str_to_str_multimap_init(&map, &global_arena, 0, 0, 0.5f));
-    TEST_BOOL(!jsl_str_to_str_multimap_init(&map, &global_arena, -4, 0, 0.5f));
-    TEST_BOOL(!jsl_str_to_str_multimap_init(&map, &global_arena, 4, 0, 0.0f));
-    TEST_BOOL(!jsl_str_to_str_multimap_init(&map, &global_arena, 4, 0, 1.1f));
+    TEST_BOOL(!jsl_str_to_str_multimap_init2(NULL, &global_arena, 0, 4, 0.5f));
+    TEST_BOOL(!jsl_str_to_str_multimap_init2(&map, NULL, 0, 4, 0.5f));
+    TEST_BOOL(!jsl_str_to_str_multimap_init2(&map, &global_arena, 0, 0, 0.5f));
+    TEST_BOOL(!jsl_str_to_str_multimap_init2(&map, &global_arena, 0, -4, 0.5f));
+    TEST_BOOL(!jsl_str_to_str_multimap_init2(&map, &global_arena, 0, 4, 0.0f));
+    TEST_BOOL(!jsl_str_to_str_multimap_init2(&map, &global_arena, 0, 4, 1.1f));
+    TEST_BOOL(!jsl_str_to_str_multimap_init2(&map, &global_arena, 0, 4, -0.5f));
 }
 
 static void test_jsl_str_to_str_multimap_insert_and_get_value_count(void)
 {
     JSLStrToStrMultimap map = {0};
-    bool ok = jsl_str_to_str_multimap_init(&map, &global_arena, 8, 42, 0.65f);
+    bool ok = jsl_str_to_str_multimap_init2(&map, &global_arena, 42, 8, 0.65f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -86,7 +87,7 @@ static void test_jsl_str_to_str_multimap_insert_and_get_value_count(void)
 
     TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&map, key1), (int64_t) 2);
     TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&map, key2), (int64_t) 1);
-    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&map, missing), (int64_t) 0);
+    TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&map, missing), (int64_t) -1);
 
     JSLStrToStrMultimap uninitialized = {0};
     TEST_BOOL(!jsl_str_to_str_multimap_insert(&uninitialized, key1, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("value"), JSL_STRING_LIFETIME_STATIC));
@@ -96,7 +97,7 @@ static void test_jsl_str_to_str_multimap_insert_and_get_value_count(void)
 static void test_jsl_str_to_str_multimap_duplicate_values_allowed(void)
 {
     JSLStrToStrMultimap map = {0};
-    bool ok = jsl_str_to_str_multimap_init(&map, &global_arena, 4, 7, 0.5f);
+    bool ok = jsl_str_to_str_multimap_init2(&map, &global_arena, 7, 4, 0.5f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -133,7 +134,7 @@ static void test_jsl_str_to_str_multimap_duplicate_values_allowed(void)
 static void test_jsl_str_to_str_multimap_transient_lifetime_copies(void)
 {
     JSLStrToStrMultimap map = {0};
-    bool ok = jsl_str_to_str_multimap_init(&map, &global_arena, 4, 123, 0.75f);
+    bool ok = jsl_str_to_str_multimap_init2(&map, &global_arena, 123, 4, 0.75f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -171,7 +172,7 @@ static void test_jsl_str_to_str_multimap_transient_lifetime_copies(void)
 static void test_jsl_str_to_str_multimap_static_lifetime_no_copy(void)
 {
     JSLStrToStrMultimap map = {0};
-    bool ok = jsl_str_to_str_multimap_init(&map, &global_arena, 4, 789, 0.5f);
+    bool ok = jsl_str_to_str_multimap_init2(&map, &global_arena, 789, 4, 0.5f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -198,7 +199,7 @@ static void test_jsl_str_to_str_multimap_static_lifetime_no_copy(void)
 static void test_jsl_str_to_str_multimap_key_value_iterator_covers_all_pairs(void)
 {
     JSLStrToStrMultimap map = {0};
-    bool ok = jsl_str_to_str_multimap_init(&map, &global_arena, 8, 555, 0.5f);
+    bool ok = jsl_str_to_str_multimap_init2(&map, &global_arena, 555, 8, 0.5f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -254,7 +255,7 @@ static void test_jsl_str_to_str_multimap_key_value_iterator_covers_all_pairs(voi
 static void test_jsl_str_to_str_multimap_get_key_iterator_filters_by_key(void)
 {
     JSLStrToStrMultimap map = {0};
-    bool ok = jsl_str_to_str_multimap_init(&map, &global_arena, 6, 1010, 0.6f);
+    bool ok = jsl_str_to_str_multimap_init2(&map, &global_arena, 1010, 6, 0.6f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -296,7 +297,7 @@ static void test_jsl_str_to_str_multimap_get_key_iterator_filters_by_key(void)
 static void test_jsl_str_to_str_multimap_handles_empty_and_binary_values(void)
 {
     JSLStrToStrMultimap map = {0};
-    bool ok = jsl_str_to_str_multimap_init(&map, &global_arena, 4, 2020, 0.5f);
+    bool ok = jsl_str_to_str_multimap_init2(&map, &global_arena, 2020, 4, 0.5f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -341,7 +342,7 @@ static void test_jsl_str_to_str_multimap_handles_empty_and_binary_values(void)
 static void test_jsl_str_to_str_multimap_delete_value(void)
 {
     JSLStrToStrMultimap map = {0};
-    bool ok = jsl_str_to_str_multimap_init(&map, &global_arena, 8, 3030, 0.55f);
+    bool ok = jsl_str_to_str_multimap_init2(&map, &global_arena, 3030, 8, 0.55f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -371,7 +372,7 @@ static void test_jsl_str_to_str_multimap_delete_value(void)
 static void test_jsl_str_to_str_multimap_delete_value_removes_empty_key(void)
 {
     JSLStrToStrMultimap map = {0};
-    bool ok = jsl_str_to_str_multimap_init(&map, &global_arena, 6, 6060, 0.5f);
+    bool ok = jsl_str_to_str_multimap_init2(&map, &global_arena, 6060, 6, 0.5f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -412,7 +413,7 @@ static void test_jsl_str_to_str_multimap_delete_value_removes_empty_key(void)
 static void test_jsl_str_to_str_multimap_delete_key(void)
 {
     JSLStrToStrMultimap map = {0};
-    bool ok = jsl_str_to_str_multimap_init(&map, &global_arena, 6, 4040, 0.5f);
+    bool ok = jsl_str_to_str_multimap_init2(&map, &global_arena, 4040, 6, 0.5f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -446,7 +447,7 @@ static void test_jsl_str_to_str_multimap_delete_key(void)
 static void test_jsl_str_to_str_multimap_clear(void)
 {
     JSLStrToStrMultimap map = {0};
-    bool ok = jsl_str_to_str_multimap_init(&map, &global_arena, 10, 5050, 0.5f);
+    bool ok = jsl_str_to_str_multimap_init2(&map, &global_arena, 5050, 10, 0.5f);
     TEST_BOOL(ok);
     if (!ok) return;
 
