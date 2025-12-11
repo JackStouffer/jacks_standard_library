@@ -109,7 +109,7 @@
     );
 
     // TODO: docs
-    JSL_STR_TO_STR_MULTIMAP_DEF void jsl_str_to_str_multimap_key_value_iterator_init(
+    JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_key_value_iterator_init(
         JSLStrToStrMultimap* map,
         JSLStrToStrMultimapKeyValueIter* iterator
     );
@@ -165,7 +165,7 @@
     };
 
     #define JSL__MULTIMAP_SSO_LENGTH 16
-    #define JSL__MULTIMAP_PRIVATE_SENTINEL 81284211UL
+    #define JSL__MULTIMAP_PRIVATE_SENTINEL 15280798434051232421UL
 
     struct JSL__StrToStrMultimapValue {
         uint8_t small_string_buffer[JSL__MULTIMAP_SSO_LENGTH];
@@ -194,10 +194,14 @@
 
     struct JSL__StrToStrMultimapKeyValueIter {
         JSLStrToStrMultimap* map;
+        int64_t current_lut_index;
+        int64_t generational_id;
+        uint64_t sentinel;
     };
 
     struct JSL__StrToStrMultimapValueIter {
         JSLStrToStrMultimap* map;
+        uint64_t sentinel;
     };
 
     struct JSL__StrToStrMultimap {
@@ -540,23 +544,39 @@
         JSLFatPtr key
     )
     {
-        (void) map;
-        (void) key;
-        return false;
+        uint64_t hash = 0;
+        int64_t lut_index = -1;
+        bool existing_found = false;
+
+        if (
+            map != NULL
+            && map->sentinel == JSL__MULTIMAP_PRIVATE_SENTINEL
+            && key.data != NULL 
+            && key.length > -1
+        )
+        {
+            jsl__str_to_str_multimap_probe(map, key, &lut_index, &hash, &existing_found);
+        }
+
+        return lut_index > -1 && existing_found;
     }
 
     JSL_STR_TO_STR_MULTIMAP_DEF int64_t jsl_str_to_str_multimap_get_key_count(
         JSLStrToStrMultimap* map
     )
     {
-        return map == NULL ? -1 : map->key_count;
+        return map == NULL && map->sentinel == JSL__MULTIMAP_PRIVATE_SENTINEL 
+            ? -1 
+            : map->key_count;
     }
 
     JSL_STR_TO_STR_MULTIMAP_DEF int64_t jsl_str_to_str_multimap_get_value_count(
         JSLStrToStrMultimap* map
     )
     {
-        return map == NULL ? -1 : map->value_count;
+        return map == NULL && map->sentinel == JSL__MULTIMAP_PRIVATE_SENTINEL 
+            ? -1 
+            : map->value_count;
     }
 
     JSL_STR_TO_STR_MULTIMAP_DEF int64_t jsl_str_to_str_multimap_get_value_count_for_key(
@@ -594,14 +614,27 @@
         return res;
     }
 
-    JSL_STR_TO_STR_MULTIMAP_DEF void jsl_str_to_str_multimap_key_value_iterator_init(
+    JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_key_value_iterator_init(
         JSLStrToStrMultimap* map,
         JSLStrToStrMultimapKeyValueIter* iterator
     )
     {
-        (void) map;
-        (void) iterator;
-        return;
+        bool res = false;
+
+        if (
+            map != NULL
+            && map->sentinel == JSL__MULTIMAP_PRIVATE_SENTINEL
+            && iterator != NULL
+        )
+        {
+            iterator->map = map;
+            iterator->current_lut_index = 0;
+            iterator->sentinel = JSL__MULTIMAP_PRIVATE_SENTINEL;
+            iterator->generational_id = map->generational_id;
+            res = true;
+        }
+
+        return res;
     }
 
     JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_key_value_iterator_next(
@@ -610,10 +643,39 @@
         JSLFatPtr* out_value
     )
     {
-        (void) iterator;
-        (void) out_key;
-        (void) out_value;
-        return false;
+        bool found = false;
+
+        if (
+            iterator != NULL
+            && iterator->sentinel == JSL__MULTIMAP_PRIVATE_SENTINEL
+            && out_key != NULL
+            && out_value != NULL
+            && iterator->generational_id == iterator->map->generational_id
+        )
+        {
+        }
+
+
+        for (
+            ;
+            iterator->current_lut_index < iterator->map->entry_lookup_table_length;
+            ++iterator->current_lut_index
+        )
+        {
+            uintptr_t lut_res = iterator->map->entry_lookup_table[iterator->current_lut_index];
+
+            if (
+                lut_res != 0
+                && lut_res != 
+            )
+            {
+                found = true;
+                break;
+            }
+
+        }
+
+        return found;
     }
 
     JSL_STR_TO_STR_MULTIMAP_DEF void jsl_str_to_str_multimap_get_key_iterator_init(
@@ -666,5 +728,8 @@
         (void) map;
         return;
     }
+
+    #undef JSL__MULTIMAP_SSO_LENGTH
+    #undef JSL__MULTIMAP_PRIVATE_SENTINEL
 
 #endif /* JSL_STR_TO_STR_MULTIMAP_IMPLEMENTATION */
