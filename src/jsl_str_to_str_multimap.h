@@ -194,6 +194,8 @@
 
     struct JSL__StrToStrMultimapKeyValueIter {
         JSLStrToStrMultimap* map;
+        struct JSL__StrToStrMultimapEntry* current_entry;
+        struct JSL__StrToStrMultimapValue* current_value;
         int64_t current_lut_index;
         int64_t generational_id;
         uint64_t sentinel;
@@ -629,6 +631,8 @@
         {
             iterator->map = map;
             iterator->current_lut_index = 0;
+            iterator->current_entry = NULL;
+            iterator->current_value = NULL;
             iterator->sentinel = JSL__MULTIMAP_PRIVATE_SENTINEL;
             iterator->generational_id = map->generational_id;
             res = true;
@@ -644,36 +648,58 @@
     )
     {
         bool found = false;
-
-        if (
+        bool good_params = (
             iterator != NULL
             && iterator->sentinel == JSL__MULTIMAP_PRIVATE_SENTINEL
             && out_key != NULL
             && out_value != NULL
             && iterator->generational_id == iterator->map->generational_id
+        );
+
+        // get next value from current key
+        if (
+            good_params && iterator->current_entry == NULL
         )
         {
+
         }
-
-
-        for (
-            ;
-            iterator->current_lut_index < iterator->map->entry_lookup_table_length;
-            ++iterator->current_lut_index
+        else if (
+            good_params
+            && iterator->current_entry != NULL
+            && iterator->current_value != NULL
+            && iterator->current_value->next != NULL
         )
         {
-            uintptr_t lut_res = iterator->map->entry_lookup_table[iterator->current_lut_index];
+            iterator->current_value = iterator->current_value->next;
 
-            if (
-                lut_res != 0
-                && lut_res != 
+            *out_key = iterator->current_entry->key;
+            *out_value = iterator->current_value->value;
+            found = true;
+        }
+        // get next key
+        else if (good_params && iterator->current_entry == NULL)
+        {
+            for (
+                ;
+                iterator->current_lut_index < iterator->map->entry_lookup_table_length;
+                ++iterator->current_lut_index
             )
             {
-                found = true;
-                break;
-            }
+                uintptr_t lut_res = iterator->map->entry_lookup_table[iterator->current_lut_index];
 
+                if (
+                    lut_res != 0
+                    && lut_res != JSL__MULTIMAP_EMPTY
+                    && lut_res != JSL__MULTIMAP_TOMBSTONE
+                )
+                {
+                    found = true;
+                    break;
+                }
+
+            }
         }
+
 
         return found;
     }
