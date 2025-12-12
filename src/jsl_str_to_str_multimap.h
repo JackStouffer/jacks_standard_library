@@ -297,8 +297,131 @@
         JSLStrToStrMultimap* map
     )
     {
-        (void) map;
-        return false;
+        bool res = false;
+
+        bool params_valid = (
+            map != NULL
+            && map->arena != NULL
+            && map->sentinel == JSL__MULTIMAP_PRIVATE_SENTINEL
+            && map->entry_lookup_table != NULL
+            && map->entry_lookup_table_length > 0
+        );
+
+        uintptr_t* old_table = params_valid ? map->entry_lookup_table : NULL;
+        int64_t old_length = params_valid ? map->entry_lookup_table_length : 0;
+
+        int64_t new_length = params_valid ? jsl_next_power_of_two_i64(old_length + 1) : 0;
+        bool length_valid = params_valid && new_length > old_length && new_length > 0;
+
+        bool bytes_possible = length_valid
+            && new_length <= (INT64_MAX / (int64_t) sizeof(uintptr_t));
+
+        int64_t bytes_needed = bytes_possible
+            ? (int64_t) sizeof(uintptr_t) * new_length
+            : 0;
+
+        JSLFatPtr new_table_mem = {0};
+        if (bytes_possible)
+        {
+            new_table_mem = jsl_arena_allocate_aligned(
+                map->arena,
+                bytes_needed,
+                _Alignof(uintptr_t),
+                false
+            );
+        }
+
+        uintptr_t* new_table = (bytes_possible && new_table_mem.data != NULL)
+            ? (uintptr_t*) new_table_mem.data
+            : NULL;
+
+        bool allocation_ok = new_table != NULL;
+
+        int64_t init_index = 0;
+        while (allocation_ok && init_index < new_length)
+        {
+            new_table[init_index] = JSL__MULTIMAP_EMPTY;
+            ++init_index;
+        }
+
+        uint64_t lut_mask = new_length > 0 ? ((uint64_t) new_length - 1u) : 0;
+        int64_t old_index = 0;
+        bool migrate_ok = allocation_ok;
+
+        while (migrate_ok && old_index < old_length)
+        {
+            uintptr_t lut_res = old_table[old_index];
+
+            bool occupied = (
+                lut_res != 0
+                && lut_res != JSL__MULTIMAP_EMPTY
+                && lut_res != JSL__MULTIMAP_TOMBSTONE
+            );
+
+            struct JSL__StrToStrMultimapEntry* entry = occupied
+                ? (struct JSL__StrToStrMultimapEntry*) lut_res
+                : NULL;
+
+            bool has_values = occupied
+                && entry != NULL
+                && entry->values_head != NULL
+                && entry->value_count > 0;
+
+            int64_t probe_index = has_values
+                ? (int64_t) (entry->hash & lut_mask)
+                : 0;
+
+            int64_t probes = 0;
+            bool insert_needed = has_values;
+
+            while (migrate_ok && insert_needed && probes < new_length)
+            {
+                uintptr_t probe_res = new_table[probe_index];
+                bool slot_free = (
+                    probe_res == 0
+                    || probe_res == JSL__MULTIMAP_EMPTY
+                    || probe_res == JSL__MULTIMAP_TOMBSTONE
+                );
+
+                if (slot_free)
+                {
+                    new_table[probe_index] = (uintptr_t) entry;
+                    insert_needed = false;
+                }
+
+                bool advance_probe = insert_needed;
+                if (advance_probe)
+                {
+                    probe_index = (int64_t) (((uint64_t) probe_index + 1u) & lut_mask);
+                    ++probes;
+                }
+            }
+
+            bool placement_failed = insert_needed;
+            if (placement_failed)
+            {
+                migrate_ok = false;
+            }
+
+            ++old_index;
+        }
+
+        bool should_commit = migrate_ok && allocation_ok && length_valid;
+        if (should_commit)
+        {
+            map->entry_lookup_table = new_table;
+            map->entry_lookup_table_length = new_length;
+            ++map->generational_id;
+            res = true;
+        }
+
+        bool failed = !should_commit;
+        if (failed)
+        {
+            res = false;
+        }
+
+        return res;
     }
 
     static bool jsl__str_to_str_multimap_add_key(
@@ -434,55 +557,81 @@
 
         int64_t first_tombstone = -1;
         bool tombstone_seen = false;
+        bool searching = true;
 
         *out_hash = jsl__rapidhash_withSeed(key.data, (size_t) key.length, map->hash_seed);
-        int64_t lut_index = (int64_t) (*out_hash & ((uint64_t) map->entry_lookup_table_length - 1u));
 
-        for (;;)
+        int64_t lut_length = map->entry_lookup_table_length;
+        uint64_t lut_mask = (uint64_t) lut_length - 1u;
+        int64_t lut_index = (int64_t) (*out_hash & lut_mask);
+        int64_t probes = 0;
+
+        while (searching && probes < lut_length)
         {
             uintptr_t lut_res = map->entry_lookup_table[lut_index];
 
-            if (lut_res == JSL__MULTIMAP_EMPTY)
+            bool is_empty = lut_res == JSL__MULTIMAP_EMPTY || lut_res == 0;
+            bool is_tombstone = lut_res == JSL__MULTIMAP_TOMBSTONE;
+
+            if (is_empty)
             {
                 *out_lut_index = tombstone_seen ? first_tombstone : lut_index;
-                break;
+                searching = false;
             }
-            else if (lut_res == JSL__MULTIMAP_TOMBSTONE)
+
+            bool record_tombstone = searching && is_tombstone && !tombstone_seen;
+            if (record_tombstone)
             {
+                first_tombstone = lut_index;
+                tombstone_seen = true;
+            }
+
+            bool slot_has_entry = searching && !is_empty && !is_tombstone;
+            struct JSL__StrToStrMultimapEntry* entry = slot_has_entry
+                ? (struct JSL__StrToStrMultimapEntry*) lut_res
+                : NULL;
+
+            bool entry_valid = slot_has_entry
+                && entry != NULL
+                && entry->value_count > 0;
+
+            bool matches = entry_valid
+                && *out_hash == entry->hash
+                && jsl_fatptr_memory_compare(key, entry->key);
+
+            if (matches)
+            {
+                *out_found = true;
+                *out_lut_index = lut_index;
+                searching = false;
+            }
+
+            bool empty_entry = slot_has_entry
+                && (entry == NULL || entry->value_count <= 0);
+
+            if (empty_entry)
+            {
+                map->entry_lookup_table[lut_index] = JSL__MULTIMAP_TOMBSTONE;
                 if (!tombstone_seen)
                 {
                     first_tombstone = lut_index;
                     tombstone_seen = true;
                 }
             }
-            else
+
+            bool advance_probe = searching;
+            if (advance_probe)
             {
-                struct JSL__StrToStrMultimapEntry* entry = (struct JSL__StrToStrMultimapEntry*) lut_res;
-
-                if (entry->value_count > 0)
-                {
-                    if (*out_hash == entry->hash && jsl_fatptr_memory_compare(key, entry->key))
-                    {
-                        *out_found = true;
-                        *out_lut_index = lut_index;
-                        break;
-                    }
-                }
-                else
-                {
-                    map->entry_lookup_table[lut_index] = JSL__MULTIMAP_TOMBSTONE;
-                    if (!tombstone_seen)
-                    {
-                        first_tombstone = lut_index;
-                        tombstone_seen = true;
-                    }
-                }
+                lut_index = (int64_t) (((uint64_t) lut_index + 1u) & lut_mask);
+                ++probes;
             }
-
-            ++lut_index;
         }
-        
-        return;
+
+        bool exhausted = searching && probes >= lut_length;
+        if (exhausted)
+        {
+            *out_lut_index = tombstone_seen ? first_tombstone : -1;
+        }
     }
 
     JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_insert(

@@ -515,13 +515,26 @@ static void test_stress_test(void)
         jsl_str_to_str_multimap_get_value_count(&map),
         key_count * value_per_key
     );
+
+    int64_t seen_value_count = 0;
+
+    JSLStrToStrMultimapKeyValueIter iter;
+    jsl_str_to_str_multimap_key_value_iterator_init(&map, &iter);
+    JSLFatPtr out_key = {0};
+    JSLFatPtr out_val = {0};
+    while (jsl_str_to_str_multimap_key_value_iterator_next(&iter, &out_key, &out_val))
+    {
+        seen_value_count++;
+    }
+
+    TEST_INT64_EQUAL(seen_value_count, key_count * value_per_key);
 }
 
 int main(void)
 {
     srand((unsigned) time(NULL));
 
-    jsl_arena_init(&global_arena, malloc(JSL_MEGABYTES(8)), JSL_MEGABYTES(8));
+    jsl_arena_init(&global_arena, malloc(JSL_MEGABYTES(32)), JSL_MEGABYTES(32));
 
     RUN_TEST_FUNCTION("init success", test_jsl_str_to_str_multimap_init_success);
     jsl_arena_reset(&global_arena);
