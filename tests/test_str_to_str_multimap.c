@@ -115,12 +115,9 @@ static void test_jsl_str_to_str_multimap_duplicate_values_allowed(void)
 
     int32_t repeat_seen = 0;
     int32_t unique_seen = 0;
-    while (true)
+    JSLFatPtr val;
+    while (jsl_str_to_str_multimap_get_values_for_key_iterator_next(&iter, &val))
     {
-        JSLFatPtr val = jsl_str_to_str_multimap_get_key_iterator_next(&iter);
-        if (val.data == NULL)
-            break;
-
         if (fatptrs_equal(val, value))
             repeat_seen++;
         else if (fatptrs_equal(val, JSL_FATPTR_EXPRESSION("unique")))
@@ -267,16 +264,13 @@ static void test_jsl_str_to_str_multimap_get_key_iterator_filters_by_key(void)
     TEST_BOOL(jsl_str_to_str_multimap_insert(&map, other_key, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("C"), JSL_STRING_LIFETIME_STATIC));
 
     JSLStrToStrMultimapValueIter iter;
-    jsl_str_to_str_multimap_get_key_iterator_init(&map, &iter, key);
+    jsl_str_to_str_multimap_get_values_for_key_iterator_init(&map, &iter, key);
 
     bool saw_a = false;
     bool saw_b = false;
-    while (true)
+    JSLFatPtr val;
+    while (jsl_str_to_str_multimap_get_values_for_key_iterator_next(&iter, &val))
     {
-        JSLFatPtr val = jsl_str_to_str_multimap_get_key_iterator_next(&iter);
-        if (val.data == NULL)
-            break;
-
         if (fatptrs_equal(val, JSL_FATPTR_EXPRESSION("A")))
             saw_a = true;
         else if (fatptrs_equal(val, JSL_FATPTR_EXPRESSION("B")))
@@ -288,10 +282,9 @@ static void test_jsl_str_to_str_multimap_get_key_iterator_filters_by_key(void)
     TEST_BOOL(saw_a);
     TEST_BOOL(saw_b);
 
-    jsl_str_to_str_multimap_get_key_iterator_init(&map, &iter, JSL_FATPTR_EXPRESSION("does-not-exist"));
-    JSLFatPtr empty = jsl_str_to_str_multimap_get_key_iterator_next(&iter);
-    TEST_BOOL(empty.data == NULL);
-    TEST_INT64_EQUAL(empty.length, (int64_t) 0);
+    jsl_str_to_str_multimap_get_values_for_key_iterator_init(&map, &iter, JSL_FATPTR_EXPRESSION("does-not-exist"));
+    bool has_data = jsl_str_to_str_multimap_get_values_for_key_iterator_next(&iter, &val);
+    TEST_BOOL(has_data == false);
 }
 
 static void test_jsl_str_to_str_multimap_handles_empty_and_binary_values(void)
@@ -315,23 +308,23 @@ static void test_jsl_str_to_str_multimap_handles_empty_and_binary_values(void)
     TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&map, bin_key), (int64_t) 2);
 
     JSLStrToStrMultimapValueIter iter;
-    jsl_str_to_str_multimap_get_key_iterator_init(&map, &iter, empty_key);
-    JSLFatPtr value = jsl_str_to_str_multimap_get_key_iterator_next(&iter);
-    TEST_BOOL(fatptrs_equal(value, JSL_FATPTR_EXPRESSION("empty-key")));
-    TEST_BOOL(jsl_str_to_str_multimap_get_key_iterator_next(&iter).data == NULL);
+    jsl_str_to_str_multimap_get_values_for_key_iterator_init(&map, &iter, empty_key);
+    JSLFatPtr val;
+    bool has_data = jsl_str_to_str_multimap_get_values_for_key_iterator_next(&iter, &val);
+    TEST_BOOL(has_data);
+    TEST_BOOL(fatptrs_equal(val, JSL_FATPTR_EXPRESSION("empty-key")));
 
-    jsl_str_to_str_multimap_get_key_iterator_init(&map, &iter, bin_key);
+    TEST_BOOL(jsl_str_to_str_multimap_get_values_for_key_iterator_next(&iter, &val) == false);
+
+    jsl_str_to_str_multimap_get_values_for_key_iterator_init(&map, &iter, bin_key);
     bool saw_binary = false;
     bool saw_empty = false;
-    while (true)
-    {
-        value = jsl_str_to_str_multimap_get_key_iterator_next(&iter);
-        if (value.data == NULL)
-            break;
 
-        if (value.length == 4 && memcmp(value.data, binary_value_buf, 4) == 0)
+    while (jsl_str_to_str_multimap_get_values_for_key_iterator_next(&iter, &val))
+    {
+        if (val.length == 4 && memcmp(val.data, binary_value_buf, 4) == 0)
             saw_binary = true;
-        else if (value.length == 0)
+        else if (val.length == 0)
             saw_empty = true;
     }
 
