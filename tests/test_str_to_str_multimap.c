@@ -111,7 +111,7 @@ static void test_jsl_str_to_str_multimap_duplicate_values_allowed(void)
     TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&map, key), (int64_t) 3);
 
     JSLStrToStrMultimapValueIter iter;
-    jsl_str_to_str_multimap_get_key_iterator_init(&map, &iter, key);
+    jsl_str_to_str_multimap_get_values_for_key_iterator_init(&map, &iter, key);
 
     int32_t repeat_seen = 0;
     int32_t unique_seen = 0;

@@ -122,15 +122,16 @@
     );
 
     // TODO: docs
-    JSL_STR_TO_STR_MULTIMAP_DEF void jsl_str_to_str_multimap_get_key_iterator_init(
+    JSL_STR_TO_STR_MULTIMAP_DEF void jsl_str_to_str_multimap_get_values_for_key_iterator_init(
         JSLStrToStrMultimap* map,
         JSLStrToStrMultimapValueIter* iterator,
         JSLFatPtr key
     );
 
     // TODO: docs
-    JSL_STR_TO_STR_MULTIMAP_DEF JSLFatPtr jsl_str_to_str_multimap_get_key_iterator_next(
-        JSLStrToStrMultimapValueIter* iterator
+    JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_get_values_for_key_iterator_next(
+        JSLStrToStrMultimapValueIter* iterator,
+        JSLFatPtr* out_value
     );
 
     // TODO: docs
@@ -203,6 +204,7 @@
 
     struct JSL__StrToStrMultimapValueIter {
         JSLStrToStrMultimap* map;
+        int64_t generational_id;
         uint64_t sentinel;
     };
 
@@ -648,81 +650,147 @@
     )
     {
         bool found = false;
-        bool good_params = (
+
+        bool params_valid = (
             iterator != NULL
-            && iterator->sentinel == JSL__MULTIMAP_PRIVATE_SENTINEL
             && out_key != NULL
             && out_value != NULL
+            && iterator->sentinel == JSL__MULTIMAP_PRIVATE_SENTINEL
+            && iterator->map != NULL
+            && iterator->map->sentinel == JSL__MULTIMAP_PRIVATE_SENTINEL
+            && iterator->map->entry_lookup_table != NULL
             && iterator->generational_id == iterator->map->generational_id
         );
 
-        // get next value from current key
-        if (
-            good_params && iterator->current_entry == NULL
-        )
-        {
-
-        }
-        else if (
-            good_params
+        bool try_same_entry = (
+            params_valid
             && iterator->current_entry != NULL
             && iterator->current_value != NULL
-            && iterator->current_value->next != NULL
-        )
-        {
-            iterator->current_value = iterator->current_value->next;
+        );
 
+        struct JSL__StrToStrMultimapValue* next_value = NULL;
+        if (try_same_entry)
+        {
+            next_value = iterator->current_value->next;
+        }
+
+        bool next_value_ready = try_same_entry && next_value != NULL;
+        if (next_value_ready)
+        {
+            iterator->current_value = next_value;
             *out_key = iterator->current_entry->key;
             *out_value = iterator->current_value->value;
             found = true;
         }
-        // get next key
-        else if (good_params && iterator->current_entry == NULL)
+
+        bool reached_end_of_entry = try_same_entry && !next_value_ready;
+        if (reached_end_of_entry)
         {
-            for (
-                ;
-                iterator->current_lut_index < iterator->map->entry_lookup_table_length;
-                ++iterator->current_lut_index
-            )
+            iterator->current_entry = NULL;
+            iterator->current_value = NULL;
+        }
+
+        bool search_for_entry = params_valid && !found;
+        int64_t lut_length = params_valid ? iterator->map->entry_lookup_table_length : 0;
+        int64_t lut_index = iterator->current_lut_index;
+        struct JSL__StrToStrMultimapEntry* found_entry = NULL;
+
+        while (search_for_entry && lut_index < lut_length)
+        {
+            uintptr_t lut_res = iterator->map->entry_lookup_table[lut_index];
+
+            bool occupied = (
+                lut_res != 0
+                && lut_res != JSL__MULTIMAP_EMPTY
+                && lut_res != JSL__MULTIMAP_TOMBSTONE
+            );
+
+            struct JSL__StrToStrMultimapEntry* candidate_entry = NULL;
+            if (occupied)
             {
-                uintptr_t lut_res = iterator->map->entry_lookup_table[iterator->current_lut_index];
+                candidate_entry = (struct JSL__StrToStrMultimapEntry*) lut_res;
+            }
 
-                if (
-                    lut_res != 0
-                    && lut_res != JSL__MULTIMAP_EMPTY
-                    && lut_res != JSL__MULTIMAP_TOMBSTONE
-                )
-                {
-                    found = true;
-                    break;
-                }
+            bool has_values = false;
+            if (occupied)
+            {
+                has_values = (
+                    candidate_entry->values_head != NULL
+                    && candidate_entry->value_count > 0
+                );
+            }
 
+            if (has_values)
+            {
+                found_entry = candidate_entry;
+                search_for_entry = false;
+            }
+
+            bool advance_index = search_for_entry;
+            if (advance_index)
+            {
+                ++lut_index;
             }
         }
 
+        bool entry_found = found_entry != NULL && !search_for_entry;
+        if (entry_found)
+        {
+            iterator->current_entry = found_entry;
+            iterator->current_value = found_entry->values_head;
+            iterator->current_lut_index = lut_index + 1;
+            *out_key = iterator->current_entry->key;
+            *out_value = iterator->current_value->value;
+            found = true;
+        }
+
+        bool exhausted = params_valid && !found;
+        if (exhausted)
+        {
+            iterator->current_entry = NULL;
+            iterator->current_value = NULL;
+            iterator->current_lut_index = lut_length;
+        }
+
+        bool invalidated = !params_valid;
+        if (invalidated)
+        {
+            found = false;
+        }
 
         return found;
     }
 
-    JSL_STR_TO_STR_MULTIMAP_DEF void jsl_str_to_str_multimap_get_key_iterator_init(
+    JSL_STR_TO_STR_MULTIMAP_DEF void jsl_str_to_str_multimap_get_values_for_key_iterator_init(
         JSLStrToStrMultimap* map,
         JSLStrToStrMultimapValueIter* iterator,
         JSLFatPtr key
     )
     {
-        (void) map;
-        (void) iterator;
-        (void) key;
-        return;
+        bool res = false;
+
+        if (
+            map != NULL
+            && map->sentinel == JSL__MULTIMAP_PRIVATE_SENTINEL
+            && iterator != NULL
+        )
+        {
+            iterator->map = map;
+            iterator->sentinel = JSL__MULTIMAP_PRIVATE_SENTINEL;
+            iterator->generational_id = map->generational_id;
+            res = true;
+        }
+
+        return res;
     }
 
-    JSL_STR_TO_STR_MULTIMAP_DEF JSLFatPtr jsl_str_to_str_multimap_get_key_iterator_next(
-        JSLStrToStrMultimapValueIter* iterator
+    JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_get_key_iterator_next(
+        JSLStrToStrMultimapValueIter* iterator,
+        JSLFatPtr* out_value
     )
     {
         (void) iterator;
-        JSLFatPtr val = {0};
-        return val;
+        return false;
     }
 
     JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_delete_key(
