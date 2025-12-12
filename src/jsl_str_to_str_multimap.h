@@ -571,18 +571,36 @@
         JSLStrToStrMultimap* map
     )
     {
-        return map == NULL && map->sentinel == JSL__MULTIMAP_PRIVATE_SENTINEL 
-            ? -1 
-            : map->key_count;
+        int64_t res = -1;
+        bool valid = (
+            map != NULL
+            && map->sentinel == JSL__MULTIMAP_PRIVATE_SENTINEL
+        );
+
+        if (valid)
+        {
+            res = map->key_count;
+        }
+
+        return res;
     }
 
     JSL_STR_TO_STR_MULTIMAP_DEF int64_t jsl_str_to_str_multimap_get_value_count(
         JSLStrToStrMultimap* map
     )
     {
-        return map == NULL && map->sentinel == JSL__MULTIMAP_PRIVATE_SENTINEL 
-            ? -1 
-            : map->value_count;
+        int64_t res = -1;
+        bool valid = (
+            map != NULL
+            && map->sentinel == JSL__MULTIMAP_PRIVATE_SENTINEL
+        );
+
+        if (valid)
+        {
+            res = map->value_count;
+        }
+
+        return res;
     }
 
     JSL_STR_TO_STR_MULTIMAP_DEF int64_t jsl_str_to_str_multimap_get_value_count_for_key(
@@ -615,6 +633,10 @@
             struct JSL__StrToStrMultimapEntry* entry = (struct JSL__StrToStrMultimapEntry*) 
                 map->entry_lookup_table[lut_index];
             res = entry->value_count;
+        }
+        else if (map != NULL && map->sentinel == JSL__MULTIMAP_PRIVATE_SENTINEL)
+        {
+            res = 0;
         }
 
         return res;
@@ -879,9 +901,64 @@
         JSLFatPtr key
     )
     {
-        (void) map;
-        (void) key;
-        return false;
+        bool res = false;
+
+        bool params_valid = (
+            map != NULL
+            && map->sentinel == JSL__MULTIMAP_PRIVATE_SENTINEL
+            && map->entry_lookup_table != NULL
+            && key.data != NULL
+            && key.length > -1
+        );
+
+        uint64_t hash = 0;
+        int64_t lut_index = -1;
+        bool existing_found = false;
+        if (params_valid)
+        {
+            jsl__str_to_str_multimap_probe(map, key, &lut_index, &hash, &existing_found);
+        }
+
+        bool key_found = existing_found && lut_index > -1;
+
+        struct JSL__StrToStrMultimapEntry* entry = NULL;
+        if (key_found)
+        {
+            entry = (struct JSL__StrToStrMultimapEntry*) map->entry_lookup_table[lut_index];
+        }
+
+        bool entry_valid = key_found && entry != NULL;
+
+        int64_t removed_value_count = 0;
+        struct JSL__StrToStrMultimapValue* value_record = NULL;
+        if (entry_valid)
+        {
+            value_record = entry->values_head;
+        }
+
+        while (entry_valid && value_record != NULL)
+        {
+            struct JSL__StrToStrMultimapValue* next = value_record->next;
+            value_record->next = map->value_free_list;
+            map->value_free_list = value_record;
+            value_record = next;
+            ++removed_value_count;
+        }
+
+        if (entry_valid)
+        {
+            entry->values_head = NULL;
+            entry->value_count = 0;
+            map->value_count -= removed_value_count;
+            map->entry_lookup_table[lut_index] = JSL__MULTIMAP_TOMBSTONE;
+            entry->next = map->entry_free_list;
+            map->entry_free_list = entry;
+            --map->key_count;
+            ++map->generational_id;
+            res = true;
+        }
+
+        return res;
     }
 
     JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_delete_value(
@@ -890,17 +967,180 @@
         JSLFatPtr value
     )
     {
-        (void) map;
-        (void) key;
-        (void) value;
-        return false;
+        bool res = false;
+
+        bool params_valid = (
+            map != NULL
+            && map->sentinel == JSL__MULTIMAP_PRIVATE_SENTINEL
+            && map->entry_lookup_table != NULL
+            && key.data != NULL
+            && key.length > -1
+            && value.data != NULL
+            && value.length > -1
+        );
+
+        uint64_t hash = 0;
+        int64_t lut_index = -1;
+        bool existing_found = false;
+        if (params_valid)
+        {
+            jsl__str_to_str_multimap_probe(map, key, &lut_index, &hash, &existing_found);
+        }
+
+        bool key_found = params_valid && existing_found && lut_index > -1;
+
+        struct JSL__StrToStrMultimapEntry* entry = NULL;
+        if (key_found)
+        {
+            entry = (struct JSL__StrToStrMultimapEntry*) map->entry_lookup_table[lut_index];
+        }
+
+        bool entry_valid = key_found
+            && entry != NULL
+            && entry->values_head != NULL
+            && entry->value_count > 0;
+
+        struct JSL__StrToStrMultimapValue* previous = NULL;
+        struct JSL__StrToStrMultimapValue* current = NULL;
+        if (entry_valid)
+        {
+            current = entry->values_head;
+        }
+
+        bool value_found = false;
+        while (entry_valid && current != NULL && !value_found)
+        {
+            bool equal = jsl_fatptr_memory_compare(current->value, value);
+            if (equal)
+            {
+                value_found = true;
+            }
+
+            bool advance = !value_found;
+            if (advance)
+            {
+                previous = current;
+                current = current->next;
+            }
+        }
+
+        bool remove_from_list = entry_valid && value_found && current != NULL;
+        struct JSL__StrToStrMultimapValue* next_node = NULL;
+        if (remove_from_list)
+        {
+            next_node = current->next;
+        }
+
+        bool removing_head = remove_from_list && previous == NULL;
+        if (removing_head)
+        {
+            entry->values_head = next_node;
+        }
+
+        bool removing_non_head = remove_from_list && previous != NULL;
+        if (removing_non_head)
+        {
+            previous->next = next_node;
+        }
+
+        if (remove_from_list)
+        {
+            current->next = map->value_free_list;
+            map->value_free_list = current;
+            --entry->value_count;
+            --map->value_count;
+        }
+
+        bool entry_empty = remove_from_list && entry->value_count == 0;
+        if (entry_empty)
+        {
+            map->entry_lookup_table[lut_index] = JSL__MULTIMAP_TOMBSTONE;
+            entry->next = map->entry_free_list;
+            map->entry_free_list = entry;
+            --map->key_count;
+        }
+
+        bool modified = remove_from_list;
+        if (modified)
+        {
+            ++map->generational_id;
+            res = true;
+        }
+
+        return res;
     }
 
     JSL_STR_TO_STR_MULTIMAP_DEF void jsl_str_to_str_multimap_clear(
         JSLStrToStrMultimap* map
     )
     {
-        (void) map;
+        bool params_valid = (
+            map != NULL
+            && map->sentinel == JSL__MULTIMAP_PRIVATE_SENTINEL
+            && map->entry_lookup_table != NULL
+        );
+
+        int64_t lut_length = params_valid ? map->entry_lookup_table_length : 0;
+        int64_t index = 0;
+
+        while (params_valid && index < lut_length)
+        {
+            uintptr_t lut_res = map->entry_lookup_table[index];
+            bool occupied = (
+                lut_res != 0
+                && lut_res != JSL__MULTIMAP_EMPTY
+                && lut_res != JSL__MULTIMAP_TOMBSTONE
+            );
+
+            struct JSL__StrToStrMultimapEntry* entry = NULL;
+            if (occupied)
+            {
+                entry = (struct JSL__StrToStrMultimapEntry*) lut_res;
+            }
+
+            bool entry_has_values = occupied
+                && entry != NULL
+                && entry->values_head != NULL
+                && entry->value_count > 0;
+
+            struct JSL__StrToStrMultimapValue* value_record = NULL;
+            if (entry_has_values)
+            {
+                value_record = entry->values_head;
+            }
+
+            while (entry_has_values && value_record != NULL)
+            {
+                struct JSL__StrToStrMultimapValue* next_value = value_record->next;
+                value_record->next = map->value_free_list;
+                map->value_free_list = value_record;
+                value_record = next_value;
+            }
+
+            if (entry_has_values)
+            {
+                entry->values_head = NULL;
+                entry->value_count = 0;
+            }
+
+            bool recycle_entry = occupied && entry != NULL;
+            if (recycle_entry)
+            {
+                entry->next = map->entry_free_list;
+                map->entry_free_list = entry;
+                map->entry_lookup_table[index] = JSL__MULTIMAP_EMPTY;
+            }
+
+            ++index;
+        }
+
+        if (params_valid)
+        {
+            map->key_count = 0;
+            map->value_count = 0;
+            ++map->generational_id;
+        }
+
         return;
     }
 
