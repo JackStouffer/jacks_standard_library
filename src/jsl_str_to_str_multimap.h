@@ -122,7 +122,7 @@
     );
 
     // TODO: docs
-    JSL_STR_TO_STR_MULTIMAP_DEF void jsl_str_to_str_multimap_get_values_for_key_iterator_init(
+    JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_get_values_for_key_iterator_init(
         JSLStrToStrMultimap* map,
         JSLStrToStrMultimapValueIter* iterator,
         JSLFatPtr key
@@ -763,7 +763,7 @@
         return found;
     }
 
-    JSL_STR_TO_STR_MULTIMAP_DEF void jsl_str_to_str_multimap_get_values_for_key_iterator_init(
+    JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_get_values_for_key_iterator_init(
         JSLStrToStrMultimap* map,
         JSLStrToStrMultimapValueIter* iterator,
         JSLFatPtr key
@@ -792,14 +792,17 @@
         uint64_t hash = 0;
         int64_t lut_index = -1;
         bool existing_found = false;
-        bool probe_allowed = params_valid;
-        if (probe_allowed)
+        if (params_valid)
         {
+            iterator->map = map;
+            iterator->generational_id = map->generational_id;
+            iterator->sentinel = JSL__MULTIMAP_PRIVATE_SENTINEL;
+
             jsl__str_to_str_multimap_probe(map, key, &lut_index, &hash, &existing_found);
         }
 
         struct JSL__StrToStrMultimapEntry* found_entry = NULL;
-        bool entry_found = params_valid && existing_found && lut_index > -1;
+        bool entry_found = existing_found && lut_index > -1;
         if (entry_found)
         {
             found_entry = (struct JSL__StrToStrMultimapEntry*) map->entry_lookup_table[lut_index];
@@ -810,39 +813,18 @@
             && found_entry->values_head != NULL
             && found_entry->value_count > 0;
 
-        bool setup_iterator = params_valid;
-        if (setup_iterator)
-        {
-            iterator->map = map;
-            iterator->generational_id = map->generational_id;
-            iterator->sentinel = JSL__MULTIMAP_PRIVATE_SENTINEL;
-        }
-
-        bool set_entry = setup_iterator && has_values;
-        if (set_entry)
+        if (has_values)
         {
             iterator->entry = found_entry;
             iterator->current_value = NULL;
         }
-
-        bool no_values = setup_iterator && !has_values;
-        if (no_values)
+        else
         {
             iterator->entry = NULL;
             iterator->current_value = NULL;
         }
 
-        bool invalid_state = !params_valid && iterator_valid;
-        if (invalid_state)
-        {
-            iterator->map = NULL;
-            iterator->entry = NULL;
-            iterator->current_value = NULL;
-            iterator->generational_id = 0;
-            iterator->sentinel = 0;
-        }
-
-        return;
+        return params_valid;
     }
 
     JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_get_values_for_key_iterator_next(
@@ -852,18 +834,9 @@
     {
         bool found = false;
 
-        bool iterator_valid = iterator != NULL;
-        bool output_valid = out_value != NULL;
-
-        if (output_valid)
-        {
-            out_value->data = NULL;
-            out_value->length = 0;
-        }
-
         bool params_valid = (
-            iterator_valid
-            && output_valid
+            iterator != NULL
+            && out_value != NULL
             && iterator->sentinel == JSL__MULTIMAP_PRIVATE_SENTINEL
             && iterator->map != NULL
             && iterator->map->sentinel == JSL__MULTIMAP_PRIVATE_SENTINEL
@@ -872,17 +845,13 @@
         );
 
         bool entry_available = params_valid && iterator->entry != NULL;
-        bool first_iteration = entry_available && iterator->current_value == NULL;
-        bool continue_iteration = entry_available && iterator->current_value != NULL;
 
         struct JSL__StrToStrMultimapValue* next_value = NULL;
-        if (first_iteration)
+        if (entry_available && iterator->current_value == NULL)
         {
             next_value = iterator->entry->values_head;
         }
-
-        bool advance_value = continue_iteration;
-        if (advance_value)
+        else if (entry_available && iterator->current_value != NULL)
         {
             next_value = iterator->current_value->next;
         }
@@ -900,12 +869,6 @@
         {
             iterator->entry = NULL;
             iterator->current_value = NULL;
-        }
-
-        bool invalidated = !params_valid;
-        if (invalidated)
-        {
-            found = false;
         }
 
         return found;
