@@ -218,6 +218,7 @@
 
         int64_t key_count;
         int64_t value_count;
+        int64_t tombstone_count;
 
         struct JSL__StrToStrMultimapEntry* entry_free_list;
         struct JSL__StrToStrMultimapValue* value_free_list;
@@ -411,6 +412,7 @@
         {
             map->entry_lookup_table = new_table;
             map->entry_lookup_table_length = new_length;
+            map->tombstone_count = 0;
             ++map->generational_id;
             res = true;
         }
@@ -424,7 +426,7 @@
         return res;
     }
 
-    static bool jsl__str_to_str_multimap_add_key(
+    static JSL__FORCE_INLINE bool jsl__str_to_str_multimap_add_key(
         JSLStrToStrMultimap* map,
         JSLFatPtr key,
         JSLStringLifeTime key_lifetime,
@@ -433,6 +435,7 @@
     )
     {
         struct JSL__StrToStrMultimapEntry* entry = NULL;
+        bool replacing_tombstone = map->entry_lookup_table[lut_index] == JSL__MULTIMAP_TOMBSTONE;
 
         if (map->entry_free_list == NULL)
         {
@@ -453,6 +456,11 @@
             
             map->entry_lookup_table[lut_index] = (uintptr_t) entry;
             ++map->key_count;
+        }
+
+        if (entry != NULL && replacing_tombstone)
+        {
+            --map->tombstone_count;
         }
 
         if (entry != NULL && key_lifetime == JSL_STRING_LIFETIME_STATIC)
@@ -481,7 +489,7 @@
         return entry != NULL;
     }
 
-    static bool jsl__str_to_str_multimap_add_value_to_key(
+    static JSL__FORCE_INLINE bool jsl__str_to_str_multimap_add_value_to_key(
         JSLStrToStrMultimap* map,
         JSLFatPtr value,
         JSLStringLifeTime value_lifetime,
@@ -611,6 +619,7 @@
 
             if (empty_entry)
             {
+                ++map->tombstone_count;
                 map->entry_lookup_table[lut_index] = JSL__MULTIMAP_TOMBSTONE;
                 if (!tombstone_seen)
                 {
@@ -654,11 +663,13 @@
         bool needs_rehash = false;
         if (res)
         {
-            float current_load_factor = (float) map->key_count / (float) map->entry_lookup_table_length;
-            needs_rehash = current_load_factor >= map->load_factor;
+            float occupied_count = (float) (map->key_count + map->tombstone_count);
+            float current_load_factor =  occupied_count / (float) map->entry_lookup_table_length;
+            bool too_many_tombstones = map->tombstone_count > (map->entry_lookup_table_length / 4);
+            needs_rehash = current_load_factor >= map->load_factor || too_many_tombstones;
         }
 
-        if (needs_rehash)
+        if (JSL__UNLIKELY(needs_rehash))
         {
             res = jsl__str_to_str_multimap_rehash(map);
         }
@@ -1098,12 +1109,17 @@
         {
             entry->values_head = NULL;
             entry->value_count = 0;
+
             map->value_count -= removed_value_count;
             map->entry_lookup_table[lut_index] = JSL__MULTIMAP_TOMBSTONE;
+
             entry->next = map->entry_free_list;
             map->entry_free_list = entry;
+
             --map->key_count;
             ++map->generational_id;
+            ++map->tombstone_count;
+
             res = true;
         }
 
@@ -1204,6 +1220,8 @@
         if (entry_empty)
         {
             map->entry_lookup_table[lut_index] = JSL__MULTIMAP_TOMBSTONE;
+            ++map->tombstone_count;
+
             entry->next = map->entry_free_list;
             map->entry_free_list = entry;
             --map->key_count;
@@ -1279,6 +1297,10 @@
                 map->entry_free_list = entry;
                 map->entry_lookup_table[index] = JSL__MULTIMAP_EMPTY;
             }
+            else if (params_valid && lut_res == JSL__MULTIMAP_TOMBSTONE)
+            {
+                map->entry_lookup_table[index] = JSL__MULTIMAP_EMPTY;
+            }
 
             ++index;
         }
@@ -1287,6 +1309,7 @@
         {
             map->key_count = 0;
             map->value_count = 0;
+            map->tombstone_count = 0;
             ++map->generational_id;
         }
 
