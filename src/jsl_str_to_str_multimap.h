@@ -1,7 +1,49 @@
 /**
  * # JSL String to String Multimap
  * 
- * TODO: docs
+ * This file is a single header file library that implements a multimap data
+ * structure, which maps length based string keys to multiple length based
+ * string values, and is optimized around the arena allocator design.
+ * This file is part of the Jack's Standard Library project.
+ * 
+ * ## Documentation
+ * 
+ * See `docs/jsl_str_to_str_multimap.md` for a formatted documentation page.
+ * 
+ * ## Usage
+ * 
+ * 1. Copy the `jsl_str_to_str_multimap.h` file into your repo
+ * 2. Include the header like normally in each source file where you use it:
+ * 
+ * ```c
+ * #include "jsl_str_to_str_multimap.h"
+ * ```
+ * 
+ * 3. Then, in ONE AND ONLY ONE file, do this:
+ * 
+ * ```c
+ * #define JSL_STR_TO_STR_MULTIMAP_IMPLEMENTATION
+ * #include "jsl_str_to_str_multimap.h"
+ * ```
+ * 
+ * **IMPORTANT**: The multimap also requires that the implementation of
+ * `jsl_core.h` be in the same executable.
+ * 
+ * This should probably be in the same file as your entrypoint function,
+ * but it doesn't have to be. It's also common to put this into an otherwise
+ * empty file for easier integration to standard C/C++ build systems.
+ * 
+ * ## Caveats
+ * 
+ * This multimap uses arenas, so some wasted memory is indeveatble. Care has
+ * been taken to reuse as much allocated memory as possible. But if your
+ * multimap is long lived it's possible to start exhausting the arena with
+ * old memory.
+ * 
+ * Remember to
+ * 
+ * * have an initial item count guess as accurate as you can to reduce rehashes
+ * * have the arena have as short a lifetime as possible
  * 
  * ## License
  *
@@ -55,10 +97,77 @@
     extern "C" {
     #endif
 
+    /**
+     * State tracking struct for iterating over all of the keys and values
+     * in the map.
+     * 
+     * @note If you mutate the map this iterator is automatically invalidated
+     * and any operations on this iterator will terminate with failure return
+     * values.
+     */
     typedef struct JSL__StrToStrMultimapKeyValueIter JSLStrToStrMultimapKeyValueIter;
 
+    /**
+     * State tracking struct for iterating over all of the values for a given
+     * key.
+     * 
+     * @note If you mutate the map this iterator is automatically invalidated
+     * and any operations on this iterator will terminate with failure return
+     * values.
+     */
     typedef struct JSL__StrToStrMultimapValueIter JSLStrToStrMultimapValueIter;
 
+    /**
+     * This is an open addressed, hash based multimap with linear probing that maps
+     * JSLFatPtr keys to multiple JSLFatPtr values.
+     * 
+     * Example:
+     *
+     * ```
+     * uint8_t buffer[JSL_KILOBYTES(16)];
+     * JSLArena stack_arena = JSL_ARENA_FROM_STACK(buffer);
+     *
+     * JSLStrToStrMultimap map;
+     * jsl_str_to_str_multimap_init(&map, &stack_arena, 0);
+     *
+     * JSLFatPtr key = JSL_FATPTR_INITIALIZER("hello-key");
+     * 
+     * jsl_str_to_str_multimap_insert(
+     *     &map,
+     *     key,
+     *     JSL_STRING_LIFETIME_STATIC,
+     *     JSL_FATPTR_EXPRESSION("hello-value"),
+     *     JSL_STRING_LIFETIME_STATIC
+     * );
+     *
+     * jsl_str_to_str_multimap_insert(
+     *     &map,
+     *     key,
+     *     JSL_STRING_LIFETIME_STATIC,
+     *     JSL_FATPTR_EXPRESSION("hello-value2"),
+     *     JSL_STRING_LIFETIME_STATIC
+     * );
+     * 
+     * jsl_str_to_str_multimap_get_value_count_for_key(&map, key); // 2
+     * ```
+     * 
+     * ## Functions
+     *
+     * * jsl_str_to_str_multimap_init
+     * * jsl_str_to_str_multimap_init2
+     * * jsl_str_to_str_multimap_get_key_count
+     * * jsl_str_to_str_multimap_get_value_count
+     * * jsl_str_to_str_multimap_has_key
+     * * jsl_str_to_str_multimap_insert
+     * * jsl_str_to_str_multimap_get_value_count_for_key
+     * * jsl_str_to_str_multimap_key_value_iterator_init
+     * * jsl_str_to_str_multimap_key_value_iterator_next
+     * * jsl_str_to_str_multimap_get_values_for_key_iterator_init
+     * * jsl_str_to_str_multimap_get_values_for_key_iterator_next
+     * * jsl_str_to_str_multimap_delete_key
+     * * jsl_str_to_str_multimap_delete_value
+     * * jsl_str_to_str_multimap_clear
+     */
     typedef struct JSL__StrToStrMultimap JSLStrToStrMultimap;
 
     // TODO: docs
