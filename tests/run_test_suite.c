@@ -478,6 +478,52 @@ int32_t main(int32_t argc, char **argv)
     /**
      *
      *
+     *         SIMDUTF SPECIAL CASE
+     *
+     *
+     */
+
+    const char* simdutf_source[] = { "src/simdutf.cpp" };
+    if (nob_needs_rebuild("tests/bin/simdutf.o", simdutf_source, 1))
+    {
+        nob_log(NOB_INFO, "Building simdutf");
+        Nob_Cmd sqlite_cmd = {0};
+        nob_cmd_append(&sqlite_cmd,
+            "clang",
+            "-O3",
+            "-march=native",
+            "-o", "tests/bin/simdutf.o",
+            "-c",
+            "src/simdutf.cpp"
+        );
+        if (!nob_cmd_run_sync(sqlite_cmd)) return 1;
+    }
+    else
+    {
+        nob_log(NOB_INFO, "simdutf already built");
+    }
+
+    const char* wrapper_source[] = { "src/jsl_simdutf_wrapper.cpp" };
+    if (nob_needs_rebuild("tests/bin/jsl_simdutf_wrapper.o", wrapper_source, 1))
+    {
+        nob_log(NOB_INFO, "Building jsl_simdutf_wrapper");
+        Nob_Cmd sqlite_cmd = {0};
+        nob_cmd_append(&sqlite_cmd,
+            "clang",
+            "-o", "tests/bin/jsl_simdutf_wrapper.o",
+            "-c",
+            "src/jsl_simdutf_wrapper.cpp"
+        );
+        if (!nob_cmd_run_sync(sqlite_cmd)) return 1;
+    }
+    else
+    {
+        nob_log(NOB_INFO, "jsl_simdutf_wrapper already built");
+    }
+
+    /**
+     *
+     *
      *              HASH MAPS
      *
      *
@@ -518,7 +564,10 @@ int32_t main(int32_t argc, char **argv)
     nob_cmd_append(
         &generate_hash_map_compile_command,
         "-o", generate_hash_map_exe_name,
-        "cli/generate_hash_map.c"
+        "-Isrc/",
+        "cli/generate_hash_map.c",
+        "tests/bin/simdutf.o",
+        "tests/bin/jsl_simdutf_wrapper.o"
     );
 
     if (!nob_cmd_run(&generate_hash_map_compile_command)) return 1;
@@ -608,52 +657,6 @@ int32_t main(int32_t argc, char **argv)
 
     if (!nob_procs_wait(hash_map_procs)) return 1;
     nob_da_free(hash_map_procs);
-
-    /**
-     *
-     *
-     *         SIMDUTF SPECIAL CASE
-     *
-     *
-     */
-
-    const char* simdutf_source[] = { "src/simdutf.cpp" };
-    if (nob_needs_rebuild("tests/bin/simdutf.o", simdutf_source, 1))
-    {
-        nob_log(NOB_INFO, "Building simdutf");
-        Nob_Cmd sqlite_cmd = {0};
-        nob_cmd_append(&sqlite_cmd,
-            "clang",
-            "-O3",
-            "-march=native",
-            "-o", "tests/bin/simdutf.o",
-            "-c",
-            "src/simdutf.cpp"
-        );
-        if (!nob_cmd_run_sync(sqlite_cmd)) return 1;
-    }
-    else
-    {
-        nob_log(NOB_INFO, "simdutf already built");
-    }
-
-    const char* wrapper_source[] = { "src/jsl_simdutf_wrapper.cpp" };
-    if (nob_needs_rebuild("tests/bin/jsl_simdutf_wrapper.o", wrapper_source, 1))
-    {
-        nob_log(NOB_INFO, "Building jsl_simdutf_wrapper");
-        Nob_Cmd sqlite_cmd = {0};
-        nob_cmd_append(&sqlite_cmd,
-            "clang",
-            "-o", "tests/bin/jsl_simdutf_wrapper.o",
-            "-c",
-            "src/jsl_simdutf_wrapper.cpp"
-        );
-        if (!nob_cmd_run_sync(sqlite_cmd)) return 1;
-    }
-    else
-    {
-        nob_log(NOB_INFO, "jsl_simdutf_wrapper already built");
-    }
     
 
     /**

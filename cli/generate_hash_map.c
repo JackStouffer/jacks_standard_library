@@ -43,11 +43,6 @@
 #endif
 #include "../src/jsl_files.h"
 
-#ifdef INCLUDE_MAIN
-    #define JSL_STR_TO_STR_MULTIMAP_IMPLEMENTATION
-#endif
-#include "../src/jsl_str_to_str_multimap.h"
-
 #include "generate_hash_map.h"
 
 /**
@@ -987,6 +982,12 @@ void write_hash_map_source(
 
 #ifdef INCLUDE_MAIN
 
+#if JSL_IS_WINDOWS
+    #include <windows.h>
+    #include <shellapi.h>
+    #pragma comment(lib, "shell32.lib")
+#endif
+
 #include "jsl_simdutf_wrapper.h"
 
 JSLFatPtr help_message = JSL_FATPTR_INITIALIZER(
@@ -1010,7 +1011,7 @@ JSLFatPtr help_message = JSL_FATPTR_INITIALIZER(
     "\t--custom-hash\t\tOverride the included hash call with the given function name\n"
 );
 
-static int32_t entrypoint(JSLArena* arena, JSLStrToStrMultimap* args)
+static int32_t entrypoint(JSLArena* arena, JSLFatPtr* args, int32_t arg_count)
 {
     bool show_help = false;
     bool print_header = false;
@@ -1024,9 +1025,9 @@ static int32_t entrypoint(JSLArena* arena, JSLStrToStrMultimap* args)
     int32_t header_includes_count = 0;
 
     // Parse command line arguments
-    for (int i = 1; i < argc; i++)
+    for (int i = 1; i < arg_count; i++)
     {
-        JSLFatPtr arg = jsl_fatptr_from_cstr(argv[i]);
+        JSLFatPtr arg = args[i];
 
         if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("-h")) || jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--help")))
         {
@@ -1038,9 +1039,9 @@ static int32_t entrypoint(JSLArena* arena, JSLStrToStrMultimap* args)
         }
         else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--name")))
         {
-            if (i + 1 < argc)
+            if (i + 1 < arg_count)
             {
-                name = jsl_fatptr_from_cstr(argv[++i]);
+                name = args[++i];
             }
             else
             {
@@ -1054,9 +1055,9 @@ static int32_t entrypoint(JSLArena* arena, JSLStrToStrMultimap* args)
         }
         else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--function_prefix")))
         {
-            if (i + 1 < argc)
+            if (i + 1 < arg_count)
             {
-                function_prefix = jsl_fatptr_from_cstr(argv[++i]);
+                function_prefix = args[++i];
             }
             else
             {
@@ -1071,9 +1072,9 @@ static int32_t entrypoint(JSLArena* arena, JSLStrToStrMultimap* args)
         }
         else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--key_type")))
         {
-            if (i + 1 < argc)
+            if (i + 1 < arg_count)
             {
-                key_type = jsl_fatptr_from_cstr(argv[++i]);
+                key_type = args[++i];
             }
             else
             {
@@ -1087,9 +1088,9 @@ static int32_t entrypoint(JSLArena* arena, JSLStrToStrMultimap* args)
         }
         else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--value_type")))
         {
-            if (i + 1 < argc)
+            if (i + 1 < arg_count)
             {
-                value_type = jsl_fatptr_from_cstr(argv[++i]);
+                value_type = args[++i];
             }
             else
             {
@@ -1131,7 +1132,7 @@ static int32_t entrypoint(JSLArena* arena, JSLStrToStrMultimap* args)
                 header_includes,
                 sizeof(JSLFatPtr) * (size_t) header_includes_count
             );
-            header_includes[header_includes_count - 1] = jsl_fatptr_from_cstr(argv[++i]);
+            header_includes[header_includes_count - 1] = args[++i];
         }
         else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--custom-hash=")))
         {
@@ -1139,9 +1140,9 @@ static int32_t entrypoint(JSLArena* arena, JSLStrToStrMultimap* args)
         }
         else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--custom-hash")))
         {
-            if (i + 1 < argc)
+            if (i + 1 < arg_count)
             {
-                hash_function_name = jsl_fatptr_from_cstr(argv[++i]);
+                hash_function_name = args[++i];
             }
             else
             {
@@ -1192,7 +1193,7 @@ static int32_t entrypoint(JSLArena* arena, JSLStrToStrMultimap* args)
     }
 
     JSLStringBuilder builder;
-    jsl_string_builder_init2(&builder, &arena, 1024, 8);
+    jsl_string_builder_init2(&builder, arena, 1024, 8);
 
     if (print_header)
     {
@@ -1239,15 +1240,24 @@ static int32_t entrypoint(JSLArena* arena, JSLStrToStrMultimap* args)
     return EXIT_SUCCESS;
 }
 
-#if JSL_WINDOWS
+
+#if JSL_IS_WINDOWS
+
+// annoyingly, clang does not special case wmain like main
+// for missing prototypes.
+int32_t wmain(int32_t argc, wchar_t **argv);
+
 int32_t wmain(int32_t argc, wchar_t** argv)
 #else
 int32_t main(int32_t argc, char** argv)
 #endif
 {
-    static JSLFatPtr empty_str = JSL_FATPTR_INITIALIZER("");
-    static JSLFatPtr dash_str = JSL_FATPTR_INITIALIZER("-");
-    static JSLFatPtr double_dash_str = JSL_FATPTR_INITIALIZER("--");
+    #if JSL_IS_WINDOWS
+        SetConsoleOutputCP(CP_UTF8);
+        SetConsoleCP(CP_UTF8);
+        _setmode(_fileno(stdout), _O_BINARY);
+        _setmode(_fileno(stderr), _O_BINARY);
+    #endif
 
     int64_t arena_size = JSL_MEGABYTES(32);
     JSLArena arena;
@@ -1257,56 +1267,31 @@ int32_t main(int32_t argc, char** argv)
 
     jsl_arena_init(&arena, backing_data, arena_size);
 
-    JSLStrToStrMultimap map;
-    jsl_str_to_str_multimap_init(&map, &stack_arena, 0);
+    JSLFatPtr* arg_array = JSL_ARENA_TYPED_ARRAY_ALLOCATE(JSLFatPtr, &arena, argc);
 
     for (int32_t i = 0; i < argc; ++i)
     {
         // Convert to UTF-8 on windows
-        #if JSL_WINDOWS
-            size_t arg_length = strlen(argv[i]);
+        #if JSL_IS_WINDOWS
+            size_t arg_length = wcslen(argv[i]);
             size_t buffer_length = simdutf_utf8_length_from_utf16(argv[i], arg_length);
-            JSLFatPtr result_buffer = jsl_arena_allocate(&arena, buffer_length, false);
+            JSLFatPtr result_buffer = jsl_arena_allocate(&arena, (int64_t) buffer_length, false);
 
             size_t result_length = simdutf_convert_utf16_to_utf8(
                 argv[i],
                 arg_length,
-                result_buffer.data
+                (char*) result_buffer.data
             ); 
 
-            JSLFatPtr arg = jsl_fatptr_slice(result_buffer, 0, result_length);
+            JSLFatPtr arg = jsl_fatptr_slice(result_buffer, 0, (int64_t) result_length);
         #else
             JSLFatPtr arg = jsl_fatptr_from_cstr(argv[i]);
         #endif
-
-
-        // Strip the dashes
-        if (jsl_fatptr_starts_with(arg, double_dash_str))
-        {
-            JSL_FATPTR_ADVANCE(arg, 2);
-        }
-        else if (jsl_fatptr_starts_with(arg, dash_str))
-        {
-            JSL_FATPTR_ADVANCE(arg, 1);
-        }
-
-        JSLFatPtr value = empty_str;
-
-        // split if there's an equals sign
-        int64_t equals_index = jsl_fatptr_index_of(arg, (uint8_t) '=');
-        if (equals_index > -1)
-        {
-            value = jsl_fatptr_slice_to_end(arg, equals_index + 1);
-        }
-
-        jsl_str_to_str_multimap_insert(
-            &map,
-            
-        );
+        
+        arg_array[i] = arg;
     }
-    
 
-    return entrypoint(&arena, &map);
+    return entrypoint(&arena, arg_array, argc);
 }
 
 
