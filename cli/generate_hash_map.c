@@ -43,6 +43,11 @@
 #endif
 #include "../src/jsl_files.h"
 
+#ifdef INCLUDE_MAIN
+    #define JSL_STR_TO_STR_MULTIMAP_IMPLEMENTATION
+#endif
+#include "../src/jsl_str_to_str_multimap.h"
+
 #include "generate_hash_map.h"
 
 /**
@@ -982,6 +987,8 @@ void write_hash_map_source(
 
 #ifdef INCLUDE_MAIN
 
+#include "jsl_simdutf_wrapper.h"
+
 JSLFatPtr help_message = JSL_FATPTR_INITIALIZER(
     "OVERVIEW:\n\n"
     "Hash map C code generation utility\n\n"
@@ -1003,7 +1010,7 @@ JSLFatPtr help_message = JSL_FATPTR_INITIALIZER(
     "\t--custom-hash\t\tOverride the included hash call with the given function name\n"
 );
 
-static int32_t entrypoint(int32_t argc, char** argv)
+static int32_t entrypoint(JSLArena* arena, JSLStrToStrMultimap* args)
 {
     bool show_help = false;
     bool print_header = false;
@@ -1184,13 +1191,6 @@ static int32_t entrypoint(int32_t argc, char** argv)
         impl = IMPL_DYNAMIC;
     }
 
-    JSLArena arena;
-    void* backing_data = malloc(JSL_MEGABYTES(8));
-    if (backing_data == NULL)
-        return EXIT_FAILURE;
-
-    jsl_arena_init(&arena, backing_data, JSL_MEGABYTES(8));
-
     JSLStringBuilder builder;
     jsl_string_builder_init2(&builder, &arena, 1024, 8);
 
@@ -1239,20 +1239,75 @@ static int32_t entrypoint(int32_t argc, char** argv)
     return EXIT_SUCCESS;
 }
 
-// #if JSL_WINDOWS
+#if JSL_WINDOWS
+int32_t wmain(int32_t argc, wchar_t** argv)
+#else
+int32_t main(int32_t argc, char** argv)
+#endif
+{
+    static JSLFatPtr empty_str = JSL_FATPTR_INITIALIZER("");
+    static JSLFatPtr dash_str = JSL_FATPTR_INITIALIZER("-");
+    static JSLFatPtr double_dash_str = JSL_FATPTR_INITIALIZER("--");
 
-//     int32_t wmain(int32_t argc, wchar_t** argv)
-//     {
+    int64_t arena_size = JSL_MEGABYTES(32);
+    JSLArena arena;
+    void* backing_data = malloc((size_t) arena_size);
+    if (backing_data == NULL)
+        return EXIT_FAILURE;
 
-//     }
+    jsl_arena_init(&arena, backing_data, arena_size);
 
-// #else
+    JSLStrToStrMultimap map;
+    jsl_str_to_str_multimap_init(&map, &stack_arena, 0);
 
-    int32_t main(int32_t argc, char** argv)
+    for (int32_t i = 0; i < argc; ++i)
     {
-        return entrypoint(argc, argv);
-    }
+        // Convert to UTF-8 on windows
+        #if JSL_WINDOWS
+            size_t arg_length = strlen(argv[i]);
+            size_t buffer_length = simdutf_utf8_length_from_utf16(argv[i], arg_length);
+            JSLFatPtr result_buffer = jsl_arena_allocate(&arena, buffer_length, false);
 
-// #endif // JSL_WINDOWS
+            size_t result_length = simdutf_convert_utf16_to_utf8(
+                argv[i],
+                arg_length,
+                result_buffer.data
+            ); 
+
+            JSLFatPtr arg = jsl_fatptr_slice(result_buffer, 0, result_length);
+        #else
+            JSLFatPtr arg = jsl_fatptr_from_cstr(argv[i]);
+        #endif
+
+
+        // Strip the dashes
+        if (jsl_fatptr_starts_with(arg, double_dash_str))
+        {
+            JSL_FATPTR_ADVANCE(arg, 2);
+        }
+        else if (jsl_fatptr_starts_with(arg, dash_str))
+        {
+            JSL_FATPTR_ADVANCE(arg, 1);
+        }
+
+        JSLFatPtr value = empty_str;
+
+        // split if there's an equals sign
+        int64_t equals_index = jsl_fatptr_index_of(arg, (uint8_t) '=');
+        if (equals_index > -1)
+        {
+            value = jsl_fatptr_slice_to_end(arg, equals_index + 1);
+        }
+
+        jsl_str_to_str_multimap_insert(
+            &map,
+            
+        );
+    }
+    
+
+    return entrypoint(&arena, &map);
+}
+
 
 #endif // INCLUDE_MAIN
