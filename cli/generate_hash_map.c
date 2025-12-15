@@ -39,9 +39,15 @@
 #include "../src/jsl_core.h"
 
 #ifdef INCLUDE_MAIN
+    #define JSL_STRING_BUILDER_IMPLEMENTATION
+#endif
+#include "../src/jsl_string_builder.h"
+
+#ifdef INCLUDE_MAIN
     #define JSL_FILES_IMPLEMENTATION
 #endif
 #include "../src/jsl_files.h"
+
 
 #include "generate_hash_map.h"
 

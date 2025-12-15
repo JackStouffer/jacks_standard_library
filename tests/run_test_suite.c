@@ -489,7 +489,7 @@ int32_t main(int32_t argc, char **argv)
         nob_log(NOB_INFO, "Building simdutf");
         Nob_Cmd sqlite_cmd = {0};
         nob_cmd_append(&sqlite_cmd,
-            "clang",
+            "clang++",
             "-O3",
             "-march=native",
             "-o", "tests/bin/simdutf.o",
@@ -544,7 +544,8 @@ int32_t main(int32_t argc, char **argv)
     Nob_Cmd generate_hash_map_compile_command = {0};
     nob_cmd_append(
         &generate_hash_map_compile_command,
-        "clang",
+        // link with C++ objects, so use clang++ driver but keep the source in C mode
+        "clang++",
         "-DINCLUDE_MAIN",
         "-O0",
         "-glldb",
@@ -565,7 +566,8 @@ int32_t main(int32_t argc, char **argv)
         &generate_hash_map_compile_command,
         "-o", generate_hash_map_exe_name,
         "-Isrc/",
-        "cli/generate_hash_map.c",
+        "-x", "c", "cli/generate_hash_map.c",
+        "-x", "none",
         "tests/bin/simdutf.o",
         "tests/bin/jsl_simdutf_wrapper.o"
     );
