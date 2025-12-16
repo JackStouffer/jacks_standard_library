@@ -451,7 +451,7 @@
                 map->arena,
                 bytes_needed,
                 _Alignof(uintptr_t),
-                false
+                true
             );
         }
 
@@ -459,18 +459,9 @@
             ? (uintptr_t*) new_table_mem.data
             : NULL;
 
-        bool allocation_ok = new_table != NULL;
-
-        int64_t init_index = 0;
-        while (allocation_ok && init_index < new_length)
-        {
-            new_table[init_index] = JSL__MAP_EMPTY;
-            ++init_index;
-        }
-
         uint64_t lut_mask = new_length > 0 ? ((uint64_t) new_length - 1u) : 0;
         int64_t old_index = 0;
-        bool migrate_ok = allocation_ok;
+        bool migrate_ok = new_table != NULL;
 
         while (migrate_ok && old_index < old_length)
         {
@@ -486,24 +477,18 @@
                 ? (struct JSL__StrToStrMapEntry*) lut_res
                 : NULL;
 
-            bool has_values = occupied
-                && entry != NULL
-                && entry->values_head != NULL
-                && entry->value_count > 0;
-
-            int64_t probe_index = has_values
+            int64_t probe_index = entry != NULL
                 ? (int64_t) (entry->hash & lut_mask)
                 : 0;
 
             int64_t probes = 0;
-            bool insert_needed = has_values;
 
+            bool insert_needed = entry != NULL;
             while (migrate_ok && insert_needed && probes < new_length)
             {
                 uintptr_t probe_res = new_table[probe_index];
                 bool slot_free = (
-                    probe_res == 0
-                    || probe_res == JSL__MAP_EMPTY
+                    probe_res == JSL__MAP_EMPTY
                     || probe_res == JSL__MAP_TOMBSTONE
                 );
 
@@ -511,14 +496,11 @@
                 {
                     new_table[probe_index] = (uintptr_t) entry;
                     insert_needed = false;
+                    break;
                 }
 
-                bool advance_probe = insert_needed;
-                if (advance_probe)
-                {
-                    probe_index = (int64_t) (((uint64_t) probe_index + 1u) & lut_mask);
-                    ++probes;
-                }
+                probe_index = (int64_t) (((uint64_t) probe_index + 1u) & lut_mask);
+                ++probes;
             }
 
             bool placement_failed = insert_needed;
@@ -530,7 +512,7 @@
             ++old_index;
         }
 
-        bool should_commit = migrate_ok && allocation_ok && length_valid;
+        bool should_commit = migrate_ok && new_table != NULL && length_valid;
         if (should_commit)
         {
             map->entry_lookup_table = new_table;
@@ -547,6 +529,38 @@
         }
 
         return res;
+    }
+
+    static JSL__FORCE_INLINE void jsl__str_to_str_map_update_value(
+        JSLStrToStrMap* map,
+        JSLFatPtr value,
+        JSLStringLifeTime value_lifetime,
+        int64_t lut_index
+    )
+    {
+        uintptr_t lut_res = map->entry_lookup_table[lut_index];
+        struct JSL__StrToStrMapEntry* entry = (struct JSL__StrToStrMapEntry*) lut_res;
+
+        if (value_lifetime == JSL_STRING_LIFETIME_STATIC)
+        {
+            entry->key = key;
+        }
+        else if (
+            && value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+            && value.length <= JSL__MAP_SSO_LENGTH
+        )
+        {
+            JSL_MEMCPY(entry->value_sso_buffer, value.data, (size_t) key.length);
+            entry->value.data = entry->value_sso_buffer;
+            entry->value.length = value.length;
+        }
+        else if (
+            && value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+            && value.length > JSL__MAP_SSO_LENGTH
+        )
+        {
+            entry->value = jsl_fatptr_duplicate(map->arena, value);
+        }
     }
 
     static JSL__FORCE_INLINE bool jsl__str_to_str_map_add(
@@ -669,7 +683,7 @@
         {
             uintptr_t lut_res = map->entry_lookup_table[lut_index];
 
-            bool is_empty = lut_res == JSL__MAP_EMPTY || lut_res == 0;
+            bool is_empty = lut_res == JSL__MAP_EMPTY;
             bool is_tombstone = lut_res == JSL__MAP_TOMBSTONE;
 
             if (is_empty)
@@ -766,19 +780,15 @@
             jsl__str_to_str_map_probe(map, key, &lut_index, &hash, &existing_found);
         }
         
-        // insert into existing
-        if (lut_index > -1 && existing_found)
-        {
-            res = jsl__str_to_str_map_add_value_to_key(map, value, value_lifetime, lut_index);
-        }
         // new key
-        else if (lut_index > -1 && !existing_found)
+        if (lut_index > -1 && !existing_found)
         {
-            bool key_add_res = jsl__str_to_str_map_add_key(map, key, key_lifetime, lut_index, hash);
-            bool value_add_res = key_add_res ? 
-                jsl__str_to_str_map_add_value_to_key(map, value, value_lifetime, lut_index)
-                : false;
-            res = key_add_res && value_add_res;
+            res = jsl__str_to_str_map_add(map, key, key_lifetime, value, value_lifetime, lut_index);
+        }
+        // update
+        else if (lut_index > -1 && existing_found)
+        {
+            jsl__str_to_str_map_update_value(map, value, value_lifetime, lut_index);
         }
 
         if (res)
