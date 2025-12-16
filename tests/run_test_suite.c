@@ -304,6 +304,7 @@ static UnitTestDecl unit_test_declarations[] = {
     { "test_string_builder", (char*[]) {"tests/test_string_builder.c", NULL} },
     { "test_intrinsics", (char*[]) {"tests/test_intrinsics.c", NULL} },
     { "test_file_utils", (char*[]) {"tests/test_file_utils.c", NULL} },
+    { "test_str_to_str_map", (char*[]) {"tests/test_str_to_str_map.c", NULL} },
     { "test_str_to_str_multimap", (char*[]) {"tests/test_str_to_str_multimap.c", NULL} },
     {
         "test_simd_wrapper",

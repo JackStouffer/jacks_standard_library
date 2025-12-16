@@ -1030,20 +1030,30 @@ static int32_t entrypoint(JSLArena* arena, JSLFatPtr* args, int32_t arg_count)
     JSLFatPtr* header_includes = NULL;
     int32_t header_includes_count = 0;
 
+    JSLFatPtr h_flag_str = JSL_FATPTR_INITIALIZER("-h");
+    JSLFatPtr help_flag_str = JSL_FATPTR_INITIALIZER("--help");
+    JSLFatPtr name_flag_str = JSL_FATPTR_INITIALIZER("--name");
+    JSLFatPtr name_flag_eq_str = JSL_FATPTR_INITIALIZER("--name=");
+    JSLFatPtr function_prefix_flag_str = JSL_FATPTR_INITIALIZER("--function_prefix");
+    JSLFatPtr function_prefix_flag_eq_str = JSL_FATPTR_INITIALIZER("--function_prefix=");
+
     // Parse command line arguments
     for (int i = 1; i < arg_count; i++)
     {
         JSLFatPtr arg = args[i];
 
-        if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("-h")) || jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--help")))
+        if (
+            jsl_fatptr_memory_compare(arg, h_flag_str)
+            || jsl_fatptr_memory_compare(arg, help_flag_str)
+        )
         {
             show_help = true;
         }
-        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--name=")))
+        else if (jsl_fatptr_memory_compare(arg, name_flag_eq_str))
         {
             name = jsl_fatptr_slice_to_end(arg, 7);
         }
-        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--name")))
+        else if (jsl_fatptr_memory_compare(arg, name_flag_str))
         {
             if (i + 1 < arg_count)
             {
@@ -1055,11 +1065,11 @@ static int32_t entrypoint(JSLArena* arena, JSLFatPtr* args, int32_t arg_count)
                 return EXIT_FAILURE;
             }
         }
-        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--function_prefix=")))
+        else if (jsl_fatptr_memory_compare(arg, function_prefix_flag_eq_str))
         {
             function_prefix = jsl_fatptr_slice_to_end(arg, 18);
         }
-        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--function_prefix")))
+        else if (jsl_fatptr_memory_compare(arg, function_prefix_flag_str))
         {
             if (i + 1 < arg_count)
             {
@@ -1251,19 +1261,22 @@ static int32_t entrypoint(JSLArena* arena, JSLFatPtr* args, int32_t arg_count)
 
 // annoyingly, clang does not special case wmain like main
 // for missing prototypes.
-int32_t wmain(int32_t argc, wchar_t **argv);
+int32_t wmain(int32_t argc, wchar_t** argv);
 
 int32_t wmain(int32_t argc, wchar_t** argv)
-#else
-int32_t main(int32_t argc, char** argv)
-#endif
 {
-    #if JSL_IS_WINDOWS
-        SetConsoleOutputCP(CP_UTF8);
-        SetConsoleCP(CP_UTF8);
-        _setmode(_fileno(stdout), _O_BINARY);
-        _setmode(_fileno(stderr), _O_BINARY);
-    #endif
+    
+    SetConsoleOutputCP(CP_UTF8);
+    SetConsoleCP(CP_UTF8);
+    _setmode(_fileno(stdout), _O_BINARY);
+    _setmode(_fileno(stderr), _O_BINARY);
+
+#else
+
+int32_t main(int32_t argc, char** argv)
+{
+
+#endif
 
     int64_t arena_size = JSL_MEGABYTES(32);
     JSLArena arena;

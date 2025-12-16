@@ -99,54 +99,15 @@
 
     /**
      * This is an open addressed, hash based map with linear probing that maps
-     * JSLFatPtr keys to multiple JSLFatPtr values.
+     * JSLFatPtr keys to JSLFatPtr values.
      * 
      * Example:
      *
-     * ```
-     * uint8_t buffer[JSL_KILOBYTES(16)];
-     * JSLArena stack_arena = JSL_ARENA_FROM_STACK(buffer);
-     *
-     * JSLStrToStrMap map;
-     * jsl_str_to_str_map_init(&map, &stack_arena, 0);
-     *
-     * JSLFatPtr key = JSL_FATPTR_INITIALIZER("hello-key");
-     * 
-     * jsl_str_to_str_map_insert(
-     *     &map,
-     *     key,
-     *     JSL_STRING_LIFETIME_STATIC,
-     *     JSL_FATPTR_EXPRESSION("hello-value"),
-     *     JSL_STRING_LIFETIME_STATIC
-     * );
-     *
-     * jsl_str_to_str_map_insert(
-     *     &map,
-     *     key,
-     *     JSL_STRING_LIFETIME_STATIC,
-     *     JSL_FATPTR_EXPRESSION("hello-value2"),
-     *     JSL_STRING_LIFETIME_STATIC
-     * );
-     * 
-     * jsl_str_to_str_map_get_value_count_for_key(&map, key); // 2
-     * ```
+     * TODO: docs
      * 
      * ## Functions
      *
-     * * jsl_str_to_str_map_init
-     * * jsl_str_to_str_map_init2
-     * * jsl_str_to_str_map_get_key_count
-     * * jsl_str_to_str_map_get_value_count
-     * * jsl_str_to_str_map_has_key
-     * * jsl_str_to_str_map_insert
-     * * jsl_str_to_str_map_get_value_count_for_key
-     * * jsl_str_to_str_map_key_value_iterator_init
-     * * jsl_str_to_str_map_key_value_iterator_next
-     * * jsl_str_to_str_map_get_values_for_key_iterator_init
-     * * jsl_str_to_str_map_get_values_for_key_iterator_next
-     * * jsl_str_to_str_map_delete_key
-     * * jsl_str_to_str_map_delete_value
-     * * jsl_str_to_str_map_clear
+     * TODO: docs
      */
     typedef struct JSL__StrToStrMap JSLStrToStrMap;
 
@@ -211,22 +172,12 @@
     );
 
     /**
-     * Get the number of distinct keys currently stored.
+     * Get the number of items currently stored.
      *
      * @param map Pointer to the map.
      * @return Key count, or `-1` on error
      */
-    JSL_STR_TO_STR_MAP_DEF int64_t jsl_str_to_str_map_get_key_count(
-        JSLStrToStrMap* map
-    );
-
-    /**
-     * Get the number of values currently stored.
-     *
-     * @param map Pointer to the map.
-     * @return Key count, or `-1` on error
-     */
-    JSL_STR_TO_STR_MAP_DEF int64_t jsl_str_to_str_map_get_value_count(
+    JSL_STR_TO_STR_MAP_DEF int64_t jsl_str_to_str_map_item_count(
         JSLStrToStrMap* map
     );
 
@@ -244,13 +195,6 @@
     /**
      * Insert a key/value pair.
      *
-     * If the key already exists, the value is appended to that key's value list;
-     * otherwise a new key entry is created. Values are not deduplicated. The
-     * `*_lifetime` parameters control whether the data is referenced directly
-     * (`JSL_STRING_LIFETIME_STATIC`) or copied into the map
-     * (`JSL_STRING_LIFETIME_TRANSIENT`). Use the transient lifetime if the string's
-     * lifetime is less than that of the map.
-     *
      * @param map Map to mutate.
      * @param key Key to insert.
      * @param key_lifetime Lifetime semantics for the key data.
@@ -267,18 +211,6 @@
     );
 
     /**
-     * Get the number of values for the given key.
-     *
-     * @param map Pointer to the map.
-     * @param key Key to check.
-     * @return Key count, or `-1` on error
-     */
-    JSL_STR_TO_STR_MAP_DEF int64_t jsl_str_to_str_map_get_value_count_for_key(
-        JSLStrToStrMap* map,
-        JSLFatPtr key
-    );
-
-    /**
      * Initialize an iterator that visits every key/value pair in the map.
      * 
      * Example:
@@ -291,7 +223,7 @@
      * 
      * JSLFatPtr key;
      * JSLFatPtr value;
-     * while (jsl_str_to_str_map_get_values_for_key_iterator_next(&iter, &key, &value))
+     * while (jsl_str_to_str_map_key_value_iterator_next(&iter, &key, &value))
      * {
      *    ...
      * }
@@ -323,7 +255,7 @@
      * 
      * JSLFatPtr key;
      * JSLFatPtr value;
-     * while (jsl_str_to_str_map_get_values_for_key_iterator_next(&iter, &key, &value))
+     * while (jsl_str_to_str_map_key_value_iterator_next(&iter, &key, &value))
      * {
      *    ...
      * }
@@ -356,28 +288,9 @@
      * @param key Key to remove.
      * @return `true` if the key existed and was removed, `false` otherwise.
      */
-    JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_delete_key(
+    JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_delete(
         JSLStrToStrMap* map,
         JSLFatPtr key
-    );
-
-    /**
-     * Remove a single value for the given key.
-     *
-     * If the value is found, it is removed from the key's list and recycled
-     * into the value free list. When the last value is removed, the key entry
-     * itself is recycled. No action is taken if the key or value is missing
-     * or parameters are invalid.
-     *
-     * @param map Map to mutate.
-     * @param key Key whose value should be removed.
-     * @param value Exact value to remove.
-     * @return `true` if a value was removed, `false` otherwise.
-     */
-    JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_delete_value(
-        JSLStrToStrMap* map,
-        JSLFatPtr key,
-        JSLFatPtr value
     );
 
     /**
@@ -433,8 +346,7 @@
         uintptr_t* entry_lookup_table;
         int64_t entry_lookup_table_length;
 
-        int64_t key_count;
-        int64_t value_count;
+        int64_t item_count;
         int64_t tombstone_count;
 
         struct JSL__StrToStrMapEntry* entry_free_list;
@@ -637,10 +549,12 @@
         return res;
     }
 
-    static JSL__FORCE_INLINE bool jsl__str_to_str_map_add_key(
+    static JSL__FORCE_INLINE bool jsl__str_to_str_map_add(
         JSLStrToStrMap* map,
         JSLFatPtr key,
         JSLStringLifeTime key_lifetime,
+        JSLFatPtr value,
+        JSLStringLifeTime value_lifetime,
         int64_t lut_index,
         uint64_t hash
     )
@@ -664,13 +578,17 @@
             entry->hash = hash;
             
             map->entry_lookup_table[lut_index] = (uintptr_t) entry;
-            ++map->key_count;
+            ++map->item_count;
         }
 
         if (entry != NULL && replacing_tombstone)
         {
             --map->tombstone_count;
         }
+
+        // 
+        // Copy the key
+        // 
 
         if (entry != NULL && key_lifetime == JSL_STRING_LIFETIME_STATIC)
         {
@@ -682,8 +600,8 @@
             && key.length <= JSL__MAP_SSO_LENGTH
         )
         {
-            JSL_MEMCPY(entry->small_string_buffer, key.data, (size_t) key.length);
-            entry->key.data = entry->small_string_buffer;
+            JSL_MEMCPY(entry->key_sso_buffer, key.data, (size_t) key.length);
+            entry->key.data = entry->key_sso_buffer;
             entry->key.length = key.length;
         }
         else if (
@@ -695,70 +613,34 @@
             entry->key = jsl_fatptr_duplicate(map->arena, key);
         }
 
-        return entry != NULL;
-    }
+        // 
+        // Copy the value
+        // 
 
-    static JSL__FORCE_INLINE bool jsl__str_to_str_map_add_value_to_key(
-        JSLStrToStrMap* map,
-        JSLFatPtr value,
-        JSLStringLifeTime value_lifetime,
-        int64_t lut_index
-    )
-    {
-        struct JSL__StrToStrMapValue* value_record = NULL;
-        uintptr_t lut_res = map->entry_lookup_table[lut_index];
-        struct JSL__StrToStrMapEntry* entry = (struct JSL__StrToStrMapEntry*) lut_res;
-
-        bool values_ok = lut_res != 0
-            && lut_res != JSL__MAP_EMPTY
-            && lut_res != JSL__MAP_TOMBSTONE;
-
-        if (values_ok && map->value_free_list == NULL)
+        if (entry != NULL && value_lifetime == JSL_STRING_LIFETIME_STATIC)
         {
-            value_record = JSL_ARENA_TYPED_ALLOCATE(struct JSL__StrToStrMapValue, map->arena);
-        }
-        else if (values_ok)
-        {
-            struct JSL__StrToStrMapValue* next = map->value_free_list->next;
-            value_record = map->value_free_list;
-            map->value_free_list = next;
-        }
-
-        if (value_record != NULL)
-        {
-            ++entry->value_count;
-            ++map->value_count;
-            value_record->next = entry->values_head;
-            entry->values_head = value_record;
-        }
-
-        if (
-            value_record != NULL
-            && value_lifetime == JSL_STRING_LIFETIME_STATIC
-        )
-        {
-            value_record->value = value;
+            entry->key = key;
         }
         else if (
-            value_record != NULL
+            entry != NULL
             && value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
             && value.length <= JSL__MAP_SSO_LENGTH
         )
         {
-            JSL_MEMCPY(value_record->small_string_buffer, value.data, (size_t) value.length);
-            value_record->value.data = value_record->small_string_buffer;
-            value_record->value.length = value.length;
+            JSL_MEMCPY(entry->value_sso_buffer, value.data, (size_t) key.length);
+            entry->value.data = entry->value_sso_buffer;
+            entry->value.length = value.length;
         }
         else if (
-            value_record != NULL
+            entry != NULL
             && value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
             && value.length > JSL__MAP_SSO_LENGTH
         )
         {
-            value_record->value = jsl_fatptr_duplicate(map->arena, value);
+            entry->value = jsl_fatptr_duplicate(map->arena, value);
         }
 
-        return value_record != NULL;
+        return entry != NULL;
     }
 
     static inline void jsl__str_to_str_map_probe(
@@ -808,11 +690,7 @@
                 ? (struct JSL__StrToStrMapEntry*) lut_res
                 : NULL;
 
-            bool entry_valid = slot_has_entry
-                && entry != NULL
-                && entry->value_count > 0;
-
-            bool matches = entry_valid
+            bool matches = entry != NULL
                 && *out_hash == entry->hash
                 && jsl_fatptr_memory_compare(key, entry->key);
 
@@ -823,22 +701,19 @@
                 searching = false;
             }
 
-            bool empty_entry = slot_has_entry
-                && (entry == NULL || entry->value_count <= 0);
-
-            if (empty_entry)
+            if (entry == NULL)
             {
                 ++map->tombstone_count;
                 map->entry_lookup_table[lut_index] = JSL__MAP_TOMBSTONE;
-                if (!tombstone_seen)
-                {
-                    first_tombstone = lut_index;
-                    tombstone_seen = true;
-                }
             }
 
-            bool advance_probe = searching;
-            if (advance_probe)
+            if (entry == NULL && !tombstone_seen)
+            {
+                first_tombstone = lut_index;
+                tombstone_seen = true;
+            }
+
+            if (searching)
             {
                 lut_index = (int64_t) (((uint64_t) lut_index + 1u) & lut_mask);
                 ++probes;
@@ -872,7 +747,7 @@
         bool needs_rehash = false;
         if (res)
         {
-            float occupied_count = (float) (map->key_count + map->tombstone_count);
+            float occupied_count = (float) (map->item_count + map->tombstone_count);
             float current_load_factor =  occupied_count / (float) map->entry_lookup_table_length;
             bool too_many_tombstones = map->tombstone_count > (map->entry_lookup_table_length / 4);
             needs_rehash = current_load_factor >= map->load_factor || too_many_tombstones;
@@ -936,76 +811,19 @@
         return lut_index > -1 && existing_found;
     }
 
-    JSL_STR_TO_STR_MAP_DEF int64_t jsl_str_to_str_map_get_key_count(
+
+    JSL_STR_TO_STR_MAP_DEF int64_t jsl_str_to_str_map_item_count(
         JSLStrToStrMap* map
     )
     {
         int64_t res = -1;
-        bool valid = (
-            map != NULL
-            && map->sentinel == JSL__MAP_PRIVATE_SENTINEL
-        );
-
-        if (valid)
-        {
-            res = map->key_count;
-        }
-
-        return res;
-    }
-
-    JSL_STR_TO_STR_MAP_DEF int64_t jsl_str_to_str_map_get_value_count(
-        JSLStrToStrMap* map
-    )
-    {
-        int64_t res = -1;
-        bool valid = (
-            map != NULL
-            && map->sentinel == JSL__MAP_PRIVATE_SENTINEL
-        );
-
-        if (valid)
-        {
-            res = map->value_count;
-        }
-
-        return res;
-    }
-
-    JSL_STR_TO_STR_MAP_DEF int64_t jsl_str_to_str_map_get_value_count_for_key(
-        JSLStrToStrMap* map,
-        JSLFatPtr key
-    )
-    {
-        int64_t res = -1;
-        bool proceed = false;
 
         if (
             map != NULL
             && map->sentinel == JSL__MAP_PRIVATE_SENTINEL
-            && key.data != NULL
-            && key.length > -1
         )
-            proceed = true;
-
-        uint64_t hash = 0;
-        int64_t lut_index = -1;
-        bool existing_found = false;
-        if (proceed)
         {
-            jsl__str_to_str_map_probe(map, key, &lut_index, &hash, &existing_found);
-            proceed = lut_index > -1 && existing_found;
-        }
-
-        if (proceed)
-        {
-            struct JSL__StrToStrMapEntry* entry = (struct JSL__StrToStrMapEntry*) 
-                map->entry_lookup_table[lut_index];
-            res = entry->value_count;
-        }
-        else if (map != NULL && map->sentinel == JSL__MAP_PRIVATE_SENTINEL)
-        {
-            res = 0;
+            res = map->item_count;
         }
 
         return res;
@@ -1026,8 +844,6 @@
         {
             iterator->map = map;
             iterator->current_lut_index = 0;
-            iterator->current_entry = NULL;
-            iterator->current_value = NULL;
             iterator->sentinel = JSL__MAP_PRIVATE_SENTINEL;
             iterator->generational_id = map->generational_id;
             res = true;
@@ -1055,106 +871,45 @@
             && iterator->generational_id == iterator->map->generational_id
         );
 
-        bool try_same_entry = (
-            params_valid
-            && iterator->current_entry != NULL
-            && iterator->current_value != NULL
-        );
-
-        struct JSL__StrToStrMapValue* next_value = NULL;
-        if (try_same_entry)
-        {
-            next_value = iterator->current_value->next;
-        }
-
-        bool next_value_ready = try_same_entry && next_value != NULL;
-        if (next_value_ready)
-        {
-            iterator->current_value = next_value;
-            *out_key = iterator->current_entry->key;
-            *out_value = iterator->current_value->value;
-            found = true;
-        }
-
-        bool reached_end_of_entry = try_same_entry && !next_value_ready;
-        if (reached_end_of_entry)
-        {
-            iterator->current_entry = NULL;
-            iterator->current_value = NULL;
-        }
-
-        bool search_for_entry = params_valid && !found;
         int64_t lut_length = params_valid ? iterator->map->entry_lookup_table_length : 0;
         int64_t lut_index = iterator->current_lut_index;
         struct JSL__StrToStrMapEntry* found_entry = NULL;
 
-        while (search_for_entry && lut_index < lut_length)
+        while (params_valid && lut_index < lut_length)
         {
             uintptr_t lut_res = iterator->map->entry_lookup_table[lut_index];
+            bool occupied = lut_res != JSL__MAP_EMPTY && lut_res != JSL__MAP_TOMBSTONE;
 
-            bool occupied = (
-                lut_res != 0
-                && lut_res != JSL__MAP_EMPTY
-                && lut_res != JSL__MAP_TOMBSTONE
-            );
-
-            struct JSL__StrToStrMapEntry* candidate_entry = NULL;
             if (occupied)
             {
-                candidate_entry = (struct JSL__StrToStrMapEntry*) lut_res;
+                found_entry = (struct JSL__StrToStrMapEntry*) lut_res;
+                break;
             }
-
-            bool has_values = false;
-            if (occupied)
-            {
-                has_values = (
-                    candidate_entry->values_head != NULL
-                    && candidate_entry->value_count > 0
-                );
-            }
-
-            if (has_values)
-            {
-                found_entry = candidate_entry;
-                search_for_entry = false;
-            }
-
-            bool advance_index = search_for_entry;
-            if (advance_index)
+            else
             {
                 ++lut_index;
             }
         }
 
-        bool entry_found = found_entry != NULL && !search_for_entry;
-        if (entry_found)
+        if (found_entry != NULL)
         {
-            iterator->current_entry = found_entry;
-            iterator->current_value = found_entry->values_head;
             iterator->current_lut_index = lut_index + 1;
-            *out_key = iterator->current_entry->key;
-            *out_value = iterator->current_value->value;
+            *out_key = found_entry->key;
+            *out_value = found_entry->value;
             found = true;
         }
 
-        bool exhausted = params_valid && !found;
+        bool exhausted = params_valid && found_entry == NULL;
         if (exhausted)
         {
-            iterator->current_entry = NULL;
-            iterator->current_value = NULL;
             iterator->current_lut_index = lut_length;
-        }
-
-        bool invalidated = !params_valid;
-        if (invalidated)
-        {
             found = false;
         }
 
         return found;
     }
 
-    JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_delete_key(
+    JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_delete(
         JSLStrToStrMap* map,
         JSLFatPtr key
     )
@@ -1177,158 +932,20 @@
             jsl__str_to_str_map_probe(map, key, &lut_index, &hash, &existing_found);
         }
 
-        bool key_found = existing_found && lut_index > -1;
-
-        struct JSL__StrToStrMapEntry* entry = NULL;
-        if (key_found)
+        if (existing_found && lut_index > -1)
         {
-            entry = (struct JSL__StrToStrMapEntry*) map->entry_lookup_table[lut_index];
-        }
-
-        bool entry_valid = key_found && entry != NULL;
-
-        int64_t removed_value_count = 0;
-        struct JSL__StrToStrMapValue* value_record = NULL;
-        if (entry_valid)
-        {
-            value_record = entry->values_head;
-        }
-
-        while (entry_valid && value_record != NULL)
-        {
-            struct JSL__StrToStrMapValue* next = value_record->next;
-            value_record->next = map->value_free_list;
-            map->value_free_list = value_record;
-            value_record = next;
-            ++removed_value_count;
-        }
-
-        if (entry_valid)
-        {
-            entry->values_head = NULL;
-            entry->value_count = 0;
-
-            map->value_count -= removed_value_count;
-            map->entry_lookup_table[lut_index] = JSL__MAP_TOMBSTONE;
+            struct JSL__StrToStrMapEntry* entry =
+                (struct JSL__StrToStrMapEntry*) map->entry_lookup_table[lut_index];
 
             entry->next = map->entry_free_list;
             map->entry_free_list = entry;
 
-            --map->key_count;
+            --map->item_count;
             ++map->generational_id;
-            ++map->tombstone_count;
 
-            res = true;
-        }
-
-        return res;
-    }
-
-    JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_delete_value(
-        JSLStrToStrMap* map,
-        JSLFatPtr key,
-        JSLFatPtr value
-    )
-    {
-        bool res = false;
-
-        bool params_valid = (
-            map != NULL
-            && map->sentinel == JSL__MAP_PRIVATE_SENTINEL
-            && map->entry_lookup_table != NULL
-            && key.data != NULL
-            && key.length > -1
-            && value.data != NULL
-            && value.length > -1
-        );
-
-        uint64_t hash = 0;
-        int64_t lut_index = -1;
-        bool existing_found = false;
-        if (params_valid)
-        {
-            jsl__str_to_str_map_probe(map, key, &lut_index, &hash, &existing_found);
-        }
-
-        bool key_found = params_valid && existing_found && lut_index > -1;
-
-        struct JSL__StrToStrMapEntry* entry = NULL;
-        if (key_found)
-        {
-            entry = (struct JSL__StrToStrMapEntry*) map->entry_lookup_table[lut_index];
-        }
-
-        bool entry_valid = key_found
-            && entry != NULL
-            && entry->values_head != NULL
-            && entry->value_count > 0;
-
-        struct JSL__StrToStrMapValue* previous = NULL;
-        struct JSL__StrToStrMapValue* current = NULL;
-        if (entry_valid)
-        {
-            current = entry->values_head;
-        }
-
-        bool value_found = false;
-        while (entry_valid && current != NULL && !value_found)
-        {
-            bool equal = jsl_fatptr_memory_compare(current->value, value);
-            if (equal)
-            {
-                value_found = true;
-            }
-
-            bool advance = !value_found;
-            if (advance)
-            {
-                previous = current;
-                current = current->next;
-            }
-        }
-
-        bool remove_from_list = entry_valid && value_found && current != NULL;
-        struct JSL__StrToStrMapValue* next_node = NULL;
-        if (remove_from_list)
-        {
-            next_node = current->next;
-        }
-
-        bool removing_head = remove_from_list && previous == NULL;
-        if (removing_head)
-        {
-            entry->values_head = next_node;
-        }
-
-        bool removing_non_head = remove_from_list && previous != NULL;
-        if (removing_non_head)
-        {
-            previous->next = next_node;
-        }
-
-        if (remove_from_list)
-        {
-            current->next = map->value_free_list;
-            map->value_free_list = current;
-            --entry->value_count;
-            --map->value_count;
-        }
-
-        bool entry_empty = remove_from_list && entry->value_count == 0;
-        if (entry_empty)
-        {
             map->entry_lookup_table[lut_index] = JSL__MAP_TOMBSTONE;
             ++map->tombstone_count;
 
-            entry->next = map->entry_free_list;
-            map->entry_free_list = entry;
-            --map->key_count;
-        }
-
-        bool modified = remove_from_list;
-        if (modified)
-        {
-            ++map->generational_id;
             res = true;
         }
 
@@ -1351,51 +968,15 @@
         while (params_valid && index < lut_length)
         {
             uintptr_t lut_res = map->entry_lookup_table[index];
-            bool occupied = (
-                lut_res != 0
-                && lut_res != JSL__MAP_EMPTY
-                && lut_res != JSL__MAP_TOMBSTONE
-            );
 
-            struct JSL__StrToStrMapEntry* entry = NULL;
-            if (occupied)
+            if (lut_res != JSL__MAP_EMPTY && lut_res != JSL__MAP_TOMBSTONE)
             {
-                entry = (struct JSL__StrToStrMapEntry*) lut_res;
-            }
-
-            bool entry_has_values = occupied
-                && entry != NULL
-                && entry->values_head != NULL
-                && entry->value_count > 0;
-
-            struct JSL__StrToStrMapValue* value_record = NULL;
-            if (entry_has_values)
-            {
-                value_record = entry->values_head;
-            }
-
-            while (entry_has_values && value_record != NULL)
-            {
-                struct JSL__StrToStrMapValue* next_value = value_record->next;
-                value_record->next = map->value_free_list;
-                map->value_free_list = value_record;
-                value_record = next_value;
-            }
-
-            if (entry_has_values)
-            {
-                entry->values_head = NULL;
-                entry->value_count = 0;
-            }
-
-            bool recycle_entry = occupied && entry != NULL;
-            if (recycle_entry)
-            {
+                struct JSL__StrToStrMapEntry* entry = (struct JSL__StrToStrMapEntry*) lut_res;
                 entry->next = map->entry_free_list;
                 map->entry_free_list = entry;
                 map->entry_lookup_table[index] = JSL__MAP_EMPTY;
             }
-            else if (params_valid && lut_res == JSL__MAP_TOMBSTONE)
+            else if (lut_res == JSL__MAP_TOMBSTONE)
             {
                 map->entry_lookup_table[index] = JSL__MAP_EMPTY;
             }
@@ -1405,8 +986,7 @@
 
         if (params_valid)
         {
-            map->key_count = 0;
-            map->value_count = 0;
+            map->item_count = 0;
             map->tombstone_count = 0;
             ++map->generational_id;
         }
