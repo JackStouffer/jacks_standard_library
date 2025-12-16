@@ -994,8 +994,6 @@ void write_hash_map_source(
     #pragma comment(lib, "shell32.lib")
 #endif
 
-#include "jsl_simdutf_wrapper.h"
-
 JSLFatPtr help_message = JSL_FATPTR_INITIALIZER(
     "OVERVIEW:\n\n"
     "Hash map C code generation utility\n\n"
@@ -1291,21 +1289,21 @@ int32_t main(int32_t argc, char** argv)
     for (int32_t i = 0; i < argc; ++i)
     {
         // Convert to UTF-8 on windows
-        #if JSL_IS_WINDOWS
-            size_t arg_length = wcslen(argv[i]);
-            size_t buffer_length = simdutf_utf8_length_from_utf16(argv[i], arg_length);
-            JSLFatPtr result_buffer = jsl_arena_allocate(&arena, (int64_t) buffer_length, false);
+        // #if JSL_IS_WINDOWS
+        //     size_t arg_length = wcslen(argv[i]);
+        //     size_t buffer_length = simdutf_utf8_length_from_utf16(argv[i], arg_length);
+        //     JSLFatPtr result_buffer = jsl_arena_allocate(&arena, (int64_t) buffer_length, false);
 
-            size_t result_length = simdutf_convert_utf16_to_utf8(
-                argv[i],
-                arg_length,
-                (char*) result_buffer.data
-            ); 
+        //     size_t result_length = simdutf_convert_utf16_to_utf8(
+        //         argv[i],
+        //         arg_length,
+        //         (char*) result_buffer.data
+        //     ); 
 
-            JSLFatPtr arg = jsl_fatptr_slice(result_buffer, 0, (int64_t) result_length);
-        #else
+        //     JSLFatPtr arg = jsl_fatptr_slice(result_buffer, 0, (int64_t) result_length);
+        // #else
             JSLFatPtr arg = jsl_fatptr_from_cstr(argv[i]);
-        #endif
+        // #endif
         
         arg_array[i] = arg;
     }

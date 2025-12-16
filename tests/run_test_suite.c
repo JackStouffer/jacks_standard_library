@@ -306,15 +306,6 @@ static UnitTestDecl unit_test_declarations[] = {
     { "test_file_utils", (char*[]) {"tests/test_file_utils.c", NULL} },
     { "test_str_to_str_multimap", (char*[]) {"tests/test_str_to_str_multimap.c", NULL} },
     {
-        "test_simd_wrapper",
-        (char*[]) {
-            "tests/test_simd_wrapper.c",
-            "tests/bin/simdutf.o",
-            "tests/bin/jsl_simdutf_wrapper.o" ,
-            NULL
-        } 
-    },
-    {
         "test_hash_map",
         (char*[]) {
             "tests/test_hash_map.c",
@@ -478,52 +469,6 @@ int32_t main(int32_t argc, char **argv)
     /**
      *
      *
-     *         SIMDUTF SPECIAL CASE
-     *
-     *
-     */
-
-    const char* simdutf_source[] = { "src/simdutf.cpp" };
-    if (nob_needs_rebuild("tests/bin/simdutf.o", simdutf_source, 1))
-    {
-        nob_log(NOB_INFO, "Building simdutf");
-        Nob_Cmd sqlite_cmd = {0};
-        nob_cmd_append(&sqlite_cmd,
-            "clang++",
-            "-O3",
-            "-march=native",
-            "-o", "tests/bin/simdutf.o",
-            "-c",
-            "src/simdutf.cpp"
-        );
-        if (!nob_cmd_run_sync(sqlite_cmd)) return 1;
-    }
-    else
-    {
-        nob_log(NOB_INFO, "simdutf already built");
-    }
-
-    const char* wrapper_source[] = { "src/jsl_simdutf_wrapper.cpp" };
-    if (nob_needs_rebuild("tests/bin/jsl_simdutf_wrapper.o", wrapper_source, 1))
-    {
-        nob_log(NOB_INFO, "Building jsl_simdutf_wrapper");
-        Nob_Cmd sqlite_cmd = {0};
-        nob_cmd_append(&sqlite_cmd,
-            "clang",
-            "-o", "tests/bin/jsl_simdutf_wrapper.o",
-            "-c",
-            "src/jsl_simdutf_wrapper.cpp"
-        );
-        if (!nob_cmd_run_sync(sqlite_cmd)) return 1;
-    }
-    else
-    {
-        nob_log(NOB_INFO, "jsl_simdutf_wrapper already built");
-    }
-
-    /**
-     *
-     *
      *              HASH MAPS
      *
      *
@@ -544,8 +489,7 @@ int32_t main(int32_t argc, char **argv)
     Nob_Cmd generate_hash_map_compile_command = {0};
     nob_cmd_append(
         &generate_hash_map_compile_command,
-        // link with C++ objects, so use clang++ driver but keep the source in C mode
-        "clang++",
+        "clang",
         "-DINCLUDE_MAIN",
         "-O0",
         "-glldb",
@@ -566,10 +510,7 @@ int32_t main(int32_t argc, char **argv)
         &generate_hash_map_compile_command,
         "-o", generate_hash_map_exe_name,
         "-Isrc/",
-        "-x", "c", "cli/generate_hash_map.c",
-        "-x", "none",
-        "tests/bin/simdutf.o",
-        "tests/bin/jsl_simdutf_wrapper.o"
+        "cli/generate_hash_map.c"
     );
 
     if (!nob_cmd_run(&generate_hash_map_compile_command)) return 1;
