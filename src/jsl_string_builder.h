@@ -75,16 +75,16 @@
     #include "jsl_core.h"
 
     /* Versioning to catch mismatches across deps */
-    #ifndef MY_LIB_VERSION
-        #define MY_LIB_VERSION 0x010200  /* 1.2.0 */
+    #ifndef JSL_STRING_BUILDER_VERSION
+        #define JSL_STRING_BUILDER_VERSION 0x010000  /* 1.0.0 */
     #else
-        #if MY_LIB_VERSION != 0x010200
-            #error "my_lib.h version mismatch across includes"
+        #if JSL_STRING_BUILDER_VERSION != 0x010200
+            #error "jsl_string_builder.h version mismatch across includes"
         #endif
     #endif
 
-    #ifndef STRING_BUILDER_DEF
-        #define STRING_BUILDER_DEF
+    #ifndef JSL_STRING_BUILDER_DEF
+        #define JSL_STRING_BUILDER_DEF
     #endif
 
     #ifdef __cplusplus
@@ -140,7 +140,7 @@
      * @param arena The arena that backs all allocations made by the builder; must not be NULL.
      * @return `true` if the builder was initialized successfully, otherwise `false`.
      */
-    STRING_BUILDER_DEF bool jsl_string_builder_init(JSLStringBuilder* builder, JSLArena* arena);
+    JSL_STRING_BUILDER_DEF bool jsl_string_builder_init(JSLStringBuilder* builder, JSLArena* arena);
 
     /**
      * Initialize a JSLStringBuilder with a custom chunk size and chunk allocation alignment.
@@ -153,7 +153,7 @@
      * @param alignment The allocation alignment of the chunks of data
      * @returns `true` if the builder was initialized successfully, otherwise `false`.
      */
-    STRING_BUILDER_DEF bool jsl_string_builder_init2(JSLStringBuilder* builder, JSLArena* arena, int32_t chunk_size, int32_t alignment);
+    JSL_STRING_BUILDER_DEF bool jsl_string_builder_init2(JSLStringBuilder* builder, JSLArena* arena, int32_t chunk_size, int32_t alignment);
 
     /**
      * Append a char value to the end of the string builder without interpretation. Each append
@@ -164,7 +164,7 @@
      * @param c The byte to append.
      * @returns `true` if the byte was inserted successfully, otherwise `false`.
      */
-    STRING_BUILDER_DEF bool jsl_string_builder_insert_char(JSLStringBuilder* builder, char c);
+    JSL_STRING_BUILDER_DEF bool jsl_string_builder_insert_char(JSLStringBuilder* builder, char c);
 
     /**
      * Append a single raw byte to the end of the string builder without interpretation.
@@ -176,7 +176,7 @@
      * @param c The byte to append.
      * @returns `true` if the byte was inserted successfully, otherwise `false`.
      */
-    STRING_BUILDER_DEF bool jsl_string_builder_insert_uint8_t(JSLStringBuilder* builder, uint8_t c);
+    JSL_STRING_BUILDER_DEF bool jsl_string_builder_insert_uint8_t(JSLStringBuilder* builder, uint8_t c);
 
     /**
      * Append the contents of a fat pointer. Additional chunks are allocated as needed
@@ -186,7 +186,7 @@
      * @param data A fat pointer describing the bytes to copy; its length may be zero.
      * @returns `true` if the data was appended successfully, otherwise `false`.
      */
-    STRING_BUILDER_DEF bool jsl_string_builder_insert_fatptr(JSLStringBuilder* builder, JSLFatPtr data);
+    JSL_STRING_BUILDER_DEF bool jsl_string_builder_insert_fatptr(JSLStringBuilder* builder, JSLFatPtr data);
 
     /**
      * Format a string using the jsl_format logic and write the result directly into
@@ -197,7 +197,7 @@
      * @param ... Variadic arguments consumed by the formatter.
      * @returns `true` if formatting succeeded and the formatted bytes were appended, otherwise `false`.
      */
-    STRING_BUILDER_DEF bool jsl_string_builder_format(JSLStringBuilder* builder, JSLFatPtr fmt, ...);
+    JSL_STRING_BUILDER_DEF bool jsl_string_builder_format(JSLStringBuilder* builder, JSLFatPtr fmt, ...);
 
     /**
      * Initialize an iterator instance so it will traverse the given string builder
@@ -214,7 +214,7 @@
      * @param builder    The string builder whose data will be traversed.
      * @param iterator   The iterator instance to initialize.
      */
-    STRING_BUILDER_DEF void jsl_string_builder_iterator_init(JSLStringBuilder* builder, JSLStringBuilderIterator* iterator);
+    JSL_STRING_BUILDER_DEF void jsl_string_builder_iterator_init(JSLStringBuilder* builder, JSLStringBuilderIterator* iterator);
 
     /**
      * Get the next chunk of data a string builder iterator. The chunk will
@@ -244,7 +244,7 @@
      * @param iterator   The iterator instance
      * @returns The next chunk of data from the string builder
      */
-    STRING_BUILDER_DEF JSLFatPtr jsl_string_builder_iterator_next(JSLStringBuilderIterator* iterator);
+    JSL_STRING_BUILDER_DEF JSLFatPtr jsl_string_builder_iterator_next(JSLStringBuilderIterator* iterator);
     
     #ifdef __cplusplus
     }

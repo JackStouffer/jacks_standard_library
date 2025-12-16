@@ -2,11 +2,38 @@
 
 ## Macros
 
+- [`JSL_CORE_LIBRARY`](#macro-jsl_core_library)
+- [`JSL_VERSION`](#macro-jsl_version)
+- [`JSL_SWITCH_FALLTHROUGH`](#macro-jsl_switch_fallthrough)
+- [`JSL_ASSERT`](#macro-jsl_assert)
+- [`JSL_MEMCPY`](#macro-jsl_memcpy)
+- [`JSL_MEMCMP`](#macro-jsl_memcmp)
+- [`JSL_MEMSET`](#macro-jsl_memset)
+- [`JSL_STRLEN`](#macro-jsl_strlen)
+- [`JSL_IS_WINDOWS`](#macro-jsl_is_windows)
+- [`JSL_IS_POSIX`](#macro-jsl_is_posix)
+- [`JSL_IS_WEB_ASSEMBLY`](#macro-jsl_is_web_assembly)
+- [`JSL_IS_X86`](#macro-jsl_is_x86)
+- [`JSL_IS_ARM`](#macro-jsl_is_arm)
+- [`JSL_IS_GCC`](#macro-jsl_is_gcc)
+- [`JSL_IS_CLANG`](#macro-jsl_is_clang)
+- [`JSL_IS_MSVC`](#macro-jsl_is_msvc)
+- [`JSL_IS_POINTER_32_BITS`](#macro-jsl_is_pointer_32_bits)
+- [`JSL_IS_POINTER_64_BITS`](#macro-jsl_is_pointer_64_bits)
+- [`JSL_WARN_UNUSED`](#macro-jsl_warn_unused)
 - [`JSL_DEF`](#macro-jsl_def)
 - [`JSL_DEFAULT_ALLOCATION_ALIGNMENT`](#macro-jsl_default_allocation_alignment)
-- [`JSL_WARN_UNUSED`](#macro-jsl_warn_unused)
+- [`JSL_PLATFORM_COUNT_TRAILING_ZEROS`](#macro-jsl_platform_count_trailing_zeros)
+- [`JSL_PLATFORM_COUNT_TRAILING_ZEROS64`](#macro-jsl_platform_count_trailing_zeros64)
+- [`JSL_PLATFORM_COUNT_LEADING_ZEROS`](#macro-jsl_platform_count_leading_zeros)
+- [`JSL_PLATFORM_COUNT_LEADING_ZEROS64`](#macro-jsl_platform_count_leading_zeros64)
+- [`JSL_PLATFORM_POPULATION_COUNT`](#macro-jsl_platform_population_count)
+- [`JSL_PLATFORM_POPULATION_COUNT64`](#macro-jsl_platform_population_count64)
+- [`JSL_PLATFORM_FIND_FIRST_SET`](#macro-jsl_platform_find_first_set)
+- [`JSL_PLATFORM_FIND_FIRST_SET64`](#macro-jsl_platform_find_first_set64)
 - [`JSL_MAX`](#macro-jsl_max)
 - [`JSL_MIN`](#macro-jsl_min)
+- [`JSL_BETWEEN`](#macro-jsl_between)
 - [`JSL_SET_BITFLAG`](#macro-jsl_set_bitflag)
 - [`JSL_UNSET_BITFLAG`](#macro-jsl_unset_bitflag)
 - [`JSL_IS_BITFLAG_SET`](#macro-jsl_is_bitflag_set)
@@ -17,29 +44,32 @@
 - [`JSL_MEGABYTES`](#macro-jsl_megabytes)
 - [`JSL_GIGABYTES`](#macro-jsl_gigabytes)
 - [`JSL_TERABYTES`](#macro-jsl_terabytes)
-- [`JSL_FATPTR_LITERAL`](#macro-jsl_fatptr_literal)
+- [`JSL_DEBUG_DONT_OPTIMIZE_AWAY`](#macro-jsl_debug_dont_optimize_away)
+- [`JSL_FATPTR_INITIALIZER`](#macro-jsl_fatptr_initializer)
+- [`JSL_FATPTR_EXPRESSION`](#macro-jsl_fatptr_expression)
 - [`JSL_FATPTR_ADVANCE`](#macro-jsl_fatptr_advance)
 - [`JSL_FATPTR_FROM_STACK`](#macro-jsl_fatptr_from_stack)
 - [`JSL_ARENA_FROM_STACK`](#macro-jsl_arena_from_stack)
 - [`JSL_ARENA_TYPED_ALLOCATE`](#macro-jsl_arena_typed_allocate)
+- [`JSL_ARENA_TYPED_ARRAY_ALLOCATE`](#macro-jsl_arena_typed_array_allocate)
 - [`JSL_FORMAT_MIN_BUFFER`](#macro-jsl_format_min_buffer)
 
 ## Types
 
 - [`JSLFatPtr`](#type-jslfatptr)
 - [`JSLArena`](#type-jslarena)
-- [`JSLStringBuilder`](#type-jslstringbuilder)
-- [`JSLStringBuilderChunk`](#type-jslstringbuilderchunk)
-- [`JSLStringBuilderIterator`](#type-jslstringbuilderiterator)
 - [`JSL_FORMAT_CALLBACK`](#type-typedef-jsl_format_callback)
-- [`JSLLoadFileResultEnum`](#type-jslloadfileresultenum)
-- [`JSLWriteFileResultEnum`](#type-jslwritefileresultenum)
-- [`JSLFileTypeEnum`](#type-jslfiletypeenum)
 
 ## Functions
 
+- [`jsl_next_power_of_two_u32`](#function-jsl_next_power_of_two_u32)
+- [`jsl_next_power_of_two_i64`](#function-jsl_next_power_of_two_i64)
+- [`jsl_next_power_of_two_u64`](#function-jsl_next_power_of_two_u64)
+- [`jsl_previous_power_of_two_u32`](#function-jsl_previous_power_of_two_u32)
+- [`jsl_previous_power_of_two_u64`](#function-jsl_previous_power_of_two_u64)
 - [`jsl_fatptr_init`](#function-jsl_fatptr_init)
 - [`jsl_fatptr_slice`](#function-jsl_fatptr_slice)
+- [`jsl_fatptr_slice_to_end`](#function-jsl_fatptr_slice_to_end)
 - [`jsl_fatptr_total_write_length`](#function-jsl_fatptr_total_write_length)
 - [`jsl_fatptr_auto_slice`](#function-jsl_fatptr_auto_slice)
 - [`jsl_fatptr_from_cstr`](#function-jsl_fatptr_from_cstr)
@@ -67,28 +97,16 @@
 - [`jsl_arena_reset`](#function-jsl_arena_reset)
 - [`jsl_arena_save_restore_point`](#function-jsl_arena_save_restore_point)
 - [`jsl_arena_load_restore_point`](#function-jsl_arena_load_restore_point)
-- [`jsl_arena_fatptr_to_cstr`](#function-jsl_arena_fatptr_to_cstr)
-- [`jsl_arena_cstr_to_fatptr`](#function-jsl_arena_cstr_to_fatptr)
+- [`jsl_fatptr_to_cstr`](#function-jsl_fatptr_to_cstr)
+- [`jsl_cstr_to_fatptr`](#function-jsl_cstr_to_fatptr)
 - [`jsl_fatptr_duplicate`](#function-jsl_fatptr_duplicate)
-- [`jsl_string_builder_init`](#function-jsl_string_builder_init)
-- [`jsl_string_builder_init2`](#function-jsl_string_builder_init2)
-- [`jsl_string_builder_insert_char`](#function-jsl_string_builder_insert_char)
-- [`jsl_string_builder_insert_uint8_t`](#function-jsl_string_builder_insert_uint8_t)
-- [`jsl_string_builder_insert_fatptr`](#function-jsl_string_builder_insert_fatptr)
-- [`jsl_string_builder_format`](#function-jsl_string_builder_format)
-- [`jsl_string_builder_iterator_init`](#function-jsl_string_builder_iterator_init)
-- [`jsl_string_builder_iterator_next`](#function-jsl_string_builder_iterator_next)
 - [`jsl_format`](#function-jsl_format)
 - [`jsl_format_buffer`](#function-jsl_format_buffer)
 - [`jsl_format_valist`](#function-jsl_format_valist)
 - [`jsl_format_callback`](#function-jsl_format_callback)
 - [`jsl_format_set_separators`](#function-jsl_format_set_separators)
-- [`jsl_load_file_contents`](#function-jsl_load_file_contents)
-- [`jsl_load_file_contents_buffer`](#function-jsl_load_file_contents_buffer)
-- [`jsl_write_file_contents`](#function-jsl_write_file_contents)
-- [`jsl_format_file`](#function-jsl_format_file)
 
-## File: src/jacks_standard_library.h
+## File: src/jsl_core.h
 
 ## Jack's Standard Library
 
@@ -102,41 +120,14 @@ See DESIGN.md for background on the design decisions.
 See DOCUMENTATION.md for a single markdown file containing all of the docstrings
 from this file. It's more nicely formatted and contains hyperlinks.
 
-### Preprocessor Switches
+The convention of this library is that all symbols prefixed with either `jsl__`
+or `JSL__` (with two underscores) are meant to be private to this library. They
+are not a stable part of the API.
+
+### External Preprocessor Definitions
 
 `JSL_DEBUG` - turns on some debugging features, like overwriting stale memory with
 `0xfeefee`.
-
-`JSL_DEF` - allows you to override linkage/visibility (e.g., __declspec) for all of
-the functions defined by this library. By default this is empty.
-
-`JSL_WARN_UNUSED` - this controls the function attribute which tells the compiler to
-issue a warning if the return value of the function is not stored in a variable, or if
-that variable is never read. This is auto defined for clang and gcc, there's no
-C11 compatible implementation for MSVC. If you want to turn this off, just define it as
-empty string.
-
-`JSL_ASSERT` - Assertion function definition. By default this will use `assert.h`.
-If you wish to override it, it must be a function which takes three parameters, a int
-conditional, a char* of the filename, and an int line number. You can also provide an
-empty function if you just want to turn off asserts altogether; this is not
-recommended. The small speed boost you get is from avoiding a branch is generally not
-worth the loss of correctness.
-
-`JSL_MEMCPY` - Controls memcpy calls in the library. By default this will include
-`string.h` and be an alias to C's `memcpy`.
-
-`JSL_MEMCMP` - Controls memcmp calls in the library. By default this will include
-`string.h` and be an alias to C's `memcmp`.
-
-`JSL_MEMSET` - Controls memset calls in the library. By default this will include
-`string.h` and be an alias to C's `memset`.
-
-`JSL_DEFAULT_ALLOCATION_ALIGNMENT` - Sets the alignment of allocations that aren't
-explicitly set. Defaults to 16 bytes.
-
-`JSL_INCLUDE_FILE_UTILS` - Include the file loading and writing utilities. These
-require linking the standard library.
 
 ### License
 
@@ -159,32 +150,288 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
 WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-<a id="macro-jsl_def"></a>
-### Macro: `JSL_DEF`
-
-Allows you to override linkage/visibility (e.g., __declspec) for all of
-the functions defined by this library. By default this is empty.
+<a id="macro-jsl_core_library"></a>
+### Macro: `JSL_CORE_LIBRARY`
 
 ```c
-#define JSL_DEF JSL_DEF
+#define JSL_CORE_LIBRARY JSL_CORE_LIBRARY
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:141`
+*Defined at*: `src/jsl_core.h:48`
 
 ---
 
-<a id="macro-jsl_default_allocation_alignment"></a>
-### Macro: `JSL_DEFAULT_ALLOCATION_ALIGNMENT`
-
-Sets the alignment of allocations that aren't explicitly set. Defaults to 16 bytes.
+<a id="macro-jsl_version"></a>
+### Macro: `JSL_VERSION`
 
 ```c
-#define JSL_DEFAULT_ALLOCATION_ALIGNMENT JSL_DEFAULT_ALLOCATION_ALIGNMENT 16
+#define JSL_VERSION JSL_VERSION 0x010000
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:148`
+*Defined at*: `src/jsl_core.h:375`
+
+---
+
+<a id="macro-jsl_switch_fallthrough"></a>
+### Macro: `JSL_SWITCH_FALLTHROUGH`
+
+```c
+#define JSL_SWITCH_FALLTHROUGH JSL_SWITCH_FALLTHROUGH __attribute__ ( ( fallthrough))
+```
+
+
+*Defined at*: `src/jsl_core.h:384`
+
+---
+
+<a id="macro-jsl_assert"></a>
+### Macro: `JSL_ASSERT`
+
+Assertion function definition. By default this will use `assert.h`.
+If you wish to override it, it must be a function which takes three parameters, a int
+conditional, a char* of the filename, and an int line number. You can also provide an
+empty function if you just want to turn off asserts altogether; this is not
+recommended. The small speed boost you get is from avoiding a branch is generally not
+worth the loss of memory protection.
+
+Define this as a macro before importing the library to override this.
+
+```c
+#define JSL_ASSERT JSL_ASSERT ( condition) jsl__assert ( condition, __FILE__, __LINE__)
+```
+
+
+*Defined at*: `src/jsl_core.h:412`
+
+---
+
+<a id="macro-jsl_memcpy"></a>
+### Macro: `JSL_MEMCPY`
+
+Controls memcpy calls in the library. By default this will include
+`string.h` and be an alias to C's `memcpy`.
+
+Define this as a macro before importing the library to override this.
+Your macro must follow the libc `memcpy` signature of
+
+```
+void your_memcpy(void*, const void*, size_t);
+```
+
+```c
+#define JSL_MEMCPY JSL_MEMCPY memcpy
+```
+
+
+*Defined at*: `src/jsl_core.h:429`
+
+---
+
+<a id="macro-jsl_memcmp"></a>
+### Macro: `JSL_MEMCMP`
+
+Controls memcmp calls in the library. By default this will include
+`string.h` and be an alias to C's `memcmp`.
+
+Define this as a macro before importing the library to override this.
+Your macro must follow the libc `memcmp` signature of
+
+```
+int your_memcmp(const void*, const void*, size_t);
+```
+
+```c
+#define JSL_MEMCMP JSL_MEMCMP memcmp
+```
+
+
+*Defined at*: `src/jsl_core.h:446`
+
+---
+
+<a id="macro-jsl_memset"></a>
+### Macro: `JSL_MEMSET`
+
+Controls memset calls in the library. By default this will include
+`string.h` and be an alias to C's `memset`.
+
+Define this as a macro before importing the library to override this.
+Your macro must follow the libc `memset` signature of
+
+```
+void your_memset(void*, int, size_t);
+```
+
+```c
+#define JSL_MEMSET JSL_MEMSET memset
+```
+
+
+*Defined at*: `src/jsl_core.h:463`
+
+---
+
+<a id="macro-jsl_strlen"></a>
+### Macro: `JSL_STRLEN`
+
+Controls strlen calls in the library. By default this will include
+`string.h` and be an alias to C's `strlen`.
+
+Define this as a macro before importing the library to override this.
+Your macro must follow the libc `strlen` signature of
+
+```
+size_t your_strlen(const char*);
+```
+
+```c
+#define JSL_STRLEN JSL_STRLEN strlen
+```
+
+
+*Defined at*: `src/jsl_core.h:480`
+
+---
+
+<a id="macro-jsl_is_windows"></a>
+### Macro: `JSL_IS_WINDOWS`
+
+If the target platform is Windows OS, then 1, else 0.
+
+```c
+#define JSL_IS_WINDOWS JSL_IS_WINDOWS JSL__IS_WINDOWS_VAL
+```
+
+
+*Defined at*: `src/jsl_core.h:492`
+
+---
+
+<a id="macro-jsl_is_posix"></a>
+### Macro: `JSL_IS_POSIX`
+
+If the target platform is a POSIX, then 1, else 0.
+
+```c
+#define JSL_IS_POSIX JSL_IS_POSIX JSL__IS_POSIX_VAL
+```
+
+
+*Defined at*: `src/jsl_core.h:497`
+
+---
+
+<a id="macro-jsl_is_web_assembly"></a>
+### Macro: `JSL_IS_WEB_ASSEMBLY`
+
+If the target platform is in WebAssembly, then 1, else 0.
+
+```c
+#define JSL_IS_WEB_ASSEMBLY JSL_IS_WEB_ASSEMBLY JSL__IS_WEB_ASSEMBLY_VAL
+```
+
+
+*Defined at*: `src/jsl_core.h:502`
+
+---
+
+<a id="macro-jsl_is_x86"></a>
+### Macro: `JSL_IS_X86`
+
+If the target platform is in x86, then 1, else 0.
+
+```c
+#define JSL_IS_X86 JSL_IS_X86 JSL__IS_X86_VAL
+```
+
+
+*Defined at*: `src/jsl_core.h:507`
+
+---
+
+<a id="macro-jsl_is_arm"></a>
+### Macro: `JSL_IS_ARM`
+
+If the target platform is in ARM, then 1, else 0.
+
+```c
+#define JSL_IS_ARM JSL_IS_ARM JSL__IS_ARM_VAL
+```
+
+
+*Defined at*: `src/jsl_core.h:512`
+
+---
+
+<a id="macro-jsl_is_gcc"></a>
+### Macro: `JSL_IS_GCC`
+
+If the host compiler is GCC, then 1, else 0.
+
+```c
+#define JSL_IS_GCC JSL_IS_GCC JSL__IS_GCC_VAL
+```
+
+
+*Defined at*: `src/jsl_core.h:517`
+
+---
+
+<a id="macro-jsl_is_clang"></a>
+### Macro: `JSL_IS_CLANG`
+
+If the host compiler is clang, then 1, else 0.
+
+```c
+#define JSL_IS_CLANG JSL_IS_CLANG JSL__IS_CLANG_VAL
+```
+
+
+*Defined at*: `src/jsl_core.h:522`
+
+---
+
+<a id="macro-jsl_is_msvc"></a>
+### Macro: `JSL_IS_MSVC`
+
+If the host compiler is MSVC, then 1, else 0.
+
+```c
+#define JSL_IS_MSVC JSL_IS_MSVC JSL__IS_MSVC_VAL
+```
+
+
+*Defined at*: `src/jsl_core.h:527`
+
+---
+
+<a id="macro-jsl_is_pointer_32_bits"></a>
+### Macro: `JSL_IS_POINTER_32_BITS`
+
+If the target executable uses 32 bit pointers, then 1, else 0.
+
+```c
+#define JSL_IS_POINTER_32_BITS JSL_IS_POINTER_32_BITS JSL__IS_POINTER_32_BITS_VAL
+```
+
+
+*Defined at*: `src/jsl_core.h:532`
+
+---
+
+<a id="macro-jsl_is_pointer_64_bits"></a>
+### Macro: `JSL_IS_POINTER_64_BITS`
+
+If the target executable uses 64 bit pointers, then 1, else 0.
+
+```c
+#define JSL_IS_POINTER_64_BITS JSL_IS_POINTER_64_BITS JSL__IS_POINTER_64_BITS_VAL
+```
+
+
+*Defined at*: `src/jsl_core.h:537`
 
 ---
 
@@ -202,7 +449,206 @@ empty string.
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:161`
+*Defined at*: `src/jsl_core.h:549`
+
+---
+
+<a id="macro-jsl_def"></a>
+### Macro: `JSL_DEF`
+
+Allows you to override linkage/visibility (e.g., __declspec) for all of
+the functions defined by this library. By default this is empty, so extern.
+
+Define this as a macro before importing the library to override this.
+
+```c
+#define JSL_DEF JSL_DEF
+```
+
+
+*Defined at*: `src/jsl_core.h:563`
+
+---
+
+<a id="macro-jsl_default_allocation_alignment"></a>
+### Macro: `JSL_DEFAULT_ALLOCATION_ALIGNMENT`
+
+Sets the alignment of allocations that aren't explicitly set. Defaults to 8 bytes.
+
+Define this as a macro before importing the library to override this.
+
+```c
+#define JSL_DEFAULT_ALLOCATION_ALIGNMENT JSL_DEFAULT_ALLOCATION_ALIGNMENT 8
+```
+
+
+*Defined at*: `src/jsl_core.h:572`
+
+---
+
+<a id="macro-jsl_platform_count_trailing_zeros"></a>
+### Macro: `JSL_PLATFORM_COUNT_TRAILING_ZEROS`
+
+Platform specific intrinsic for returning the count of trailing zeros for 32
+bit signed and unsigned integers.
+
+In order to be as fast as possible, this does not represent a cross
+platform abstraction over different ctz implementations.
+On GCC and clang, this is replaced with `__builtin_ctz`. On MSVC
+`_BitScanForward` is used in a forced inline function call. Behavior
+with zero is undefined for GCC and clang while MSVC will give 32.
+
+```c
+#define JSL_PLATFORM_COUNT_TRAILING_ZEROS JSL_PLATFORM_COUNT_TRAILING_ZEROS ( x) JSL__COUNT_TRAILING_ZEROS_IMPL ( ( x))
+```
+
+
+*Defined at*: `src/jsl_core.h:585`
+
+---
+
+<a id="macro-jsl_platform_count_trailing_zeros64"></a>
+### Macro: `JSL_PLATFORM_COUNT_TRAILING_ZEROS64`
+
+Platform specific intrinsic for returning the count of trailing zeros for 64
+bit signed and unsigned integers.
+
+In order to be as fast as possible, this does not represent a cross
+platform abstraction over different ctz implementations.
+On GCC and clang, this is replaced with `__builtin_ctzll`. On MSVC
+`_BitScanForward64` is used in a forced inline function call. Behavior
+with zero is undefined for GCC and clang while MSVC will give 32.
+
+```c
+#define JSL_PLATFORM_COUNT_TRAILING_ZEROS64 JSL_PLATFORM_COUNT_TRAILING_ZEROS64 ( x) JSL__COUNT_TRAILING_ZEROS_IMPL64 ( ( x))
+```
+
+
+*Defined at*: `src/jsl_core.h:597`
+
+---
+
+<a id="macro-jsl_platform_count_leading_zeros"></a>
+### Macro: `JSL_PLATFORM_COUNT_LEADING_ZEROS`
+
+Platform specific intrinsic for returning the count of leading zeros for 32
+bit signed and unsigned integers.
+
+In order to be as fast as possible, this does not represent a cross
+platform abstraction over different clz implementations.
+On GCC and clang, this is replaced with `__builtin_clz`. On MSVC
+`_BitScanReverse` is used in a forced inline function call. Behavior
+with zero is undefined for GCC and clang while MSVC will give 32.
+
+```c
+#define JSL_PLATFORM_COUNT_LEADING_ZEROS JSL_PLATFORM_COUNT_LEADING_ZEROS ( x) JSL__COUNT_LEADING_ZEROS_IMPL ( ( x))
+```
+
+
+*Defined at*: `src/jsl_core.h:609`
+
+---
+
+<a id="macro-jsl_platform_count_leading_zeros64"></a>
+### Macro: `JSL_PLATFORM_COUNT_LEADING_ZEROS64`
+
+Platform specific intrinsic for returning the count of leading zeros for 64
+bit signed and unsigned integers.
+
+In order to be as fast as possible, this does not represent a cross
+platform abstraction over different clz implementations.
+On GCC and clang, this is replaced with `__builtin_clzll`. On MSVC
+`_BitScanReverse64` is used in a forced inline function call. Behavior
+with zero is undefined for GCC and clang while MSVC will give 32.
+
+```c
+#define JSL_PLATFORM_COUNT_LEADING_ZEROS64 JSL_PLATFORM_COUNT_LEADING_ZEROS64 ( x) JSL__COUNT_LEADING_ZEROS_IMPL64 ( ( x))
+```
+
+
+*Defined at*: `src/jsl_core.h:621`
+
+---
+
+<a id="macro-jsl_platform_population_count"></a>
+### Macro: `JSL_PLATFORM_POPULATION_COUNT`
+
+Platform specific intrinsic for returning the count of set bits for 32
+bit signed and unsigned integers.
+
+In order to be as fast as possible, this does not represent a cross
+platform abstraction over different popcnt implementations.
+On GCC and clang, this is replaced with `__builtin_popcount`. On MSVC
+`__popcnt` is used.
+
+```c
+#define JSL_PLATFORM_POPULATION_COUNT JSL_PLATFORM_POPULATION_COUNT ( x) JSL__POPULATION_COUNT_IMPL ( ( x))
+```
+
+
+*Defined at*: `src/jsl_core.h:632`
+
+---
+
+<a id="macro-jsl_platform_population_count64"></a>
+### Macro: `JSL_PLATFORM_POPULATION_COUNT64`
+
+Platform specific intrinsic for returning the count of set bits for 64
+bit signed and unsigned integers.
+
+In order to be as fast as possible, this does not represent a cross
+platform abstraction over different popcnt implementations.
+On GCC and clang, this is replaced with `__builtin_popcountll`. On MSVC
+`__popcnt64` is used.
+
+```c
+#define JSL_PLATFORM_POPULATION_COUNT64 JSL_PLATFORM_POPULATION_COUNT64 ( x) JSL__POPULATION_COUNT_IMPL64 ( ( x))
+```
+
+
+*Defined at*: `src/jsl_core.h:643`
+
+---
+
+<a id="macro-jsl_platform_find_first_set"></a>
+### Macro: `JSL_PLATFORM_FIND_FIRST_SET`
+
+Platform specific intrinsic for returning the index of the first set
+bit for 32 bit signed and unsigned integers.
+
+In order to be as fast as possible, this does not represent a cross
+platform abstraction over different ffs implementations.
+On GCC and clang, this is replaced with `__builtin_ffs`. On MSVC
+`_BitScanForward` is used in a forced inline function call. Behavior
+with zero is undefined for GCC and clang while MSVC will give 32.
+
+```c
+#define JSL_PLATFORM_FIND_FIRST_SET JSL_PLATFORM_FIND_FIRST_SET ( x) JSL__FIND_FIRST_SET_IMPL ( ( x))
+```
+
+
+*Defined at*: `src/jsl_core.h:655`
+
+---
+
+<a id="macro-jsl_platform_find_first_set64"></a>
+### Macro: `JSL_PLATFORM_FIND_FIRST_SET64`
+
+Platform specific intrinsic for returning the index of the first set
+bit for 64 bit signed and unsigned integers.
+
+In order to be as fast as possible, this does not represent a cross
+platform abstraction over different ffs implementations.
+On GCC and clang, this is replaced with `__builtin_ffsll`. On MSVC
+`_BitScanForward64` is used in a forced inline function call. Behavior
+with zero is undefined for GCC and clang while MSVC will give 32.
+
+```c
+#define JSL_PLATFORM_FIND_FIRST_SET64 JSL_PLATFORM_FIND_FIRST_SET64 ( x) JSL__FIND_FIRST_SET_IMPL64 ( ( x))
+```
+
+
+*Defined at*: `src/jsl_core.h:667`
 
 ---
 
@@ -231,7 +677,7 @@ double max_d = JSL_MAX(3.14, 2.71);   // Returns 3.14
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:185`
+*Defined at*: `src/jsl_core.h:685`
 
 ---
 
@@ -260,7 +706,36 @@ double max_d = JSL_MAX(3.14, 2.71);   // Returns 3.14
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:203`
+*Defined at*: `src/jsl_core.h:703`
+
+---
+
+<a id="macro-jsl_between"></a>
+### Macro: `JSL_BETWEEN`
+
+Returns `x` bound between the two given values.
+
+#### Warning
+
+This macro evaluates its arguments multiple times. Do not use with
+arguments that have side effects (e.g., function calls, increment/decrement
+operations) as they will be executed more than once.
+
+Example:
+```c
+int max_val = JSL_BETWEEN(10, 15, 20);        // Returns 15
+double max_d = JSL_BETWEEN(1.2, 0.1, 3.14);   // Returns 1.2
+
+// DANGER: Don't do this - increment happens more than once!
+// int bad = JSL_BETWEEN(32, ++x, 64);
+```
+
+```c
+#define JSL_BETWEEN JSL_BETWEEN ( min, x, max) ( ( x) < ( min) ? ( min) : ( ( x)> ( max) ? ( max) : ( x)))
+```
+
+
+*Defined at*: `src/jsl_core.h:721`
 
 ---
 
@@ -287,7 +762,7 @@ Example:
 
 ```
 #define FLAG_READ    JSL_MAKE_BITFLAG(1)
-#define FLAG_WRITE   JSL_MAKE_BITFLAG(2) 
+#define FLAG_WRITE   JSL_MAKE_BITFLAG(2)
 
 uint32_t permissions = 0;
 
@@ -303,7 +778,7 @@ JSL_SET_BITFLAG(&permissions, FLAG_WRITE);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:230`
+*Defined at*: `src/jsl_core.h:748`
 
 ---
 
@@ -325,7 +800,7 @@ JSL_UNSET_BITFLAG(&permissions, FLAG_WRITE);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:243`
+*Defined at*: `src/jsl_core.h:761`
 
 ---
 
@@ -348,7 +823,7 @@ if (JSL_IS_BITFLAG_SET(permissions, FLAG_READ)) {
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:257`
+*Defined at*: `src/jsl_core.h:775`
 
 ---
 
@@ -371,7 +846,7 @@ if (JSL_IS_BITFLAG_NOT_SET(permissions, FLAG_WRITE)) {
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:271`
+*Defined at*: `src/jsl_core.h:789`
 
 ---
 
@@ -395,7 +870,7 @@ uint32_t permissions = FLAG_READ | FLAG_WRITE;
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:286`
+*Defined at*: `src/jsl_core.h:804`
 
 ---
 
@@ -409,7 +884,7 @@ Macro to simply mark a value as representing a size in bytes. Does nothing with 
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:291`
+*Defined at*: `src/jsl_core.h:809`
 
 ---
 
@@ -433,7 +908,7 @@ jsl_arena_init(&arena, buffer, JSL_KILOBYTES(16));
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:306`
+*Defined at*: `src/jsl_core.h:824`
 
 ---
 
@@ -457,7 +932,7 @@ jsl_arena_init(&arena, buffer, JSL_MEGABYTES(16));
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:321`
+*Defined at*: `src/jsl_core.h:839`
 
 ---
 
@@ -481,7 +956,7 @@ jsl_arena_init(&arena, buffer, JSL_GIGABYTES(2));
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:337`
+*Defined at*: `src/jsl_core.h:855`
 
 ---
 
@@ -497,7 +972,7 @@ Example:
 ```c
 // Reserve two gigabytes of virtual address space starting at 2 terabytes.
 // If you're using static offsets this means that your objects in memory will
-// be at the same place everytime you run your program in your debugger!
+// be at the same place every time you run your program in your debugger!
 
 void* buffer = VirtualAlloc(JSL_TERABYTES(2), JSL_GIGABYTES(2), MEM_RESERVE, PAGE_READWRITE);
 JSLArena arena;
@@ -509,54 +984,94 @@ jsl_arena_init(&arena, buffer, JSL_GIGABYTES(2));
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:356`
+*Defined at*: `src/jsl_core.h:874`
 
 ---
 
-<a id="macro-jsl_fatptr_literal"></a>
-### Macro: `JSL_FATPTR_LITERAL`
+<a id="macro-jsl_debug_dont_optimize_away"></a>
+### Macro: `JSL_DEBUG_DONT_OPTIMIZE_AWAY`
 
-Creates a [JSLFatPtr](#type-jslfatptr) from a string literal at compile time.
+TODO: docs
 
-#### Note
+```c
+#define JSL_DEBUG_DONT_OPTIMIZE_AWAY JSL_DEBUG_DONT_OPTIMIZE_AWAY ( x) JSL__DONT_OPTIMIZE_AWAY_IMPL ( x)
+```
 
-The resulting fat pointer points directly to the string literal's memory,
-so no copying occurs.
+
+*Defined at*: `src/jsl_core.h:879`
+
+---
+
+<a id="macro-jsl_fatptr_initializer"></a>
+### Macro: `JSL_FATPTR_INITIALIZER`
+
+Creates a [JSLFatPtr](#type-jslfatptr) from a string literal at compile time. The resulting fat pointer
+points directly to the string literal's memory, so no copying occurs.
+
+#### Warning
+
+With MSVC this will only work during variable initialization as MSVC
+still does not support compound literals.
 
 Example:
 
 ```c
 // Create fat pointers from string literals
-JSLFatPtr hello = JSL_FATPTR_LITERAL("Hello, World!");
-JSLFatPtr path = JSL_FATPTR_LITERAL("/usr/local/bin");
-JSLFatPtr empty = JSL_FATPTR_LITERAL("");
+JSLFatPtr hello = JSL_FATPTR_INITIALIZER("Hello, World!");
+JSLFatPtr path = JSL_FATPTR_INITIALIZER("/usr/local/bin");
+JSLFatPtr empty = JSL_FATPTR_INITIALIZER("");
 ```
 
 ```c
-#define JSL_FATPTR_LITERAL JSL_FATPTR_LITERAL ( s) ( ( JSLFatPtr) { . data = ( uint8_t *) ( s), . length = ( int64_t) ( sizeof ( "" s "") - 1) })
+#define JSL_FATPTR_INITIALIZER JSL_FATPTR_INITIALIZER ( s) { ( uint8_t *) ( s), ( int64_t) ( sizeof ( s) - 1) }
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:407`
+*Defined at*: `src/jsl_core.h:1016`
+
+---
+
+<a id="macro-jsl_fatptr_expression"></a>
+### Macro: `JSL_FATPTR_EXPRESSION`
+
+Creates a [JSLFatPtr](#type-jslfatptr) from a string literal for usage as an rvalue. The resulting fat pointer
+points directly to the string literal's memory, so no copying occurs.
+
+#### Warning
+
+On MSVC this will be a function call as MSVC does not support compound literals.
+On all other compilers this will be a zero cost compound literal
+
+Example:
+
+```c
+void my_function(JSLFatPtr data);
+
+my_function(JSL_FATPTR_EXPRESSION("my data"));
+```
+
+```c
+#define JSL_FATPTR_EXPRESSION JSL_FATPTR_EXPRESSION ( s) ( ( JSLFatPtr) { ( uint8_t *) ( s), ( int64_t) ( sizeof ( s) - 1) })
+```
+
+
+*Defined at*: `src/jsl_core.h:1054`
 
 ---
 
 <a id="macro-jsl_fatptr_advance"></a>
 ### Macro: `JSL_FATPTR_ADVANCE`
 
-Advances a fat pointer forward by `n`.
-
-#### Note
-
-This macro does no bounds checking and is intentionally tiny so it can
-live in hot loops without adding overhead.
+Advances a fat pointer forward by `n`. This macro does not bounds check
+and is intentionally tiny so it can live in hot loops without adding overhead.
+Only use this in cases where you've already checked the length.
 
 ```c
-#define JSL_FATPTR_ADVANCE JSL_FATPTR_ADVANCE ( fatptr, n) fatptr . data += n; fatptr . length -= n;
+#define JSL_FATPTR_ADVANCE JSL_FATPTR_ADVANCE ( fatptr, n) do { fatptr . data += n; fatptr . length -= n; \ } while ( 0)
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:416`
+*Defined at*: `src/jsl_core.h:1064`
 
 ---
 
@@ -575,12 +1090,17 @@ uint8_t buffer[JSL_KILOBYTES(4)];
 JSLFatPtr ptr = JSL_FATPTR_FROM_STACK(buffer);
 ```
 
+#### Warning
+
+This macro only works for variable initializers and cannot be used as a
+normal rvalue.
+
 ```c
-#define JSL_FATPTR_FROM_STACK JSL_FATPTR_FROM_STACK ( buf) ( JSLFatPtr) { . data = ( uint8_t *) ( buf), . length = ( int64_t) ( sizeof ( buf)) }
+#define JSL_FATPTR_FROM_STACK JSL_FATPTR_FROM_STACK ( buf) { ( uint8_t *) ( buf), ( int64_t) ( sizeof ( buf)) }
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:432`
+*Defined at*: `src/jsl_core.h:1085`
 
 ---
 
@@ -599,27 +1119,33 @@ JSLArena stack_arena = JSL_ARENA_FROM_STACK(buffer);
 This incredibly useful for getting a dynamic allocator for things which will only
 last the lifetime of the current function. For example, if the current function
 needs a hash map, you can use this macro and then there's no cleanup at the end
-because the stack pointer will be reset at the end of the function.
+because the stack pointer will be reset.
 
 ```
 void some_func(void)
 {
-uint8_t buffer[16 * 1024];
+uint8_t buffer[JSL_KILOBYTES(16)];
 JSLArena stack_arena = JSL_ARENA_FROM_STACK(buffer);
 
+// example hash map, not real
 IntToStrMap map = int_to_str_ctor(&arena);
-int_to_str_add(&map, 64, JSL_FATPTR_LITERAL("This is my string data!"));
+int_to_str_add(&map, 64, JSL_FATPTR_INITIALIZER("This is my string data!"));
+
+my_hash_map_calculations(&map);
+
+// All hash map memory goes out of scope automatically,
+// no need for any destructor
 }
 ```
 
 Fast, cheap, easy automatic memory management!
 
 ```c
-#define JSL_ARENA_FROM_STACK JSL_ARENA_FROM_STACK ( buf) ( JSLArena) { . start = ( uint8_t *) ( buf), . current = ( uint8_t *) ( buf), . end = ( uint8_t *) ( buf) + sizeof ( buf) }
+#define JSL_ARENA_FROM_STACK JSL_ARENA_FROM_STACK ( buf) jsl__arena_from_stack_internal ( ( buf), sizeof ( buf))
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:496`
+*Defined at*: `src/jsl_core.h:1166`
 
 ---
 
@@ -642,17 +1168,46 @@ Pointer to the allocated object or `NULL` on failure.
 
 ```
 struct MyStruct { uint64_t the_data; };
-uint8_t buffer[1024];
-JSLArena path = JSL_ARENA_FROM_STACK(buffer);
 struct MyStruct* thing = JSL_ARENA_TYPED_ALLOCATE(struct MyStruct, arena);
 ```
 
 ```c
-#define JSL_ARENA_TYPED_ALLOCATE JSL_ARENA_TYPED_ALLOCATE ( T, arena) ( T *) jsl_arena_allocate ( arena, sizeof ( T), false) . data
+#define JSL_ARENA_TYPED_ALLOCATE JSL_ARENA_TYPED_ALLOCATE ( T, arena) ( T *) jsl_arena_allocate_aligned ( arena, sizeof ( T), _Alignof ( T), false) . data
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:907`
+*Defined at*: `src/jsl_core.h:1571`
+
+---
+
+<a id="macro-jsl_arena_typed_array_allocate"></a>
+### Macro: `JSL_ARENA_TYPED_ARRAY_ALLOCATE`
+
+Macro to make it easier to allocate a zero filled array of `T` within an arena.
+
+#### Parameters
+
+**T** — Type to allocate.
+
+**arena** — Arena to allocate from; must be initialized.
+
+
+
+#### Returns
+
+Pointer to the allocated object or `NULL` on failure.
+
+```
+struct MyStruct { uint64_t the_data; };
+struct MyStruct* thing_array = JSL_ARENA_TYPED_ALLOCATE(struct MyStruct, arena, 42);
+```
+
+```c
+#define JSL_ARENA_TYPED_ARRAY_ALLOCATE JSL_ARENA_TYPED_ARRAY_ALLOCATE ( T, arena, length) ( T *) jsl_arena_allocate_aligned ( arena, ( int64_t) sizeof ( T) * length, _Alignof ( T), true) . data
+```
+
+
+*Defined at*: `src/jsl_core.h:1585`
 
 ---
 
@@ -664,7 +1219,165 @@ struct MyStruct* thing = JSL_ARENA_TYPED_ALLOCATE(struct MyStruct, arena);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:1124`
+*Defined at*: `src/jsl_core.h:1684`
+
+---
+
+<a id="function-jsl_next_power_of_two_u32"></a>
+### Function: `jsl_next_power_of_two_u32`
+
+Round x up to the next power of two. If x is a power of two it returns
+the same value.
+
+This function is designed to be used in tight loops and other performance
+critical areas. Therefore, both zero, one, and values greater than 2^31 not special
+cased. The return values for these cases are compiler, OS, and ISA specific.
+If you need consistent behavior, then you can easily call this function like
+so:
+
+```
+jsl_next_power_of_two_u32(
+JSL_BETWEEN(2u, x, 0x80000000u)
+);
+```
+
+#### Parameters
+
+**x** — The value to round up
+
+
+
+#### Returns
+
+the next power of two
+
+```c
+int jsl_next_power_of_two_u32(int x);
+```
+
+
+*Defined at*: `src/jsl_core.h:900`
+
+---
+
+<a id="function-jsl_next_power_of_two_i64"></a>
+### Function: `jsl_next_power_of_two_i64`
+
+```c
+int jsl_next_power_of_two_i64(int x);
+```
+
+
+*Defined at*: `src/jsl_core.h:903`
+
+---
+
+<a id="function-jsl_next_power_of_two_u64"></a>
+### Function: `jsl_next_power_of_two_u64`
+
+Round x up to the next power of two. If x is a power of two it returns
+the same value.
+
+This function is designed to be used in tight loops and other performance
+critical areas. Therefore, both zero and values greater than 2^63 not special
+cased. The return values for these cases are compiler, OS, and ISA specific.
+If you need consistent behavior, then you can easily call this function like
+so:
+
+```
+jsl_next_power_of_two_u64(
+JSL_BETWEEN(1ull, x, 0x8000000000000000ull)
+);
+```
+
+#### Parameters
+
+**x** — The value to round up
+
+
+
+#### Returns
+
+the next power of two
+
+```c
+int jsl_next_power_of_two_u64(int x);
+```
+
+
+*Defined at*: `src/jsl_core.h:924`
+
+---
+
+<a id="function-jsl_previous_power_of_two_u32"></a>
+### Function: `jsl_previous_power_of_two_u32`
+
+Round x down to the previous power of two. If x is a power of two it returns
+the same value.
+
+This function is designed to be used in tight loops and other performance
+critical areas. Therefore, zero is not special cased. The return value is
+compiler, OS, and ISA specific. If you need consistent behavior, then you
+can easily call this function like so:
+
+```
+jsl_previous_power_of_two_u32(
+JSL_MAX(1, x)
+);
+```
+
+#### Parameters
+
+**x** — The value to round up
+
+
+
+#### Returns
+
+the next power of two
+
+```c
+int jsl_previous_power_of_two_u32(int x);
+```
+
+
+*Defined at*: `src/jsl_core.h:944`
+
+---
+
+<a id="function-jsl_previous_power_of_two_u64"></a>
+### Function: `jsl_previous_power_of_two_u64`
+
+Round x down to the previous power of two. If x is a power of two it returns
+the same value.
+
+This function is designed to be used in tight loops and other performance
+critical areas. Therefore, zero is not special cased. The return value is
+compiler, OS, and ISA specific. If you need consistent behavior, then you
+can easily call this function like so:
+
+```
+jsl_previous_power_of_two_u64(
+JSL_MAX(1UL, x)
+);
+```
+
+#### Parameters
+
+**x** — The value to round up
+
+
+
+#### Returns
+
+the next power of two
+
+```c
+int jsl_previous_power_of_two_u64(int x);
+```
+
+
+*Defined at*: `src/jsl_core.h:964`
 
 ---
 
@@ -686,7 +1399,7 @@ cost benefit analysis to be in the negative.
 - `int length;`
 
 
-*Defined at*: `src/jacks_standard_library.h:370`
+*Defined at*: `src/jsl_core.h:978`
 
 ---
 
@@ -724,90 +1437,7 @@ single thread. If you want to share an arena between threads you need to lock.
 - `int * end;`
 
 
-*Defined at*: `src/jacks_standard_library.h:461`
-
----
-
-<a id="type-jslstringbuilder"></a>
-### : `JSLStringBuilder`
-
-A string builder is a container for building large strings. It's specialized for
-situations where many different smaller operations result in small strings being
-coalesced into a final result, specifically using an arena as its allocator.
-
-While this is called string builder, the underlying data store is just bytes, so
-any binary data which is built in chunks can use the string builder.
-
-A string builder is different from a normal dynamic array in two ways. One, it
-has specific operations for writing string data in both fat pointer form but also
-as a `snprintf` like operation. Two, the resulting string data is not stored as a
-contiguous range of memory, but as a series of chunks which is given to the user
-as an iterator when the string is finished. 
-
-This is due to the nature of arena allocations. If you're using an arena for a
-life time in your program, then the most common case is 
-
-1. You do some operations, these operations themselves allocate
-2. You add generate a string from the operations
-3. The string is concatenated into some buffer
-4. Repeat
-
-A dynamically sized array which grows would mean throwing away the old memory when
-the array resizes. A separate arena that's used purely for the array would work, but
-with the string builder allows for less lifetimes to track.
-
-By default, each chunk is 256 bytes and is aligned to a 32 byte address. These are
-tuneable parameters that you can set during init. The custom alignment helps if you
-want to use SIMD code on the consuming code.
-
-Functions:
-
-* [jsl_string_builder_init](#function-jsl_string_builder_init)
-* [jsl_string_builder_init2](#function-jsl_string_builder_init2)
-* [jsl_string_builder_insert_char](#function-jsl_string_builder_insert_char)
-* [jsl_string_builder_insert_uint8_t](#function-jsl_string_builder_insert_uint8_t)
-* [jsl_string_builder_insert_fatptr](#function-jsl_string_builder_insert_fatptr)
-* [jsl_string_builder_format](#function-jsl_string_builder_format)
-
-- `JSLArena * arena;`
-- `struct JSLStringBuilderChunk * head;`
-- `struct JSLStringBuilderChunk * tail;`
-- `int alignment;`
-- `int chunk_size;`
-
-
-*Defined at*: `src/jacks_standard_library.h:540`
-
----
-
-<a id="type-jslstringbuilderchunk"></a>
-### : `JSLStringBuilderChunk`
-
-
-
-*Defined at*: `src/jacks_standard_library.h:543`
-
----
-
-<a id="type-jslstringbuilderiterator"></a>
-### : `JSLStringBuilderIterator`
-
-The iterator type for a [JSLStringBuilder](#type-jslstringbuilder) instance. This keeps track of
-where the iterator is over the course of calling the next function.
-
-#### Warning
-
-It is not valid to modify a string builder while iterating over it. 
-
-Functions:
-
-* [jsl_string_builder_iterator_init](#function-jsl_string_builder_iterator_init)
-* [jsl_string_builder_iterator_next](#function-jsl_string_builder_iterator_next)
-
-- `struct JSLStringBuilderChunk * current;`
-
-
-*Defined at*: `src/jacks_standard_library.h:560`
+*Defined at*: `src/jsl_core.h:1112`
 
 ---
 
@@ -823,7 +1453,7 @@ JSLFatPtr jsl_fatptr_init(int *ptr, int length);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:571`
+*Defined at*: `src/jsl_core.h:1173`
 
 ---
 
@@ -840,7 +1470,24 @@ JSLFatPtr jsl_fatptr_slice(JSLFatPtr fatptr, int start, int end);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:579`
+*Defined at*: `src/jsl_core.h:1181`
+
+---
+
+<a id="function-jsl_fatptr_slice_to_end"></a>
+### Function: `jsl_fatptr_slice_to_end`
+
+Create a new fat pointer that points to the given parameter's data but
+with a view of [start, length).
+
+This function is bounds checked. Out of bounds slices will assert.
+
+```c
+JSLFatPtr jsl_fatptr_slice_to_end(JSLFatPtr fatptr, int start);
+```
+
+
+*Defined at*: `src/jsl_core.h:1189`
 
 ---
 
@@ -851,8 +1498,11 @@ Utility function to get the total amount of bytes written to the original
 fat pointer when compared to a writer fat pointer. See [jsl_fatptr_auto_slice](#function-jsl_fatptr_auto_slice)
 to get a slice of the written portion.
 
-This function checks for NULL and checks that `writer_fatptr` points to data
-in `original_fatptr`. If either of these checks fail, then `-1` is returned.
+This function asserts on the following conditions
+
+* Either fatptr has a null data field
+* Either fatptr has a negative length
+* The writer_fatptr does not point to the memory of original_fatptr
 
 ```
 JSLFatPtr original = jsl_arena_allocate(arena, 128 * 1024 * 1024);
@@ -879,7 +1529,7 @@ int jsl_fatptr_total_write_length(JSLFatPtr original_fatptr, JSLFatPtr writer_fa
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:601`
+*Defined at*: `src/jsl_core.h:1214`
 
 ---
 
@@ -887,10 +1537,13 @@ int jsl_fatptr_total_write_length(JSLFatPtr original_fatptr, JSLFatPtr writer_fa
 ### Function: `jsl_fatptr_auto_slice`
 
 Returns the slice in `original_fatptr` that represents the written to portion, given
-the size and pointer in `writer_fatptr`. If either parameter has a NULL data
-field, has a negative length, or if the writer does not point to a portion
-of the original allocation, this function will return a fat pointer with a 
-`NULL` data pointer.
+the size and pointer in `writer_fatptr`.
+
+This function asserts on the following conditions
+
+* Either fatptr has a null data field
+* Either fatptr has a negative length
+* The writer_fatptr does not point to the memory of original_fatptr
 
 Example:
 
@@ -920,7 +1573,7 @@ JSLFatPtr jsl_fatptr_auto_slice(JSLFatPtr original_fatptr, JSLFatPtr writer_fatp
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:625`
+*Defined at*: `src/jsl_core.h:1241`
 
 ---
 
@@ -929,7 +1582,7 @@ JSLFatPtr jsl_fatptr_auto_slice(JSLFatPtr original_fatptr, JSLFatPtr writer_fatp
 
 Build a fat pointer from a null terminated string. **DOES NOT** copy the data.
 It simply sets the data pointer to `str` and the length value to the result of
-JSL_STRLEN.
+[JSL_STRLEN](#macro-jsl_strlen).
 
 #### Parameters
 
@@ -946,7 +1599,7 @@ JSLFatPtr jsl_fatptr_from_cstr(char *str);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:635`
+*Defined at*: `src/jsl_core.h:1251`
 
 ---
 
@@ -955,14 +1608,22 @@ JSLFatPtr jsl_fatptr_from_cstr(char *str);
 
 Copy the contents of `source` into `destination`.
 
-This function is bounds checked, meaning a max of `destination->length` bytes
-will be copied into `destination`. This function also checks for overlapping
-buffers, null pointers in either `destination` or `source`, and negative lengths.
-In all these cases, -1 will be returned.
-
 `destination` is modified to point to the remaining data in the buffer. I.E.
 if the entire buffer was used then `destination->length` will be `0` and
 `destination->data` will be pointing to the end of the buffer.
+
+This function is bounds checked, meaning a max of `destination->length` bytes
+will be copied into `destination`. 
+
+This function also checks for
+
+* overlapping buffers
+* null pointers in either `destination` or `source`
+* negative lengths.
+* If either `destination` or `source` would overflow if their
+length was added to the pointer
+
+In all these cases, -1 will be returned.
 
 #### Returns
 
@@ -973,7 +1634,7 @@ int jsl_fatptr_memory_copy(JSLFatPtr *destination, JSLFatPtr source);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:651`
+*Defined at*: `src/jsl_core.h:1275`
 
 ---
 
@@ -987,7 +1648,7 @@ will be copied into `destination`. This function does not check for overlapping
 pointers.
 
 If `cstring` is not a valid null terminated string then this function's behavior
-is undefined, as it uses JSL_STRLEN.
+is undefined, as it uses [JSL_STRLEN](#macro-jsl_strlen).
 
 `destination` is modified to point to the remaining data in the buffer. I.E.
 if the entire buffer was used then `destination->length` will be `0`.
@@ -1001,7 +1662,7 @@ int jsl_fatptr_cstr_memory_copy(JSLFatPtr *destination, char *cstring, int inclu
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:668`
+*Defined at*: `src/jsl_core.h:1292`
 
 ---
 
@@ -1009,7 +1670,22 @@ int jsl_fatptr_cstr_memory_copy(JSLFatPtr *destination, char *cstring, int inclu
 ### Function: `jsl_fatptr_substring_search`
 
 Searches `string` for the byte sequence in `substring` and returns the index of the first
-match or `-1` when no match exists. Both fat pointers must reference valid data.
+match or `-1` when no match exists. This is roughly equivalent to C's `strstr` for
+fat pointers.
+
+This function is optimized with SIMD specific implementations when SIMD code generation
+is enabled during compilation. When SIMD is not enabled, this function falls back to a
+combination of BNDM and Sunday algorithms (based on substring size). These algorithms
+are `O(n*m)` in the worst case which is generally text that is very pattern heavy and
+contains a lot of repeated text. In the general case performance is closer to `O(n/m)`.
+
+In cases where any of the following are true you will want to use a different search
+function:
+
+* Your string is very long, e.g. hundreds of megabytes or more
+* Your string is full of small repeating patterns
+* Your substring is more than a couple of kilobytes
+* You want to search multiple different substrings on the same string
 
 #### Parameters
 
@@ -1035,14 +1711,15 @@ int jsl_fatptr_substring_search(JSLFatPtr string, JSLFatPtr substring);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:687`
+*Defined at*: `src/jsl_core.h:1326`
 
 ---
 
 <a id="function-jsl_fatptr_index_of"></a>
 ### Function: `jsl_fatptr_index_of`
 
-Locate the first byte equal to `item` in a fat pointer.
+Locate the first byte equal to `item` in a fat pointer. This is roughly equivalent to C's
+`strchr` function for fat pointers.
 
 #### Parameters
 
@@ -1056,12 +1733,19 @@ Locate the first byte equal to `item` in a fat pointer.
 
 index of the first match, or -1 if none is found.
 
+#### Note
+
+The comparison operates on raw code units. In UTF encodings, multiple code units can
+form a single grapheme cluster, so the index does not necessarily map to user-perceived
+characters. No Unicode normalization is performed; normalize inputs first if combining mark
+equivalence is required.
+
 ```c
 int jsl_fatptr_index_of(JSLFatPtr data, int item);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:696`
+*Defined at*: `src/jsl_core.h:1341`
 
 ---
 
@@ -1082,12 +1766,19 @@ Count the number of occurrences of `item` within a fat pointer.
 
 Total number of matches, or 0 when the sequence is empty.
 
+#### Note
+
+The comparison operates on raw code units. In UTF encodings, multiple code units can
+form a single grapheme cluster, so the index does not necessarily map to user-perceived
+characters. No Unicode normalization is performed; normalize inputs first if combining mark
+equivalence is required.
+
 ```c
 int jsl_fatptr_count(JSLFatPtr str, int item);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:705`
+*Defined at*: `src/jsl_core.h:1355`
 
 ---
 
@@ -1108,12 +1799,19 @@ Locate the final occurrence of `character` within a fat pointer.
 
 index of the last match, or -1 when no match exists.
 
+#### Note
+
+The comparison operates on raw code units. In UTF encodings, multiple code units can
+form a single grapheme cluster, so the index does not necessarily map to user-perceived
+characters. No Unicode normalization is performed; normalize inputs first if combining mark
+equivalence is required.
+
 ```c
 int jsl_fatptr_index_of_reverse(JSLFatPtr str, int character);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:714`
+*Defined at*: `src/jsl_core.h:1369`
 
 ---
 
@@ -1123,8 +1821,7 @@ int jsl_fatptr_index_of_reverse(JSLFatPtr str, int character);
 Check whether `str` begins with the bytes stored in `prefix`.
 
 Returns `false` when either fat pointer is null or when `prefix` exceeds `str` in length.
-Comparison is bytewise; no Unicode normalization is performed. An empty `prefix` yields
-`true`.
+An empty `prefix` yields `true`.
 
 #### Parameters
 
@@ -1138,12 +1835,19 @@ Comparison is bytewise; no Unicode normalization is performed. An empty `prefix`
 
 `true` if `str` starts with `prefix`, otherwise `false`.
 
+#### Note
+
+The comparison operates on raw code units. In UTF encodings, multiple code units can
+form a single grapheme cluster, so the index does not necessarily map to user-perceived
+characters. No Unicode normalization is performed; normalize inputs first if combining mark
+equivalence is required.
+
 ```c
 int jsl_fatptr_starts_with(JSLFatPtr str, JSLFatPtr prefix);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:727`
+*Defined at*: `src/jsl_core.h:1386`
 
 ---
 
@@ -1153,7 +1857,6 @@ int jsl_fatptr_starts_with(JSLFatPtr str, JSLFatPtr prefix);
 Check whether `str` ends with the bytes stored in `postfix`.
 
 Returns `false` when either fat pointer is null or when `postfix` exceeds `str` in length.
-Comparison is bytewise; no Unicode normalization is performed.
 
 #### Parameters
 
@@ -1167,12 +1870,19 @@ Comparison is bytewise; no Unicode normalization is performed.
 
 `true` if `str` ends with `postfix`, otherwise `false`.
 
+#### Note
+
+The comparison operates on raw code units. In UTF encodings, multiple code units can
+form a single grapheme cluster, so the index does not necessarily map to user-perceived
+characters. No Unicode normalization is performed; normalize inputs first if combining mark
+equivalence is required.
+
 ```c
 int jsl_fatptr_ends_with(JSLFatPtr str, JSLFatPtr postfix);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:739`
+*Defined at*: `src/jsl_core.h:1402`
 
 ---
 
@@ -1204,7 +1914,7 @@ Fat pointer referencing the basename or, in the fallback cases described above, 
 original input pointer.
 
 ```
-JSLFatPtr path = jsl_fatptr_from_cstr("/tmp/example.txt");
+JSLFatPtr path = JSL_FATPTR_INITIALIZER("/tmp/example.txt");
 JSLFatPtr base = jsl_fatptr_basename(path); // "example.txt"
 ```
 
@@ -1213,7 +1923,7 @@ JSLFatPtr jsl_fatptr_basename(JSLFatPtr filename);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:764`
+*Defined at*: `src/jsl_core.h:1427`
 
 ---
 
@@ -1244,7 +1954,7 @@ Fat pointer to the extension (excluding the dot) or an empty fat pointer
 when no extension exists.
 
 ```
-JSLFatPtr path = jsl_fatptr_from_cstr("archive.tar.gz");
+JSLFatPtr path = JSL_FATPTR_INITIALIZER("archive.tar.gz");
 JSLFatPtr ext = jsl_fatptr_get_file_extension(path); // "gz"
 ```
 
@@ -1253,7 +1963,7 @@ JSLFatPtr jsl_fatptr_get_file_extension(JSLFatPtr filename);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:788`
+*Defined at*: `src/jsl_core.h:1451`
 
 ---
 
@@ -1285,7 +1995,7 @@ int jsl_fatptr_memory_compare(JSLFatPtr a, JSLFatPtr b);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:806`
+*Defined at*: `src/jsl_core.h:1469`
 
 ---
 
@@ -1294,7 +2004,8 @@ int jsl_fatptr_memory_compare(JSLFatPtr a, JSLFatPtr b);
 
 Element by element comparison of the contents of a fat pointer and a null terminated
 string. If the fat pointer has a null data value or a zero length, or if cstr is null,
-then this function will return false.
+then this function will return false. This is true even when both pointers are
+NULL.
 
 #### Parameters
 
@@ -1315,7 +2026,7 @@ int jsl_fatptr_cstr_compare(JSLFatPtr a, char *cstr);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:820`
+*Defined at*: `src/jsl_core.h:1484`
 
 ---
 
@@ -1334,7 +2045,7 @@ int jsl_fatptr_compare_ascii_insensitive(JSLFatPtr a, JSLFatPtr b);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:828`
+*Defined at*: `src/jsl_core.h:1492`
 
 ---
 
@@ -1349,7 +2060,7 @@ void jsl_fatptr_to_lowercase_ascii(JSLFatPtr str);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:834`
+*Defined at*: `src/jsl_core.h:1498`
 
 ---
 
@@ -1363,6 +2074,14 @@ Stops once it hits the first non-accepted character. This function does
 not check for overflows or underflows. `result` is not written to if
 there were no successfully parsed bytes.
 
+#### Parameters
+
+**str** — a string with an int representation at the start
+
+**result** — out parameter where the parsing result will be stored
+
+
+
 #### Returns
 
 The number of bytes that were successfully read from the string
@@ -1372,7 +2091,7 @@ int jsl_fatptr_to_int32(JSLFatPtr str, int *result);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:846`
+*Defined at*: `src/jsl_core.h:1512`
 
 ---
 
@@ -1394,7 +2113,7 @@ void jsl_arena_init(JSLArena *arena, void *memory, int length);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:855`
+*Defined at*: `src/jsl_core.h:1521`
 
 ---
 
@@ -1417,7 +2136,7 @@ void jsl_arena_init2(JSLArena *arena, JSLFatPtr memory);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:866`
+*Defined at*: `src/jsl_core.h:1532`
 
 ---
 
@@ -1449,7 +2168,7 @@ JSLFatPtr jsl_arena_allocate(JSLArena *arena, int bytes, int zeroed);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:880`
+*Defined at*: `src/jsl_core.h:1546`
 
 ---
 
@@ -1479,7 +2198,7 @@ JSLFatPtr jsl_arena_allocate_aligned(JSLArena *arena, int bytes, int alignment, 
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:891`
+*Defined at*: `src/jsl_core.h:1557`
 
 ---
 
@@ -1487,17 +2206,14 @@ JSLFatPtr jsl_arena_allocate_aligned(JSLArena *arena, int bytes, int alignment, 
 ### Function: `jsl_arena_reallocate`
 
 Resize the allocation if it was the last allocation, otherwise, allocate a new
-chunk of memory.
-
-In debug mode, this function will set `original_allocation->data` to null to
-help detect stale pointer bugs.
+chunk of memory and copy the old allocation's contents.
 
 ```c
 JSLFatPtr jsl_arena_reallocate(JSLArena *arena, JSLFatPtr original_allocation, int new_num_bytes);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:916`
+*Defined at*: `src/jsl_core.h:1591`
 
 ---
 
@@ -1505,17 +2221,14 @@ JSLFatPtr jsl_arena_reallocate(JSLArena *arena, JSLFatPtr original_allocation, i
 ### Function: `jsl_arena_reallocate_aligned`
 
 Resize the allocation if it was the last allocation, otherwise, allocate a new
-chunk of memory.
-
-In debug mode, this function will set `original_allocation->data` to null to
-help detect stale pointer bugs.
+chunk of memory and copy the old allocation's contents.
 
 ```c
 JSLFatPtr jsl_arena_reallocate_aligned(JSLArena *arena, JSLFatPtr original_allocation, int new_num_bytes, int align);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:929`
+*Defined at*: `src/jsl_core.h:1601`
 
 ---
 
@@ -1532,7 +2245,7 @@ void jsl_arena_reset(JSLArena *arena);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:942`
+*Defined at*: `src/jsl_core.h:1614`
 
 ---
 
@@ -1563,7 +2276,7 @@ int * jsl_arena_save_restore_point(JSLArena *arena);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:964`
+*Defined at*: `src/jsl_core.h:1636`
 
 ---
 
@@ -1589,32 +2302,35 @@ kilobytes used.
 In debug mode, [jsl_arena_load_restore_point](#function-jsl_arena_load_restore_point) function will set all of the memory
 that was allocated to `0xfeeefeee` to help detect use after free bugs.
 
+This function will assert if you attempt to use a different restore point from an
+arena different that the one passed in as the parameter.
+
 ```c
 void jsl_arena_load_restore_point(JSLArena *arena, int *restore_point);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:986`
+*Defined at*: `src/jsl_core.h:1661`
 
 ---
 
-<a id="function-jsl_arena_fatptr_to_cstr"></a>
-### Function: `jsl_arena_fatptr_to_cstr`
+<a id="function-jsl_fatptr_to_cstr"></a>
+### Function: `jsl_fatptr_to_cstr`
 
 Allocate a new buffer from the arena and copy the contents of a fat pointer with
 a null terminator.
 
 ```c
-char * jsl_arena_fatptr_to_cstr(JSLArena *arena, JSLFatPtr str);
+char * jsl_fatptr_to_cstr(JSLArena *arena, JSLFatPtr str);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:992`
+*Defined at*: `src/jsl_core.h:1667`
 
 ---
 
-<a id="function-jsl_arena_cstr_to_fatptr"></a>
-### Function: `jsl_arena_cstr_to_fatptr`
+<a id="function-jsl_cstr_to_fatptr"></a>
+### Function: `jsl_cstr_to_fatptr`
 
 Allocate and copy the contents of a fat pointer with a null terminator.
 
@@ -1623,11 +2339,11 @@ Allocate and copy the contents of a fat pointer with a null terminator.
 Use `jsl_fatptr_from_cstr` to make a fat pointer without copying.
 
 ```c
-JSLFatPtr jsl_arena_cstr_to_fatptr(JSLArena *arena, char *str);
+JSLFatPtr jsl_cstr_to_fatptr(JSLArena *arena, char *str);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:999`
+*Defined at*: `src/jsl_core.h:1674`
 
 ---
 
@@ -1638,262 +2354,14 @@ Allocate space for, and copy the contents of a fat pointer.
 
 #### Note
 
-Use `jsl_arena_cstr_to_fatptr` to copy a c string into a fatptr.
+Use `jsl_cstr_to_fatptr` to copy a c string into a fatptr.
 
 ```c
 JSLFatPtr jsl_fatptr_duplicate(JSLArena *arena, JSLFatPtr str);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:1006`
-
----
-
-<a id="function-jsl_string_builder_init"></a>
-### Function: `jsl_string_builder_init`
-
-Initialize a [JSLStringBuilder](#type-jslstringbuilder) using the default settings. See the [JSLStringBuilder](#type-jslstringbuilder)
-for more information on the container. A chunk is allocated right away and if that
-fails this returns false.
-
-#### Parameters
-
-**builder** — The builder instance to initialize; must not be NULL.
-
-**arena** — The arena that backs all allocations made by the builder; must not be NULL.
-
-
-
-#### Returns
-
-`true` if the builder was initialized successfully, otherwise `false`.
-
-```c
-int jsl_string_builder_init(JSLStringBuilder *builder, JSLArena *arena);
-```
-
-
-*Defined at*: `src/jacks_standard_library.h:1017`
-
----
-
-<a id="function-jsl_string_builder_init2"></a>
-### Function: `jsl_string_builder_init2`
-
-Initialize a [JSLStringBuilder](#type-jslstringbuilder) with a custom chunk size and chunk allocation alignment.
-See the [JSLStringBuilder](#type-jslstringbuilder) for more information on the container. A chunk is allocated
-right away and if that fails this returns false.
-
-#### Parameters
-
-**builder** — The builder instance to initialize; must not be NULL.
-
-**arena** — The arena that backs all allocations made by the builder; must not be NULL.
-
-**chunk_size** — The number of bytes that are allocated each time the container needs to grow
-
-**alignment** — The allocation alignment of the chunks of data
-
-
-
-#### Returns
-
-`true` if the builder was initialized successfully, otherwise `false`.
-
-```c
-int jsl_string_builder_init2(JSLStringBuilder *builder, JSLArena *arena, int chunk_size, int alignment);
-```
-
-
-*Defined at*: `src/jacks_standard_library.h:1030`
-
----
-
-<a id="function-jsl_string_builder_insert_char"></a>
-### Function: `jsl_string_builder_insert_char`
-
-Append a char value to the end of the string builder without interpretation. Each append
-may result in an allocation if there's no more space. If that allocation fails then this
-function returns false.
-
-#### Parameters
-
-**builder** — The string builder to append to; must be initialized.
-
-**c** — The byte to append.
-
-
-
-#### Returns
-
-`true` if the byte was inserted successfully, otherwise `false`.
-
-```c
-int jsl_string_builder_insert_char(JSLStringBuilder *builder, char c);
-```
-
-
-*Defined at*: `src/jacks_standard_library.h:1041`
-
----
-
-<a id="function-jsl_string_builder_insert_uint8_t"></a>
-### Function: `jsl_string_builder_insert_uint8_t`
-
-Append a single raw byte to the end of the string builder without interpretation. 
-The value is written as-is, so it can be used for arbitrary binary data, including
-zero bytes. Each append may result in an allocation if there's no more space. If
-that allocation fails then this function returns false.
-
-#### Parameters
-
-**builder** — The string builder to append to; must be initialized.
-
-**c** — The byte to append.
-
-
-
-#### Returns
-
-`true` if the byte was inserted successfully, otherwise `false`.
-
-```c
-int jsl_string_builder_insert_uint8_t(JSLStringBuilder *builder, int c);
-```
-
-
-*Defined at*: `src/jacks_standard_library.h:1053`
-
----
-
-<a id="function-jsl_string_builder_insert_fatptr"></a>
-### Function: `jsl_string_builder_insert_fatptr`
-
-Append the contents of a fat pointer. Additional chunks are allocated as needed
-while copying so if any of the allocations fail this returns false.
-
-#### Parameters
-
-**builder** — The string builder to append to; must be initialized.
-
-**data** — A fat pointer describing the bytes to copy; its length may be zero.
-
-
-
-#### Returns
-
-`true` if the data was appended successfully, otherwise `false`.
-
-```c
-int jsl_string_builder_insert_fatptr(JSLStringBuilder *builder, JSLFatPtr data);
-```
-
-
-*Defined at*: `src/jacks_standard_library.h:1063`
-
----
-
-<a id="function-jsl_string_builder_format"></a>
-### Function: `jsl_string_builder_format`
-
-Format a string using the [jsl_format](#function-jsl_format) logic and write the result directly into
-the string builder.
-
-#### Parameters
-
-**builder** — The string builder that receives the formatted output; must be initialized.
-
-**fmt** — A fat pointer describing the format string.
-
-**...** — Variadic arguments consumed by the formatter.
-
-
-
-#### Returns
-
-`true` if formatting succeeded and the formatted bytes were appended, otherwise `false`.
-
-```c
-int jsl_string_builder_format(JSLStringBuilder *builder, JSLFatPtr fmt, ...);
-```
-
-
-*Defined at*: `src/jacks_standard_library.h:1074`
-
----
-
-<a id="function-jsl_string_builder_iterator_init"></a>
-### Function: `jsl_string_builder_iterator_init`
-
-Initialize an iterator instance so it will traverse the given string builder
-from the begining. It's easiest to just put an empty iterator on the stack
-and then call this function.
-
-```
-JSLStringBuilder builder = ...;
-
-JSLStringBuilderIterator iter;
-jsl_string_builder_iterator_init(&builder, &iter);
-```
-
-#### Parameters
-
-**builder** — The string builder whose data will be traversed.
-
-**iterator** — The iterator instance to initialize.
-
-```c
-void jsl_string_builder_iterator_init(JSLStringBuilder *builder, JSLStringBuilderIterator *iterator);
-```
-
-
-*Defined at*: `src/jacks_standard_library.h:1091`
-
----
-
-<a id="function-jsl_string_builder_iterator_next"></a>
-### Function: `jsl_string_builder_iterator_next`
-
-Get the next chunk of data a string builder iterator. The chunk will
-have a `NULL` data pointer when iteration is over.
-
-This example program prints all the data in a string builder to stdout:
-
-```
-#include <stdio.h>
-
-JSLStringBuilder builder = ...;
-
-JSLStringBuilderIterator iter;
-jsl_string_builder_iterator_init(&builder, &iter);
-
-while (true)
-{
-JSLFatPtr str = jsl_string_builder_iterator_next(&iter);
-
-if (str.data == NULL)
-break;
-
-jsl_format_out(stdout, str);
-}
-```
-
-#### Parameters
-
-**iterator** — The iterator instance
-
-
-
-#### Returns
-
-The next chunk of data from the string builder
-
-```c
-JSLFatPtr jsl_string_builder_iterator_next(JSLStringBuilderIterator *iterator);
-```
-
-
-*Defined at*: `src/jacks_standard_library.h:1121`
+*Defined at*: `src/jsl_core.h:1681`
 
 ---
 
@@ -1927,7 +2395,7 @@ typedef int *(int *, void *, int) JSL_FORMAT_CALLBACK;
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:1141`
+*Defined at*: `src/jsl_core.h:1701`
 
 ---
 
@@ -1946,7 +2414,7 @@ There are a set of different functions for different use cases
 * [jsl_format_buffer](#function-jsl_format_buffer)
 * [jsl_format_valist](#function-jsl_format_valist)
 * [jsl_format_callback](#function-jsl_format_callback)
-* [jsl_string_builder_format](#function-jsl_string_builder_format)
+* jsl_string_builder_format
 
 ## Fat Pointers
 
@@ -2001,7 +2469,7 @@ JSLFatPtr jsl_format(JSLArena *arena, JSLFatPtr fmt, ...);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:1206`
+*Defined at*: `src/jsl_core.h:1766`
 
 ---
 
@@ -2017,7 +2485,7 @@ int jsl_format_buffer(JSLFatPtr *buffer, JSLFatPtr fmt, ...);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:1213`
+*Defined at*: `src/jsl_core.h:1773`
 
 ---
 
@@ -2034,7 +2502,7 @@ int jsl_format_valist(JSLFatPtr *buffer, JSLFatPtr fmt, int va);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:1225`
+*Defined at*: `src/jsl_core.h:1785`
 
 ---
 
@@ -2055,7 +2523,7 @@ int jsl_format_callback(JSL_FORMAT_CALLBACK *callback, void *user, int *buf, JSL
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:1241`
+*Defined at*: `src/jsl_core.h:1801`
 
 ---
 
@@ -2069,176 +2537,7 @@ void jsl_format_set_separators(char comma, char period);
 ```
 
 
-*Defined at*: `src/jacks_standard_library.h:1253`
-
----
-
-<a id="type-jslloadfileresultenum"></a>
-### : `JSLLoadFileResultEnum`
-
-- `JSL_FILE_LOAD_BAD_PARAMETERS = 0`
-- `JSL_FILE_LOAD_SUCCESS = 1`
-- `JSL_FILE_LOAD_COULD_NOT_OPEN = 2`
-- `JSL_FILE_LOAD_COULD_NOT_GET_FILE_SIZE = 3`
-- `JSL_FILE_LOAD_COULD_NOT_GET_MEMORY = 4`
-- `JSL_FILE_LOAD_READ_FAILED = 5`
-- `JSL_FILE_LOAD_CLOSE_FAILED = 6`
-- `JSL_FILE_LOAD_ERROR_UNKNOWN = 7`
-- `JSL_FILE_LOAD_ENUM_COUNT = 8`
-
-
-*Defined at*: `src/jacks_standard_library.h:1283`
-
----
-
-<a id="type-jslwritefileresultenum"></a>
-### : `JSLWriteFileResultEnum`
-
-- `JSL_FILE_WRITE_BAD_PARAMETERS = 0`
-- `JSL_FILE_WRITE_SUCCESS = 1`
-- `JSL_FILE_WRITE_COULD_NOT_OPEN = 2`
-- `JSL_FILE_WRITE_COULD_NOT_WRITE = 3`
-- `JSL_FILE_WRITE_COULD_NOT_CLOSE = 4`
-- `JSL_FILE_WRITE_ENUM_COUNT = 5`
-
-
-*Defined at*: `src/jacks_standard_library.h:1298`
-
----
-
-<a id="type-jslfiletypeenum"></a>
-### : `JSLFileTypeEnum`
-
-- `JSL_FILE_TYPE_UNKNOWN = 0`
-- `JSL_FILE_TYPE_REG = 1`
-- `JSL_FILE_TYPE_DIR = 2`
-- `JSL_FILE_TYPE_SYMLINK = 3`
-- `JSL_FILE_TYPE_BLOCK = 4`
-- `JSL_FILE_TYPE_CHAR = 5`
-- `JSL_FILE_TYPE_FIFO = 6`
-- `JSL_FILE_TYPE_SOCKET = 7`
-- `JSL_FILE_TYPE_COUNT = 8`
-
-
-*Defined at*: `src/jacks_standard_library.h:1310`
-
----
-
-<a id="function-jsl_load_file_contents"></a>
-### Function: `jsl_load_file_contents`
-
-Load the contents of the file at `path` into a newly allocated buffer
-from the given arena. The buffer will be the exact size of the file contents.
-
-If the arena does not have enough space,
-
-```c
-JSLLoadFileResultEnum jsl_load_file_contents(JSLArena *arena, JSLFatPtr path, JSLFatPtr *out_contents, int *out_errno);
-```
-
-
-*Defined at*: `src/jacks_standard_library.h:1329`
-
----
-
-<a id="function-jsl_load_file_contents_buffer"></a>
-### Function: `jsl_load_file_contents_buffer`
-
-Load the contents of the file at `path` into an existing fat pointer buffer.
-
-Copies up to `buffer->length` bytes into `buffer->data` and advances the fat
-pointer by the amount read so the caller can continue writing into the same
-backing storage. Returns a `JSLLoadFileResultEnum` describing the outcome and
-optionally stores the system `errno` in `out_errno` on failure.
-
-#### Parameters
-
-**buffer** — buffer to write to
-
-**path** — The file system path
-
-**out_errno** — A pointer which will be written to with the errno on failure
-
-
-
-#### Returns
-
-An enum which represents the result
-
-```c
-JSLLoadFileResultEnum jsl_load_file_contents_buffer(JSLFatPtr *buffer, JSLFatPtr path, int *out_errno);
-```
-
-
-*Defined at*: `src/jacks_standard_library.h:1349`
-
----
-
-<a id="function-jsl_write_file_contents"></a>
-### Function: `jsl_write_file_contents`
-
-Write the bytes in `contents` to the file located at `path`.
-
-Opens or creates the destination file and attempts to write the entire
-contents buffer. Returns a `JSLWriteFileResultEnum` describing the
-outcome, stores the number of bytes written in `bytes_written` when
-provided, and optionally writes the failing `errno` into `out_errno`.
-
-#### Parameters
-
-**contents** — Data to be written to disk
-
-**path** — File system path to write to
-
-**bytes_written** — Optional pointer that receives the bytes written on success
-
-**out_errno** — Optional pointer that receives the system errno on failure
-
-
-
-#### Returns
-
-A result enum describing the write outcome
-
-```c
-JSLWriteFileResultEnum jsl_write_file_contents(JSLFatPtr contents, JSLFatPtr path, int *bytes_written, int *out_errno);
-```
-
-
-*Defined at*: `src/jacks_standard_library.h:1369`
-
----
-
-<a id="function-jsl_format_file"></a>
-### Function: `jsl_format_file`
-
-Format a string using the JSL formatter and write the result to a `FILE*`,
-most often this will be `stdout`.
-
-Streams that reject writes (for example, read-only streams or closed
-pipes) cause the function to return `false`. Passing a `NULL` file handle,
-a `NULL` format pointer, or a negative format length also causes failure.
-
-#### Parameters
-
-**out** — Destination stream
-
-**fmt** — Format string
-
-**...** — Format args
-
-
-
-#### Returns
-
-`true` when formatting and writing succeeds, otherwise `false`
-
-```c
-int jsl_format_file(int *out, JSLFatPtr fmt, ...);
-```
-
-
-*Defined at*: `src/jacks_standard_library.h:1389`
+*Defined at*: `src/jsl_core.h:1813`
 
 ---
 

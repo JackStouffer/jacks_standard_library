@@ -41,9 +41,9 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef JSL_FILES
+#ifndef JSL_FILES_H_INCLUDED
 
-#define JSL_FILES
+#define JSL_FILES_H_INCLUDED
 
 #include <stdarg.h>
 #include <stddef.h>
@@ -748,4 +748,4 @@ JSL__ASAN_OFF bool jsl_format_file(FILE* out, JSLFatPtr fmt, ...)
 
 #endif // JSL_FILES_IMPLEMENTATION
 
-#endif // JSL_FILES
+#endif // JSL_FILES_H_INCLUDED

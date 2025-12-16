@@ -735,6 +735,37 @@ static void test_jsl_str_to_str_map_item_count_and_has_key(void)
     TEST_INT64_EQUAL(jsl_str_to_str_map_item_count(&uninitialized), (int64_t) -1);
 }
 
+static void test_jsl_str_to_str_map_get(void)
+{
+    JSLStrToStrMap map = {0};
+    bool ok = jsl_str_to_str_map_init2(&map, &global_arena, 2468, 8, 0.6f);
+    TEST_BOOL(ok);
+    if (!ok) return;
+
+    JSLFatPtr key = JSL_FATPTR_INITIALIZER("lookup-key");
+    JSLFatPtr value = JSL_FATPTR_INITIALIZER("lookup-value");
+
+    JSLFatPtr out_value = JSL_FATPTR_EXPRESSION("should-reset");
+    TEST_BOOL(!jsl_str_to_str_map_get(&map, key, &out_value));
+    TEST_INT64_EQUAL(out_value.length, (int64_t) 0);
+
+    TEST_BOOL(jsl_str_to_str_map_insert(
+        &map,
+        key, JSL_STRING_LIFETIME_STATIC,
+        value, JSL_STRING_LIFETIME_STATIC
+    ));
+
+    TEST_BOOL(jsl_str_to_str_map_get(&map, key, &out_value));
+    TEST_BOOL(jsl_fatptr_memory_compare(out_value, value));
+
+    JSLFatPtr missing = JSL_FATPTR_INITIALIZER("missing");
+    out_value = JSL_FATPTR_EXPRESSION("still-reset");
+    TEST_BOOL(!jsl_str_to_str_map_get(&map, missing, &out_value));
+    TEST_INT64_EQUAL(out_value.length, (int64_t) 0);
+
+    TEST_BOOL(!jsl_str_to_str_map_get(&map, key, NULL));
+}
+
 static void test_jsl_str_to_str_map_insert_overwrites_value(void)
 {
     JSLStrToStrMap map = {0};
@@ -1000,7 +1031,7 @@ static void test_jsl_str_to_str_map_iterator_invalidated_on_mutation(void)
     TEST_BOOL(has_data == false);
 }
 
-static void test_jsl_str_to_str_map_delete_behavior(void)
+static void test_jsl_str_to_str_map_delete(void)
 {
     JSLStrToStrMap map = {0};
     bool ok = jsl_str_to_str_map_init2(&map, &global_arena, 2222, 12, 0.7f);
@@ -1027,7 +1058,7 @@ static void test_jsl_str_to_str_map_delete_behavior(void)
     TEST_BOOL(jsl_str_to_str_map_has_key(&map, other));
 }
 
-static void test_jsl_str_to_str_map_clear_resets_state(void)
+static void test_jsl_str_to_str_map_clear(void)
 {
     JSLStrToStrMap map = {0};
     bool ok = jsl_str_to_str_map_init(&map, &global_arena, 3333);
@@ -1054,7 +1085,7 @@ static void test_jsl_str_to_str_map_clear_resets_state(void)
     TEST_BOOL(jsl_str_to_str_map_has_key(&map, JSL_FATPTR_EXPRESSION("c")));
 }
 
-static void test_jsl_str_to_str_map_rehash_preserves_entries(void)
+static void test_jsl_str_to_str_map_rehash(void)
 {
     JSLStrToStrMap map = {0};
     bool ok = jsl_str_to_str_map_init2(&map, &global_arena, 4444, 4, 0.5f);
@@ -1169,7 +1200,10 @@ int main(void)
     RUN_TEST_FUNCTION("Test str to str map item count and has key", test_jsl_str_to_str_map_item_count_and_has_key);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("Test str to str map insert overwrites value", test_jsl_str_to_str_map_insert_overwrites_value);
+    RUN_TEST_FUNCTION("Test str to str map get", test_jsl_str_to_str_map_get);
+    jsl_arena_reset(&global_arena);
+
+    RUN_TEST_FUNCTION("Test str to str map insert", test_jsl_str_to_str_map_insert_overwrites_value);
     jsl_arena_reset(&global_arena);
 
     RUN_TEST_FUNCTION("Test str to str map transient lifetime copies", test_jsl_str_to_str_map_transient_lifetime_copies_data);
@@ -1181,19 +1215,19 @@ int main(void)
     RUN_TEST_FUNCTION("Test str to str map empty and binary strings", test_jsl_str_to_str_map_handles_empty_and_binary_strings);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("Test str to str map iterator covers pairs", test_jsl_str_to_str_map_iterator_covers_all_pairs);
+    RUN_TEST_FUNCTION("Test str to str map iterator", test_jsl_str_to_str_map_iterator_covers_all_pairs);
     jsl_arena_reset(&global_arena);
 
     RUN_TEST_FUNCTION("Test str to str map iterator invalid after mutation", test_jsl_str_to_str_map_iterator_invalidated_on_mutation);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("Test str to str map delete behavior", test_jsl_str_to_str_map_delete_behavior);
+    RUN_TEST_FUNCTION("Test str to str map delete", test_jsl_str_to_str_map_delete);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("Test str to str map clear resets state", test_jsl_str_to_str_map_clear_resets_state);
+    RUN_TEST_FUNCTION("Test str to str map clear", test_jsl_str_to_str_map_clear);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("Test str to str map rehash preserves entries", test_jsl_str_to_str_map_rehash_preserves_entries);
+    RUN_TEST_FUNCTION("Test str to str map rehash", test_jsl_str_to_str_map_rehash);
     jsl_arena_reset(&global_arena);
 
     RUN_TEST_FUNCTION("Test str to str map invalid inserts", test_jsl_str_to_str_map_invalid_inserts);

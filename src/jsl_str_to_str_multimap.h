@@ -429,10 +429,8 @@
     /**
      * Remove a key and all of its values.
      *
-     * Reclaims the key entry and value nodes into internal free lists without
-     * releasing arena memory. Iterators become invalid. If the key is not
-     * present or parameters are invalid, the map is unchanged and `false` is
-     * returned.
+     * Iterators become invalid. If the key is not present or parameters are invalid,
+     * the map is unchanged and `false` is returned.
      *
      * @param map Multimap to mutate.
      * @param key Key to remove.
@@ -463,10 +461,7 @@
     );
 
     /**
-     * Remove all keys and values from the map.
-     *
-     * All entries and values are recycled into free lists for reuse; arena
-     * allocations are retained. Iterators become invalid.
+     * Remove all keys and values from the map. Iterators become invalid.
      *
      * @param map Multimap to clear.
      */

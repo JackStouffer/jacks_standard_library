@@ -1,43 +1,43 @@
 /**
  * # JSL String to String Map
  * 
- * This file is a single header file library that implements a multimap data
- * structure, which maps length based string keys to multiple length based
- * string values, and is optimized around the arena allocator design.
- * This file is part of the Jack's Standard Library project.
+ * This file is a single header file library that implements a hash map data
+ * structure, which maps length based string keys to length based string values,
+ * and is optimized around the arena allocator design. This file is part of
+ * the Jack's Standard Library project.
  * 
  * ## Documentation
  * 
- * See `docs/jsl_str_to_str_multimap.md` for a formatted documentation page.
+ * See `docs/jsl_str_to_str_map.md` for a formatted documentation page.
  * 
  * ## Usage
  * 
- * 1. Copy the `jsl_str_to_str_multimap.h` file into your repo
+ * 1. Copy the `jsl_str_to_str_map.h` file into your repo
  * 2. Include the header like normally in each source file where you use it:
  * 
  * ```c
- * #include "jsl_str_to_str_multimap.h"
+ * #include "jsl_str_to_str_map.h"
  * ```
  * 
  * 3. Then, in ONE AND ONLY ONE file, do this:
  * 
  * ```c
  * #define JSL_STR_TO_STR_MAP_IMPLEMENTATION
- * #include "jsl_str_to_str_multimap.h"
+ * #include "jsl_str_to_str_map.h"
  * ```
  * 
- * **IMPORTANT**: The multimap also requires that the implementation of
- * `jsl_core.h` be in the same executable.
+ * **IMPORTANT**: The map also requires that the implementation of
+ * `jsl_core.h` be available at link time.
  * 
- * This should probably be in the same file as your entrypoint function,
+ * The implementation should probably be in the same file as your entrypoint function,
  * but it doesn't have to be. It's also common to put this into an otherwise
  * empty file for easier integration to standard C/C++ build systems.
  * 
  * ## Caveats
  * 
- * This multimap uses arenas, so some wasted memory is indeveatble. Care has
+ * This map uses arenas, so some wasted memory is indeveatble. Care has
  * been taken to reuse as much allocated memory as possible. But if your
- * multimap is long lived it's possible to start exhausting the arena with
+ * map is long lived it's possible to start exhausting the arena with
  * old memory.
  * 
  * Remember to
@@ -98,16 +98,47 @@
     #endif
 
     /**
-     * This is an open addressed, hash based map with linear probing that maps
-     * JSLFatPtr keys to JSLFatPtr values.
+     * This is an open addressed hash map with linear probing that maps
+     * JSLFatPtr keys to JSLFatPtr values. This map uses rapidhash, which
+     * is a avalanche hash with a configurable seed value for protection
+     * against hash flooding attacks.
      * 
      * Example:
      *
-     * TODO: docs
+     * ```
+     * uint8_t buffer[JSL_KILOBYTES(16)];
+     * JSLArena stack_arena = JSL_ARENA_FROM_STACK(buffer);
+     *
+     * JSLStrToStrMap map;
+     * jsl_str_to_str_map_init(&map, &stack_arena, 0);
+     *
+     * JSLFatPtr key = JSL_FATPTR_INITIALIZER("hello-key");
+     * 
+     * jsl_str_to_str_multimap_insert(
+     *     &map,
+     *     key,
+     *     JSL_STRING_LIFETIME_STATIC,
+     *     JSL_FATPTR_EXPRESSION("hello-value"),
+     *     JSL_STRING_LIFETIME_STATIC
+     * );
+     * 
+     * JSLFatPtr value
+     * jsl_str_to_str_map_get(&map, key, &value);
+     * ```
      * 
      * ## Functions
      *
-     * TODO: docs
+     *  * jsl_str_to_str_map_init
+     *  * jsl_str_to_str_map_init2
+     *  * jsl_str_to_str_map_item_count
+     *  * jsl_str_to_str_map_has_key
+     *  * jsl_str_to_str_map_insert
+     *  * jsl_str_to_str_map_get
+     *  * jsl_str_to_str_map_key_value_iterator_init
+     *  * jsl_str_to_str_map_key_value_iterator_next
+     *  * jsl_str_to_str_map_delete
+     *  * jsl_str_to_str_map_clear
+     *
      */
     typedef struct JSL__StrToStrMap JSLStrToStrMap;
 
@@ -121,8 +152,8 @@
      * 
      * ## Functions
      *
-     * * jsl_str_to_str_map_key_value_iterator_init
-     * * jsl_str_to_str_map_key_value_iterator_next
+     *  * jsl_str_to_str_map_key_value_iterator_init
+     *  * jsl_str_to_str_map_key_value_iterator_next
      */
     typedef struct JSL__StrToStrMapKeyValueIter JSLStrToStrMapKeyValueIter;
 
@@ -211,6 +242,20 @@
     );
 
     /**
+     * Get the value of the key.
+     *
+     * @param map Map to search.
+     * @param key Key to search for.
+     * @param out_value Output parameter that will be filled with the value if successful
+     * @returns A bool indicating success or failure
+     */
+    JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_get(
+        JSLStrToStrMap* map,
+        JSLFatPtr key,
+        JSLFatPtr* out_value
+    );
+
+    /**
      * Initialize an iterator that visits every key/value pair in the map.
      * 
      * Example:
@@ -229,8 +274,7 @@
      * }
      * ```
      *
-     * Values for a key are returned before moving on to the next occupied slot,
-     * and the overall traversal order is undefined. The iterator is invalidated
+     * Overall traversal order is undefined. The iterator is invalidated
      * if the map is mutated after initialization.
      *
      * @param map Map to iterate over; must be initialized.
@@ -261,9 +305,9 @@
      * }
      * ```
      *
-     * Returns the next key/value pair for the map, visiting all values for
-     * a key before moving on. The iterator must be initialized and is
-     * invalidated if the map is mutated; iteration order is undefined.
+     * Returns the next key/value pair for the map. The iterator must be
+     * initialized and is invalidated if the map is mutated; iteration order
+     * is undefined.
      *
      * @param iterator Iterator to advance.
      * @param out_key Output for the current key.
@@ -277,12 +321,10 @@
     );
 
     /**
-     * Remove a key and all of its values.
+     * Remove a key/value.
      *
-     * Reclaims the key entry and value nodes into internal free lists without
-     * releasing arena memory. Iterators become invalid. If the key is not
-     * present or parameters are invalid, the map is unchanged and `false` is
-     * returned.
+     * Iterators become invalid. If the key is not present or parameters are invalid,
+     * the map is unchanged and `false` is returned.
      *
      * @param map Map to mutate.
      * @param key Key to remove.
@@ -294,10 +336,7 @@
     );
 
     /**
-     * Remove all keys and values from the map.
-     *
-     * All entries and values are recycled into free lists for reuse; arena
-     * allocations are retained. Iterators become invalid.
+     * Remove all keys and values from the map.  Iterators become invalid.
      *
      * @param map Map to clear.
      */
@@ -826,7 +865,47 @@
 
         return lut_index > -1 && existing_found;
     }
+    
+    JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_get(
+        JSLStrToStrMap* map,
+        JSLFatPtr key,
+        JSLFatPtr* out_value
+    )
+    {
+        bool res = false;
 
+        bool params_valid = (
+            map != NULL
+            && map->sentinel == JSL__MAP_PRIVATE_SENTINEL
+            && map->entry_lookup_table != NULL
+            && out_value != NULL
+            && key.data != NULL 
+            && key.length > -1
+        );
+
+        uint64_t hash = 0;
+        int64_t lut_index = -1;
+        bool existing_found = false;
+
+        if (params_valid)
+        {
+            jsl__str_to_str_map_probe(map, key, &lut_index, &hash, &existing_found);
+        }
+
+        if (params_valid && existing_found && lut_index > -1)
+        {
+            struct JSL__StrToStrMapEntry* entry =
+                (struct JSL__StrToStrMapEntry*) map->entry_lookup_table[lut_index];
+            *out_value = entry->value;
+            res = true;
+        }
+        else if (out_value != NULL)
+        {
+            *out_value = (JSLFatPtr) {0};
+        }
+
+        return res;
+    }
 
     JSL_STR_TO_STR_MAP_DEF int64_t jsl_str_to_str_map_item_count(
         JSLStrToStrMap* map
