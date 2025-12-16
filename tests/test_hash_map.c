@@ -37,23 +37,23 @@
 
 #include "minctest.h"
 #include "test_hash_map_types.h"
-#include "hash_maps/static_comp2_to_int_map.h"
-#include "hash_maps/static_comp3_to_comp2_map.h"
-#include "hash_maps/static_int32_to_comp1_map.h"
-#include "hash_maps/static_int32_to_int32_map.h"
+#include "hash_maps/fixed_comp2_to_int_map.h"
+#include "hash_maps/fixed_comp3_to_comp2_map.h"
+#include "hash_maps/fixed_int32_to_comp1_map.h"
+#include "hash_maps/fixed_int32_to_int32_map.h"
 
 const int64_t arena_size = JSL_MEGABYTES(32);
 JSLArena global_arena;
 
-static void test_static_insert(void)
+static void test_fixed_insert(void)
 {
     jsl_arena_reset(&global_arena);
 
     {
-        StaticIntToIntMap hashmap;
-        static_int32_to_int32_map_init(&hashmap, &global_arena, 256, 0);
+        FixedIntToIntMap hashmap;
+        fixed_int32_to_int32_map_init(&hashmap, &global_arena, 256, 0);
 
-        int32_t insert_res = static_int32_to_int32_map_insert(&hashmap, 42, 999);
+        int32_t insert_res = fixed_int32_to_int32_map_insert(&hashmap, 42, 999);
 
         TEST_BOOL(insert_res);
         TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 1);
@@ -61,7 +61,7 @@ static void test_static_insert(void)
         // test max item count behavior
         for (int32_t i = 0; i < 300; i++)
         {
-            static_int32_to_int32_map_insert(&hashmap, i, 999);
+            fixed_int32_to_int32_map_insert(&hashmap, i, 999);
         }
 
         TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 256);
@@ -70,13 +70,13 @@ static void test_static_insert(void)
     jsl_arena_reset(&global_arena);
 
     {
-        StaticIntToCompositeType1Map hashmap;
-        static_int32_to_comp1_map_init(&hashmap, &global_arena, 256, 0);
+        FixedIntToCompositeType1Map hashmap;
+        fixed_int32_to_comp1_map_init(&hashmap, &global_arena, 256, 0);
 
         CompositeType1 value;
         value.a = 887;
         value.b = 56784587;
-        int32_t insert_res = static_int32_to_comp1_map_insert(&hashmap, 4875847, value);
+        int32_t insert_res = fixed_int32_to_comp1_map_insert(&hashmap, 4875847, value);
 
         TEST_BOOL(insert_res);
         TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 1);
@@ -84,7 +84,7 @@ static void test_static_insert(void)
         // test max item count behavior
         for (int32_t i = 0; i < 300; i++)
         {
-            static_int32_to_comp1_map_insert(&hashmap, i, value);
+            fixed_int32_to_comp1_map_insert(&hashmap, i, value);
         }
 
         TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 256);
@@ -93,14 +93,14 @@ static void test_static_insert(void)
     jsl_arena_reset(&global_arena);
 
     {
-        StaticCompositeType2ToIntMap hashmap;
-        static_comp2_to_int_map_init(&hashmap, &global_arena, 256, 0);
+        FixedCompositeType2ToIntMap hashmap;
+        fixed_comp2_to_int_map_init(&hashmap, &global_arena, 256, 0);
 
         CompositeType2 key;
         key.a = 5497684;
         key.b = 84656;
         key.c = true;
-        int32_t insert_res = static_comp2_to_int_map_insert(&hashmap, key, 849594759);
+        int32_t insert_res = fixed_comp2_to_int_map_insert(&hashmap, key, 849594759);
 
         TEST_BOOL(insert_res);
         TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 1);
@@ -112,7 +112,7 @@ static void test_static_insert(void)
             key1.a = i;
             key1.b = 84656;
             key1.c = true;
-            static_comp2_to_int_map_insert(&hashmap, key1, 849594759);
+            fixed_comp2_to_int_map_insert(&hashmap, key1, 849594759);
         }
 
         TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 256);
@@ -121,8 +121,8 @@ static void test_static_insert(void)
     jsl_arena_reset(&global_arena);
 
     {
-        StaticCompositeType3ToCompositeType2Map hashmap;
-        static_comp3_to_comp2_map_init(&hashmap, &global_arena, 256, 0);
+        FixedCompositeType3ToCompositeType2Map hashmap;
+        fixed_comp3_to_comp2_map_init(&hashmap, &global_arena, 256, 0);
 
         CompositeType3 key = {
             82154,
@@ -137,7 +137,7 @@ static void test_static_insert(void)
         value.a = 5497684;
         value.b = 84656;
         value.c = true;
-        int32_t insert_res = static_comp3_to_comp2_map_insert(&hashmap, key, value);
+        int32_t insert_res = fixed_comp3_to_comp2_map_insert(&hashmap, key, value);
 
         TEST_BOOL(insert_res);
         TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 1);
@@ -154,7 +154,7 @@ static void test_static_insert(void)
                 79725,
                 192849
             };
-            static_comp3_to_comp2_map_insert(&hashmap, key1, value);
+            fixed_comp3_to_comp2_map_insert(&hashmap, key1, value);
         }
 
         TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 256);
@@ -163,72 +163,72 @@ static void test_static_insert(void)
     jsl_arena_reset(&global_arena);
 }
 
-static void test_static_get(void)
+static void test_fixed_get(void)
 {
     jsl_arena_reset(&global_arena);
 
     {
-        StaticIntToIntMap hashmap;
-        static_int32_to_int32_map_init(&hashmap, &global_arena, 256, 0);
+        FixedIntToIntMap hashmap;
+        fixed_int32_to_int32_map_init(&hashmap, &global_arena, 256, 0);
 
-        int32_t insert_res = static_int32_to_int32_map_insert(&hashmap, 8976, 1111);
+        int32_t insert_res = fixed_int32_to_int32_map_insert(&hashmap, 8976, 1111);
         TEST_BOOL(insert_res == true);
 
-        int32_t* get_res = static_int32_to_int32_map_get(&hashmap, 1112);
+        int32_t* get_res = fixed_int32_to_int32_map_get(&hashmap, 1112);
         TEST_BOOL(get_res == NULL);
 
-        get_res = static_int32_to_int32_map_get(&hashmap, 8976);
+        get_res = fixed_int32_to_int32_map_get(&hashmap, 8976);
         TEST_BOOL(*get_res == 1111);
     }
 
     jsl_arena_reset(&global_arena);
 
     {
-        StaticIntToCompositeType1Map hashmap;
-        static_int32_to_comp1_map_init(&hashmap, &global_arena, 256, 0);
+        FixedIntToCompositeType1Map hashmap;
+        fixed_int32_to_comp1_map_init(&hashmap, &global_arena, 256, 0);
 
         CompositeType1 value = {0};
         value.a = 887;
         value.b = 56784587;
 
-        int32_t insert_res = static_int32_to_comp1_map_insert(&hashmap, 585678435, value);
+        int32_t insert_res = fixed_int32_to_comp1_map_insert(&hashmap, 585678435, value);
         TEST_BOOL(insert_res == true);
 
-        CompositeType1* get_res = static_int32_to_comp1_map_get(&hashmap, 809367483);
+        CompositeType1* get_res = fixed_int32_to_comp1_map_get(&hashmap, 809367483);
         TEST_BOOL(get_res == NULL);
 
-        get_res = static_int32_to_comp1_map_get(&hashmap, 585678435);
+        get_res = fixed_int32_to_comp1_map_get(&hashmap, 585678435);
         TEST_BOOL(memcmp(get_res, &value, sizeof(CompositeType1)) == 0);
     }
 
     jsl_arena_reset(&global_arena);
 
     {
-        StaticCompositeType2ToIntMap hashmap;
-        static_comp2_to_int_map_init(&hashmap, &global_arena, 256, 0);
+        FixedCompositeType2ToIntMap hashmap;
+        fixed_comp2_to_int_map_init(&hashmap, &global_arena, 256, 0);
 
         CompositeType2 key = {0};
         key.a = 36463453;
         key.b = true;
 
-        int32_t insert_res = static_comp2_to_int_map_insert(&hashmap, key, 777777);
+        int32_t insert_res = fixed_comp2_to_int_map_insert(&hashmap, key, 777777);
         TEST_BOOL(insert_res == true);
 
         CompositeType2 bad_key = {0};
         bad_key.a = 36463453;
         bad_key.b = false;
-        int32_t* get_res = static_comp2_to_int_map_get(&hashmap, bad_key);
+        int32_t* get_res = fixed_comp2_to_int_map_get(&hashmap, bad_key);
         TEST_BOOL(get_res == NULL);
 
-        get_res = static_comp2_to_int_map_get(&hashmap, key);
+        get_res = fixed_comp2_to_int_map_get(&hashmap, key);
         TEST_BOOL(*get_res == 777777);
     }
 
     jsl_arena_reset(&global_arena);
 
     {
-        StaticCompositeType3ToCompositeType2Map hashmap;
-        static_comp3_to_comp2_map_init(&hashmap, &global_arena, 256, 0);
+        FixedCompositeType3ToCompositeType2Map hashmap;
+        fixed_comp3_to_comp2_map_init(&hashmap, &global_arena, 256, 0);
 
         CompositeType3 key = {
             82154,
@@ -245,56 +245,56 @@ static void test_static_get(void)
         value.b = 56784587;
         value.c = false;
 
-        int32_t insert_res = static_comp3_to_comp2_map_insert(&hashmap, key, value);
+        int32_t insert_res = fixed_comp3_to_comp2_map_insert(&hashmap, key, value);
         TEST_BOOL(insert_res == true);
 
         CompositeType3 bad_key = key;
         bad_key.a = 36463453;
-        CompositeType2* get_res = static_comp3_to_comp2_map_get(&hashmap, bad_key);
+        CompositeType2* get_res = fixed_comp3_to_comp2_map_get(&hashmap, bad_key);
         TEST_BOOL(get_res == NULL);
 
-        get_res = static_comp3_to_comp2_map_get(&hashmap, key);
+        get_res = fixed_comp3_to_comp2_map_get(&hashmap, key);
         TEST_BOOL(memcmp(get_res, &value, sizeof(CompositeType2)) == 0);
     }
 
     jsl_arena_reset(&global_arena);
 }
 
-static void test_static_delete(void)
+static void test_fixed_delete(void)
 {
     jsl_arena_reset(&global_arena);
 
     {
-        StaticIntToIntMap hashmap;
-        static_int32_to_int32_map_init(&hashmap, &global_arena, 256, 0);
+        FixedIntToIntMap hashmap;
+        fixed_int32_to_int32_map_init(&hashmap, &global_arena, 256, 0);
 
-        bool insert_res = static_int32_to_int32_map_insert(&hashmap, 567687, 3546757);
+        bool insert_res = fixed_int32_to_int32_map_insert(&hashmap, 567687, 3546757);
         TEST_BOOL(insert_res == true);
 
-        insert_res = static_int32_to_int32_map_insert(&hashmap, 23940, 3546757);
+        insert_res = fixed_int32_to_int32_map_insert(&hashmap, 23940, 3546757);
         TEST_BOOL(insert_res == true);
 
-        insert_res = static_int32_to_int32_map_insert(&hashmap, 48686, 3546757);
+        insert_res = fixed_int32_to_int32_map_insert(&hashmap, 48686, 3546757);
         TEST_BOOL(insert_res == true);
 
         TEST_BOOL(hashmap.item_count == 3);
 
-        bool delete_res = static_int32_to_int32_map_delete(&hashmap, 9999999);
+        bool delete_res = fixed_int32_to_int32_map_delete(&hashmap, 9999999);
         TEST_BOOL(delete_res == false);
         TEST_BOOL(hashmap.item_count == 3);
 
-        delete_res = static_int32_to_int32_map_delete(&hashmap, 23940);
+        delete_res = fixed_int32_to_int32_map_delete(&hashmap, 23940);
         TEST_BOOL(delete_res == true);
         TEST_BOOL(hashmap.item_count == 2);
 
         int64_t count = 0;
-        StaticIntToIntMapIterator iter;
+        FixedIntToIntMapIterator iter;
         int32_t iter_key;
         int32_t iter_value;
-        bool iter_ok = static_int32_to_int32_map_iterator_start(&hashmap, &iter);
+        bool iter_ok = fixed_int32_to_int32_map_iterator_start(&hashmap, &iter);
         TEST_BOOL(iter_ok == true);
 
-        while (static_int32_to_int32_map_iterator_next(&iter, &iter_key, &iter_value))
+        while (fixed_int32_to_int32_map_iterator_next(&iter, &iter_key, &iter_value))
         {
             TEST_BOOL(iter_key != 23940);
             ++count;
@@ -307,43 +307,43 @@ static void test_static_delete(void)
     jsl_arena_reset(&global_arena);
 
     {
-        StaticIntToCompositeType1Map hashmap;
-        static_int32_to_comp1_map_init(&hashmap, &global_arena, 256, 0);
+        FixedIntToCompositeType1Map hashmap;
+        fixed_int32_to_comp1_map_init(&hashmap, &global_arena, 256, 0);
 
         CompositeType1 value;
         value.a = 887;
         value.b = 56784587;
-        bool insert_res = static_int32_to_comp1_map_insert(&hashmap, 567687, value);
+        bool insert_res = fixed_int32_to_comp1_map_insert(&hashmap, 567687, value);
         TEST_BOOL(insert_res == true);
 
-        insert_res = static_int32_to_comp1_map_insert(&hashmap, 23940, value);
+        insert_res = fixed_int32_to_comp1_map_insert(&hashmap, 23940, value);
         TEST_BOOL(insert_res == true);
 
-        insert_res = static_int32_to_comp1_map_insert(&hashmap, 48686, value);
+        insert_res = fixed_int32_to_comp1_map_insert(&hashmap, 48686, value);
         TEST_BOOL(insert_res == true);
 
         TEST_BOOL(hashmap.item_count == 3);
 
-        bool delete_res = static_int32_to_comp1_map_delete(&hashmap, 9999999);
+        bool delete_res = fixed_int32_to_comp1_map_delete(&hashmap, 9999999);
         TEST_BOOL(delete_res == false);
         TEST_BOOL(hashmap.item_count == 3);
 
-        delete_res = static_int32_to_comp1_map_delete(&hashmap, 23940);
+        delete_res = fixed_int32_to_comp1_map_delete(&hashmap, 23940);
         TEST_BOOL(delete_res == true);
         TEST_BOOL(hashmap.item_count == 2);
 
         int64_t count = 0;
 
-        StaticIntToCompositeType1MapIterator iter;
+        FixedIntToCompositeType1MapIterator iter;
         int32_t iter_key;
         CompositeType1 iter_value;
 
-        bool iter_ok = static_int32_to_comp1_map_iterator_start(&hashmap, &iter);
+        bool iter_ok = fixed_int32_to_comp1_map_iterator_start(&hashmap, &iter);
         TEST_BOOL(iter_ok == true);
 
         TEST_BOOL(iter_ok == true);
 
-        while (static_int32_to_comp1_map_iterator_next(&iter, &iter_key, &iter_value))
+        while (fixed_int32_to_comp1_map_iterator_next(&iter, &iter_key, &iter_value))
         {
             TEST_BOOL(iter_key != 23940);
             ++count;
@@ -356,42 +356,42 @@ static void test_static_delete(void)
     jsl_arena_reset(&global_arena);
 
     {
-        StaticCompositeType2ToIntMap hashmap;
-        static_comp2_to_int_map_init(&hashmap, &global_arena, 256, 0);
+        FixedCompositeType2ToIntMap hashmap;
+        fixed_comp2_to_int_map_init(&hashmap, &global_arena, 256, 0);
 
         CompositeType2 key1 = { .a = 67, .b = false };
         CompositeType2 key2 = { .a = 67, .b = true };
         CompositeType2 key3 = { .a = 1434, .b = true };
         CompositeType2 key4 = { .a = 0, .b = false };
 
-        bool insert_res = static_comp2_to_int_map_insert(&hashmap, key1, 58678568);
+        bool insert_res = fixed_comp2_to_int_map_insert(&hashmap, key1, 58678568);
         TEST_BOOL(insert_res == true);
 
-        insert_res = static_comp2_to_int_map_insert(&hashmap, key2, 58678568);
+        insert_res = fixed_comp2_to_int_map_insert(&hashmap, key2, 58678568);
         TEST_BOOL(insert_res == true);
 
-        insert_res = static_comp2_to_int_map_insert(&hashmap, key3, 58678568);
+        insert_res = fixed_comp2_to_int_map_insert(&hashmap, key3, 58678568);
         TEST_BOOL(insert_res == true);
 
         TEST_BOOL(hashmap.item_count == 3);
 
-        bool delete_res = static_comp2_to_int_map_delete(&hashmap, key4);
+        bool delete_res = fixed_comp2_to_int_map_delete(&hashmap, key4);
         TEST_BOOL(delete_res == false);
         TEST_BOOL(hashmap.item_count == 3);
 
-        delete_res = static_comp2_to_int_map_delete(&hashmap, key2);
+        delete_res = fixed_comp2_to_int_map_delete(&hashmap, key2);
         TEST_BOOL(delete_res == true);
         TEST_BOOL(hashmap.item_count == 2);
 
         int64_t count = 0;
-        StaticCompositeType2ToIntMapIterator iter;
+        FixedCompositeType2ToIntMapIterator iter;
         CompositeType2 iter_key;
         int32_t iter_value;
 
-        bool iter_ok = static_comp2_to_int_map_iterator_start(&hashmap, &iter);
+        bool iter_ok = fixed_comp2_to_int_map_iterator_start(&hashmap, &iter);
         TEST_BOOL(iter_ok == true);
 
-        while (static_comp2_to_int_map_iterator_next(&iter, &iter_key, &iter_value))
+        while (fixed_comp2_to_int_map_iterator_next(&iter, &iter_key, &iter_value))
         {
             TEST_BOOL(memcmp(&iter_key, &key2, sizeof(CompositeType2)) != 0);
             ++count;
@@ -404,8 +404,8 @@ static void test_static_delete(void)
     jsl_arena_reset(&global_arena);
 
     {
-        StaticCompositeType3ToCompositeType2Map hashmap;
-        static_comp3_to_comp2_map_init(&hashmap, &global_arena, 256, 0);
+        FixedCompositeType3ToCompositeType2Map hashmap;
+        fixed_comp3_to_comp2_map_init(&hashmap, &global_arena, 256, 0);
 
         CompositeType3 key1 = {
             82154,
@@ -448,34 +448,34 @@ static void test_static_delete(void)
         value.a = 887;
         value.b = 56784587;
         value.c = false;
-        bool insert_res = static_comp3_to_comp2_map_insert(&hashmap, key1, value);
+        bool insert_res = fixed_comp3_to_comp2_map_insert(&hashmap, key1, value);
         TEST_BOOL(insert_res == true);
 
-        insert_res = static_comp3_to_comp2_map_insert(&hashmap, key2, value);
+        insert_res = fixed_comp3_to_comp2_map_insert(&hashmap, key2, value);
         TEST_BOOL(insert_res == true);
 
-        insert_res = static_comp3_to_comp2_map_insert(&hashmap, key3, value);
+        insert_res = fixed_comp3_to_comp2_map_insert(&hashmap, key3, value);
         TEST_BOOL(insert_res == true);
 
         TEST_BOOL(hashmap.item_count == 3);
 
-        bool delete_res = static_comp3_to_comp2_map_delete(&hashmap, key4);
+        bool delete_res = fixed_comp3_to_comp2_map_delete(&hashmap, key4);
         TEST_BOOL(delete_res == false);
         TEST_BOOL(hashmap.item_count == 3);
 
-        delete_res = static_comp3_to_comp2_map_delete(&hashmap, key2);
+        delete_res = fixed_comp3_to_comp2_map_delete(&hashmap, key2);
         TEST_BOOL(delete_res == true);
         TEST_BOOL(hashmap.item_count == 2);
 
         int64_t count = 0;
-        StaticCompositeType3ToCompositeType2MapIterator iter;
+        FixedCompositeType3ToCompositeType2MapIterator iter;
         CompositeType3 iter_key;
         CompositeType2 iter_value;
 
-        bool iter_ok = static_comp3_to_comp2_map_iterator_start(&hashmap, &iter);
+        bool iter_ok = fixed_comp3_to_comp2_map_iterator_start(&hashmap, &iter);
         TEST_BOOL(iter_ok == true);
 
-        while (static_comp3_to_comp2_map_iterator_next(&iter, &iter_key, &iter_value))
+        while (fixed_comp3_to_comp2_map_iterator_next(&iter, &iter_key, &iter_value))
         {
             TEST_BOOL(memcmp(&iter_key, &key2, sizeof(CompositeType3)) != 0);
             ++count;
@@ -488,42 +488,42 @@ static void test_static_delete(void)
     jsl_arena_reset(&global_arena);
 }
 
-static void test_static_iterator(void)
+static void test_fixed_iterator(void)
 {
     jsl_arena_reset(&global_arena);
 
     {
-        StaticIntToIntMap hashmap;
-        static_int32_to_int32_map_init(&hashmap, &global_arena, 500, 0);
+        FixedIntToIntMap hashmap;
+        fixed_int32_to_int32_map_init(&hashmap, &global_arena, 500, 0);
 
         for (int32_t i = 0; i < 300; ++i)
         {
-            int32_t res = static_int32_to_int32_map_insert(&hashmap, i, i);
+            int32_t res = fixed_int32_to_int32_map_insert(&hashmap, i, i);
             TEST_BOOL(res == true);
         }
 
         int32_t count = 0;
 
-        StaticIntToIntMapIterator iter;
+        FixedIntToIntMapIterator iter;
         int32_t iter_key;
         int32_t iter_value;
-        bool iter_ok = static_int32_to_int32_map_iterator_start(&hashmap, &iter);
+        bool iter_ok = fixed_int32_to_int32_map_iterator_start(&hashmap, &iter);
         TEST_BOOL(iter_ok == true);
 
-        while (static_int32_to_int32_map_iterator_next(&iter, &iter_key, &iter_value))
+        while (fixed_int32_to_int32_map_iterator_next(&iter, &iter_key, &iter_value))
         {
             ++count;
         }
 
         TEST_INT32_EQUAL(count, 300);
 
-        static_int32_to_int32_map_delete(&hashmap, 100);
+        fixed_int32_to_int32_map_delete(&hashmap, 100);
 
         count = 0;
-        iter_ok = static_int32_to_int32_map_iterator_start(&hashmap, &iter);
+        iter_ok = fixed_int32_to_int32_map_iterator_start(&hashmap, &iter);
         TEST_BOOL(iter_ok == true);
 
-        while (static_int32_to_int32_map_iterator_next(&iter, &iter_key, &iter_value))
+        while (fixed_int32_to_int32_map_iterator_next(&iter, &iter_key, &iter_value))
         {
             ++count;
         }
@@ -534,39 +534,39 @@ static void test_static_iterator(void)
     jsl_arena_reset(&global_arena);
 
     {
-        StaticIntToCompositeType1Map hashmap;
-        static_int32_to_comp1_map_init(&hashmap, &global_arena, 500, 0);
+        FixedIntToCompositeType1Map hashmap;
+        fixed_int32_to_comp1_map_init(&hashmap, &global_arena, 500, 0);
 
         for (int32_t i = 0; i < 300; ++i)
         {
             CompositeType1 value;
             value.a = 887;
             value.b = 56784587;
-            int32_t res = static_int32_to_comp1_map_insert(&hashmap, i, value);
+            int32_t res = fixed_int32_to_comp1_map_insert(&hashmap, i, value);
             TEST_BOOL(res == true);
         }
 
         int32_t count = 0;
-        StaticIntToCompositeType1MapIterator iter;
-        bool iter_ok = static_int32_to_comp1_map_iterator_start(&hashmap, &iter);
+        FixedIntToCompositeType1MapIterator iter;
+        bool iter_ok = fixed_int32_to_comp1_map_iterator_start(&hashmap, &iter);
         TEST_BOOL(iter_ok);
 
         int32_t iter_key;
         CompositeType1 iter_value;
-        while (static_int32_to_comp1_map_iterator_next(&iter, &iter_key, &iter_value))
+        while (fixed_int32_to_comp1_map_iterator_next(&iter, &iter_key, &iter_value))
         {
             ++count;
         }
 
         TEST_INT32_EQUAL(count, 300);
 
-        static_int32_to_comp1_map_delete(&hashmap, 100);
+        fixed_int32_to_comp1_map_delete(&hashmap, 100);
 
         count = 0;
-        iter_ok = static_int32_to_comp1_map_iterator_start(&hashmap, &iter);
+        iter_ok = fixed_int32_to_comp1_map_iterator_start(&hashmap, &iter);
         TEST_BOOL(iter_ok);
 
-        while (static_int32_to_comp1_map_iterator_next(&iter, &iter_key, &iter_value))
+        while (fixed_int32_to_comp1_map_iterator_next(&iter, &iter_key, &iter_value))
         {
             ++count;
         }
@@ -577,8 +577,8 @@ static void test_static_iterator(void)
     jsl_arena_reset(&global_arena);
 
     {
-        StaticCompositeType2ToIntMap hashmap;
-        static_comp2_to_int_map_init(&hashmap, &global_arena, 500, 0);
+        FixedCompositeType2ToIntMap hashmap;
+        fixed_comp2_to_int_map_init(&hashmap, &global_arena, 500, 0);
 
         for (int32_t i = 0; i < 300; ++i)
         {
@@ -586,18 +586,18 @@ static void test_static_iterator(void)
             key.a = i;
             key.b = 10;
             key.c = true;
-            int32_t res = static_comp2_to_int_map_insert(&hashmap, key, i);
+            int32_t res = fixed_comp2_to_int_map_insert(&hashmap, key, i);
             TEST_BOOL(res == true);
         }
 
         int32_t count = 0;
-        StaticCompositeType2ToIntMapIterator iter;
-        bool iter_ok = static_comp2_to_int_map_iterator_start(&hashmap, &iter);
+        FixedCompositeType2ToIntMapIterator iter;
+        bool iter_ok = fixed_comp2_to_int_map_iterator_start(&hashmap, &iter);
         TEST_BOOL(iter_ok);
 
         CompositeType2 iter_key;
         int32_t iter_value;
-        while (static_comp2_to_int_map_iterator_next(&iter, &iter_key, &iter_value))
+        while (fixed_comp2_to_int_map_iterator_next(&iter, &iter_key, &iter_value))
         {
             ++count;
         }
@@ -608,14 +608,14 @@ static void test_static_iterator(void)
         delete_key.a = 100;
         delete_key.b = 10;
         delete_key.c = true;
-        bool del_ok = static_comp2_to_int_map_delete(&hashmap, delete_key);
+        bool del_ok = fixed_comp2_to_int_map_delete(&hashmap, delete_key);
         TEST_BOOL(del_ok);
 
         count = 0;
-        iter_ok = static_comp2_to_int_map_iterator_start(&hashmap, &iter);
+        iter_ok = fixed_comp2_to_int_map_iterator_start(&hashmap, &iter);
         TEST_BOOL(iter_ok);
 
-        while (static_comp2_to_int_map_iterator_next(&iter, &iter_key, &iter_value))
+        while (fixed_comp2_to_int_map_iterator_next(&iter, &iter_key, &iter_value))
         {
             ++count;
         }
@@ -626,8 +626,8 @@ static void test_static_iterator(void)
     jsl_arena_reset(&global_arena);
 
     {
-        StaticCompositeType3ToCompositeType2Map hashmap;
-        static_comp3_to_comp2_map_init(&hashmap, &global_arena, 500, 0);
+        FixedCompositeType3ToCompositeType2Map hashmap;
+        fixed_comp3_to_comp2_map_init(&hashmap, &global_arena, 500, 0);
 
         for (int32_t i = 0; i < 300; ++i)
         {
@@ -638,18 +638,18 @@ static void test_static_iterator(void)
             value.a = 887;
             value.b = i;
 
-            int32_t res = static_comp3_to_comp2_map_insert(&hashmap, key, value);
+            int32_t res = fixed_comp3_to_comp2_map_insert(&hashmap, key, value);
             TEST_BOOL(res == true);
         }
 
         int32_t count = 0;
-        StaticCompositeType3ToCompositeType2MapIterator iter;
-        bool iter_ok = static_comp3_to_comp2_map_iterator_start(&hashmap, &iter);
+        FixedCompositeType3ToCompositeType2MapIterator iter;
+        bool iter_ok = fixed_comp3_to_comp2_map_iterator_start(&hashmap, &iter);
         TEST_BOOL(iter_ok);
 
         CompositeType3 iter_key;
         CompositeType2 iter_value;
-        while (static_comp3_to_comp2_map_iterator_next(&iter, &iter_key, &iter_value))
+        while (fixed_comp3_to_comp2_map_iterator_next(&iter, &iter_key, &iter_value))
         {
             ++count;
         }
@@ -658,13 +658,13 @@ static void test_static_iterator(void)
 
         CompositeType3 delete_key = {0};
         delete_key.a = 100;
-        bool del_ok = static_comp3_to_comp2_map_delete(&hashmap, delete_key);
+        bool del_ok = fixed_comp3_to_comp2_map_delete(&hashmap, delete_key);
         TEST_BOOL(del_ok);
 
         count = 0;
-        iter_ok = static_comp3_to_comp2_map_iterator_start(&hashmap, &iter);
+        iter_ok = fixed_comp3_to_comp2_map_iterator_start(&hashmap, &iter);
         TEST_BOOL(iter_ok);
-        while (static_comp3_to_comp2_map_iterator_next(&iter, &iter_key, &iter_value))
+        while (fixed_comp3_to_comp2_map_iterator_next(&iter, &iter_key, &iter_value))
         {
             ++count;
         }
@@ -859,15 +859,15 @@ static void test_jsl_str_to_str_map_transient_lifetime_copies_data(void)
     TEST_BOOL(saw_long);
 }
 
-static void test_jsl_str_to_str_map_static_lifetime_uses_original_pointers(void)
+static void test_jsl_str_to_str_map_fixed_lifetime_uses_original_pointers(void)
 {
     JSLStrToStrMap map = {0};
     bool ok = jsl_str_to_str_map_init2(&map, &global_arena, 777, 8, 0.65f);
     TEST_BOOL(ok);
     if (!ok) return;
 
-    JSLFatPtr key = JSL_FATPTR_INITIALIZER("static-key");
-    JSLFatPtr value = JSL_FATPTR_INITIALIZER("static-value");
+    JSLFatPtr key = JSL_FATPTR_INITIALIZER("fixed-key");
+    JSLFatPtr value = JSL_FATPTR_INITIALIZER("fixed-value");
 
     const uint8_t* expected_key_ptr = key.data;
     const uint8_t* expected_val_ptr = value.data;
@@ -1179,16 +1179,16 @@ int main(void)
 
     jsl_arena_init(&global_arena, malloc(arena_size), arena_size);
 
-    RUN_TEST_FUNCTION("Test static hashmap insert", test_static_insert);
+    RUN_TEST_FUNCTION("Test fixed hashmap insert", test_fixed_insert);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("Test static hashmap get", test_static_get);
+    RUN_TEST_FUNCTION("Test fixed hashmap get", test_fixed_get);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("Test static hashmap iterator", test_static_iterator);
+    RUN_TEST_FUNCTION("Test fixed hashmap iterator", test_fixed_iterator);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("Test static hashmap delete", test_static_delete);
+    RUN_TEST_FUNCTION("Test fixed hashmap delete", test_fixed_delete);
     jsl_arena_reset(&global_arena);
 
     RUN_TEST_FUNCTION("Test str to str map init success", test_jsl_str_to_str_map_init_success);
@@ -1209,7 +1209,7 @@ int main(void)
     RUN_TEST_FUNCTION("Test str to str map transient lifetime copies", test_jsl_str_to_str_map_transient_lifetime_copies_data);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("Test str to str map static lifetime keeps pointer", test_jsl_str_to_str_map_static_lifetime_uses_original_pointers);
+    RUN_TEST_FUNCTION("Test str to str map static lifetime keeps pointer", test_jsl_str_to_str_map_fixed_lifetime_uses_original_pointers);
     jsl_arena_reset(&global_arena);
 
     RUN_TEST_FUNCTION("Test str to str map empty and binary strings", test_jsl_str_to_str_map_handles_empty_and_binary_strings);

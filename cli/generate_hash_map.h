@@ -6,7 +6,7 @@
 
 typedef enum {
     IMPL_ERROR,
-    IMPL_STATIC,
+    IMPL_FIXED,
     IMPL_DYNAMIC
 } HashMapImplementation;
 

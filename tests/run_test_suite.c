@@ -309,10 +309,10 @@ static UnitTestDecl unit_test_declarations[] = {
         "test_hash_map",
         (char*[]) {
             "tests/test_hash_map.c",
-            "tests/hash_maps/static_comp2_to_int_map.c",
-            "tests/hash_maps/static_comp3_to_comp2_map.c",
-            "tests/hash_maps/static_int32_to_comp1_map.c",
-            "tests/hash_maps/static_int32_to_int32_map.c",
+            "tests/hash_maps/fixed_comp2_to_int_map.c",
+            "tests/hash_maps/fixed_comp3_to_comp2_map.c",
+            "tests/hash_maps/fixed_int32_to_comp1_map.c",
+            "tests/hash_maps/fixed_int32_to_int32_map.c",
             NULL
         }
     }
@@ -320,46 +320,46 @@ static UnitTestDecl unit_test_declarations[] = {
 
 static HashMapDecl hash_map_declarations[] = {
     {
-        "StaticIntToIntMap",
-        "static_int32_to_int32_map",
+        "FixedIntToIntMap",
+        "fixed_int32_to_int32_map",
         "int32_t",
         "int32_t",
-        "--static",
+        "--fixed",
         (char*[]) {
-            "../tests/hash_maps/static_int32_to_int32_map.h",
+            "../tests/hash_maps/fixed_int32_to_int32_map.h",
             "../tests/test_hash_map_types.h", NULL
         }
     },
     {
-        "StaticIntToCompositeType1Map",
-        "static_int32_to_comp1_map",
+        "FixedIntToCompositeType1Map",
+        "fixed_int32_to_comp1_map",
         "int32_t",
         "CompositeType1",
-        "--static",
+        "--fixed",
         (char*[]) {
-            "../tests/hash_maps/static_int32_to_comp1_map.h",
+            "../tests/hash_maps/fixed_int32_to_comp1_map.h",
             "../tests/test_hash_map_types.h", NULL
         }
     },
     {
-        "StaticCompositeType2ToIntMap",
-        "static_comp2_to_int_map",
+        "FixedCompositeType2ToIntMap",
+        "fixed_comp2_to_int_map",
         "CompositeType2",
         "int32_t",
-        "--static",
+        "--fixed",
         (char*[]) {
-            "../tests/hash_maps/static_comp2_to_int_map.h",
+            "../tests/hash_maps/fixed_comp2_to_int_map.h",
             "../tests/test_hash_map_types.h", NULL
         }
     },
     {
-        "StaticCompositeType3ToCompositeType2Map",
-        "static_comp3_to_comp2_map",
+        "FixedCompositeType3ToCompositeType2Map",
+        "fixed_comp3_to_comp2_map",
         "CompositeType3",
         "CompositeType2",
-        "--static",
+        "--fixed",
         (char*[]) {
-            "../tests/hash_maps/static_comp3_to_comp2_map.h",
+            "../tests/hash_maps/fixed_comp3_to_comp2_map.h",
             "../tests/test_hash_map_types.h", NULL
         }
     }

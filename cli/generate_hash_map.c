@@ -65,7 +65,7 @@
  *  - Give warning about composite keys and zero initialization, garbage memory in the padding
  */
 
-JSLFatPtr static_hash_map_docstring = JSL_FATPTR_INITIALIZER("/**\n"
+JSLFatPtr fixed_hash_map_docstring = JSL_FATPTR_INITIALIZER("/**\n"
 " * AUTO GENERATED FILE\n"
 " *\n"
 " * This file contains the %y for a hash map `%y` which maps\n"
@@ -94,7 +94,7 @@ JSLFatPtr static_hash_map_docstring = JSL_FATPTR_INITIALIZER("/**\n"
 " * want a normal hash map either as you'd be streaming things in and out of memory).\n"
 " */\n\n");
 
-JSLFatPtr static_map_type_typedef = JSL_FATPTR_INITIALIZER("/**\n"
+JSLFatPtr fixed_map_type_typedef = JSL_FATPTR_INITIALIZER("/**\n"
 " * A hash map which maps `%y` keys to `%y` values.\n"
 " *\n"
 " * This hash map uses open addressing with linear probing. However, it never grows.\n"
@@ -116,7 +116,7 @@ JSLFatPtr static_map_type_typedef = JSL_FATPTR_INITIALIZER("/**\n"
 "\n"
 );
 
-JSLFatPtr static_map_iterator_typedef = JSL_FATPTR_INITIALIZER("/**\n"
+JSLFatPtr fixed_map_iterator_typedef = JSL_FATPTR_INITIALIZER("/**\n"
 " * Iterator type which is used by the iterator functions to\n"
 " * allow you to loop over the hash map contents.\n"
 " */\n"
@@ -128,7 +128,7 @@ JSLFatPtr static_map_iterator_typedef = JSL_FATPTR_INITIALIZER("/**\n"
 "\n"
 );
 
-JSLFatPtr static_find_res_struct = JSL_FATPTR_INITIALIZER(""
+JSLFatPtr fixed_find_res_struct = JSL_FATPTR_INITIALIZER(""
 "struct %yFindRes {\n"
 "    int64_t value_index;\n"
 "    int64_t is_set_array_index;\n"
@@ -138,7 +138,7 @@ JSLFatPtr static_find_res_struct = JSL_FATPTR_INITIALIZER(""
 "\n"
 );
 
-JSLFatPtr static_init_function_signature = JSL_FATPTR_INITIALIZER("/**\n"
+JSLFatPtr fixed_init_function_signature = JSL_FATPTR_INITIALIZER("/**\n"
 " * Initialize an instance of the hash map.\n"
 " *\n"
 " * All of the memory that this hash map will need will be allocated from the passed in arena.\n"
@@ -170,7 +170,7 @@ JSLFatPtr static_init_function_signature = JSL_FATPTR_INITIALIZER("/**\n"
 "    uint64_t seed\n"
 ");\n\n");
 
-JSLFatPtr static_insert_function_signature = JSL_FATPTR_INITIALIZER("/**\n"
+JSLFatPtr fixed_insert_function_signature = JSL_FATPTR_INITIALIZER("/**\n"
 " * Insert the given value into the hash map. If the key already exists in "
 " * the map the value will be overwritten. If the key type for this hash map\n"
 " * is a pointer, then a NULL key is a valid key type.\n"
@@ -186,7 +186,7 @@ JSLFatPtr static_insert_function_signature = JSL_FATPTR_INITIALIZER("/**\n"
 "    %y value\n"
 ");\n\n");
 
-JSLFatPtr static_get_function_signature = JSL_FATPTR_INITIALIZER("/**\n"
+JSLFatPtr fixed_get_function_signature = JSL_FATPTR_INITIALIZER("/**\n"
 " * Get a value from the hash map if it exists. If it does not NULL is returned\n"
 " *\n"
 " * The pointer returned actually points to value stored inside of hash map.\n"
@@ -203,7 +203,7 @@ JSLFatPtr static_get_function_signature = JSL_FATPTR_INITIALIZER("/**\n"
 ");\n\n"
 );
 
-JSLFatPtr static_delete_function_signature = JSL_FATPTR_INITIALIZER("/**\n"
+JSLFatPtr fixed_delete_function_signature = JSL_FATPTR_INITIALIZER("/**\n"
 " * Remove a key/value pair from the hash map if it exists.\n"
 " * If it does not false is returned\n"
 " */\n"
@@ -213,7 +213,7 @@ JSLFatPtr static_delete_function_signature = JSL_FATPTR_INITIALIZER("/**\n"
 ");\n\n"
 );
 
-JSLFatPtr static_iterator_start_function_signature = JSL_FATPTR_INITIALIZER("/**\n"
+JSLFatPtr fixed_iterator_start_function_signature = JSL_FATPTR_INITIALIZER("/**\n"
 " * Create a new iterator over this hash map.\n"
 " *\n"
 " * An iterator is a struct which holds enough state that it allows a loop to visit\n"
@@ -240,7 +240,7 @@ JSLFatPtr static_iterator_start_function_signature = JSL_FATPTR_INITIALIZER("/**
 "    %yIterator* iterator\n"
 ");\n\n");
 
-JSLFatPtr static_iterator_next_function_signature = JSL_FATPTR_INITIALIZER("/**\n"
+JSLFatPtr fixed_iterator_next_function_signature = JSL_FATPTR_INITIALIZER("/**\n"
 " * Iterate over the hash map. If a key/value was found then true is returned.\n"
 " *\n"
 " * Example usage:\n"
@@ -261,7 +261,7 @@ JSLFatPtr static_iterator_next_function_signature = JSL_FATPTR_INITIALIZER("/**\
 ");\n\n"
 );
 
-JSLFatPtr static_init_function_code = JSL_FATPTR_INITIALIZER(""
+JSLFatPtr fixed_init_function_code = JSL_FATPTR_INITIALIZER(""
 "bool %y_init(\n"
 "    %y* hash_map,\n"
 "    JSLArena* arena,\n"
@@ -307,7 +307,7 @@ JSLFatPtr static_init_function_code = JSL_FATPTR_INITIALIZER(""
 "    return true;\n"
 "}\n\n");
 
-JSLFatPtr static_hash_function_code = JSL_FATPTR_INITIALIZER(""
+JSLFatPtr fixed_hash_function_code = JSL_FATPTR_INITIALIZER(""
 "static inline struct %yFindRes %y_hash_and_find_slot(\n"
 "    %y* hash_map,\n"
 "    %y key,\n"
@@ -387,7 +387,7 @@ JSLFatPtr static_hash_function_code = JSL_FATPTR_INITIALIZER(""
 "    return return_value;\n"
 "}\n\n");
 
-JSLFatPtr static_insert_function_code = JSL_FATPTR_INITIALIZER(""
+JSLFatPtr fixed_insert_function_code = JSL_FATPTR_INITIALIZER(""
 "bool %y_insert(\n"
 "    %y* hash_map,\n"
 "    %y key,\n"
@@ -441,7 +441,7 @@ JSLFatPtr static_insert_function_code = JSL_FATPTR_INITIALIZER(""
 "    return insert_success;\n"
 "}\n\n");
 
-JSLFatPtr static_get_function_code = JSL_FATPTR_INITIALIZER(""
+JSLFatPtr fixed_get_function_code = JSL_FATPTR_INITIALIZER(""
 "%y* %y_get(\n"
 "    %y* hash_map,\n"
 "    %y key\n"
@@ -466,7 +466,7 @@ JSLFatPtr static_get_function_code = JSL_FATPTR_INITIALIZER(""
 "    return res;\n"
 "}\n\n");
 
-JSLFatPtr static_delete_function_code = JSL_FATPTR_INITIALIZER(""
+JSLFatPtr fixed_delete_function_code = JSL_FATPTR_INITIALIZER(""
 "bool %y_delete(\n"
 "    %y* hash_map,\n"
 "    %y key\n"
@@ -498,7 +498,7 @@ JSLFatPtr static_delete_function_code = JSL_FATPTR_INITIALIZER(""
 "    return success;\n"
 "}\n\n");
 
-JSLFatPtr static_iterator_start_function_code = JSL_FATPTR_INITIALIZER(""
+JSLFatPtr fixed_iterator_start_function_code = JSL_FATPTR_INITIALIZER(""
 "bool %y_iterator_start(\n"
 "    %y* hash_map,\n"
 "    %yIterator* iterator\n"
@@ -521,7 +521,7 @@ JSLFatPtr static_iterator_start_function_code = JSL_FATPTR_INITIALIZER(""
 "    return iterator;\n"
 "}\n\n");
 
-JSLFatPtr static_iterator_next_function_code = JSL_FATPTR_INITIALIZER(""
+JSLFatPtr fixed_iterator_next_function_code = JSL_FATPTR_INITIALIZER(""
 "bool %y_iterator_next(\n"
 "    %yIterator* iterator,\n"
 "    %y* key,\n"
@@ -692,7 +692,7 @@ void write_hash_map_header(
 
     jsl_string_builder_format(
         builder,
-        static_hash_map_docstring,
+        fixed_hash_map_docstring,
         JSL_FATPTR_EXPRESSION("header"),
         hash_map_name,
         key_type_name,
@@ -712,7 +712,7 @@ void write_hash_map_header(
 
     jsl_string_builder_format(
         builder,
-        static_map_type_typedef,
+        fixed_map_type_typedef,
         key_type_name,
         value_type_name,
         hash_map_name,
@@ -723,7 +723,7 @@ void write_hash_map_header(
 
     jsl_string_builder_format(
         builder,
-        static_map_iterator_typedef,
+        fixed_map_iterator_typedef,
         hash_map_name,
         hash_map_name,
         hash_map_name
@@ -731,20 +731,20 @@ void write_hash_map_header(
 
     jsl_string_builder_format(
         builder,
-        static_find_res_struct,
+        fixed_find_res_struct,
         hash_map_name
     );
 
     jsl_string_builder_format(
         builder,
-        static_init_function_signature,
+        fixed_init_function_signature,
         function_prefix,
         hash_map_name
     );
 
     jsl_string_builder_format(
         builder,
-        static_insert_function_signature,
+        fixed_insert_function_signature,
         function_prefix,
         hash_map_name,
         key_type_name,
@@ -753,7 +753,7 @@ void write_hash_map_header(
 
     jsl_string_builder_format(
         builder,
-        static_get_function_signature,
+        fixed_get_function_signature,
         value_type_name,
         function_prefix,
         hash_map_name,
@@ -762,7 +762,7 @@ void write_hash_map_header(
 
     jsl_string_builder_format(
         builder,
-        static_delete_function_signature,
+        fixed_delete_function_signature,
         function_prefix,
         hash_map_name,
         key_type_name
@@ -770,7 +770,7 @@ void write_hash_map_header(
 
     jsl_string_builder_format(
         builder,
-        static_iterator_start_function_signature,
+        fixed_iterator_start_function_signature,
         key_type_name,
         value_type_name,
         hash_map_name,
@@ -784,7 +784,7 @@ void write_hash_map_header(
 
     jsl_string_builder_format(
         builder,
-        static_iterator_next_function_signature,
+        fixed_iterator_next_function_signature,
         key_type_name,
         value_type_name,
         hash_map_name,
@@ -813,7 +813,7 @@ void write_hash_map_source(
 
     jsl_string_builder_format(
         builder,
-        static_hash_map_docstring,
+        fixed_hash_map_docstring,
         JSL_FATPTR_EXPRESSION("source"),
         hash_map_name,
         key_type_name,
@@ -856,7 +856,7 @@ void write_hash_map_source(
 
     jsl_string_builder_format(
         builder,
-        static_init_function_code,
+        fixed_init_function_code,
         function_prefix,
         hash_map_name,
         hash_map_name,
@@ -923,7 +923,7 @@ void write_hash_map_source(
 
         jsl_string_builder_format(
             builder,
-            static_hash_function_code,
+            fixed_hash_function_code,
             hash_map_name,
             function_prefix,
             hash_map_name,
@@ -936,7 +936,7 @@ void write_hash_map_source(
 
     jsl_string_builder_format(
         builder,
-        static_insert_function_code,
+        fixed_insert_function_code,
         function_prefix,
         hash_map_name,
         key_type_name,
@@ -947,7 +947,7 @@ void write_hash_map_source(
 
     jsl_string_builder_format(
         builder,
-        static_get_function_code,
+        fixed_get_function_code,
         value_type_name,
         function_prefix,
         hash_map_name,
@@ -959,7 +959,7 @@ void write_hash_map_source(
 
     jsl_string_builder_format(
         builder,
-        static_delete_function_code,
+        fixed_delete_function_code,
         function_prefix,
         hash_map_name,
         key_type_name,
@@ -969,7 +969,7 @@ void write_hash_map_source(
 
     jsl_string_builder_format(
         builder,
-        static_iterator_start_function_code,
+        fixed_iterator_start_function_code,
         function_prefix,
         hash_map_name,
         hash_map_name
@@ -977,7 +977,7 @@ void write_hash_map_source(
 
     jsl_string_builder_format(
         builder,
-        static_iterator_next_function_code,
+        fixed_iterator_next_function_code,
         function_prefix,
         hash_map_name,
         key_type_name,
@@ -1112,9 +1112,9 @@ static int32_t entrypoint(JSLArena* arena, JSLFatPtr* args, int32_t arg_count)
                 return EXIT_FAILURE;
             }
         }
-        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--static")))
+        else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--fixed")))
         {
-            impl = IMPL_STATIC;
+            impl = IMPL_FIXED;
         }
         else if (jsl_fatptr_memory_compare(arg, JSL_FATPTR_EXPRESSION("--dynamic")))
         {
