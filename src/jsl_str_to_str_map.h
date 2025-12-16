@@ -543,19 +543,19 @@
 
         if (value_lifetime == JSL_STRING_LIFETIME_STATIC)
         {
-            entry->key = key;
+            entry->value = value;
         }
         else if (
-            && value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+            value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
             && value.length <= JSL__MAP_SSO_LENGTH
         )
         {
-            JSL_MEMCPY(entry->value_sso_buffer, value.data, (size_t) key.length);
+            JSL_MEMCPY(entry->value_sso_buffer, value.data, (size_t) value.length);
             entry->value.data = entry->value_sso_buffer;
             entry->value.length = value.length;
         }
         else if (
-            && value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+            value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
             && value.length > JSL__MAP_SSO_LENGTH
         )
         {
@@ -633,7 +633,7 @@
 
         if (entry != NULL && value_lifetime == JSL_STRING_LIFETIME_STATIC)
         {
-            entry->key = key;
+            entry->value = value;
         }
         else if (
             entry != NULL
@@ -641,7 +641,7 @@
             && value.length <= JSL__MAP_SSO_LENGTH
         )
         {
-            JSL_MEMCPY(entry->value_sso_buffer, value.data, (size_t) key.length);
+            JSL_MEMCPY(entry->value_sso_buffer, value.data, (size_t) value.length);
             entry->value.data = entry->value_sso_buffer;
             entry->value.length = value.length;
         }
@@ -783,7 +783,13 @@
         // new key
         if (lut_index > -1 && !existing_found)
         {
-            res = jsl__str_to_str_map_add(map, key, key_lifetime, value, value_lifetime, lut_index);
+            res = jsl__str_to_str_map_add(
+                map,
+                key, key_lifetime,
+                value, value_lifetime,
+                lut_index,
+                hash
+            );
         }
         // update
         else if (lut_index > -1 && existing_found)
