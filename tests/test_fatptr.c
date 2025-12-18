@@ -230,6 +230,144 @@ static void test_jsl_fatptr_auto_slice(void)
     }
 }
 
+static void test_jsl_fatptr_strip_whitespace_left(void)
+{
+    {
+        JSLFatPtr empty = {0};
+        int64_t res = jsl_fatptr_strip_whitespace_left(&empty);
+        TEST_INT64_EQUAL(res, (int64_t) -1);
+    }
+
+    {
+        JSLFatPtr negative_length = {
+            .data = (uint8_t*) "  Hello",
+            .length = -5
+        };
+        int64_t res = jsl_fatptr_strip_whitespace_left(&negative_length);
+        TEST_INT64_EQUAL(res, (int64_t) -1);
+    }
+
+    {
+        JSLFatPtr str = JSL_FATPTR_INITIALIZER("Hello");
+        int64_t res = jsl_fatptr_strip_whitespace_left(&str);
+        TEST_INT64_EQUAL(res, (int64_t) 0);
+        TEST_BOOL(jsl_fatptr_cstr_compare(str, "Hello"));
+    }
+
+    {
+        JSLFatPtr original = JSL_FATPTR_INITIALIZER(" \t\nHello");
+        JSLFatPtr str = original;
+
+        int64_t res = jsl_fatptr_strip_whitespace_left(&str);
+        TEST_INT64_EQUAL(res, (int64_t) 3);
+        TEST_BOOL(str.data == original.data + 3);
+        TEST_INT64_EQUAL(str.length, (int64_t) 5);
+        TEST_BOOL(jsl_fatptr_cstr_compare(str, "Hello"));
+    }
+
+    {
+        JSLFatPtr original = JSL_FATPTR_INITIALIZER(" \t\n\r");
+        JSLFatPtr str = original;
+
+        int64_t res = jsl_fatptr_strip_whitespace_left(&str);
+        TEST_INT64_EQUAL(res, (int64_t) original.length);
+        TEST_BOOL(str.data == original.data + original.length);
+        TEST_INT64_EQUAL(str.length, (int64_t) 0);
+    }
+}
+
+static void test_jsl_fatptr_strip_whitespace_right(void)
+{
+    {
+        JSLFatPtr empty = {0};
+        int64_t res = jsl_fatptr_strip_whitespace_right(&empty);
+        TEST_INT64_EQUAL(res, (int64_t) -1);
+    }
+
+    {
+        JSLFatPtr negative_length = {
+            .data = (uint8_t*) "Hello  ",
+            .length = -2
+        };
+        int64_t res = jsl_fatptr_strip_whitespace_right(&negative_length);
+        TEST_INT64_EQUAL(res, (int64_t) -1);
+    }
+
+    {
+        JSLFatPtr str = JSL_FATPTR_INITIALIZER("Hello");
+        int64_t res = jsl_fatptr_strip_whitespace_right(&str);
+        TEST_INT64_EQUAL(res, (int64_t) 0);
+        TEST_BOOL(jsl_fatptr_cstr_compare(str, "Hello"));
+    }
+
+    {
+        JSLFatPtr original = JSL_FATPTR_INITIALIZER("Hello\t  ");
+        JSLFatPtr str = original;
+
+        int64_t res = jsl_fatptr_strip_whitespace_right(&str);
+        TEST_INT64_EQUAL(res, (int64_t) 3);
+        TEST_BOOL(str.data == original.data);
+        TEST_INT64_EQUAL(str.length, original.length - 3);
+        TEST_BOOL(jsl_fatptr_cstr_compare(str, "Hello"));
+    }
+
+    {
+        JSLFatPtr original = JSL_FATPTR_INITIALIZER(" \t\n\r");
+        JSLFatPtr str = original;
+
+        int64_t res = jsl_fatptr_strip_whitespace_right(&str);
+        TEST_INT64_EQUAL(res, (int64_t) original.length);
+        TEST_BOOL(str.data == original.data);
+        TEST_INT64_EQUAL(str.length, (int64_t) 0);
+    }
+}
+
+static void test_jsl_fatptr_strip_whitespace(void)
+{
+    {
+        JSLFatPtr empty = {0};
+        int64_t res = jsl_fatptr_strip_whitespace(&empty);
+        TEST_INT64_EQUAL(res, (int64_t) -1);
+    }
+
+    {
+        JSLFatPtr negative_length = {
+            .data = (uint8_t*) "   Hello   ",
+            .length = -10
+        };
+        int64_t res = jsl_fatptr_strip_whitespace(&negative_length);
+        TEST_INT64_EQUAL(res, (int64_t) -1);
+    }
+
+    {
+        JSLFatPtr str = JSL_FATPTR_INITIALIZER("Hello");
+        int64_t res = jsl_fatptr_strip_whitespace(&str);
+        TEST_INT64_EQUAL(res, (int64_t) 0);
+        TEST_BOOL(jsl_fatptr_cstr_compare(str, "Hello"));
+    }
+
+    {
+        JSLFatPtr original = JSL_FATPTR_INITIALIZER("  Hello World \n\t");
+        JSLFatPtr str = original;
+
+        int64_t res = jsl_fatptr_strip_whitespace(&str);
+        TEST_INT64_EQUAL(res, (int64_t) 5);
+        TEST_BOOL(str.data == original.data + 2);
+        TEST_INT64_EQUAL(str.length, original.length - 5);
+        TEST_BOOL(jsl_fatptr_cstr_compare(str, "Hello World"));
+    }
+
+    {
+        JSLFatPtr original = JSL_FATPTR_INITIALIZER("\t \n ");
+        JSLFatPtr str = original;
+
+        int64_t res = jsl_fatptr_strip_whitespace(&str);
+        TEST_INT64_EQUAL(res, (int64_t) original.length);
+        TEST_BOOL(str.data == original.data + original.length);
+        TEST_INT64_EQUAL(str.length, (int64_t) 0);
+    }
+}
+
 static void test_jsl_fatptr_substring_search(void)
 {
     {
@@ -797,6 +935,9 @@ int main(void)
     RUN_TEST_FUNCTION("Test jsl_fatptr_slice", test_jsl_fatptr_slice);
     RUN_TEST_FUNCTION("Test jsl_fatptr_total_write_length", test_jsl_fatptr_total_write_length);
     RUN_TEST_FUNCTION("Test jsl_fatptr_auto_slice", test_jsl_fatptr_auto_slice);
+    RUN_TEST_FUNCTION("Test jsl_fatptr_strip_whitespace_left", test_jsl_fatptr_strip_whitespace_left);
+    RUN_TEST_FUNCTION("Test jsl_fatptr_strip_whitespace_right", test_jsl_fatptr_strip_whitespace_right);
+    RUN_TEST_FUNCTION("Test jsl_fatptr_strip_whitespace", test_jsl_fatptr_strip_whitespace);
     RUN_TEST_FUNCTION("Test jsl_fatptr_index_of", test_jsl_fatptr_index_of);
     RUN_TEST_FUNCTION("Test jsl_fatptr_index_of_reverse", test_jsl_fatptr_index_of_reverse);
     RUN_TEST_FUNCTION("Test jsl_fatptr_to_lowercase_ascii", test_jsl_fatptr_to_lowercase_ascii);

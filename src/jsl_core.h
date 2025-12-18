@@ -3155,24 +3155,22 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     int64_t jsl_fatptr_strip_whitespace_left(JSLFatPtr* str)
     {
-        int64_t bytes_read = -1;
+        int64_t bytes_read = str->data != NULL && str->length > -1 ?
+            0 : -1;
 
-        if (str->data != NULL && str->length > -1)
+        while (
+            str->data != NULL && str->length > 0
+            && (str->data[0] == ' '
+            || str->data[0] == '\r'
+            || str->data[0] == '\n'
+            || str->data[0] == '\v'
+            || str->data[0] == '\f'
+            || str->data[0] == '\t')
+        )
         {
-            bytes_read = 0;
-            while (
-                str->data[0] == ' '
-                || str->data[0] == '\r'
-                || str->data[0] == '\n'
-                || str->data[0] == '\v'
-                || str->data[0] == '\f'
-                || str->data[0] == '\t'
-            )
-            {
-                ++str->data;
-                --str->length;
-                ++bytes_read;
-            }
+            ++str->data;
+            --str->length;
+            ++bytes_read;
         }
 
         return bytes_read;
@@ -3180,24 +3178,23 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 
     int64_t jsl_fatptr_strip_whitespace_right(JSLFatPtr* str)
     {
-        int64_t bytes_read = -1;
+        int64_t bytes_read = str->data != NULL && str->length > -1 ?
+            0 : -1;
 
-        if (str->data != NULL && str->length > -1)
-        {
-            bytes_read = 0;
-            uint8_t c = str->data[str.length - 1];
-            while (
-                c == ' '
-                || c == '\r'
-                || c == '\n'
-                || c == '\v'
-                || c == '\f'
-                || c == '\t'
+        while (
+            str->data != NULL && str->length > 0
+            && (
+                str->data[str->length - 1] == ' '
+                || str->data[str->length - 1] == '\r'
+                || str->data[str->length - 1] == '\n'
+                || str->data[str->length - 1] == '\v'
+                || str->data[str->length - 1] == '\f'
+                || str->data[str->length - 1] == '\t'
             )
-            {
-                --str->length;
-                ++bytes_read;
-            }
+        )
+        {
+            --str->length;
+            ++bytes_read;
         }
 
         return bytes_read;
