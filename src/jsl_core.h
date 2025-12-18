@@ -1450,7 +1450,6 @@ JSL_DEF JSLFatPtr jsl_fatptr_basename(JSLFatPtr filename);
  */
 JSL_DEF JSLFatPtr jsl_fatptr_get_file_extension(JSLFatPtr filename);
 
-
 /**
  * Element by element comparison of the contents of the two fat pointers. If either
  * parameter has a null value for its data or a zero length, then this function will
@@ -1510,6 +1509,36 @@ JSL_DEF void jsl_fatptr_to_lowercase_ascii(JSLFatPtr str);
  * @return The number of bytes that were successfully read from the string
  */
 JSL_DEF int32_t jsl_fatptr_to_int32(JSLFatPtr str, int32_t* result);
+
+/**
+ * Advance the fat pointer until the first non-whitespace character is
+ * reached. If the fat pointer is null or has a negative length, -1 is
+ * returned.
+ *
+ * @param str a fat pointer
+ * @return The number of bytes that were advanced or -1
+ */
+JSL_DEF int64_t jsl_fatptr_strip_whitespace_left(JSLFatPtr* str);
+
+/**
+ * Reduce the fat pointer's length until the first non-whitespace character is
+ * reached. If the fat pointer is null or has a negative length, -1 is
+ * returned.
+ *
+ * @param str a fat pointer
+ * @return The number of bytes that were advanced or -1
+ */
+JSL_DEF int64_t jsl_fatptr_strip_whitespace_right(JSLFatPtr* str);
+
+/**
+ * Modify the fat pointer such that it points to the part of the string
+ * without any whitespace characters at the begining or the end. If the
+ * fat pointer is null or has a negative length, -1 is returned.
+ *
+ * @param str a fat pointer
+ * @return The number of bytes that were advanced or -1
+ */
+JSL_DEF int64_t jsl_fatptr_strip_whitespace(JSLFatPtr* str);
 
 /**
  * Initialize an arena with the supplied buffer.
@@ -3122,6 +3151,69 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
             *result = ret;
 
         return i;
+    }
+
+    int64_t jsl_fatptr_strip_whitespace_left(JSLFatPtr* str)
+    {
+        int64_t bytes_read = -1;
+
+        if (str->data != NULL && str->length > -1)
+        {
+            bytes_read = 0;
+            while (
+                str->data[0] == ' '
+                || str->data[0] == '\r'
+                || str->data[0] == '\n'
+                || str->data[0] == '\v'
+                || str->data[0] == '\f'
+                || str->data[0] == '\t'
+            )
+            {
+                ++str->data;
+                --str->length;
+                ++bytes_read;
+            }
+        }
+
+        return bytes_read;
+    }
+
+    int64_t jsl_fatptr_strip_whitespace_right(JSLFatPtr* str)
+    {
+        int64_t bytes_read = -1;
+
+        if (str->data != NULL && str->length > -1)
+        {
+            bytes_read = 0;
+            uint8_t c = str->data[str.length - 1];
+            while (
+                c == ' '
+                || c == '\r'
+                || c == '\n'
+                || c == '\v'
+                || c == '\f'
+                || c == '\t'
+            )
+            {
+                --str->length;
+                ++bytes_read;
+            }
+        }
+
+        return bytes_read;
+    }
+
+    int64_t jsl_fatptr_strip_whitespace(JSLFatPtr* str)
+    {
+        int64_t bytes_read = -1;
+
+        if (str->data != NULL && str->length > -1)
+        {
+            bytes_read = jsl_fatptr_strip_whitespace_left(str);
+            bytes_read += jsl_fatptr_strip_whitespace_right(str);
+        }
+
+        return bytes_read;
     }
 
     void jsl_arena_init(JSLArena* arena, void* memory, int64_t length)

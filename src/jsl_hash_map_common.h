@@ -305,6 +305,12 @@ enum JSL__HashmapFlags
     JSL__HASHMAP_NULL_VALUE_SET = JSL_MAKE_BITFLAG(4)
 };
 
+enum JSL__ProbeState
+{
+    JSL__HASHMAP_EMPTY = 0,
+    JSL__HASHMAP_TOMBSTONE = 1
+};
+
 typedef enum JSLStringLifeTime {
     /// @brief The string's lifetime is less than the container
     JSL_STRING_LIFETIME_TRANSIENT = 0,
