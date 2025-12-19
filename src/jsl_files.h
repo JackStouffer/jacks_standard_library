@@ -217,6 +217,9 @@ JSL__ASAN_OFF JSL_DEF bool jsl_format_file(FILE* out, JSLFatPtr fmt, ...);
 } /* extern "C" */
 #endif
 
+#endif // JSL_FILES_H_INCLUDED
+
+
 #ifdef JSL_FILES_IMPLEMENTATION
 
 JSLGetFileSizeResultEnum jsl_get_file_size(
@@ -747,5 +750,3 @@ JSL__ASAN_OFF bool jsl_format_file(FILE* out, JSLFatPtr fmt, ...)
 }
 
 #endif // JSL_FILES_IMPLEMENTATION
-
-#endif // JSL_FILES_H_INCLUDED

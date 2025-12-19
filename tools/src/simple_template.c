@@ -17,17 +17,17 @@ void render_template(
         int64_t index_of_open = jsl_fatptr_substring_search(template_reader, open_param);
         int64_t index_of_close = jsl_fatptr_substring_search(template_reader, close_param);
 
-        // No more variables, write everything then break
+        // No more variables, write everything
         if (index_of_open == -1)
         {
             jsl_string_builder_insert_fatptr(str_builder, template_reader);
-            break;
+            JSL_FATPTR_ADVANCE(template_reader, template_reader.length);
         }
-        // Improperly closed template param, write everything then break
+        // Improperly closed template param, write everything
         else if (index_of_open > -1 && index_of_close == -1)
         {
             jsl_string_builder_insert_fatptr(str_builder, template_reader);
-            break;
+            JSL_FATPTR_ADVANCE(template_reader, template_reader.length);
         }
         // Close before open, write everything up to the next open
         else if (index_of_open > -1 && index_of_close > -1 && index_of_close < index_of_open)
@@ -43,7 +43,16 @@ void render_template(
             jsl_string_builder_insert_fatptr(str_builder, slice);
             JSL_FATPTR_ADVANCE(template_reader, index_of_open + 2);
 
-            
+            JSLFatPtr var_name = jsl_fatptr_slice(template_reader, 0, index_of_close);
+            jsl_fatptr_strip_whitespace(&var_name);
+
+            JSLFatPtr var_value;
+            if (jsl_str_to_str_map_get(variables, var_name, &var_value))
+            {
+                jsl_string_builder_insert_fatptr(str_builder, var_value);
+            }
+
+            JSL_FATPTR_ADVANCE(template_reader, index_of_close + 2);
         }
     }
 }

@@ -38,7 +38,7 @@
  */
 
 #define NOB_IMPLEMENTATION
-#include "nob.h"
+#include "../vendor/nob.h"
 
 #include <stdint.h>
 #include <stdio.h>

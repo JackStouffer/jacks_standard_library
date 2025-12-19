@@ -1,0 +1,368 @@
+bool %y_init(
+    %y* hash_map,
+    JSLArena* arena,
+    int64_t max_item_count,
+    uint64_t seed
+)
+{
+    JSL_MEMSET(hash_map, 0, sizeof(%y));
+
+    if (hash_map == NULL || arena == NULL || max_item_count < 0)
+        return false;
+
+    hash_map->seed = seed;
+    hash_map->max_item_count = max_item_count;
+    hash_map->arrays_length = (int64_t) jsl_next_power_of_two_u64((uint64_t) (max_item_count + 2));
+    hash_map->arrays_length = JSL_MAX(hash_map->arrays_length, 32);
+
+    hash_map->keys_array = (%y*) jsl_arena_allocate_aligned(
+       arena,
+       ((int64_t) sizeof(%y)) * hash_map->arrays_length,
+       (int32_t) _Alignof(%y),
+       false
+    ).data;
+    if (hash_map->keys_array == NULL)
+        return false;
+
+    hash_map->values_array = (%y*) jsl_arena_allocate_aligned(
+        arena,
+        ((int64_t) sizeof(%y)) * hash_map->arrays_length,
+        (int32_t) _Alignof(%y),
+        false
+    ).data;
+    if (hash_map->values_array == NULL)
+        return false;
+
+    hash_map->hashes_array = (uint64_t*) jsl_arena_allocate_aligned(
+        arena,
+        ((int64_t) sizeof(uint64_t)) * hash_map->arrays_length,
+        (int32_t) _Alignof(uint64_t),
+        false
+    ).data;
+    if (hash_map->hashes_array == NULL)
+        return false;
+
+    return true;
+}
+
+static inline void %y_probe(
+    %y* hash_map,
+    %y key,
+    int64_t* out_slot,
+    uint64_t* out_hash,
+    bool* out_found
+)
+{
+    *out_slot = -1;
+    *out_found = false;
+
+    int64_t first_tombstone = -1;
+    bool tombstone_seen = false;
+    bool searching = true;
+
+    %y;
+
+    int64_t total_checked = 0;
+    // Since our slot array length is always a pow 2, we can avoid a modulo
+    int64_t slot = (int64_t) (*out_hash & ((uint64_t) hash_map->arrays_length - 1u));
+
+    while (total_checked < hash_map->arrays_length)
+    {
+        uint64_t slot_hash = hash_map->hashes_array[slot];
+
+        bool is_empty = slot_hash == JSL__HASHMAP_EMPTY;
+        bool is_tombstone = slot_hash == JSL__HASHMAP_TOMBSTONE;
+
+        if (is_slot_set == 0 && is_insert)
+        {
+            return_value.value_index = slot_index;
+            return_value.is_update = false;
+            break;
+        }
+        /* Updating value */
+        else if (is_slot_set == 1)
+        {
+            int32_t memcmp_res = JSL_MEMCMP(
+                &hash_map->keys_array[slot_index],
+                &key,
+                sizeof(%y)
+            );
+            if (memcmp_res == 0)
+            {
+                return_value.value_index = slot_index;
+                return_value.is_update = true;
+                break;
+            }
+        }
+
+        // Collision. Move to the next spot with linear probing
+
+        ++total_checked;
+        ++slot_index;
+
+
+        // Loop all the way back around
+        if (slot_index == hash_map->arrays_length)
+        {
+            slot_index = 0;
+            return_value.is_set_array_bit = 0;
+            return_value.is_set_array_index = 0;
+        }
+    }
+
+    return return_value;
+}
+
+bool %y_insert(
+    %y* hash_map,
+    %y key,
+    %y value
+)
+{
+    bool insert_success = false;
+
+    if (
+        hash_map == NULL
+        || hash_map->values_array == NULL
+        || hash_map->keys_array == NULL
+        || hash_map->is_set_flags_array == NULL
+        || hash_map->item_count == hash_map->max_item_count
+    )
+        return insert_success;
+
+    if (hash_map->item_count == hash_map->arrays_length)
+    {
+        return insert_success;
+    }
+
+    struct %yFindRes find_res = %y_hash_and_find_slot(
+        hash_map,
+        key,
+        true
+    );
+    if (find_res.value_index != -1)
+    {
+        if (find_res.is_update)
+        {
+            hash_map->values_array[find_res.value_index] = value;
+            insert_success = true;
+        }
+        else
+        {
+            hash_map->keys_array[find_res.value_index] = key;
+            hash_map->values_array[find_res.value_index] = value;
+            uint32_t bit_flag = JSL_MAKE_BITFLAG(find_res.is_set_array_bit);
+            JSL_SET_BITFLAG(
+                &hash_map->is_set_flags_array[find_res.is_set_array_index],
+                bit_flag
+            );
+            ++hash_map->item_count;
+            insert_success = true;
+        }
+
+        ++hash_map->generational_id;
+    }
+
+    return insert_success;
+}
+
+%y* %y_get(
+    %y* hash_map,
+    %y key
+)
+{
+    %y* res = NULL;
+
+    if (
+        hash_map == NULL
+        || hash_map->values_array == NULL
+        || hash_map->keys_array == NULL
+        || hash_map->is_set_flags_array == NULL
+    )
+        return res;
+
+    struct %yFindRes find_res = %y_hash_and_find_slot(hash_map, key, false);
+    if (find_res.value_index != -1 && find_res.is_update)
+    {
+        res = &hash_map->values_array[find_res.value_index];
+    }
+
+    return res;
+}
+
+bool %y_delete(
+    %y* hash_map,
+    %y key
+)
+{
+    bool success = false;
+
+    if (
+        hash_map == NULL
+        || hash_map->values_array == NULL
+        || hash_map->keys_array == NULL
+        || hash_map->is_set_flags_array == NULL
+    )
+        return success;
+
+    struct %yFindRes find_res = %y_hash_and_find_slot(hash_map, key, false);
+
+    if (find_res.value_index != -1 && find_res.is_update)
+    {
+        uint32_t bit_flag = JSL_MAKE_BITFLAG(find_res.is_set_array_bit);
+        JSL_UNSET_BITFLAG(
+            &hash_map->is_set_flags_array[find_res.is_set_array_index],
+            bit_flag
+        );
+        --hash_map->item_count;
+        success = true;
+    }
+
+    return success;
+}
+
+bool %y_iterator_start(
+    %y* hash_map,
+    %yIterator* iterator
+)
+{
+    bool success = false;
+
+    if (
+        hash_map == NULL
+        || hash_map->values_array == NULL
+        || hash_map->keys_array == NULL
+        || hash_map->is_set_flags_array == NULL
+    )
+        return success;
+
+    iterator->hash_map = hash_map;
+    iterator->current_slot_index = 0;
+    iterator->generational_id = hash_map->generational_id;
+
+    return iterator;
+}
+
+bool %y_iterator_next(
+    %yIterator* iterator,
+    %y* key,
+    %y* value
+)
+{
+    bool result = false;
+
+    if (
+        iterator == NULL
+        || iterator->hash_map == NULL
+        || iterator->hash_map->values_array == NULL
+        || iterator->hash_map->keys_array == NULL
+        || iterator->hash_map->is_set_flags_array == NULL
+    )
+        return result;
+
+    while (iterator->current_slot_index < iterator->hash_map->arrays_length)
+    {
+        int64_t is_set_flags_index = JSL__HASH_MAP_GET_SET_FLAG_INDEX(iterator->current_slot_index);
+        uint32_t is_set_flags = iterator->hash_map->is_set_flags_array[is_set_flags_index];
+        bool at_start_of_flags = (iterator->current_slot_index & 31) == 0;  // modulo 32
+
+        if (at_start_of_flags && is_set_flags == 0)
+        {
+            iterator->current_slot_index += 32;
+        }
+        else if (at_start_of_flags)
+        {
+            iterator->current_slot_index += JSL_PLATFORM_COUNT_TRAILING_ZEROS(is_set_flags);
+
+            *key = iterator->hash_map->keys_array[iterator->current_slot_index];
+            *value = iterator->hash_map->values_array[iterator->current_slot_index];
+
+            ++iterator->current_slot_index;
+            result = true;
+            break;
+        }
+        else
+        {
+            uint32_t current_is_set_flags_bit = (uint32_t) (iterator->current_slot_index - (is_set_flags_index * 32));
+            uint32_t bitflag = JSL_MAKE_BITFLAG(current_is_set_flags_bit);
+            bool is_set = JSL_IS_BITFLAG_SET(is_set_flags, bitflag);
+
+            if (is_set)
+            {
+                *key = iterator->hash_map->keys_array[iterator->current_slot_index];
+                *value = iterator->hash_map->values_array[iterator->current_slot_index];
+
+                ++iterator->current_slot_index;
+                result = true;
+                break;
+            }
+            else
+            {
+                ++iterator->current_slot_index;
+            }
+        }
+    }
+
+    return result;
+}
+
+static bool function_prefix##_expand(JSL_HASHMAP_TYPE_NAME(name)* hash_map)
+{
+    JSL_DEBUG_ASSERT(hash_map != NULL);
+    JSL_DEBUG_ASSERT(hash_map->arena != NULL);
+    JSL_DEBUG_ASSERT(hash_map->slots_array != NULL);
+    JSL_DEBUG_ASSERT(hash_map->is_set_flags_array != NULL);
+
+    bool success;
+
+    JSL_HASHMAP_ITEM_TYPE_NAME(name)* old_slots_array = hash_map->slots_array;
+    int64_t old_slots_array_length = hash_map->slots_array_length;
+
+    uint32_t* old_is_set_flags_array = hash_map->is_set_flags_array;
+    int64_t old_is_set_flags_array_length = hash_map->is_set_flags_array_length;
+
+    int64_t new_slots_array_length = jsl__hashmap_expand_size(old_slots_array_length);
+    JSL_HASHMAP_ITEM_TYPE_NAME(name)* new_slots_array = (JSL_HASHMAP_ITEM_TYPE_NAME(name)*) jsl_arena_allocate(
+        hash_map->arena, sizeof(JSL_HASHMAP_ITEM_TYPE_NAME(name)) * new_slots_array_length, false
+    ).data;
+
+    int64_t new_is_set_flags_array_length = new_slots_array_length >> 5L;
+    uint32_t* new_is_set_flags_array = (uint32_t*) jsl_arena_allocate(
+        hash_map->arena, sizeof(uint32_t) * new_is_set_flags_array_length, true
+    ).data;
+
+    if (new_slots_array != NULL && new_is_set_flags_array != NULL)
+    {
+        hash_map->item_count = 0;
+        hash_map->slots_array = new_slots_array;
+        hash_map->slots_array_length = new_slots_array_length;
+        hash_map->is_set_flags_array = new_is_set_flags_array;
+        hash_map->is_set_flags_array_length = new_is_set_flags_array_length;
+
+        int64_t slot_index = 0;
+        for (
+            int64_t is_set_flags_index = 0;
+            is_set_flags_index < old_is_set_flags_array_length;
+            is_set_flags_index++
+        )
+        {
+            for (uint32_t current_bit = 0; current_bit < 32; current_bit++)
+            {
+                uint32_t bitflag = JSL_MAKE_BITFLAG(current_bit);
+                if (JSL_IS_BITFLAG_SET(old_is_set_flags_array[is_set_flags_index], bitflag))
+                {
+                    function_prefix##_insert(hash_map, old_slots_array[slot_index].key, old_slots_array[slot_index].value);
+                }
+                ++slot_index;
+            }
+        }
+
+        success = true;
+    }
+    else
+    {
+        success = false;
+    }
+
+    return success;
+}

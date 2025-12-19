@@ -1,0 +1,272 @@
+/**
+ * # Build CLI Tools
+ * 
+ * TODO: docs
+ */
+
+#define NOB_IMPLEMENTATION
+#include "../vendor/nob.h"
+
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#define JSL_CORE_IMPLEMENTATION
+#include "../src/jsl_core.h"
+
+#define JSL_FILES_IMPLEMENTATION
+#include "../src/jsl_files.h"
+
+static char* clang_warning_flags[] = {
+    "-Wall",
+    "-Wextra",
+    "-Wconversion",
+    "-Wsign-conversion",
+    "-Wshadow",
+    "-Wconditional-uninitialized",
+    "-Wcomma",
+    "-Widiomatic-parentheses",
+    "-Wpointer-arith",
+    "-Wassign-enum",
+    "-Wswitch-enum",
+    "-Wimplicit-fallthrough",
+    "-Wnull-dereference",
+    "-Wmissing-prototypes",
+    "-Wundef",
+    "-pedantic",
+    NULL
+};
+
+static JSLFatPtr help_message = JSL_FATPTR_INITIALIZER(""
+    "OVERVIEW:\n\n"
+    "Build program for the tool programs.\n\n"
+    "This program builds the tooling programs as either command line programs\n"
+    "or static library files (.a or .lib).\n\n"
+    "USAGE:\n\n"
+    "\tbuild [--library | --program]\n\n"
+    "Required arguments:\n"
+    "\t--library\t\tBuild static library files for the host OS\n"
+    "\t--program\t\tBuild the command line programs\n"
+);
+
+static JSLFatPtr h_flag_str = JSL_FATPTR_INITIALIZER("-h");
+static JSLFatPtr help_flag_str = JSL_FATPTR_INITIALIZER("--help");
+static JSLFatPtr library_flag_str = JSL_FATPTR_INITIALIZER("--library");
+static JSLFatPtr program_flag_str = JSL_FATPTR_INITIALIZER("--program");
+
+void write_template_files(JSLArena* arena)
+{
+
+    const char* header_template[] = {"tools/src/templates/static_hash_map_header.txt"};
+    bool build_header_data = nob_needs_rebuild("tools/src/templates/static_hash_map_header.h", header_template, 1U);
+    if (build_header_data)
+    {
+        JSLFatPtr header_template_path = JSL_FATPTR_EXPRESSION("tools/src/templates/static_hash_map_header.txt");
+        JSLFatPtr header_output_path = JSL_FATPTR_EXPRESSION("tools/src/templates/static_hash_map_header.h");
+
+        JSLFatPtr header_template_contents = {0};
+        int32_t load_errno = 0;
+        JSLLoadFileResultEnum load_result = jsl_load_file_contents(
+            arena,
+            header_template_path,
+            &header_template_contents,
+            &load_errno
+        );
+
+        if (load_result != JSL_FILE_LOAD_SUCCESS)
+        {
+            jsl_format_file(
+                stderr,
+                JSL_FATPTR_EXPRESSION("Failed to load template file %y (errno %d)\n"),
+                header_template_path,
+                load_errno
+            );
+            exit(EXIT_FAILURE);
+        }
+
+        Nob_String_Builder header_output = {0};
+        nob_sb_append_cstr(&header_output, "#pragma once\n\n");
+        nob_sb_append_cstr(&header_output, "#include <stdint.h>\n\n");
+        nob_sb_append_cstr(&header_output, "static const uint8_t static_hash_map_header_template[] = {\n");
+
+        const int32_t bytes_per_line = 12;
+        for (int64_t i = 0; i < header_template_contents.length; ++i)
+        {
+            if (i % bytes_per_line == 0)
+                nob_sb_append_cstr(&header_output, "    ");
+
+            nob_sb_appendf(&header_output, "0x%02x", header_template_contents.data[i]);
+
+            bool is_last = (i + 1) == header_template_contents.length;
+            bool end_of_line = ((i + 1) % bytes_per_line) == 0;
+
+            if (!is_last)
+                nob_sb_append_cstr(&header_output, ",");
+
+            if (end_of_line || is_last)
+                nob_sb_append_cstr(&header_output, "\n");
+            else
+                nob_sb_append_cstr(&header_output, " ");
+        }
+
+        nob_sb_append_cstr(&header_output, "};\n\n");
+        nob_sb_appendf(
+            &header_output,
+            "static const uint64_t static_hash_map_header_template_len = %lld;\n",
+            (long long) header_template_contents.length
+        );
+
+        if (!nob_write_entire_file(
+            (const char*) header_output_path.data,
+            header_output.items,
+            header_output.count
+        ))
+        {
+            nob_sb_free(header_output);
+            exit(EXIT_FAILURE);
+        }
+
+        nob_sb_free(header_output);
+    }
+}
+
+int32_t build_library_files(JSLArena* arena)
+{
+    write_template_files(arena);
+
+    Nob_Cmd generate_hash_map_compile_command = {0};
+    nob_cmd_append(
+        &generate_hash_map_compile_command,
+        "clang",
+        "-O3",
+        "-std=c11"
+    );
+
+    // add clang warnings
+    for (int32_t flag_idx = 0;; ++flag_idx)
+    {
+        char* flag = clang_warning_flags[flag_idx];
+        if (flag == NULL)
+            break;
+
+        nob_cmd_append(&generate_hash_map_compile_command, flag);
+    }
+
+    nob_cmd_append(
+        &generate_hash_map_compile_command,
+        "-o", "tools/dist/generate_hash_map.o",
+        "-Isrc/",
+        "tools/src/generate_hash_map.c"
+    );
+
+    if (!nob_cmd_run(&generate_hash_map_compile_command)) return EXIT_FAILURE;
+
+    // Generate archive file
+    Nob_Cmd generate_hash_map_build_library = {0};
+    nob_cmd_append(
+        &generate_hash_map_build_library,
+        "ar",
+        "rcs",
+        "tools/dist/generate_hash_map.a",
+        "tools/dist/generate_hash_map.o"
+    );
+
+    return EXIT_SUCCESS;
+}
+
+int32_t build_program_files(JSLArena* arena)
+{
+    write_template_files(arena);
+
+    Nob_Cmd generate_hash_map_compile_command = {0};
+    nob_cmd_append(
+        &generate_hash_map_compile_command,
+        "clang",
+        "-O3",
+        "-DINCLUDE_MAIN",
+        "-std=c11"
+    );
+
+    // add clang warnings
+    for (int32_t flag_idx = 0;; ++flag_idx)
+    {
+        char* flag = clang_warning_flags[flag_idx];
+        if (flag == NULL)
+            break;
+
+        nob_cmd_append(&generate_hash_map_compile_command, flag);
+    }
+
+    nob_cmd_append(
+        &generate_hash_map_compile_command,
+        "-o", "tools/dist/generate_hash_map",
+        "-Isrc/",
+        "tools/src/generate_hash_map.c"
+    );
+
+    if (!nob_cmd_run(&generate_hash_map_compile_command)) return EXIT_FAILURE;
+
+    return EXIT_SUCCESS;
+}
+
+int32_t main(int32_t argc, char **argv)
+{
+    NOB_GO_REBUILD_URSELF(argc, argv);
+
+    JSLArena arena;
+    jsl_arena_init(&arena, malloc(JSL_MEGABYTES(32)), JSL_MEGABYTES(32));
+
+    bool show_help = false;
+    bool build_libraries = false;
+    bool build_programs = false;
+
+    for (int32_t i = 1; i < argc; ++i)
+    {
+        JSLFatPtr arg = jsl_fatptr_from_cstr(argv[i]); 
+
+        if (
+            jsl_fatptr_memory_compare(arg, h_flag_str)
+            || jsl_fatptr_memory_compare(arg, help_flag_str)
+        )
+        {
+            show_help = true;
+        }
+        else if (jsl_fatptr_memory_compare(arg, library_flag_str))
+        {
+            build_libraries = true;
+        }
+        else if (jsl_fatptr_memory_compare(arg, program_flag_str))
+        {
+            build_programs = true;
+        }
+        else
+        {
+            jsl_format_file(stdout, JSL_FATPTR_EXPRESSION("Unknown argument %y\n"), arg);
+        }
+    }
+
+    if (show_help)
+    {
+        jsl_format_file(stdout, help_message);
+        return EXIT_SUCCESS;
+    }
+    else if (build_libraries && build_programs)
+    {
+        jsl_format_file(stdout, JSL_FATPTR_EXPRESSION("Cannot specify both --library and --program\n"));
+        return EXIT_FAILURE;
+    }
+    else if (build_libraries)
+    {
+        return build_library_files(&arena);
+    }
+    else if (build_programs)
+    {
+        return build_program_files(&arena);
+    }
+    else
+    {
+        jsl_format_file(stdout, JSL_FATPTR_EXPRESSION("Must specify either --library or --program\n"));
+        return EXIT_FAILURE;
+    }
+}
