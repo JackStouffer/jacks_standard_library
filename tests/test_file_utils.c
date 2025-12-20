@@ -29,11 +29,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define JSL_CORE_IMPLEMENTATION
 #include "../src/jsl_core.h"
-
-#define JSL_FILES_IMPLEMENTATION
-#include "../src/jsl_files.h"
+#include "../src/jsl_os.h"
 
 #include "minctest.h"
 

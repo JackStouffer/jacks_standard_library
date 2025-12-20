@@ -51,7 +51,6 @@ SOFTWARE.
 
 #include "minctest.h"
 
-#define JSL_CORE_IMPLEMENTATION
 #include "../src/jsl_core.h"
 
 #define CHECK_END(str)                                                              \

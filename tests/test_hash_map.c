@@ -29,10 +29,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define JSL_CORE_IMPLEMENTATION
 #include "../src/jsl_core.h"
-
-#define JSL_STR_TO_STR_MAP_IMPLEMENTATION
 #include "../src/jsl_str_to_str_map.h"
 
 #include "minctest.h"

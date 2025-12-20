@@ -28,10 +28,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#define JSL_CORE_IMPLEMENTATION
 #include "../src/jsl_core.h"
-
-#define JSL_STRING_BUILDER_IMPLEMENTATION
 #include "../src/jsl_string_builder.h"
 
 #include "minctest.h"

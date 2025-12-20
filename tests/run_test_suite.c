@@ -45,8 +45,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#define JSL_CORE_IMPLEMENTATION
-#include "../src/jsl_core.h"
+#include "../src/jsl_core.c"
 
 #if JSL_IS_POSIX
     #include <sys/types.h>
@@ -299,16 +298,44 @@ static CompilerConfig msvc_configs[] = {
 };
 
 static UnitTestDecl unit_test_declarations[] = {
-    { "test_fatptr", (char*[]) {"tests/test_fatptr.c", NULL} },
-    { "test_format", (char*[]) {"tests/test_format.c", NULL} },
-    { "test_string_builder", (char*[]) {"tests/test_string_builder.c", NULL} },
-    { "test_intrinsics", (char*[]) {"tests/test_intrinsics.c", NULL} },
-    { "test_file_utils", (char*[]) {"tests/test_file_utils.c", NULL} },
-    { "test_str_to_str_multimap", (char*[]) {"tests/test_str_to_str_multimap.c", NULL} },
+    { "test_fatptr", (char*[]) {
+        "tests/test_fatptr.c",
+        "src/jsl_core.c",
+        NULL
+    } },
+    { "test_format", (char*[]) {
+        "tests/test_format.c",
+        "src/jsl_core.c",
+        NULL
+    } },
+    { "test_string_builder", (char*[]) {
+        "tests/test_string_builder.c",
+        "src/jsl_core.c",
+        "src/jsl_string_builder.c",
+        NULL
+    } },
+    { "test_intrinsics", (char*[]) {
+        "tests/test_intrinsics.c",
+        "src/jsl_core.c",
+        NULL
+    } },
+    { "test_file_utils", (char*[]) {
+        "tests/test_file_utils.c",
+        "src/jsl_core.c",
+        "src/jsl_os.c",
+        NULL
+    } },
+    { "test_str_to_str_multimap", (char*[]) {
+        "tests/test_str_to_str_multimap.c",
+        "src/jsl_core.c",
+        "src/str_to_str_multimap.c",
+        NULL
+    } },
     {
         "test_hash_map",
         (char*[]) {
             "tests/test_hash_map.c",
+            "src/str_to_str_map.c",
             "tests/hash_maps/fixed_comp2_to_int_map.c",
             "tests/hash_maps/fixed_comp3_to_comp2_map.c",
             "tests/hash_maps/fixed_int32_to_comp1_map.c",

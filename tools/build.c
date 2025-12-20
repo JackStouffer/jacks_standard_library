@@ -12,11 +12,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define JSL_CORE_IMPLEMENTATION
 #include "../src/jsl_core.h"
-
-#define JSL_FILES_IMPLEMENTATION
-#include "../src/jsl_files.h"
+#include "../src/jsl_os.h"
 
 static char* clang_warning_flags[] = {
     "-Wall",

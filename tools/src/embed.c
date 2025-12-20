@@ -15,14 +15,9 @@
 #define EMBED_IMPLEMENTATION
 #include "embed.h"
 
-#define JSL_CORE_IMPLEMENTATION
 #include "../../src/jsl_core.h"
-
-#define JSL_STRING_BUILDER_IMPLEMENTATION
 #include "../../src/jsl_string_builder.h"
-
-#define JSL_FILES_IMPLEMENTATION
-#include "../../src/jsl_files.h"
+#include "../../src/jsl_os.h"
 
 int32_t main(int32_t argc, char **argv)
 {

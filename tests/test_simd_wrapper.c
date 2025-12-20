@@ -31,7 +31,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#define JSL_CORE_IMPLEMENTATION
 #include "../src/jsl_core.h"
 
 #include "jsl_simdutf_wrapper.h"
