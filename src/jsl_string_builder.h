@@ -189,6 +189,16 @@
     JSL_STRING_BUILDER_DEF bool jsl_string_builder_insert_fatptr(JSLStringBuilder* builder, JSLFatPtr data);
 
     /**
+     * Append the contents of a null terminated C string. Additional chunks are allocated as needed
+     * while copying so if any of the allocations fail this returns false.
+     *
+     * @param builder The string builder to append to; must be initialized.
+     * @param data A null terminated C string
+     * @returns `true` if the data was appended successfully, otherwise `false`.
+     */
+    JSL_STRING_BUILDER_DEF bool jsl_string_builder_insert_cstr(JSLStringBuilder* builder, const char* data);
+
+    /**
      * Format a string using the jsl_format logic and write the result directly into
      * the string builder.
      *
@@ -421,6 +431,41 @@
 
             int64_t bytes_written = jsl_fatptr_memory_copy(&builder->tail->writer, data);
             JSL_FATPTR_ADVANCE(data, bytes_written);
+        }
+
+        return res;
+    }
+
+    bool jsl_string_builder_insert_cstr(JSLStringBuilder* builder, const char* data)
+    {
+        if (
+            builder == NULL
+            || builder->head == NULL
+            || builder->tail == NULL
+            || data == NULL
+        )
+            return false;
+
+        bool res = true;
+
+        size_t bytes_remaining = JSL_STRLEN(data);
+
+        while (bytes_remaining > 0)
+        {
+            if (builder->tail->writer.length == 0)
+            {
+                res = jsl__string_builder_add_chunk(builder);
+                if (!res)
+                    break;
+            }
+
+            int64_t bytes_written = jsl_fatptr_cstr_memory_copy(
+                &builder->tail->writer,
+                data,
+                false
+            );
+            bytes_remaining -= bytes_written;
+            data += bytes_written;
         }
 
         return res;

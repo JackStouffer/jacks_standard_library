@@ -43,9 +43,9 @@
  */
 
 
-#ifndef JSL_CORE_LIBRARY
+#ifndef JSL_CORE_H_INCLUDED
 
-#define JSL_CORE_LIBRARY
+#define JSL_CORE_H_INCLUDED
 
 #ifdef __cplusplus
 extern "C" {
@@ -76,7 +76,7 @@ extern "C" {
     || defined(__ARMEB__)
     || defined(__MIPSEB__)
 
-    #error "ERROR: JSL_CORE_LIBRARY.h does not support big endian targets!"
+    #error "ERROR: JSL_CORE_H_INCLUDED.h does not support big endian targets!"
 
 #endif
 
@@ -165,7 +165,7 @@ extern "C" {
         #define JSL__IS_POINTER_32_BITS_VAL 1
         #define JSL__IS_POINTER_64_BITS_VAL 0
     #else
-        #error "ERROR: JSL_CORE_LIBRARY.h can only be used with 32 or 64 bit pointers"
+        #error "ERROR: JSL_CORE_H_INCLUDED.h can only be used with 32 or 64 bit pointers"
     #endif
 #elif defined(_WIN64)
     #define JSL__IS_POINTER_32_BITS_VAL 0
@@ -180,7 +180,7 @@ extern "C" {
     #define JSL__IS_POINTER_32_BITS_VAL 1
     #define JSL__IS_POINTER_64_BITS_VAL 0
 #else
-    #error "ERROR: JSL_CORE_LIBRARY.h can only be used with 32 or 64 bit pointers"
+    #error "ERROR: JSL_CORE_H_INCLUDED.h can only be used with 32 or 64 bit pointers"
 #endif
 
 #ifndef JSL_DEBUG
@@ -375,7 +375,7 @@ int32_t jsl__find_first_set_u64(uint64_t x);
     #define JSL_VERSION 0x010000  /* 1.0.0 */
 #else
     #if JSL_VERSION != 0x010000
-        #error "ERROR: Conflicting versions of JSL_CORE_LIBRARY.h included in the same translation unit!"
+        #error "ERROR: Conflicting versions of JSL_CORE_H_INCLUDED.h included in the same translation unit!"
     #endif
 #endif
 
@@ -1291,7 +1291,7 @@ JSL_DEF int64_t jsl_fatptr_memory_copy(JSLFatPtr* destination, JSLFatPtr source)
  */
 JSL_DEF int64_t jsl_fatptr_cstr_memory_copy(
     JSLFatPtr* destination,
-    char* cstring,
+    const char* cstring,
     bool include_null_terminator
 );
 
@@ -1845,6 +1845,8 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
 } /* extern "C" */
 #endif
 
+#endif // JSL_CORE_H_INCLUDED
+
 
 /**
  *
@@ -2286,7 +2288,7 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
         return memcpy_length;
     }
 
-    JSL_WARN_UNUSED int64_t jsl_fatptr_cstr_memory_copy(JSLFatPtr* destination, char* cstring, bool include_null_terminator)
+    JSL_WARN_UNUSED int64_t jsl_fatptr_cstr_memory_copy(JSLFatPtr* destination, const char* cstring, bool include_null_terminator)
     {
         if (
             cstring == NULL
@@ -5319,5 +5321,3 @@ JSL_DEF void jsl_format_set_separators(char comma, char period);
     #undef STBSP__UNALIGNED
 
 #endif // JSL_CORE_IMPLEMENTATION
-
-#endif // JSL_CORE_LIBRARY

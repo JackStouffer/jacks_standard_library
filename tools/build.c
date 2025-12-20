@@ -1,5 +1,5 @@
 /**
- * # Build CLI Tools
+ * # Build The CLI Tools
  * 
  * TODO: docs
  */
@@ -57,77 +57,15 @@ static JSLFatPtr program_flag_str = JSL_FATPTR_INITIALIZER("--program");
 
 void write_template_files(JSLArena* arena)
 {
+    JSLFatPtr header_template_path = JSL_FATPTR_EXPRESSION("tools/src/templates/static_hash_map_header.txt");
+    JSLFatPtr header_output_path = JSL_FATPTR_EXPRESSION("tools/src/templates/static_hash_map_header.h");
+
 
     const char* header_template[] = {"tools/src/templates/static_hash_map_header.txt"};
     bool build_header_data = nob_needs_rebuild("tools/src/templates/static_hash_map_header.h", header_template, 1U);
     if (build_header_data)
     {
-        JSLFatPtr header_template_path = JSL_FATPTR_EXPRESSION("tools/src/templates/static_hash_map_header.txt");
-        JSLFatPtr header_output_path = JSL_FATPTR_EXPRESSION("tools/src/templates/static_hash_map_header.h");
-
-        JSLFatPtr header_template_contents = {0};
-        int32_t load_errno = 0;
-        JSLLoadFileResultEnum load_result = jsl_load_file_contents(
-            arena,
-            header_template_path,
-            &header_template_contents,
-            &load_errno
-        );
-
-        if (load_result != JSL_FILE_LOAD_SUCCESS)
-        {
-            jsl_format_file(
-                stderr,
-                JSL_FATPTR_EXPRESSION("Failed to load template file %y (errno %d)\n"),
-                header_template_path,
-                load_errno
-            );
-            exit(EXIT_FAILURE);
-        }
-
-        Nob_String_Builder header_output = {0};
-        nob_sb_append_cstr(&header_output, "#pragma once\n\n");
-        nob_sb_append_cstr(&header_output, "#include <stdint.h>\n\n");
-        nob_sb_append_cstr(&header_output, "static const uint8_t static_hash_map_header_template[] = {\n");
-
-        const int32_t bytes_per_line = 12;
-        for (int64_t i = 0; i < header_template_contents.length; ++i)
-        {
-            if (i % bytes_per_line == 0)
-                nob_sb_append_cstr(&header_output, "    ");
-
-            nob_sb_appendf(&header_output, "0x%02x", header_template_contents.data[i]);
-
-            bool is_last = (i + 1) == header_template_contents.length;
-            bool end_of_line = ((i + 1) % bytes_per_line) == 0;
-
-            if (!is_last)
-                nob_sb_append_cstr(&header_output, ",");
-
-            if (end_of_line || is_last)
-                nob_sb_append_cstr(&header_output, "\n");
-            else
-                nob_sb_append_cstr(&header_output, " ");
-        }
-
-        nob_sb_append_cstr(&header_output, "};\n\n");
-        nob_sb_appendf(
-            &header_output,
-            "static const uint64_t static_hash_map_header_template_len = %lld;\n",
-            (long long) header_template_contents.length
-        );
-
-        if (!nob_write_entire_file(
-            (const char*) header_output_path.data,
-            header_output.items,
-            header_output.count
-        ))
-        {
-            nob_sb_free(header_output);
-            exit(EXIT_FAILURE);
-        }
-
-        nob_sb_free(header_output);
+        
     }
 }
 
@@ -213,6 +151,8 @@ int32_t build_program_files(JSLArena* arena)
 int32_t main(int32_t argc, char **argv)
 {
     NOB_GO_REBUILD_URSELF(argc, argv);
+
+    if (!nob_mkdir_if_not_exists("tools/dist")) return EXIT_FAILURE;
 
     JSLArena arena;
     jsl_arena_init(&arena, malloc(JSL_MEGABYTES(32)), JSL_MEGABYTES(32));
