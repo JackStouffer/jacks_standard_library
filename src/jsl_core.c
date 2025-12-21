@@ -1535,16 +1535,7 @@ JSLFatPtr jsl_arena_reallocate_aligned(
         return res;
 
     const uintptr_t arena_start = (uintptr_t) arena->start;
-    const uintptr_t arena_current = (uintptr_t) arena->current;
     const uintptr_t arena_end = (uintptr_t) arena->end;
-
-    const uintptr_t aligned_current_addr = (uintptr_t) align_ptr_upwards(
-        arena->current,
-        align
-    );
-
-    if (aligned_current_addr > arena_end)
-        return res;
 
     #if JSL__HAS_ASAN
         const uintptr_t guard_size = (uintptr_t) JSL__ASAN_GUARD_SIZE;
@@ -1552,24 +1543,11 @@ JSLFatPtr jsl_arena_reallocate_aligned(
         const uintptr_t guard_size = 0;
     #endif
 
-    bool can_hold_bytes = (uint64_t) new_num_bytes <= UINTPTR_MAX - aligned_current_addr;
-    uintptr_t potential_end = can_hold_bytes 
-        ? aligned_current_addr + (uintptr_t) new_num_bytes 
-        : 0;
-
-    uintptr_t next_current_addr = 0;
-    bool is_space_left = false;
-
-    bool guard_overflow = !can_hold_bytes || guard_size > UINTPTR_MAX - potential_end;
-    if (!guard_overflow)
-    {
-        next_current_addr = potential_end + guard_size;
-        is_space_left = next_current_addr <= arena_end;
-    }
-
     // Only resize if this given allocation was the last thing alloc-ed
     uintptr_t original_data_addr = (uintptr_t) original_allocation.data;
     bool same_pointer = false;
+    uintptr_t aligned_original_addr = 0;
+    uintptr_t original_end_addr = 0;
 
     if (
         original_data_addr >= arena_start
@@ -1577,47 +1555,80 @@ JSLFatPtr jsl_arena_reallocate_aligned(
         && (uint64_t) original_allocation.length <= UINTPTR_MAX - original_data_addr
     )
     {
-        uintptr_t original_end_addr = original_data_addr + (uintptr_t) original_allocation.length;
-        same_pointer = (arena_current == original_end_addr);
+        original_end_addr = original_data_addr + (uintptr_t) original_allocation.length;
+        uintptr_t arena_current_addr = (uintptr_t) arena->current;
+
+        bool matches_no_guard = arena_current_addr == original_end_addr;
+        bool matches_guard = false;
+
+        if (guard_size <= UINTPTR_MAX - original_end_addr)
+        {
+            uintptr_t guarded_end = original_end_addr + guard_size;
+            matches_guard = arena_current_addr == guarded_end;
+        }
+
+        same_pointer = matches_no_guard || matches_guard;
+        aligned_original_addr = (uintptr_t) align_ptr_upwards(
+            (uint8_t*) original_data_addr,
+            align
+        );
     }
 
-    if (same_pointer && is_space_left)
+    if (same_pointer)
     {
-        res.data = (uint8_t*) original_data_addr;
-        res.length = new_num_bytes;
-        arena->current = (uint8_t*) next_current_addr;
+        bool can_hold_bytes = (
+            (uint64_t) new_num_bytes <= UINTPTR_MAX - aligned_original_addr
+        );
 
-        ASAN_UNPOISON_MEMORY_REGION(res.data, res.length);
-
-        if (new_num_bytes < original_allocation.length)
+        if (can_hold_bytes)
         {
-            ASAN_POISON_MEMORY_REGION(
-                res.data + new_num_bytes,
-                original_allocation.length - new_num_bytes
-            );
+            uintptr_t potential_end = aligned_original_addr + (uintptr_t) new_num_bytes;
+            bool guard_overflow = guard_size > UINTPTR_MAX - potential_end;
+            if (!guard_overflow)
+            {
+                uintptr_t next_current_addr = potential_end + guard_size;
+                bool is_space_left = next_current_addr <= arena_end;
+
+                if (is_space_left)
+                {
+                    res.data = (uint8_t*) original_data_addr;
+                    res.length = new_num_bytes;
+                    arena->current = (uint8_t*) next_current_addr;
+
+                    ASAN_UNPOISON_MEMORY_REGION(res.data, res.length);
+
+                    if (new_num_bytes < original_allocation.length)
+                    {
+                        ASAN_POISON_MEMORY_REGION(
+                            res.data + new_num_bytes,
+                            original_allocation.length - new_num_bytes
+                        );
+                    }
+
+                    return res;
+                }
+            }
         }
     }
-    else
+
+    res = jsl_arena_allocate_aligned(arena, new_num_bytes, align, false);
+    if (res.data != NULL)
     {
-        res = jsl_arena_allocate_aligned(arena, new_num_bytes, align, false);
-        if (res.data != NULL)
-        {
-            JSL_MEMCPY(
-                res.data,
-                original_allocation.data,
+        JSL_MEMCPY(
+            res.data,
+            original_allocation.data,
+            (size_t) original_allocation.length
+        );
+
+        #ifdef JSL_DEBUG
+            JSL_MEMSET(
+                (void*) original_allocation.data,
+                (int32_t) 0xfeeefeee,
                 (size_t) original_allocation.length
             );
+        #endif
 
-            #ifdef JSL_DEBUG
-                JSL_MEMSET(
-                    (void*) original_allocation.data,
-                    (int32_t) 0xfeeefeee,
-                    (size_t) original_allocation.length
-                );
-            #endif
-
-            ASAN_POISON_MEMORY_REGION(original_allocation.data, original_allocation.length);
-        }
+        ASAN_POISON_MEMORY_REGION(original_allocation.data, original_allocation.length);
     }
 
     return res;

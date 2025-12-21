@@ -229,6 +229,46 @@ static void test_jsl_fatptr_auto_slice(void)
     }
 }
 
+static void test_jsl_fatptr_auto_slice_arena_reallocate(void)
+{
+    const int64_t arena_size = JSL_KILOBYTES(64);
+    JSLArena arena;
+    jsl_arena_init(&arena, malloc((size_t) arena_size), arena_size);
+
+    JSLFatPtr buffer = jsl_arena_allocate(&arena, 4096, false);
+    TEST_BOOL(buffer.data != NULL);
+    TEST_INT64_EQUAL(buffer.length, (int64_t) 4096);
+    uint8_t* original_ptr = buffer.data;
+
+    JSLFatPtr writer = buffer;
+
+    // Fill the initial allocation
+    JSL_FATPTR_ADVANCE(writer, 4096);
+    TEST_INT64_EQUAL(writer.length, (int64_t) 0);
+
+    // First grow should keep the pointer stable
+    buffer = jsl_arena_reallocate(&arena, buffer, 8192);
+    TEST_BOOL(buffer.data != NULL);
+    TEST_BOOL(buffer.data == original_ptr);
+    TEST_INT64_EQUAL(buffer.length, (int64_t) 8192);
+    writer.length += 4096;
+
+    // Fill the grown region
+    JSL_FATPTR_ADVANCE(writer, 4096);
+    TEST_INT64_EQUAL(writer.length, (int64_t) 0);
+
+    // Second grow must still stay in place; otherwise auto_slice asserts
+    buffer = jsl_arena_reallocate(&arena, buffer, 12288);
+    TEST_BOOL(buffer.data != NULL);
+    TEST_BOOL(buffer.data == original_ptr);
+    TEST_INT64_EQUAL(buffer.length, (int64_t) 12288);
+    writer.length += 4096;
+
+    JSLFatPtr slice = jsl_fatptr_auto_slice(buffer, writer);
+    TEST_INT64_EQUAL(slice.length, (int64_t) 8192);
+    TEST_BOOL(slice.data == buffer.data);
+}
+
 static void test_jsl_fatptr_strip_whitespace_left(void)
 {
     {
@@ -934,6 +974,7 @@ int main(void)
     RUN_TEST_FUNCTION("Test jsl_fatptr_slice", test_jsl_fatptr_slice);
     RUN_TEST_FUNCTION("Test jsl_fatptr_total_write_length", test_jsl_fatptr_total_write_length);
     RUN_TEST_FUNCTION("Test jsl_fatptr_auto_slice", test_jsl_fatptr_auto_slice);
+    RUN_TEST_FUNCTION("Test jsl_fatptr_auto_slice_arena_reallocate", test_jsl_fatptr_auto_slice_arena_reallocate);
     RUN_TEST_FUNCTION("Test jsl_fatptr_strip_whitespace_left", test_jsl_fatptr_strip_whitespace_left);
     RUN_TEST_FUNCTION("Test jsl_fatptr_strip_whitespace_right", test_jsl_fatptr_strip_whitespace_right);
     RUN_TEST_FUNCTION("Test jsl_fatptr_strip_whitespace", test_jsl_fatptr_strip_whitespace);

@@ -100,7 +100,11 @@ static int32_t entrypoint(JSLCmdLine* cmd, JSLArena* arena)
 
             if (stdin_buffer_read_buffer.length < 32)
             {
-                stdin_buffer = jsl_arena_reallocate(arena, stdin_buffer, stdin_buffer.length + 4096);
+                stdin_buffer = jsl_arena_reallocate(
+                    arena,
+                    stdin_buffer,
+                    stdin_buffer.length + 4096
+                );
                 stdin_buffer_read_buffer.length += 4096;
             }
         }
