@@ -1522,17 +1522,22 @@ JSLFatPtr jsl_arena_reallocate_aligned(
 {
     JSL_ASSERT(align > 0 && jsl__is_power_of_two(align));
 
+    JSLFatPtr res = {0};
+    bool should_continue = true;
+
     #ifdef NDEBUG
-        if (alignment < 1 || !jsl__is_power_of_two(alignment))
+        bool runtime_align_valid = (align > 0 && jsl__is_power_of_two(align));
+        if (!runtime_align_valid)
         {
-            return res;
+            should_continue = false;
         }
     #endif
 
-    JSLFatPtr res = {0};
-
-    if (new_num_bytes < 0 || original_allocation.length < 0)
-        return res;
+    bool sizes_non_negative = (new_num_bytes >= 0 && original_allocation.length >= 0);
+    if (!sizes_non_negative)
+    {
+        should_continue = false;
+    }
 
     const uintptr_t arena_start = (uintptr_t) arena->start;
     const uintptr_t arena_end = (uintptr_t) arena->end;
@@ -1545,74 +1550,87 @@ JSLFatPtr jsl_arena_reallocate_aligned(
 
     // Only resize if this given allocation was the last thing alloc-ed
     uintptr_t original_data_addr = (uintptr_t) original_allocation.data;
-    bool same_pointer = false;
     uintptr_t aligned_original_addr = 0;
     uintptr_t original_end_addr = 0;
+    uintptr_t arena_current_addr = (uintptr_t) arena->current;
 
-    if (
+    bool original_length_fits = (uint64_t) original_allocation.length <= UINTPTR_MAX - original_data_addr;
+    bool original_addr_in_range = (
         original_data_addr >= arena_start
         && original_data_addr <= arena_end
-        && (uint64_t) original_allocation.length <= UINTPTR_MAX - original_data_addr
-    )
+    );
+    bool pointer_checks_passed = should_continue && original_addr_in_range && original_length_fits;
+
+    if (pointer_checks_passed)
     {
         original_end_addr = original_data_addr + (uintptr_t) original_allocation.length;
-        uintptr_t arena_current_addr = (uintptr_t) arena->current;
+    }
 
-        bool matches_no_guard = arena_current_addr == original_end_addr;
-        bool matches_guard = false;
+    bool matches_no_guard = pointer_checks_passed && arena_current_addr == original_end_addr;
 
-        if (guard_size <= UINTPTR_MAX - original_end_addr)
-        {
-            uintptr_t guarded_end = original_end_addr + guard_size;
-            matches_guard = arena_current_addr == guarded_end;
-        }
+    bool guard_room_available = pointer_checks_passed && guard_size <= UINTPTR_MAX - original_end_addr;
+    uintptr_t guarded_end = original_end_addr;
+    if (guard_room_available)
+    {
+        guarded_end = original_end_addr + guard_size;
+    }
 
-        same_pointer = matches_no_guard || matches_guard;
+    bool matches_guard = guard_room_available && arena_current_addr == guarded_end;
+    bool same_pointer = pointer_checks_passed && (matches_no_guard || matches_guard);
+
+    if (same_pointer)
+    {
         aligned_original_addr = (uintptr_t) align_ptr_upwards(
             (uint8_t*) original_data_addr,
             align
         );
     }
 
-    if (same_pointer)
+    bool can_hold_bytes = same_pointer && ((uint64_t) new_num_bytes <= UINTPTR_MAX - aligned_original_addr);
+    uintptr_t potential_end = aligned_original_addr;
+    if (can_hold_bytes)
     {
-        bool can_hold_bytes = (
-            (uint64_t) new_num_bytes <= UINTPTR_MAX - aligned_original_addr
-        );
-
-        if (can_hold_bytes)
-        {
-            uintptr_t potential_end = aligned_original_addr + (uintptr_t) new_num_bytes;
-            bool guard_overflow = guard_size > UINTPTR_MAX - potential_end;
-            if (!guard_overflow)
-            {
-                uintptr_t next_current_addr = potential_end + guard_size;
-                bool is_space_left = next_current_addr <= arena_end;
-
-                if (is_space_left)
-                {
-                    res.data = (uint8_t*) original_data_addr;
-                    res.length = new_num_bytes;
-                    arena->current = (uint8_t*) next_current_addr;
-
-                    ASAN_UNPOISON_MEMORY_REGION(res.data, res.length);
-
-                    if (new_num_bytes < original_allocation.length)
-                    {
-                        ASAN_POISON_MEMORY_REGION(
-                            res.data + new_num_bytes,
-                            original_allocation.length - new_num_bytes
-                        );
-                    }
-
-                    return res;
-                }
-            }
-        }
+        potential_end = aligned_original_addr + (uintptr_t) new_num_bytes;
     }
 
-    res = jsl_arena_allocate_aligned(arena, new_num_bytes, align, false);
-    if (res.data != NULL)
+    bool guard_overflow = can_hold_bytes && guard_size > UINTPTR_MAX - potential_end;
+    bool can_advance_current = can_hold_bytes && !guard_overflow;
+
+    uintptr_t next_current_addr = potential_end;
+    if (can_advance_current)
+    {
+        next_current_addr = potential_end + guard_size;
+    }
+
+    bool is_space_left = can_advance_current && next_current_addr <= arena_end;
+    bool perform_in_place = is_space_left;
+
+    if (perform_in_place)
+    {
+        res.data = (uint8_t*) original_data_addr;
+        res.length = new_num_bytes;
+        arena->current = (uint8_t*) next_current_addr;
+
+        ASAN_UNPOISON_MEMORY_REGION(res.data, res.length);
+    }
+
+    bool shrink_allocation = perform_in_place && new_num_bytes < original_allocation.length;
+    if (shrink_allocation)
+    {
+        ASAN_POISON_MEMORY_REGION(
+            res.data + new_num_bytes,
+            original_allocation.length - new_num_bytes
+        );
+    }
+
+    bool should_allocate_new = should_continue && !perform_in_place;
+    if (should_allocate_new)
+    {
+        res = jsl_arena_allocate_aligned(arena, new_num_bytes, align, false);
+    }
+
+    bool allocation_successful = should_allocate_new && res.data != NULL;
+    if (allocation_successful)
     {
         JSL_MEMCPY(
             res.data,
@@ -1621,11 +1639,12 @@ JSLFatPtr jsl_arena_reallocate_aligned(
         );
 
         #ifdef JSL_DEBUG
-            JSL_MEMSET(
-                (void*) original_allocation.data,
-                (int32_t) 0xfeeefeee,
-                (size_t) original_allocation.length
-            );
+            int64_t* fake_array = (int64_t*) original_allocation.data;
+            int64_t fake_array_len = original_allocation.length / (int64_t) sizeof(int64_t);
+            for (int64_t i = 0; i < fake_array_len; ++i)
+            {
+                fake_array[i] = 0xfeeefeee;
+            }
         #endif
 
         ASAN_POISON_MEMORY_REGION(original_allocation.data, original_allocation.length);
