@@ -42,6 +42,17 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include <stdarg.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <limits.h>
+
+#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L
+    #include <stdbool.h>
+#endif
+
+#include "jsl_core.h"
+
 #if JSL_IS_X86
     #include <immintrin.h>
 #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
@@ -53,17 +64,6 @@
 #if JSL_IS_MSVC
     #include <intrin.h>
 #endif
-
-#include <stdarg.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <limits.h>
-
-#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L
-    #include <stdbool.h>
-#endif
-
-#include "jsl_core.h"
 
 #if defined(__ARM_NEON) || defined(__ARM_NEON__)
     static inline uint32_t jsl__neon_movemask(uint8x16_t v)
@@ -437,7 +437,7 @@ JSLFatPtr jsl_fatptr_auto_slice(JSLFatPtr original_fatptr, JSLFatPtr writer_fatp
     return original_fatptr;
 }
 
-JSLFatPtr jsl_fatptr_from_cstr(char* str)
+JSLFatPtr jsl_fatptr_from_cstr(const char* str)
 {
     JSLFatPtr ret = {
         .data = (uint8_t*) str,
@@ -987,49 +987,49 @@ int64_t jsl_fatptr_index_of_reverse(JSLFatPtr string, uint8_t item)
     #endif
 }
 
-static inline bool jsl__fatptr_small_prefix_match(const uint8_t* str_ptr, const uint8_t* pre_ptr, int64_t len)
-{
-    if (len <= 3)
-    {
-        if (len == 1)
-            return str_ptr[0] == pre_ptr[0];
-
-        if (len == 2)
-            return (str_ptr[0] == pre_ptr[0]) && (str_ptr[1] == pre_ptr[1]);
-
-        return (str_ptr[0] == pre_ptr[0]) && (str_ptr[1] == pre_ptr[1]) && (str_ptr[2] == pre_ptr[2]);
-    }
-    else if (len <= 8)
-    {
-        uint32_t head_a = 0;
-        uint32_t head_b = 0;
-        uint32_t tail_a = 0;
-        uint32_t tail_b = 0;
-
-        JSL_MEMCPY(&head_a, str_ptr, 4);
-        JSL_MEMCPY(&head_b, pre_ptr, 4);
-        JSL_MEMCPY(&tail_a, str_ptr + 4, (size_t) (len - 4));
-        JSL_MEMCPY(&tail_b, pre_ptr + 4, (size_t) (len - 4));
-
-        return (head_a ^ head_b) == 0 && (tail_a ^ tail_b) == 0;
-    }
-    else
-    {
-        uint64_t head_a = 0;
-        uint64_t head_b = 0;
-        uint64_t tail_a = 0;
-        uint64_t tail_b = 0;
-
-        JSL_MEMCPY(&head_a, str_ptr, 8);
-        JSL_MEMCPY(&head_b, pre_ptr, 8);
-        JSL_MEMCPY(&tail_a, str_ptr + 8, (size_t) (len - 8));
-        JSL_MEMCPY(&tail_b, pre_ptr + 8, (size_t) (len - 8));
-
-        return (head_a ^ head_b) == 0 && (tail_a ^ tail_b) == 0;
-    }
-}
-
 #ifdef __AVX2__
+    static inline bool jsl__fatptr_small_prefix_match(const uint8_t* str_ptr, const uint8_t* pre_ptr, int64_t len)
+    {
+        if (len <= 3)
+        {
+            if (len == 1)
+                return str_ptr[0] == pre_ptr[0];
+
+            if (len == 2)
+                return (str_ptr[0] == pre_ptr[0]) && (str_ptr[1] == pre_ptr[1]);
+
+            return (str_ptr[0] == pre_ptr[0]) && (str_ptr[1] == pre_ptr[1]) && (str_ptr[2] == pre_ptr[2]);
+        }
+        else if (len <= 8)
+        {
+            uint32_t head_a = 0;
+            uint32_t head_b = 0;
+            uint32_t tail_a = 0;
+            uint32_t tail_b = 0;
+
+            JSL_MEMCPY(&head_a, str_ptr, 4);
+            JSL_MEMCPY(&head_b, pre_ptr, 4);
+            JSL_MEMCPY(&tail_a, str_ptr + 4, (size_t) (len - 4));
+            JSL_MEMCPY(&tail_b, pre_ptr + 4, (size_t) (len - 4));
+
+            return (head_a ^ head_b) == 0 && (tail_a ^ tail_b) == 0;
+        }
+        else
+        {
+            uint64_t head_a = 0;
+            uint64_t head_b = 0;
+            uint64_t tail_a = 0;
+            uint64_t tail_b = 0;
+
+            JSL_MEMCPY(&head_a, str_ptr, 8);
+            JSL_MEMCPY(&head_b, pre_ptr, 8);
+            JSL_MEMCPY(&tail_a, str_ptr + 8, (size_t) (len - 8));
+            JSL_MEMCPY(&tail_b, pre_ptr + 8, (size_t) (len - 8));
+
+            return (head_a ^ head_b) == 0 && (tail_a ^ tail_b) == 0;
+        }
+    }
+
     static inline bool jsl__fatptr_compare_upto_32(const uint8_t* str_ptr, const uint8_t* pre_ptr, int64_t len)
     {
         if (len <= 16)

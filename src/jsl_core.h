@@ -1246,7 +1246,7 @@ JSL_DEF JSLFatPtr jsl_fatptr_auto_slice(JSLFatPtr original_fatptr, JSLFatPtr wri
  * @param str the str to create the fat ptr from
  * @return A fat ptr
  */
-JSL_DEF JSLFatPtr jsl_fatptr_from_cstr(char* str);
+JSL_DEF JSLFatPtr jsl_fatptr_from_cstr(const char* str);
 
 /**
  * Copy the contents of `source` into `destination`.

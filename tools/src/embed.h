@@ -18,7 +18,7 @@
 
     #include "../../src/jsl_core.h"
     #include "../../src/jsl_string_builder.h"
-    #include "../../src/jsl_files.h"
+    #include "../../src/jsl_os.h"
 
     /* Versioning to catch mismatches across deps */
     #ifndef EMBED_VERSION

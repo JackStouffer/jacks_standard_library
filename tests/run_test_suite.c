@@ -314,6 +314,14 @@ static UnitTestDecl unit_test_declarations[] = {
         "src/jsl_string_builder.c",
         NULL
     } },
+    { "test_cmd_line", (char*[]) {
+        "tests/test_cmd_line.c",
+        "src/jsl_core.c",
+        "src/jsl_str_to_str_map.c",
+        "src/jsl_str_to_str_multimap.c",
+        "src/jsl_cmd_line.c",
+        NULL
+    } },
     { "test_intrinsics", (char*[]) {
         "tests/test_intrinsics.c",
         "src/jsl_core.c",
@@ -328,14 +336,14 @@ static UnitTestDecl unit_test_declarations[] = {
     { "test_str_to_str_multimap", (char*[]) {
         "tests/test_str_to_str_multimap.c",
         "src/jsl_core.c",
-        "src/str_to_str_multimap.c",
+        "src/jsl_str_to_str_multimap.c",
         NULL
     } },
     {
         "test_hash_map",
         (char*[]) {
             "tests/test_hash_map.c",
-            "src/str_to_str_map.c",
+            "src/jsl_str_to_str_map.c",
             "tests/hash_maps/fixed_comp2_to_int_map.c",
             "tests/hash_maps/fixed_comp3_to_comp2_map.c",
             "tests/hash_maps/fixed_int32_to_comp1_map.c",

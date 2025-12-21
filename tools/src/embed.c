@@ -1,7 +1,11 @@
 /**
  * # Embed File Data
  * 
- * TODO: docs
+ * Every large, serious C program wants to take file data and include
+ * it in binary. Unfortunately it took until C23 for this to be standardized
+ * in the language. This program takes the binary representation of a
+ * file and generates the text of a C header with that info as a fat pointer.
+ *
  */
 
 #include <stdint.h>
@@ -15,58 +19,72 @@
 #define EMBED_IMPLEMENTATION
 #include "embed.h"
 
-#include "../../src/jsl_core.h"
-#include "../../src/jsl_string_builder.h"
-#include "../../src/jsl_os.h"
+#include "../../src/jsl_core.c"
+#include "../../src/jsl_string_builder.c"
+#include "../../src/jsl_os.c"
 
 int32_t main(int32_t argc, char **argv)
 {
     JSLArena arena;
     jsl_arena_init(&arena, malloc(JSL_MEGABYTES(32)), JSL_MEGABYTES(32));
 
-    JSLFatPtr header_template_path = JSL_FATPTR_EXPRESSION("tools/src/templates/static_hash_map_header.txt");
-    JSLFatPtr header_output_path = JSL_FATPTR_EXPRESSION("tools/src/templates/static_hash_map_header.h");
-
-    JSLFatPtr header_template_contents = {0};
+    JSLFatPtr file_path = {0};
+    JSLFatPtr file_contents = {0};
     int32_t load_errno = 0;
-    JSLLoadFileResultEnum load_result = jsl_load_file_contents(
-        &arena,
-        header_template_path,
-        &header_template_contents,
-        &load_errno
-    );
 
-    if (load_result != JSL_FILE_LOAD_SUCCESS)
+    if (argc == 2)
     {
-        jsl_format_file(
-            stderr,
-            JSL_FATPTR_EXPRESSION("Failed to load template file %y (errno %d)\n"),
-            header_template_path,
-            load_errno
+        file_path = jsl_fatptr_from_cstr(argv[1]);
+
+        JSLLoadFileResultEnum load_result = jsl_load_file_contents(
+            &arena,
+            file_path,
+            &file_contents,
+            &load_errno
         );
-        exit(EXIT_FAILURE);
+
+        if (load_result != JSL_FILE_LOAD_SUCCESS)
+        {
+            jsl_format_file(
+                stderr,
+                JSL_FATPTR_EXPRESSION("Failed to load template file %y (errno %d)\n"),
+                file_contents,
+                load_errno
+            );
+            exit(EXIT_FAILURE);
+        }
+
+        JSLStringBuilder builder;
+        jsl_string_builder_init(&builder, &arena);
+
+        generate_embed_header(
+            &builder,
+            JSL_FATPTR_EXPRESSION("test"),
+            file_contents
+        );
+        
+        JSLStringBuilderIterator iterator;
+        jsl_string_builder_iterator_init(&builder, &iterator);
+
+        while (true)
+        {
+            JSLFatPtr slice = jsl_string_builder_iterator_next(&iterator);
+            if (slice.data == NULL)
+                break;
+
+            jsl_format_file(stdout, slice);
+        }
+
+        return EXIT_SUCCESS;
     }
-
-    JSLStringBuilder builder;
-    jsl_string_builder_init(&builder, &arena);
-
-    generate_embed_header(
-        &builder,
-        JSL_FATPTR_EXPRESSION("test"),
-        header_template_contents
-    );
-    
-    JSLStringBuilderIterator iterator;
-    jsl_string_builder_iterator_init(&builder, &iterator);
-
-    while (true)
+    else if (argc == 1)
     {
-        JSLFatPtr slice = jsl_string_builder_iterator_next(&iterator);
-        if (slice.data == NULL)
-            break;
-
-        jsl_format_file(stdout, slice);
+        jsl_format_file(stderr, JSL_FATPTR_EXPRESSION("Must provide a file"));
+        return EXIT_FAILURE;
     }
-
-    return EXIT_SUCCESS;
+    else
+    {
+        jsl_format_file(stderr, JSL_FATPTR_EXPRESSION("Only one file path allowed"));
+        return EXIT_FAILURE;
+    }
 }

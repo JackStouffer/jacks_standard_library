@@ -54,51 +54,6 @@
 #include "jsl_hash_map_common.h"
 #include "jsl_str_to_str_map.h"
 
-enum JSLStrToStrMapKeyState {
-    JSL__MAP_EMPTY = 0UL,
-    JSL__MAP_TOMBSTONE = 1UL
-};
-
-#define JSL__MAP_SSO_LENGTH 8
-#define JSL__MAP_PRIVATE_SENTINEL 15280798434051232421UL
-
-struct JSL__StrToStrMapEntry {
-    uint8_t key_sso_buffer[JSL__MAP_SSO_LENGTH];
-    uint8_t value_sso_buffer[JSL__MAP_SSO_LENGTH];
-
-    JSLFatPtr key;
-    JSLFatPtr value;
-    uint64_t hash;
-
-    /// @brief Used to store in the free list, ignored otherwise
-    struct JSL__StrToStrMapEntry* next;
-};
-
-struct JSL__StrToStrMapKeyValueIter {
-    JSLStrToStrMap* map;
-    int64_t current_lut_index;
-    int64_t generational_id;
-    uint64_t sentinel;
-};
-
-struct JSL__StrToStrMap {
-    JSLArena* arena;
-
-    uintptr_t* entry_lookup_table;
-    int64_t entry_lookup_table_length;
-
-    int64_t item_count;
-    int64_t tombstone_count;
-
-    struct JSL__StrToStrMapEntry* entry_free_list;
-
-    uint64_t sentinel;
-
-    uint64_t hash_seed;
-    float load_factor;
-    int32_t generational_id;
-};
-
 JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_init(
     JSLStrToStrMap* map,
     JSLArena* arena,
