@@ -34,17 +34,17 @@ static int32_t entrypoint(JSLCmdLine* cmd, JSLArena* arena)
 
     jsl_cmd_line_pop_arg_list(cmd, &file_path);
 
-    if (jsl_cmd_line_pop_arg_list(cmd, &file_path))
-    {
-        jsl_format_file(
-            stderr,
-            JSL_FATPTR_EXPRESSION("Only provide zero or one file path\n")
-        );
-        return EXIT_FAILURE;
-    }
-
     if (file_path.data != NULL)
     {
+        if (jsl_cmd_line_pop_arg_list(cmd, &file_path))
+        {
+            jsl_format_file(
+                stderr,
+                JSL_FATPTR_EXPRESSION("Only provide zero or one file path\n")
+            );
+            return EXIT_FAILURE;
+        }
+
         JSLLoadFileResultEnum load_result = jsl_load_file_contents(
             arena,
             file_path,
@@ -62,7 +62,35 @@ static int32_t entrypoint(JSLCmdLine* cmd, JSLArena* arena)
             );
             return EXIT_FAILURE;
         }
+    }
+    else
+    {
+        JSLFatPtr stdin_buffer = jsl_arena_allocate(arena, 4096, false);
+        JSLFatPtr stdin_buffer_read_buffer = stdin_buffer;
 
+        size_t n;
+        while ((n = fread(stdin_buffer_read_buffer.data, 1, stdin_buffer_read_buffer.length, stdin)) > 0)
+        {
+            printf("n %lu\n", n);
+            jsl_format_file(stdout, stdin_buffer);
+            JSL_FATPTR_ADVANCE(stdin_buffer_read_buffer, (int64_t) n);
+
+            if (stdin_buffer_read_buffer.length < 32)
+            {
+                stdin_buffer = jsl_arena_reallocate(
+                    arena,
+                    stdin_buffer,
+                    stdin_buffer.length + 4096
+                );
+                stdin_buffer_read_buffer.length += 4096;
+            }
+        }
+
+        file_contents = jsl_fatptr_auto_slice(stdin_buffer, stdin_buffer_read_buffer);
+    }
+
+    if (file_contents.length > 0)
+    {
         JSLStringBuilder builder;
         jsl_string_builder_init(&builder, arena);
 
@@ -88,32 +116,15 @@ static int32_t entrypoint(JSLCmdLine* cmd, JSLArena* arena)
     }
     else
     {
-        JSLFatPtr stdin_buffer = jsl_arena_allocate(arena, 4096, false);
-        JSLFatPtr stdin_buffer_read_buffer = stdin_buffer;
+        jsl_format_file(
+            stderr,
+            JSL_FATPTR_EXPRESSION("No file paths passed as arguments and no data provided from stdin\n"),
+            file_contents,
+            load_errno
+        );
 
-        size_t n;
-        while ((n = fread(stdin_buffer_read_buffer.data, 1, stdin_buffer_read_buffer.length, stdin)) > 0)
-        {
-            printf("n %lu\n", n);
-            jsl_format_file(stdout, stdin_buffer);
-            JSL_FATPTR_ADVANCE(stdin_buffer_read_buffer, (int64_t) n);
-
-            if (stdin_buffer_read_buffer.length < 32)
-            {
-                stdin_buffer = jsl_arena_reallocate(
-                    arena,
-                    stdin_buffer,
-                    stdin_buffer.length + 4096
-                );
-                stdin_buffer_read_buffer.length += 4096;
-            }
-        }
-
-        JSLFatPtr written_to = jsl_fatptr_auto_slice(stdin_buffer, stdin_buffer_read_buffer);
-        jsl_format_file(stdout, written_to);
+        return EXIT_FAILURE;
     }
-
-    return EXIT_SUCCESS;
 }
 
 #if JSL_IS_WINDOWS
