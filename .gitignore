@@ -16,6 +16,7 @@ bin/
 *.dSYM
 run_tests
 generate_hash_map
+embed
 *.old
 tests/hash_maps
 .DS_Store

@@ -545,7 +545,7 @@ int32_t main(int32_t argc, char **argv)
         &generate_hash_map_compile_command,
         "-o", generate_hash_map_exe_name,
         "-Isrc/",
-        "cli/generate_hash_map.c"
+        "tools/generate_hash_map.c"
     );
 
     if (!nob_cmd_run(&generate_hash_map_compile_command)) return 1;
