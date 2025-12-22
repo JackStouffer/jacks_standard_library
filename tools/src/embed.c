@@ -26,7 +26,23 @@
 #include "../../src/jsl_str_to_str_multimap.c"
 #include "../../src/jsl_cmd_line.c"
 
-static int32_t entrypoint(JSLCmdLine* cmd, JSLArena* arena)
+static JSLFatPtr help_message = JSL_FATPTR_INITIALIZER(
+    "OVERVIEW:\n\n"
+    "Embed a file into a C program by generating a header file with the binary data.\n"
+    "Pass in the file data as an argument or from stdin.\n\n"
+    "USAGE:\n"
+    "\tembed --var-name=VAR-NAME [file]\n\n"
+    "Optional arguments:\n"
+    "\t--var-name\t\tSet the name of the exported variable containing the binary data.\n"
+);
+
+static JSLFatPtr default_var_name = JSL_FATPTR_EXPRESSION("data");
+
+static int32_t entrypoint(
+    JSLCmdLine* cmd,
+    JSLArena* arena,
+    bool stdin_has_data
+)
 {
     JSLFatPtr file_path = {0};
     JSLFatPtr file_contents = {0};
@@ -63,7 +79,7 @@ static int32_t entrypoint(JSLCmdLine* cmd, JSLArena* arena)
             return EXIT_FAILURE;
         }
     }
-    else
+    else if (stdin_has_data)
     {
         JSLFatPtr stdin_buffer = jsl_arena_allocate(arena, 4096, false);
         JSLFatPtr stdin_buffer_read_buffer = stdin_buffer;
@@ -71,8 +87,6 @@ static int32_t entrypoint(JSLCmdLine* cmd, JSLArena* arena)
         size_t n;
         while ((n = fread(stdin_buffer_read_buffer.data, 1, stdin_buffer_read_buffer.length, stdin)) > 0)
         {
-            printf("n %lu\n", n);
-            jsl_format_file(stdout, stdin_buffer);
             JSL_FATPTR_ADVANCE(stdin_buffer_read_buffer, (int64_t) n);
 
             if (stdin_buffer_read_buffer.length < 32)
@@ -88,15 +102,23 @@ static int32_t entrypoint(JSLCmdLine* cmd, JSLArena* arena)
 
         file_contents = jsl_fatptr_auto_slice(stdin_buffer, stdin_buffer_read_buffer);
     }
+    else
+    {
+        jsl_format_file(stdout, help_message);
+        return EXIT_FAILURE;
+    }
 
     if (file_contents.length > 0)
     {
         JSLStringBuilder builder;
         jsl_string_builder_init(&builder, arena);
 
+        JSLFatPtr var_name = default_var_name;
+        jsl_cmd_line_pop_flag_with_value(cmd, JSL_FATPTR_EXPRESSION("var-name"), &var_name);
+
         generate_embed_header(
             &builder,
-            JSL_FATPTR_EXPRESSION("test"),
+            var_name,
             file_contents
         );
         
@@ -116,13 +138,7 @@ static int32_t entrypoint(JSLCmdLine* cmd, JSLArena* arena)
     }
     else
     {
-        jsl_format_file(
-            stderr,
-            JSL_FATPTR_EXPRESSION("No file paths passed as arguments and no data provided from stdin\n"),
-            file_contents,
-            load_errno
-        );
-
+        jsl_format_file(stdout, help_message);
         return EXIT_FAILURE;
     }
 }
@@ -131,6 +147,8 @@ static int32_t entrypoint(JSLCmdLine* cmd, JSLArena* arena)
 
     #include <windows.h>
     #include <shellapi.h>
+    #include <fcntl.h>
+    #include <io.h>
     #pragma comment(lib, "shell32.lib")
 
     int32_t wmain(int32_t argc, wchar_t** argv);
@@ -154,10 +172,28 @@ static int32_t entrypoint(JSLCmdLine* cmd, JSLArena* arena)
         jsl_cmd_line_init(&cmd, &arena);
         jsl_cmd_line_parse_wide(&cmd, argc, argv);
 
-        return entrypoint(&cmd, &arena);
+        HANDLE stdin_handle = GetStdHandle(STD_INPUT_HANDLE);
+        DWORD stdin_type = GetFileType(stdin_handle);
+        bool stdin_has_data = false;
+
+        if (stdin_type == FILE_TYPE_PIPE)
+        {
+            DWORD bytes_available = 0;
+            if (PeekNamedPipe(stdin_handle, NULL, 0, NULL, &bytes_available, NULL) && bytes_available > 0)
+                stdin_has_data = true;
+        }
+        else if (stdin_type == FILE_TYPE_DISK)
+        {
+            stdin_has_data = true;
+        }
+
+        return entrypoint(&cmd, &arena, stdin_has_data);
     }
 
-#else
+#elif JSL_IS_POSIX
+
+    #include <poll.h>
+    #include <unistd.h>
 
     int32_t main(int32_t argc, char **argv)
     {
@@ -182,7 +218,18 @@ static int32_t entrypoint(JSLCmdLine* cmd, JSLArena* arena)
             return EXIT_FAILURE;
         }
 
-        return entrypoint(&cmd, &arena);
+        struct pollfd stdin_poll = {
+            .fd = STDIN_FILENO,
+            .events = POLLIN
+        };
+        int stdin_poll_result = poll(&stdin_poll, 1, 0);
+        bool stdin_has_data = stdin_poll_result > 0 && (stdin_poll.revents & POLLIN);
+
+        return entrypoint(&cmd, &arena, stdin_has_data);
     }
 
+#else
+
+    #error "Unknown platform. Only Windows and POSIX systems are supported."
+    
 #endif
