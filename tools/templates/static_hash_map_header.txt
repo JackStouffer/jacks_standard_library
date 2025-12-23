@@ -4,11 +4,12 @@
  * This file contains the header for a hash map `{{ hash_map_name }}` which maps
  * `{{ key_type_name }}` keys to `{{ value_type_name }}` values.
  *
- * This file was auto generated from the hash map generation utility that's part of the "Jack's Standard Library" project.
- * The utility generates a header file and a C file for a type safe, open addressed, hash map.
- * By generating the code rather than using macros, two benefits are gained. One, the code is
- * much easier to debug. Two, it's much more obvious how much code you're generating, which means
- * you are much less likely to accidentally create the combinatoric explosion of code that's
+ * This file was auto generated from the hash map generation utility that's part of
+ * the "Jack's Standard Library" project. The utility generates a header file and a
+ * C file for a type safe, open addressed, hash map. By generating the code rather
+ * than using macros, two benefits are gained. One, the code is much easier to debug.
+ * Two, it's much more obvious how much code you're generating, which means you are
+ * much less likely to accidentally create the combinatoric explosion of code that's
  * so common in C++ projects. Adding friction to things is actually good sometimes.
  *
  * Much like the arena allocator it uses, this hash map is designed for situations where
@@ -28,13 +29,13 @@
  */
 
 /**
- * A hash map which maps `{{ key_type_name }}` keys to `%y` values.
+ * A hash map which maps `{{ key_type_name }}` keys to `{{ value_type_name }}` values.
  *
  * This hash map uses open addressing with linear probing. However, it never grows.
  * When initalized with the init function, all the memory this hash map will have
  * is allocated right away.
  */
-typedef struct %y {
+typedef struct {{ hash_map_name }} {
     {{ key_type_name }}* keys_array;
     {{ value_type_name }}* values_array;
     uint64_t* hashes_array;
@@ -49,7 +50,7 @@ typedef struct %y {
  * Iterator type which is used by the iterator functions to
  * allow you to loop over the hash map contents.
  */
-typedef struct %yIterator {
+typedef struct {{ hash_map_name }}Iterator {
     {{ hash_map_name }}* hash_map;
     int64_t current_slot_index;
     uint16_t generational_id;

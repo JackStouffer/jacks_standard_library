@@ -81,14 +81,10 @@ jsl_string_builder_insert_fatptr(&builder, JSL_FATPTR_EXPRESSION("Some data")); 
 jsl_string_builder_format(&builder, JSL_FATPTR_EXPRESSION("My string %d"), 42); // no op
 jsl_string_builder_iterator_init(&builder, &iter); // empty iterator
 
-while (true)
+// no data, fails right away
+JSLFatPtr str;
+while (jsl_string_builder_iterator_next(&iter, &str))
 {
-   JSLFatPtr str = jsl_string_builder_iterator_next(&iter);
-
-   // no data, breaks right away
-   if (str.data == NULL)
-      break;
-
    jsl_format_file(stdout, str);
 }
 ```
@@ -126,9 +122,8 @@ if (res)
 if (res)
    res = jsl_string_builder_iterator_init(&builder, &iter);
 
-if (res) while (true)
-{
-   JSLFatPtr str = jsl_string_builder_iterator_next(&iter);
+JSLFatPtr str;
+if (res) while (jsl_string_builder_iterator_next(&iter, &str))
 
    if (str.data == NULL)
       break;

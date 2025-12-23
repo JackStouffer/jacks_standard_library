@@ -395,10 +395,9 @@ int32_t jsl__find_first_set_u64(uint64_t x);
 
 #ifndef JSL_ASSERT
     #include <assert.h>
-    void jsl__assert(int condition, char* file, int line);
 
     /**
-     * Assertion function definition. By default this will use `assert.h`.
+     * Assertion macro definition. By default this will use `assert.h`.
      * If you wish to override it, it must be a function which takes three parameters, a int
      * conditional, a char* of the filename, and an int line number. You can also provide an
      * empty function if you just want to turn off asserts altogether; this is not
@@ -407,7 +406,7 @@ int32_t jsl__find_first_set_u64(uint64_t x);
      *
      * Define this as a macro before importing the library to override this.
      */
-    #define JSL_ASSERT(condition) jsl__assert(condition, __FILE__, __LINE__)
+    #define JSL_ASSERT(condition) assert(condition)
 #endif
 
 #ifndef JSL_MEMCPY

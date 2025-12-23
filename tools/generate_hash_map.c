@@ -33,11 +33,17 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#include "../src/jsl_core.h"
-#include "../src/jsl_string_builder.h"
-#include "../src/jsl_os.h"
+#include "../src/jsl_core.c"
+#include "../src/jsl_string_builder.c"
+#include "../src/jsl_str_to_str_map.c"
+#include "../src/jsl_os.c"
 
 #include "generate_hash_map.h"
+#include "templates/static_hash_map_header.h"
+#include "templates/static_hash_map_source.h"
+
+#define SIMPLE_TEMPLATE_IMPLEMENTATION
+#include "simple_template.h"
 
 /**
  * TODO: Documentation: talk about
@@ -53,6 +59,88 @@
  *  - Give warning about composite keys and zero initialization, garbage memory in the padding
  */
 
+
+//  static bool function_prefix##_expand(JSL_HASHMAP_TYPE_NAME(name)* hash_map)
+// {
+//     JSL_DEBUG_ASSERT(hash_map != NULL);
+//     JSL_DEBUG_ASSERT(hash_map->arena != NULL);
+//     JSL_DEBUG_ASSERT(hash_map->slots_array != NULL);
+//     JSL_DEBUG_ASSERT(hash_map->is_set_flags_array != NULL);
+
+//     bool success;
+
+//     JSL_HASHMAP_ITEM_TYPE_NAME(name)* old_slots_array = hash_map->slots_array;
+//     int64_t old_slots_array_length = hash_map->slots_array_length;
+
+//     uint32_t* old_is_set_flags_array = hash_map->is_set_flags_array;
+//     int64_t old_is_set_flags_array_length = hash_map->is_set_flags_array_length;
+
+//     int64_t new_slots_array_length = jsl__hashmap_expand_size(old_slots_array_length);
+//     JSL_HASHMAP_ITEM_TYPE_NAME(name)* new_slots_array = (JSL_HASHMAP_ITEM_TYPE_NAME(name)*) jsl_arena_allocate(
+//         hash_map->arena, sizeof(JSL_HASHMAP_ITEM_TYPE_NAME(name)) * new_slots_array_length, false
+//     ).data;
+
+//     int64_t new_is_set_flags_array_length = new_slots_array_length >> 5L;
+//     uint32_t* new_is_set_flags_array = (uint32_t*) jsl_arena_allocate(
+//         hash_map->arena, sizeof(uint32_t) * new_is_set_flags_array_length, true
+//     ).data;
+
+//     if (new_slots_array != NULL && new_is_set_flags_array != NULL)
+//     {
+//         hash_map->item_count = 0;
+//         hash_map->slots_array = new_slots_array;
+//         hash_map->slots_array_length = new_slots_array_length;
+//         hash_map->is_set_flags_array = new_is_set_flags_array;
+//         hash_map->is_set_flags_array_length = new_is_set_flags_array_length;
+
+//         int64_t slot_index = 0;
+//         for (
+//             int64_t is_set_flags_index = 0;
+//             is_set_flags_index < old_is_set_flags_array_length;
+//             is_set_flags_index++
+//         )
+//         {
+//             for (uint32_t current_bit = 0; current_bit < 32; current_bit++)
+//             {
+//                 uint32_t bitflag = JSL_MAKE_BITFLAG(current_bit);
+//                 if (JSL_IS_BITFLAG_SET(old_is_set_flags_array[is_set_flags_index], bitflag))
+//                 {
+//                     function_prefix##_insert(hash_map, old_slots_array[slot_index].key, old_slots_array[slot_index].value);
+//                 }
+//                 ++slot_index;
+//             }
+//         }
+
+//         success = true;
+//     }
+//     else
+//     {
+//         success = false;
+//     }
+
+//     return success;
+// }
+
+static JSLFatPtr hash_map_name_key = JSL_FATPTR_INITIALIZER("hash_map_name");
+static JSLFatPtr key_type_name_key = JSL_FATPTR_INITIALIZER("key_type_name");
+static JSLFatPtr value_type_name_key = JSL_FATPTR_INITIALIZER("value_type_name");
+static JSLFatPtr function_prefix_key = JSL_FATPTR_INITIALIZER("function_prefix");
+static JSLFatPtr hash_function_key = JSL_FATPTR_INITIALIZER("hash_function");
+
+static JSLFatPtr int32_t_str = JSL_FATPTR_INITIALIZER("int32_t");
+static JSLFatPtr int_str = JSL_FATPTR_INITIALIZER("int");
+static JSLFatPtr unsigned_str = JSL_FATPTR_INITIALIZER("unsigned");
+static JSLFatPtr unsigned_int_str = JSL_FATPTR_INITIALIZER("unsigned int");
+static JSLFatPtr uint32_t_str = JSL_FATPTR_INITIALIZER("uint32_t");
+static JSLFatPtr int64_t_str = JSL_FATPTR_INITIALIZER("int64_t");
+static JSLFatPtr long_str = JSL_FATPTR_INITIALIZER("long");
+static JSLFatPtr long_int_str = JSL_FATPTR_INITIALIZER("long int");
+static JSLFatPtr long_long_str = JSL_FATPTR_INITIALIZER("long long");
+static JSLFatPtr long_long_int_str = JSL_FATPTR_INITIALIZER("long long int");
+static JSLFatPtr uint64_t_str = JSL_FATPTR_INITIALIZER("uint64_t");
+static JSLFatPtr unsigned_long_str = JSL_FATPTR_INITIALIZER("unsigned long");
+static JSLFatPtr unsigned_long_long_str = JSL_FATPTR_INITIALIZER("unsigned long long");
+static JSLFatPtr unsigned_long_long_int_str = JSL_FATPTR_INITIALIZER("unsigned long long int");
 
 /**
  * Generates the header file data for your hash map. This file includes all the typedefs
@@ -83,8 +171,9 @@
  *          allocation failures during header generation.
  */
 void write_hash_map_header(
-    HashMapImplementation impl,
+    JSLArena* arena,
     JSLStringBuilder* builder,
+    HashMapImplementation impl,
     JSLFatPtr hash_map_name,
     JSLFatPtr function_prefix,
     JSLFatPtr key_type_name,
@@ -97,18 +186,19 @@ void write_hash_map_header(
     (void) impl;
     (void) hash_function_name;
 
-    jsl_string_builder_format(
+    jsl_string_builder_insert_fatptr(
         builder,
-        fixed_hash_map_docstring,
-        JSL_FATPTR_EXPRESSION("header"),
-        hash_map_name,
-        key_type_name,
-        value_type_name
+        JSL_FATPTR_EXPRESSION("// DEFAULT INCLUDED HEADERS\n")
     );
 
     jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#pragma once\n\n"));
     jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include <stdint.h>\n"));
     jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include \"jsl_hash_map_common.h\"\n\n"));
+
+    jsl_string_builder_insert_fatptr(
+        builder,
+        JSL_FATPTR_EXPRESSION("// USER INCLUDED HEADERS\n")
+    );
 
     for (int32_t i = 0; i < include_header_count; ++i)
     {
@@ -117,90 +207,45 @@ void write_hash_map_header(
 
     jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("\n"));
 
-    jsl_string_builder_format(
-        builder,
-        fixed_map_type_typedef,
+    JSLStrToStrMap map;
+    jsl_str_to_str_map_init(&map, arena, 0x123456789);
+
+    jsl_str_to_str_map_insert(
+        &map,
+        hash_map_name_key,
+        JSL_STRING_LIFETIME_STATIC,
+        hash_map_name,
+        JSL_STRING_LIFETIME_STATIC
+    );
+    jsl_str_to_str_map_insert(
+        &map,
+        key_type_name_key,
+        JSL_STRING_LIFETIME_STATIC,
         key_type_name,
+        JSL_STRING_LIFETIME_STATIC
+    );
+    jsl_str_to_str_map_insert(
+        &map,
+        value_type_name_key,
+        JSL_STRING_LIFETIME_STATIC,
         value_type_name,
-        hash_map_name,
-        key_type_name,
-        value_type_name,
-        hash_map_name
+        JSL_STRING_LIFETIME_STATIC
+    );
+    jsl_str_to_str_map_insert(
+        &map,
+        function_prefix_key,
+        JSL_STRING_LIFETIME_STATIC,
+        function_prefix,
+        JSL_STRING_LIFETIME_STATIC
     );
 
-    jsl_string_builder_format(
-        builder,
-        fixed_map_iterator_typedef,
-        hash_map_name,
-        hash_map_name,
-        hash_map_name
-    );
-
-    jsl_string_builder_format(
-        builder,
-        fixed_init_function_signature,
-        function_prefix,
-        hash_map_name
-    );
-
-    jsl_string_builder_format(
-        builder,
-        fixed_insert_function_signature,
-        function_prefix,
-        hash_map_name,
-        key_type_name,
-        value_type_name
-    );
-
-    jsl_string_builder_format(
-        builder,
-        fixed_get_function_signature,
-        value_type_name,
-        function_prefix,
-        hash_map_name,
-        key_type_name
-    );
-
-    jsl_string_builder_format(
-        builder,
-        fixed_delete_function_signature,
-        function_prefix,
-        hash_map_name,
-        key_type_name
-    );
-
-    jsl_string_builder_format(
-        builder,
-        fixed_iterator_start_function_signature,
-        key_type_name,
-        value_type_name,
-        hash_map_name,
-        function_prefix,
-        function_prefix,
-        function_prefix,
-        hash_map_name,
-        hash_map_name,
-        hash_map_name
-    );
-
-    jsl_string_builder_format(
-        builder,
-        fixed_iterator_next_function_signature,
-        key_type_name,
-        value_type_name,
-        hash_map_name,
-        function_prefix,
-        function_prefix,
-        function_prefix,
-        hash_map_name,
-        key_type_name,
-        value_type_name
-    );
+    render_template(builder, header_template, &map);
 }
 
 void write_hash_map_source(
-    HashMapImplementation impl,
+    JSLArena* arena,
     JSLStringBuilder* builder,
+    HashMapImplementation impl,
     JSLFatPtr hash_map_name,
     JSLFatPtr function_prefix,
     JSLFatPtr key_type_name,
@@ -211,15 +256,6 @@ void write_hash_map_source(
 )
 {
     (void) impl;
-
-    jsl_string_builder_format(
-        builder,
-        fixed_hash_map_docstring,
-        JSL_FATPTR_EXPRESSION("source"),
-        hash_map_name,
-        key_type_name,
-        value_type_name
-    );
 
     jsl_string_builder_insert_fatptr(
         builder,
@@ -255,32 +291,41 @@ void write_hash_map_source(
 
     jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("\n"));
 
-    jsl_string_builder_format(
-        builder,
-        fixed_init_function_code,
+
+    JSLStrToStrMap map;
+    jsl_str_to_str_map_init(&map, arena, 0x123456789);
+
+    jsl_str_to_str_map_insert(
+        &map,
+        hash_map_name_key,
+        JSL_STRING_LIFETIME_STATIC,
+        hash_map_name,
+        JSL_STRING_LIFETIME_STATIC
+    );
+    jsl_str_to_str_map_insert(
+        &map,
+        key_type_name_key,
+        JSL_STRING_LIFETIME_STATIC,
+        key_type_name,
+        JSL_STRING_LIFETIME_STATIC
+    );
+    jsl_str_to_str_map_insert(
+        &map,
+        value_type_name_key,
+        JSL_STRING_LIFETIME_STATIC,
+        value_type_name,
+        JSL_STRING_LIFETIME_STATIC
+    );
+    jsl_str_to_str_map_insert(
+        &map,
+        function_prefix_key,
+        JSL_STRING_LIFETIME_STATIC,
         function_prefix,
-        hash_map_name,
-        hash_map_name,
-        key_type_name,
-        key_type_name,
-        key_type_name,
-        value_type_name,
-        value_type_name,
-        value_type_name
+        JSL_STRING_LIFETIME_STATIC
     );
 
     // hash and find slot
     {
-        static JSLFatPtr int32_t_str = JSL_FATPTR_INITIALIZER("int32_t");
-        static JSLFatPtr int_str = JSL_FATPTR_INITIALIZER("int");
-        static JSLFatPtr unsigned_str = JSL_FATPTR_INITIALIZER("unsigned");
-        static JSLFatPtr unsigned_int_str = JSL_FATPTR_INITIALIZER("unsigned int");
-        static JSLFatPtr uint32_t_str = JSL_FATPTR_INITIALIZER("uint32_t");
-        static JSLFatPtr int64_t_str = JSL_FATPTR_INITIALIZER("int64_t");
-        static JSLFatPtr long_str = JSL_FATPTR_INITIALIZER("long");
-        static JSLFatPtr uint64_t_str = JSL_FATPTR_INITIALIZER("uint64_t");
-        static JSLFatPtr unsigned_long_str = JSL_FATPTR_INITIALIZER("unsigned long");
-
         uint8_t hash_function_call_buffer[4098];
         JSLArena hash_function_scratch_arena = JSL_ARENA_FROM_STACK(hash_function_call_buffer);
 
@@ -304,6 +349,11 @@ void write_hash_map_source(
             || jsl_fatptr_memory_compare(key_type_name, long_str)
             || jsl_fatptr_memory_compare(key_type_name, uint64_t_str)
             || jsl_fatptr_memory_compare(key_type_name, unsigned_long_str)
+            || jsl_fatptr_memory_compare(key_type_name, long_int_str)
+            || jsl_fatptr_memory_compare(key_type_name, long_long_str)
+            || jsl_fatptr_memory_compare(key_type_name, long_long_int_str)
+            || jsl_fatptr_memory_compare(key_type_name, unsigned_long_long_str)
+            || jsl_fatptr_memory_compare(key_type_name, unsigned_long_long_int_str)
             || key_type_name.data[key_type_name.length - 1] == '*'
         )
         {
@@ -322,67 +372,16 @@ void write_hash_map_source(
             );
         }
 
-        jsl_string_builder_format(
-            builder,
-            fixed_hash_function_code,
-            function_prefix,
-            hash_map_name,
-            key_type_name,
+        jsl_str_to_str_map_insert(
+            &map,
+            hash_function_key,
+            JSL_STRING_LIFETIME_STATIC,
             resolved_hash_function_call,
-            key_type_name
+            JSL_STRING_LIFETIME_STATIC
         );
     }
 
-    jsl_string_builder_format(
-        builder,
-        fixed_insert_function_code,
-        function_prefix,
-        hash_map_name,
-        key_type_name,
-        value_type_name,
-        hash_map_name,
-        function_prefix
-    );
-
-    jsl_string_builder_format(
-        builder,
-        fixed_get_function_code,
-        value_type_name,
-        function_prefix,
-        hash_map_name,
-        key_type_name,
-        value_type_name,
-        hash_map_name,
-        function_prefix
-    );
-
-    jsl_string_builder_format(
-        builder,
-        fixed_delete_function_code,
-        function_prefix,
-        hash_map_name,
-        key_type_name,
-        hash_map_name,
-        function_prefix
-    );
-
-    jsl_string_builder_format(
-        builder,
-        fixed_iterator_start_function_code,
-        function_prefix,
-        hash_map_name,
-        hash_map_name
-    );
-
-    jsl_string_builder_format(
-        builder,
-        fixed_iterator_next_function_code,
-        function_prefix,
-        hash_map_name,
-        key_type_name,
-        value_type_name
-    );
-
+    render_template(builder, source_template, &map);
 }
 
 #ifdef INCLUDE_MAIN
@@ -565,38 +564,38 @@ static int32_t entrypoint(JSLArena* arena, JSLFatPtr* args, int32_t arg_count)
         }
         else
         {
-            jsl_format_file(stderr, JSL_FATPTR_EXPRESSION("Error: Unknown argument: %y\n"), arg);
+            jsl_format_to_file(stderr, JSL_FATPTR_EXPRESSION("Error: Unknown argument: %y\n"), arg);
             return EXIT_FAILURE;
         }
     }
 
     if (show_help)
     {
-        jsl_format_file(stdout, help_message);
+        jsl_format_to_file(stdout, help_message);
         return EXIT_SUCCESS;
     }
     // Check that all required parameters are provided
     else if (name.data == NULL)
     {
-        jsl_format_file(stderr, JSL_FATPTR_EXPRESSION("Error: --name is required\n"));
+        jsl_format_to_file(stderr, JSL_FATPTR_EXPRESSION("Error: --name is required\n"));
         return EXIT_FAILURE;
     }
 
     if (function_prefix.data == NULL)
     {
-        jsl_format_file(stderr, JSL_FATPTR_EXPRESSION("Error: --function_prefix is required\n"));
+        jsl_format_to_file(stderr, JSL_FATPTR_EXPRESSION("Error: --function_prefix is required\n"));
         return EXIT_FAILURE;
     }
 
     if (key_type.data == NULL)
     {
-        jsl_format_file(stderr, JSL_FATPTR_EXPRESSION("Error: --key_type is required\n"));
+        jsl_format_to_file(stderr, JSL_FATPTR_EXPRESSION("Error: --key_type is required\n"));
         return EXIT_FAILURE;
     }
 
     if (value_type.data == NULL)
     {
-        jsl_format_file(stderr, JSL_FATPTR_EXPRESSION("Error: --value_type is required\n"));
+        jsl_format_to_file(stderr, JSL_FATPTR_EXPRESSION("Error: --value_type is required\n"));
         return EXIT_FAILURE;
     }
 
@@ -611,8 +610,9 @@ static int32_t entrypoint(JSLArena* arena, JSLFatPtr* args, int32_t arg_count)
     if (print_header)
     {
         write_hash_map_header(
-            impl,
+            arena,
             &builder,
+            impl,
             name,
             function_prefix,
             key_type,
@@ -625,8 +625,9 @@ static int32_t entrypoint(JSLArena* arena, JSLFatPtr* args, int32_t arg_count)
     else
     {
         write_hash_map_source(
-            impl,
+            arena,
             &builder,
+            impl,
             name,
             function_prefix,
             key_type,
@@ -640,13 +641,10 @@ static int32_t entrypoint(JSLArena* arena, JSLFatPtr* args, int32_t arg_count)
     JSLStringBuilderIterator iterator;
     jsl_string_builder_iterator_init(&builder, &iterator);
 
-    while (true)
+    JSLFatPtr slice;
+    while (jsl_string_builder_iterator_next(&iterator, &slice))
     {
-        JSLFatPtr slice = jsl_string_builder_iterator_next(&iterator);
-        if (slice.data == NULL)
-            break;
-
-        jsl_format_file(stdout, slice);
+        jsl_format_to_file(stdout, slice);
     }
 
 
@@ -654,26 +652,26 @@ static int32_t entrypoint(JSLArena* arena, JSLFatPtr* args, int32_t arg_count)
 }
 
 
-#if JSL_IS_WINDOWS
+// #if JSL_IS_WINDOWS
 
-// annoyingly, clang does not special case wmain like main
-// for missing prototypes.
-int32_t wmain(int32_t argc, wchar_t** argv);
+// // annoyingly, clang does not special case wmain like main
+// // for missing prototypes.
+// int32_t wmain(int32_t argc, wchar_t** argv);
 
-int32_t wmain(int32_t argc, wchar_t** argv)
-{
+// int32_t wmain(int32_t argc, wchar_t** argv)
+// {
     
-    SetConsoleOutputCP(CP_UTF8);
-    SetConsoleCP(CP_UTF8);
-    _setmode(_fileno(stdout), _O_BINARY);
-    _setmode(_fileno(stderr), _O_BINARY);
+//     SetConsoleOutputCP(CP_UTF8);
+//     SetConsoleCP(CP_UTF8);
+//     _setmode(_fileno(stdout), _O_BINARY);
+//     _setmode(_fileno(stderr), _O_BINARY);
 
-#else
+// #else
 
 int32_t main(int32_t argc, char** argv)
 {
 
-#endif
+// #endif
 
     int64_t arena_size = JSL_MEGABYTES(32);
     JSLArena arena;

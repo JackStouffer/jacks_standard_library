@@ -79,7 +79,6 @@ enum JSLStrToStrMapKeyState {
 };
 
 #define JSL__MAP_SSO_LENGTH 8
-#define JSL__MAP_PRIVATE_SENTINEL 15280798434051232421UL
 
 struct JSL__StrToStrMapEntry {
     uint8_t key_sso_buffer[JSL__MAP_SSO_LENGTH];
@@ -101,6 +100,11 @@ struct JSL__StrToStrMapKeyValueIter {
 };
 
 struct JSL__StrToStrMap {
+    // putting the sentinel first means it's much more likely to get
+    // corrupted from accidental overwrites, therefore making it
+    // more likely that memory bugs are caught.
+    uint64_t sentinel;
+
     JSLArena* arena;
 
     uintptr_t* entry_lookup_table;
@@ -110,8 +114,6 @@ struct JSL__StrToStrMap {
     int64_t tombstone_count;
 
     struct JSL__StrToStrMapEntry* entry_free_list;
-
-    uint64_t sentinel;
 
     uint64_t hash_seed;
     float load_factor;

@@ -87,6 +87,29 @@
 extern "C" {
 #endif
 
+
+struct JSL__StringBuilderChunk
+{
+    JSLFatPtr buffer;
+    JSLFatPtr writer;
+    struct JSL__StringBuilderChunk* next;
+};
+
+// private. use the fields directly at your own risk
+struct JSL__StringBuilder
+{
+    // putting the sentinel first means it's much more likely to get
+    // corrupted from accidental overwrites, therefore making it
+    // more likely that memory bugs are caught.
+    uint64_t sentinel;
+
+    JSLArena* arena;
+    struct JSL__StringBuilderChunk* head;
+    struct JSL__StringBuilderChunk* tail;
+    int32_t alignment;
+    int32_t chunk_size;
+};
+
 /**
  * Container type for the string builder. See the top level docstring for an overview.
  * 
@@ -102,14 +125,7 @@ extern "C" {
  * * jsl_string_builder_insert_fatptr
  * * jsl_string_builder_format
  */
-typedef struct JSLStringBuilder
-{
-    JSLArena* arena;
-    struct JSLStringBuilderChunk* head;
-    struct JSLStringBuilderChunk* tail;
-    int32_t alignment;
-    int32_t chunk_size;
-} JSLStringBuilder;
+typedef struct JSL__StringBuilder JSLStringBuilder;
 
 /**
  * The iterator type for a JSLStringBuilder instance. This keeps track of
@@ -124,7 +140,7 @@ typedef struct JSLStringBuilder
  */
 typedef struct JSLStringBuilderIterator
 {
-    struct JSLStringBuilderChunk* current;
+    struct JSL__StringBuilderChunk* current;
 } JSLStringBuilderIterator;
 
 /**
@@ -223,34 +239,30 @@ JSL_STRING_BUILDER_DEF bool jsl_string_builder_format(JSLStringBuilder* builder,
 JSL_STRING_BUILDER_DEF void jsl_string_builder_iterator_init(JSLStringBuilder* builder, JSLStringBuilderIterator* iterator);
 
 /**
- * Get the next chunk of data a string builder iterator. The chunk will
- * have a `NULL` data pointer when iteration is over.
+ * Get the next chunk of data a string builder iterator.
  *
  * This example program prints all the data in a string builder to stdout:
  *
  * ```
  * #include <stdio.h>
  *
- * JSLStringBuilder builder = ...;
- *
  * JSLStringBuilderIterator iter;
  * jsl_string_builder_iterator_init(&builder, &iter);
  *
- * while (true)
+ * JSLFatPtr str;
+ * while (jsl_string_builder_iterator_next(&iter. &str))
  * {
- *      JSLFatPtr str = jsl_string_builder_iterator_next(&iter);
- *
- *      if (str.data == NULL)
- *          break;
- *
- *      jsl_format_file(stdout, str);
+ *      jsl_format_to_file(stdout, str);
  * }
  * ```
  *
- * @param iterator   The iterator instance
- * @returns The next chunk of data from the string builder
+ * @param iterator The iterator instance
+ * @returns If this iteration has data
  */
-JSL_STRING_BUILDER_DEF JSLFatPtr jsl_string_builder_iterator_next(JSLStringBuilderIterator* iterator);
+JSL_STRING_BUILDER_DEF bool jsl_string_builder_iterator_next(
+    JSLStringBuilderIterator* iterator,
+    JSLFatPtr* out_chunk
+);
 
 #ifdef __cplusplus
 }

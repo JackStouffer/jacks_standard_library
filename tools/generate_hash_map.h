@@ -11,8 +11,9 @@ typedef enum {
 } HashMapImplementation;
 
 void write_hash_map_header(
-    HashMapImplementation impl,
+    JSLArena* arena,
     JSLStringBuilder* builder,
+    HashMapImplementation impl,
     JSLFatPtr hash_map_name,
     JSLFatPtr function_prefix,
     JSLFatPtr key_type_name,
@@ -23,8 +24,9 @@ void write_hash_map_header(
 );
 
 void write_hash_map_source(
-    HashMapImplementation impl,
+    JSLArena* arena,
     JSLStringBuilder* builder,
+    HashMapImplementation impl,
     JSLFatPtr hash_map_name,
     JSLFatPtr function_prefix,
     JSLFatPtr key_type_name,

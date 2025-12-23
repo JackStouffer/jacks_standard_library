@@ -70,17 +70,12 @@
 #include "jsl_core.h"
 #include "jsl_string_builder.h"
 
-struct JSLStringBuilderChunk
-{
-    JSLFatPtr buffer;
-    JSLFatPtr writer;
-    struct JSLStringBuilderChunk* next;
-};
+#define JSL__BUILDER_PRIVATE_SENTINEL 4401537694999363085U
 
 static bool jsl__string_builder_add_chunk(JSLStringBuilder* builder)
 {
-    struct JSLStringBuilderChunk* chunk = JSL_ARENA_TYPED_ALLOCATE(
-        struct JSLStringBuilderChunk,
+    struct JSL__StringBuilderChunk* chunk = JSL_ARENA_TYPED_ALLOCATE(
+        struct JSL__StringBuilderChunk,
         builder->arena
     );
     chunk->next = NULL;
@@ -119,7 +114,7 @@ bool jsl_string_builder_init(JSLStringBuilder* builder, JSLArena* arena)
     return jsl_string_builder_init2(
         builder,
         arena,
-        256,
+        1024,
         8
     );
 }
@@ -136,14 +131,20 @@ bool jsl_string_builder_init2(
     if (builder != NULL)
     {
         JSL_MEMSET(builder, 0, sizeof(JSLStringBuilder));
-
-        if (arena != NULL && chunk_size > 0 && alignment > 0)
-        {
-            builder->arena = arena;
-            builder->chunk_size = chunk_size;
-            builder->alignment = alignment;
-            res = jsl__string_builder_add_chunk(builder);
-        }
+    }
+    
+    if (
+        builder != NULL
+        && arena != NULL
+        && chunk_size > 0
+        && alignment > 0
+    )
+    {
+        builder->sentinel = JSL__BUILDER_PRIVATE_SENTINEL;
+        builder->arena = arena;
+        builder->chunk_size = chunk_size;
+        builder->alignment = alignment;
+        res = jsl__string_builder_add_chunk(builder);
     }
 
     return res;
@@ -151,7 +152,12 @@ bool jsl_string_builder_init2(
 
 bool jsl_string_builder_insert_char(JSLStringBuilder* builder, char c)
 {
-    if (builder == NULL || builder->head == NULL || builder->tail == NULL)
+    if (
+        builder == NULL
+        || builder->sentinel != JSL__BUILDER_PRIVATE_SENTINEL
+        || builder->head == NULL
+        || builder->tail == NULL
+    )
         return false;
 
     bool res = false;
@@ -186,7 +192,12 @@ bool jsl_string_builder_insert_char(JSLStringBuilder* builder, char c)
 
 bool jsl_string_builder_insert_uint8_t(JSLStringBuilder* builder, uint8_t c)
 {
-    if (builder == NULL || builder->head == NULL || builder->tail == NULL)
+    if (
+        builder == NULL
+        || builder->sentinel != JSL__BUILDER_PRIVATE_SENTINEL
+        || builder->head == NULL
+        || builder->tail == NULL
+    )
         return false;
 
     bool res = false;
@@ -221,7 +232,12 @@ bool jsl_string_builder_insert_uint8_t(JSLStringBuilder* builder, uint8_t c)
 
 bool jsl_string_builder_insert_fatptr(JSLStringBuilder* builder, JSLFatPtr data)
 {
-    if (builder == NULL || builder->head == NULL || builder->tail == NULL)
+    if (
+        builder == NULL
+        || builder->sentinel != JSL__BUILDER_PRIVATE_SENTINEL
+        || builder->head == NULL
+        || builder->tail == NULL
+    )
         return false;
 
     bool res = true;
@@ -246,6 +262,7 @@ bool jsl_string_builder_insert_cstr(JSLStringBuilder* builder, const char* data)
 {
     if (
         builder == NULL
+        || builder->sentinel != JSL__BUILDER_PRIVATE_SENTINEL
         || builder->head == NULL
         || builder->tail == NULL
         || data == NULL
@@ -254,7 +271,7 @@ bool jsl_string_builder_insert_cstr(JSLStringBuilder* builder, const char* data)
 
     bool res = true;
 
-    size_t bytes_remaining = JSL_STRLEN(data);
+    int64_t bytes_remaining = (int64_t) JSL_STRLEN(data);
 
     while (bytes_remaining > 0)
     {
@@ -279,23 +296,29 @@ bool jsl_string_builder_insert_cstr(JSLStringBuilder* builder, const char* data)
 
 void jsl_string_builder_iterator_init(JSLStringBuilder* builder, JSLStringBuilderIterator* iterator)
 {
-    if (builder != NULL && iterator != NULL)
+    if (iterator != NULL)
+        JSL_MEMSET(iterator, 0, sizeof(JSLStringBuilderIterator));
+
+    if (
+        builder != NULL
+        && iterator != NULL
+        && builder->sentinel == JSL__BUILDER_PRIVATE_SENTINEL
+    )
         iterator->current = builder->head;
 }
 
-JSLFatPtr jsl_string_builder_iterator_next(JSLStringBuilderIterator* iterator)
+bool jsl_string_builder_iterator_next(JSLStringBuilderIterator* iterator, JSLFatPtr* out_chunk)
 {
-    JSLFatPtr ret = {0};
-    if (iterator == NULL)
-        return ret;
+    if (iterator == NULL || out_chunk == NULL)
+        return false;
 
-    struct JSLStringBuilderChunk* current = iterator->current;
+    struct JSL__StringBuilderChunk* current = iterator->current;
     if (current == NULL || current->buffer.data == NULL)
-        return ret;
+        return false;
 
     iterator->current = current->next;
-    ret = jsl_fatptr_auto_slice(current->buffer, current->writer);
-    return ret;
+    *out_chunk = jsl_fatptr_auto_slice(current->buffer, current->writer);
+    return true;
 }
 
 struct JSL__StringBuilderContext
@@ -309,7 +332,13 @@ static uint8_t* format_string_builder_callback(uint8_t *buf, void *user, int64_t
 {
     struct JSL__StringBuilderContext* context = (struct JSL__StringBuilderContext*) user;
 
-    if (context->builder->head == NULL || context->builder->tail == NULL || len > JSL_FORMAT_MIN_BUFFER)
+    if (
+        context->builder == NULL
+        || context->builder->sentinel != JSL__BUILDER_PRIVATE_SENTINEL
+        || context->builder->head == NULL
+        || context->builder->tail == NULL
+        || len > JSL_FORMAT_MIN_BUFFER
+    )
         return NULL;
 
     bool res = jsl_string_builder_insert_fatptr(context->builder, jsl_fatptr_init(buf, len));
@@ -349,3 +378,5 @@ JSL__ASAN_OFF bool jsl_string_builder_format(JSLStringBuilder* builder, JSLFatPt
 
     return !context.failure_flag;
 }
+
+#undef JSL__BUILDER_PRIVATE_SENTINEL

@@ -41,12 +41,9 @@ static void debug_concatenate_builder(JSLStringBuilder* builder, JSLFatPtr* writ
     JSLStringBuilderIterator iterator;
     jsl_string_builder_iterator_init(builder, &iterator);
 
-    while (true)
+    JSLFatPtr slice;
+    while (jsl_string_builder_iterator_next(&iterator, &slice))
     {
-        JSLFatPtr slice = jsl_string_builder_iterator_next(&iterator);
-        if (slice.data == NULL)
-            break;
-
         int64_t memcpy_res = jsl_fatptr_memory_copy(writer, slice);
         TEST_INT64_EQUAL(memcpy_res, slice.length);
     }
@@ -132,17 +129,17 @@ static void test_jsl_string_builder_insert_char_grows_chunks(void)
 
     JSLStringBuilderIterator iterator;
     jsl_string_builder_iterator_init(&builder, &iterator);
-    JSLFatPtr first = jsl_string_builder_iterator_next(&iterator);
+    JSLFatPtr first;
+    TEST_BOOL(jsl_string_builder_iterator_next(&iterator, &first));
     TEST_BOOL(first.length == 2);
     TEST_BOOL(memcmp(first.data, "XY", 2) == 0);
 
-    JSLFatPtr second = jsl_string_builder_iterator_next(&iterator);
+    JSLFatPtr second;
+    TEST_BOOL(jsl_string_builder_iterator_next(&iterator, &second));
     TEST_BOOL(second.length == 1);
     TEST_BOOL(second.data[0] == 'Z');
 
-    JSLFatPtr done = jsl_string_builder_iterator_next(&iterator);
-    TEST_BOOL(done.data == NULL);
-    TEST_BOOL(done.length == 0);
+    TEST_BOOL(!jsl_string_builder_iterator_next(&iterator, &second));
 }
 
 static void test_jsl_string_builder_insert_uint8_t_binary(void)
@@ -190,9 +187,12 @@ static void test_jsl_string_builder_insert_fatptr_multi_chunk(void)
 
     JSLStringBuilderIterator iterator;
     jsl_string_builder_iterator_init(&builder, &iterator);
-    JSLFatPtr first = jsl_string_builder_iterator_next(&iterator);
-    JSLFatPtr second = jsl_string_builder_iterator_next(&iterator);
-    JSLFatPtr third = jsl_string_builder_iterator_next(&iterator);
+    JSLFatPtr first;
+    jsl_string_builder_iterator_next(&iterator, &first);
+    JSLFatPtr second;
+    jsl_string_builder_iterator_next(&iterator, &second);
+    JSLFatPtr third;
+    jsl_string_builder_iterator_next(&iterator, &third);
 
     TEST_INT64_EQUAL(first.length, (int64_t) 4);
     TEST_INT64_EQUAL(second.length, (int64_t) 4);
@@ -245,7 +245,8 @@ static void test_jsl_string_builder_iterator_behavior(void)
     jsl_string_builder_iterator_init(&builder, &iterator);
     TEST_BOOL(iterator.current == builder.head);
 
-    JSLFatPtr slice = jsl_string_builder_iterator_next(&iterator);
+    JSLFatPtr slice;
+    jsl_string_builder_iterator_next(&iterator, &slice);
     TEST_BOOL(slice.data != NULL);
     TEST_BOOL(slice.length == 0);
 
@@ -254,22 +255,21 @@ static void test_jsl_string_builder_iterator_behavior(void)
     TEST_BOOL(jsl_string_builder_insert_char(&builder, '3'));
 
     jsl_string_builder_iterator_init(&builder, &iterator);
-    slice = jsl_string_builder_iterator_next(&iterator);
+    jsl_string_builder_iterator_next(&iterator, &slice);
 
     TEST_BOOL(slice.length == 3);
     TEST_BUFFERS_EQUAL(slice.data, "123", 3);
 
-    JSLFatPtr end = jsl_string_builder_iterator_next(&iterator);
+    JSLFatPtr end;
+    jsl_string_builder_iterator_next(&iterator, &end);
     TEST_BOOL(end.data == NULL);
     TEST_INT64_EQUAL(end.length, (int64_t) 0);
 
     JSLStringBuilder invalid = {0};
     JSLStringBuilderIterator invalid_iterator;
     jsl_string_builder_iterator_init(&invalid, &invalid_iterator);
-    JSLFatPtr invalid_slice = jsl_string_builder_iterator_next(&invalid_iterator);
-
-    TEST_BOOL(invalid_slice.data == NULL);
-    TEST_INT64_EQUAL(invalid_slice.length, (int64_t) 0);
+    JSLFatPtr invalid_slice;
+    TEST_BOOL(!jsl_string_builder_iterator_next(&invalid_iterator, &invalid_slice));
 }
 
 static void test_jsl_string_builder_format_success(void)

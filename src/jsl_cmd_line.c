@@ -13,6 +13,14 @@
 #include "jsl_str_to_str_map.h"
 #include "jsl_str_to_str_multimap.h"
 
+#if WCHAR_MAX <= 0xFFFFu
+    #define JSL__CMD_LINE_WCHAR_IS_16_BIT 1
+#elif WCHAR_MAX <= 0xFFFFFFFFu
+    #define JSL__CMD_LINE_WCHAR_IS_32_BIT 1
+#else
+    #error "Unsupported wchar_t size"
+#endif
+
 static const JSLFatPtr JSL__CMD_LINE_EMPTY_VALUE = JSL_FATPTR_INITIALIZER("");
 
 static void jsl__cmd_line_set_short_flag(JSLCmdLine* cmd_line, uint8_t flag)
@@ -144,8 +152,7 @@ static bool jsl__cmd_line_utf16_to_utf8(JSLArena* arena, wchar_t* wide, JSLFatPt
     {
         uint32_t codepoint = 0;
 
-        if (sizeof(wchar_t) == 2)
-        {
+        #if defined(JSL__CMD_LINE_WCHAR_IS_16_BIT)
             uint16_t word = (uint16_t) wide[wide_length];
 
             if (word >= 0xD800u && word <= 0xDBFFu)
@@ -171,9 +178,7 @@ static bool jsl__cmd_line_utf16_to_utf8(JSLArena* arena, wchar_t* wide, JSLFatPt
             {
                 codepoint = word;
             }
-        }
-        else if (sizeof(wchar_t) == 4)
-        {
+        #elif defined(JSL__CMD_LINE_WCHAR_IS_32_BIT)
             uint32_t value = (uint32_t) wide[wide_length];
             bool surrogate = value >= 0xD800u && value <= 0xDFFFu;
             bool too_large = value > 0x10FFFFu;
@@ -185,11 +190,9 @@ static bool jsl__cmd_line_utf16_to_utf8(JSLArena* arena, wchar_t* wide, JSLFatPt
             {
                 iteration_valid = false;
             }
-        }
-        else
-        {
+        #else
             iteration_valid = false;
-        }
+        #endif
 
         if (iteration_valid)
         {
@@ -239,8 +242,7 @@ static bool jsl__cmd_line_utf16_to_utf8(JSLArena* arena, wchar_t* wide, JSLFatPt
         {
             uint32_t codepoint = 0;
 
-            if (sizeof(wchar_t) == 2)
-            {
+            #if defined(JSL__CMD_LINE_WCHAR_IS_16_BIT)
                 uint16_t word = (uint16_t) wide[index];
                 if (word >= 0xD800u && word <= 0xDBFFu)
                 {
@@ -253,11 +255,12 @@ static bool jsl__cmd_line_utf16_to_utf8(JSLArena* arena, wchar_t* wide, JSLFatPt
                 {
                     codepoint = word;
                 }
-            }
-            else
-            {
+            #elif defined(JSL__CMD_LINE_WCHAR_IS_32_BIT)
                 codepoint = (uint32_t) wide[index];
-            }
+            #else
+                codepoint = 0;
+                encode_ok = false;
+            #endif
 
             if (codepoint <= 0x7Fu)
             {

@@ -123,6 +123,11 @@ struct JSL__StrToStrMultimapValueIter {
 };
 
 struct JSL__StrToStrMultimap {
+    // putting the sentinel first means it's much more likely to get
+    // corrupted from accidental overwrites, therefore making it
+    // more likely that memory bugs are caught.
+    uint64_t sentinel;
+
     JSLArena* arena;
 
     uintptr_t* entry_lookup_table;
@@ -134,8 +139,6 @@ struct JSL__StrToStrMultimap {
 
     struct JSL__StrToStrMultimapEntry* entry_free_list;
     struct JSL__StrToStrMultimapValue* value_free_list;
-
-    uint64_t sentinel;
 
     uint64_t hash_seed;
     float load_factor;

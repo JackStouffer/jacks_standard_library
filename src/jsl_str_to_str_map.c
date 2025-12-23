@@ -54,6 +54,8 @@
 #include "jsl_hash_map_common.h"
 #include "jsl_str_to_str_map.h"
 
+#define JSL__MAP_PRIVATE_SENTINEL 8973815015742603881U
+
 JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_init(
     JSLStrToStrMap* map,
     JSLArena* arena,

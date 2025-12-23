@@ -16,9 +16,8 @@
         #include <stdbool.h>
     #endif
 
-    #include "../../src/jsl_core.h"
-    #include "../../src/jsl_string_builder.h"
-    #include "../../src/jsl_os.h"
+    #include "../src/jsl_core.h"
+    #include "../src/jsl_string_builder.h"
 
     /* Versioning to catch mismatches across deps */
     #ifndef EMBED_VERSION

@@ -208,7 +208,7 @@ JSL_WARN_UNUSED JSL_DEF JSLWriteFileResultEnum jsl_write_file_contents(
 * @param ... Format args
 * @returns `true` when formatting and writing succeeds, otherwise `false`
 */
-JSL__ASAN_OFF JSL_DEF bool jsl_format_file(FILE* out, JSLFatPtr fmt, ...);
+JSL__ASAN_OFF JSL_DEF bool jsl_format_to_file(FILE* out, JSLFatPtr fmt, ...);
 
 
 #ifdef __cplusplus

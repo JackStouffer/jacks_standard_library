@@ -526,6 +526,8 @@ int32_t main(int32_t argc, char **argv)
         &generate_hash_map_compile_command,
         "clang",
         "-DINCLUDE_MAIN",
+        "-fno-omit-frame-pointer",
+        "-fno-optimize-sibling-calls",
         "-O0",
         "-glldb",
         "-std=c11"
@@ -717,8 +719,8 @@ int32_t main(int32_t argc, char **argv)
                 nob_cmd_append(&compile_command, source_file);
             }
 
-            // if (!nob_cmd_run(&compile_command)) return 1;
-            if (!nob_cmd_run(&compile_command, .async = &compile_procs, .max_procs = (size_t)logical_processors)) return 1;
+            if (!nob_cmd_run(&compile_command)) return 1;
+            // if (!nob_cmd_run(&compile_command, .async = &compile_procs, .max_procs = (size_t)logical_processors)) return 1;
 
             cstring_array_insert(&executables, exe_name);
         }
@@ -793,8 +795,8 @@ int32_t main(int32_t argc, char **argv)
                     nob_cmd_append(&compile_command, source_file);
                 }
 
-                // if (!nob_cmd_run(&compile_command)) return 1;
-                if (!nob_cmd_run(&compile_command, .async = &compile_procs, .max_procs = (size_t)logical_processors)) return 1;
+                if (!nob_cmd_run(&compile_command)) return 1;
+                // if (!nob_cmd_run(&compile_command, .async = &compile_procs, .max_procs = (size_t)logical_processors)) return 1;
 
                 cstring_array_insert(&executables, exe_name);
             }

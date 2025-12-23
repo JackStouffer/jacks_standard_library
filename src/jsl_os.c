@@ -554,7 +554,7 @@ static uint8_t* format_out_callback(uint8_t *buf, void *user, int64_t len)
     }
 }
 
-JSL__ASAN_OFF bool jsl_format_file(FILE* out, JSLFatPtr fmt, ...)
+JSL__ASAN_OFF bool jsl_format_to_file(FILE* out, JSLFatPtr fmt, ...)
 {
     if (out == NULL || fmt.data == NULL || fmt.length < 0)
         return false;
