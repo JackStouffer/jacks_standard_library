@@ -525,7 +525,7 @@ int32_t main(int32_t argc, char **argv)
     nob_cmd_append(
         &generate_hash_map_compile_command,
         "clang",
-        "-DINCLUDE_MAIN",
+        "-DJSL_DEBUG",
         "-fno-omit-frame-pointer",
         "-fno-optimize-sibling-calls",
         "-O0",

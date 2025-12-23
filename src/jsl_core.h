@@ -74,7 +74,7 @@ extern "C" {
     || defined(__ARMEB__)
     || defined(__MIPSEB__)
 
-    #error "ERROR: JSL_CORE_H_INCLUDED.h does not support big endian targets!"
+    #error "ERROR: JSL does not support big endian targets!"
 
 #endif
 
@@ -163,7 +163,7 @@ extern "C" {
         #define JSL__IS_POINTER_32_BITS_VAL 1
         #define JSL__IS_POINTER_64_BITS_VAL 0
     #else
-        #error "ERROR: JSL_CORE_H_INCLUDED.h can only be used with 32 or 64 bit pointers"
+        #error "ERROR: JSL can only be used with 32 or 64 bit pointers"
     #endif
 #elif defined(_WIN64)
     #define JSL__IS_POINTER_32_BITS_VAL 0
@@ -178,7 +178,7 @@ extern "C" {
     #define JSL__IS_POINTER_32_BITS_VAL 1
     #define JSL__IS_POINTER_64_BITS_VAL 0
 #else
-    #error "ERROR: JSL_CORE_H_INCLUDED.h can only be used with 32 or 64 bit pointers"
+    #error "ERROR: JSL can only be used with 32 or 64 bit pointers"
 #endif
 
 #if JSL__IS_MSVC_VAL
@@ -495,14 +495,6 @@ static JSL__FORCE_INLINE JSL__UNUSED int32_t jsl__find_first_set_u64(uint64_t x)
  *
  */
 
-
-#ifndef JSL_VERSION
-    #define JSL_VERSION 0x010000  /* 1.0.0 */
-#else
-    #if JSL_VERSION != 0x010000
-        #error "ERROR: Conflicting versions of JSL_CORE_H_INCLUDED.h included in the same translation unit!"
-    #endif
-#endif
 
 #if defined(__has_attribute)
     #if __has_attribute(fallthrough)
