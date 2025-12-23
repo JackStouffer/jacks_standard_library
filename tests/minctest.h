@@ -125,10 +125,10 @@ static size_t lfails = 0;
     TEST_INT32_EQUAL_base((a) == (b), a, b, "%u")
 
 #define TEST_INT64_EQUAL(a, b)\
-    TEST_INT32_EQUAL_base((a) == (b), a, b, "%" PRId64)
+    TEST_INT32_EQUAL_base((int64_t)(a) == (int64_t)(b), (int64_t)(a), (int64_t)(b), "%" PRId64)
 
 #define TEST_UINT64_EQUAL(a, b)\
-    TEST_INT32_EQUAL_base((a) == (b), a, b, "%" PRIu64)
+    TEST_INT32_EQUAL_base((uint64_t)(a) == (uint64_t)(b), (uint64_t)(a), (uint64_t)(b), "%" PRIu64)
 
 /* Assert two floats are equal (Within TESTING_FLOAT_TOLERANCE). */
 #define TEST_F32_EQUAL(a, b)\

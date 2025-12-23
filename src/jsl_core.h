@@ -181,6 +181,10 @@ extern "C" {
     #error "ERROR: JSL_CORE_H_INCLUDED.h can only be used with 32 or 64 bit pointers"
 #endif
 
+#if JSL__IS_MSVC_VAL
+    #include <intrin.h>
+#endif
+
 #ifndef JSL_DEBUG
     #ifndef JSL__FORCE_INLINE
 
@@ -244,6 +248,16 @@ extern "C" {
     #define JSL__ASAN_OFF
 #endif
 
+#if defined(__has_attribute)
+    #if __has_attribute(unused)
+        #define JSL__UNUSED __attribute__((__unused__))
+    #endif
+#endif
+
+#ifndef JSL__UNUSED
+    #define JSL__UNUSED
+#endif
+
 #define JSL__ASAN_GUARD_SIZE 8
 
 
@@ -253,14 +267,127 @@ extern "C" {
  *
  */
 
-int32_t jsl__count_trailing_zeros_u32(uint32_t x);
-int32_t jsl__count_trailing_zeros_u64(uint64_t x);
-int32_t jsl__count_leading_zeros_u32(uint32_t x);
-int32_t jsl__count_leading_zeros_u64(uint64_t x);
-int32_t jsl__population_count_u32(uint32_t x);
-int32_t jsl__population_count_u64(uint64_t x);
-int32_t jsl__find_first_set_u32(uint32_t x);
-int32_t jsl__find_first_set_u64(uint64_t x);
+static JSL__FORCE_INLINE JSL__UNUSED int32_t jsl__count_trailing_zeros_u32(uint32_t x)
+{
+    #if JSL__IS_MSVC_VAL
+        unsigned long index;
+        _BitScanForward(&index, x);
+        return (int32_t) index;
+    #else
+        int32_t n = 0;
+        while ((x & 1u) == 0)
+        {
+            x >>= 1;
+            ++n;
+        }
+        return n;
+    #endif
+}
+
+static JSL__FORCE_INLINE JSL__UNUSED int32_t jsl__count_trailing_zeros_u64(uint64_t x)
+{
+    #if JSL__IS_MSVC_VAL
+        unsigned long index;
+        _BitScanForward64(&index, x);
+        return (int32_t) index;
+    #else
+        int32_t n = 0;
+        while ((x & 1u) == 0)
+        {
+            x >>= 1;
+            ++n;
+        }
+        return n;
+    #endif
+}
+
+static JSL__FORCE_INLINE JSL__UNUSED int32_t jsl__count_leading_zeros_u32(uint32_t x)
+{
+    if (x == 0) return 32;
+    int32_t n = 0;
+    if ((x & 0xFFFF0000) == 0) { n += 16; x <<= 16; }
+    if ((x & 0xFF000000) == 0) { n += 8;  x <<= 8;  }
+    if ((x & 0xF0000000) == 0) { n += 4;  x <<= 4;  }
+    if ((x & 0xC0000000) == 0) { n += 2;  x <<= 2;  }
+    if ((x & 0x80000000) == 0) { n += 1; }
+    return n;
+}
+
+static JSL__FORCE_INLINE JSL__UNUSED int32_t jsl__count_leading_zeros_u64(uint64_t x)
+{
+    if (x == 0) return 64;
+    int32_t n = 0;
+    if ((x & 0xFFFFFFFF00000000ULL) == 0) { n += 32; x <<= 32; }
+    if ((x & 0xFFFF000000000000ULL) == 0) { n += 16; x <<= 16; }
+    if ((x & 0xFF00000000000000ULL) == 0) { n += 8;  x <<= 8;  }
+    if ((x & 0xF000000000000000ULL) == 0) { n += 4;  x <<= 4;  }
+    if ((x & 0xC000000000000000ULL) == 0) { n += 2;  x <<= 2;  }
+    if ((x & 0x8000000000000000ULL) == 0) { n += 1; }
+    return n;
+}
+
+static JSL__FORCE_INLINE JSL__UNUSED int32_t jsl__population_count_u32(uint32_t x)
+{
+    // Branchless SWAR
+    x = x - ((x >> 1) & 0x55555555u);
+    x = (x & 0x33333333u) + ((x >> 2) & 0x33333333u);
+    x = (x + (x >> 4)) & 0x0F0F0F0Fu;
+    x = x + (x >> 8);
+    x = x + (x >> 16);
+    return x & 0x3Fu;
+}
+
+static JSL__FORCE_INLINE JSL__UNUSED int32_t jsl__population_count_u64(uint64_t x)
+{
+    x = x - ((x >> 1) & 0x5555555555555555ULL);
+    x = (x & 0x3333333333333333ULL) + ((x >> 2) & 0x3333333333333333ULL);
+    x = (x + (x >> 4)) & 0x0F0F0F0F0F0F0F0FULL;
+    x = x + (x >> 8);
+    x = x + (x >> 16);
+    x = x + (x >> 32);
+    return x & 0x7F;  // result fits in 7 bits (0–64)
+}
+
+static JSL__FORCE_INLINE JSL__UNUSED int32_t jsl__find_first_set_u32(uint32_t x)
+{
+    #if JSL__IS_MSVC_VAL
+        unsigned long index;
+        _BitScanForward(&index, x);
+        return (int32_t) (index + 1);
+    #else
+        if (x == 0) return 0;
+
+        int32_t n = 1;
+        if ((x & 0xFFFF) == 0) { x >>= 16; n += 16; }
+        if ((x & 0xFF) == 0)   { x >>= 8;  n += 8;  }
+        if ((x & 0xF) == 0)    { x >>= 4;  n += 4;  }
+        if ((x & 0x3) == 0)    { x >>= 2;  n += 2;  }
+        if ((x & 0x1) == 0)    { n += 1; }
+
+        return n;
+    #endif
+}
+
+static JSL__FORCE_INLINE JSL__UNUSED int32_t jsl__find_first_set_u64(uint64_t x)
+{
+    #if JSL__IS_MSVC_VAL
+        unsigned long index;
+        _BitScanForward64(&index, x);
+        return (uint32_t) (index + 1);
+    #else
+        if (x == 0) return 0;
+
+        int32_t n = 1;
+        if ((x & 0xFFFFFFFFULL) == 0) { x >>= 32; n += 32; }
+        if ((x & 0xFFFFULL) == 0)     { x >>= 16; n += 16; }
+        if ((x & 0xFFULL) == 0)       { x >>= 8;  n += 8;  }
+        if ((x & 0xFULL) == 0)        { x >>= 4;  n += 4;  }
+        if ((x & 0x3ULL) == 0)        { x >>= 2;  n += 2;  }
+        if ((x & 0x1ULL) == 0)        { n += 1; }
+
+        return n;
+    #endif
+}
 
 #if JSL__IS_GCC_VAL || JSL__IS_CLANG_VAL
     #define JSL__COUNT_TRAILING_ZEROS_IMPL(x) __builtin_ctz(x)
