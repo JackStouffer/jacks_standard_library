@@ -76,6 +76,9 @@
 
 #ifdef GENERATE_HASH_MAP_IMPLEMENTATION
 
+    #include <stdlib.h>
+    #include <time.h>
+
     /**
      * TODO: Documentation: talk about
      *  - must use arena with lifetime greater than the hash_map
@@ -157,6 +160,7 @@
     static JSLFatPtr value_type_name_key = JSL_FATPTR_INITIALIZER("value_type_name");
     static JSLFatPtr function_prefix_key = JSL_FATPTR_INITIALIZER("function_prefix");
     static JSLFatPtr hash_function_key = JSL_FATPTR_INITIALIZER("hash_function");
+    static JSLFatPtr key_compare_key = JSL_FATPTR_INITIALIZER("key_compare");
 
     static JSLFatPtr int32_t_str = JSL_FATPTR_INITIALIZER("int32_t");
     static JSLFatPtr int_str = JSL_FATPTR_INITIALIZER("int");
@@ -284,6 +288,8 @@
     {
         (void) impl;
         (void) hash_function_name;
+
+        srand((uint32_t) (time(NULL) % UINT32_MAX));
 
         jsl_string_builder_insert_fatptr(
             builder,
@@ -485,6 +491,55 @@
                 hash_function_key,
                 JSL_STRING_LIFETIME_STATIC,
                 resolved_hash_function_call,
+                JSL_STRING_LIFETIME_STATIC
+            );
+        }
+
+        // key comparison
+        {
+            uint8_t resolved_key_buffer[4098];
+            JSLArena scratch_arena = JSL_ARENA_FROM_STACK(resolved_key_buffer);
+
+            JSLFatPtr resolved_key_compare;
+
+            if (
+                jsl_fatptr_memory_compare(key_type_name, int32_t_str)
+                || jsl_fatptr_memory_compare(key_type_name, int_str)
+                || jsl_fatptr_memory_compare(key_type_name, unsigned_str)
+                || jsl_fatptr_memory_compare(key_type_name, unsigned_int_str)
+                || jsl_fatptr_memory_compare(key_type_name, uint32_t_str)
+                || jsl_fatptr_memory_compare(key_type_name, int64_t_str)
+                || jsl_fatptr_memory_compare(key_type_name, long_str)
+                || jsl_fatptr_memory_compare(key_type_name, uint64_t_str)
+                || jsl_fatptr_memory_compare(key_type_name, unsigned_long_str)
+                || jsl_fatptr_memory_compare(key_type_name, long_int_str)
+                || jsl_fatptr_memory_compare(key_type_name, long_long_str)
+                || jsl_fatptr_memory_compare(key_type_name, long_long_int_str)
+                || jsl_fatptr_memory_compare(key_type_name, unsigned_long_long_str)
+                || jsl_fatptr_memory_compare(key_type_name, unsigned_long_long_int_str)
+                || key_type_name.data[key_type_name.length - 1] == '*'
+            )
+            {
+                resolved_key_compare = jsl_format(
+                    &scratch_arena,
+                    JSL_FATPTR_EXPRESSION("key == hash_map->keys_array[slot]"),
+                    key_type_name
+                );
+            }
+            else
+            {
+                resolved_key_compare = jsl_format(
+                    &scratch_arena,
+                    JSL_FATPTR_EXPRESSION("JSL_MEMCMP(&key, &hash_map->keys_array[slot], sizeof(%y)) == 0"),
+                    key_type_name
+                );
+            }
+
+            jsl_str_to_str_map_insert(
+                &map,
+                key_compare_key,
+                JSL_STRING_LIFETIME_STATIC,
+                resolved_key_compare,
                 JSL_STRING_LIFETIME_STATIC
             );
         }

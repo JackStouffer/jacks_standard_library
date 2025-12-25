@@ -36,14 +36,17 @@ bool {{ function_prefix }}_init(
     uint64_t seed
 )
 {
-    JSL_MEMSET(hash_map, 0, sizeof({{ hash_map_name }}));
-
     if (hash_map == NULL || arena == NULL || max_item_count < 0)
         return false;
 
+    JSL_MEMSET(hash_map, 0, sizeof({{ hash_map_name }}));
+
     hash_map->seed = seed;
     hash_map->max_item_count = max_item_count;
-    hash_map->arrays_length = (int64_t) jsl_next_power_of_two_u64((uint64_t) (max_item_count + 2));
+
+    int64_t max_with_load_factor = (int64_t) ((float) max_item_count / 0.75f);
+
+    hash_map->arrays_length = jsl_next_power_of_two_i64(max_with_load_factor);
     hash_map->arrays_length = JSL_MAX(hash_map->arrays_length, 32);
 
     hash_map->keys_array = ({{ key_type_name }}*) jsl_arena_allocate_aligned(
@@ -88,12 +91,9 @@ static inline void {{ function_prefix }}_probe(
     *out_slot = -1;
     *out_found = false;
 
-    int64_t first_tombstone = -1;
-    bool tombstone_seen = false;
-
     {{ hash_function }};
 
-    // Avoid clashing with empty/tombstone sentinels
+    // Avoid clashing with sentinel values
     if (*out_hash <= (uint64_t) JSL__HASHMAP_TOMBSTONE)
     {
         *out_hash = (uint64_t) JSL__HASHMAP_VALUE_OK;
@@ -108,42 +108,17 @@ static inline void {{ function_prefix }}_probe(
     {
         uint64_t slot_hash_value = hash_map->hashes_array[slot];
 
-        bool is_empty = slot_hash_value == JSL__HASHMAP_EMPTY;
-        bool is_tombstone = slot_hash_value == JSL__HASHMAP_TOMBSTONE;
-
-        if (is_empty)
+        if (slot_hash_value == JSL__HASHMAP_EMPTY)
         {
-            *out_slot = tombstone_seen ? first_tombstone : slot;
-            break;
-        }
-
-        if (is_tombstone && !tombstone_seen)
-        {
-            first_tombstone = slot;
-            tombstone_seen = true;
-        }
-
-        bool slot_has_value = !is_empty && !is_tombstone;
-        bool matches = slot_has_value
-            && *out_hash == slot_hash_value
-            && JSL_MEMCMP(&key, &hash_map->keys_array[slot], sizeof({{ key_type_name }})) == 0;
-
-        if (matches)
-        {
-            *out_found = true;
             *out_slot = slot;
             break;
         }
 
-        if (!slot_has_value)
+        if (slot_hash_value == *out_hash && {{ key_compare }})
         {
-            hash_map->hashes_array[slot] = JSL__HASHMAP_TOMBSTONE;
-        }
-
-        if (!slot_has_value && !tombstone_seen)
-        {
-            first_tombstone = slot;
-            tombstone_seen = true;
+            *out_found = true;
+            *out_slot = slot;
+            break;
         }
 
         slot = (int64_t) (((uint64_t) slot + 1u) & slot_mask);
@@ -152,7 +127,48 @@ static inline void {{ function_prefix }}_probe(
 
     if (total_checked >= hash_map->arrays_length)
     {
-        *out_slot = tombstone_seen ? first_tombstone : -1;
+        *out_slot = -1;
+    }
+}
+
+static inline void {{ function_prefix }}_backshift(
+    {{ hash_map_name }}* hash_map,
+    int64_t start_slot
+)
+{
+    uint64_t slot_mask = (uint64_t) hash_map->arrays_length - 1u;
+
+    int64_t hole = start_slot;
+    int64_t current = (int64_t) (((uint64_t) start_slot + 1u) & slot_mask);
+
+    int64_t loop_check = 0;
+    while (loop_check < hash_map->arrays_length)
+    {
+        uint64_t hash_value = hash_map->hashes_array[current];
+
+        if (hash_value == JSL__HASHMAP_EMPTY)
+        {
+            hash_map->hashes_array[hole] = JSL__HASHMAP_EMPTY;
+            break;
+        }
+
+        int64_t ideal_slot = (int64_t) (hash_value & slot_mask);
+
+        bool should_move = (current > hole)
+            ? (ideal_slot <= hole || ideal_slot > current)
+            : (ideal_slot <= hole && ideal_slot > current);
+
+        if (should_move)
+        {
+            hash_map->keys_array[hole] = hash_map->keys_array[current];
+            hash_map->values_array[hole] = hash_map->values_array[current];
+            hash_map->hashes_array[hole] = hash_map->hashes_array[current];
+            hole = current;
+        }
+
+        current = (int64_t) (((uint64_t) current + 1u) & slot_mask);
+
+        ++loop_check;
     }
 }
 
@@ -255,8 +271,9 @@ bool {{ function_prefix }}_delete(
 
     if (slot > -1 && existing_found)
     {
-        hash_map->hashes_array[slot] = JSL__HASHMAP_TOMBSTONE;
+        {{ function_prefix }}_backshift(hash_map, slot);
         --hash_map->item_count;
+        ++hash_map->generational_id;
         success = true;
     }
 
@@ -268,8 +285,6 @@ bool {{ function_prefix }}_iterator_start(
     {{ hash_map_name }}Iterator* iterator
 )
 {
-    bool success = false;
-
     if (
         hash_map == NULL
         || hash_map->sentinel != PRIVATE_SENTINEL_{{ hash_map_name }}
@@ -277,13 +292,13 @@ bool {{ function_prefix }}_iterator_start(
         || hash_map->keys_array == NULL
         || hash_map->hashes_array == NULL
     )
-        return success;
+        return false;
 
     iterator->hash_map = hash_map;
     iterator->current_slot = 0;
     iterator->generational_id = hash_map->generational_id;
 
-    return iterator;
+    return true;
 }
 
 bool {{ function_prefix }}_iterator_next(
@@ -311,8 +326,7 @@ bool {{ function_prefix }}_iterator_next(
     {
         uint64_t hash_value = iterator->hash_map->hashes_array[iterator->current_slot];
 
-        bool occupied = hash_value != JSL__HASHMAP_EMPTY
-            && hash_value != JSL__HASHMAP_TOMBSTONE;
+        bool occupied = hash_value != JSL__HASHMAP_EMPTY;
 
         if (occupied)
         {

@@ -32,7 +32,7 @@
  * A hash map which maps `{{ key_type_name }}` keys to `{{ value_type_name }}` values.
  *
  * This hash map uses open addressing with linear probing. However, it never grows.
- * When initalized with the init function, all the memory this hash map will have
+ * When initialized with the init function, all the memory this hash map will have
  * is allocated right away.
  */
 typedef struct {{ hash_map_name }} {
@@ -127,7 +127,11 @@ bool {{ function_prefix }}_insert(
 
 /**
  * Remove a key/value pair from the hash map if it exists.
- * If it does not false is returned
+ * If it does not false is returned.
+ *
+ * This hash map uses backshift deletion instead of tombstones
+ * due to the lack of rehashing. Deletion can be expensive in
+ * medium sized maps.
  */
 bool {{ function_prefix }}_delete(
     {{ hash_map_name }}* hash_map,
@@ -140,9 +144,9 @@ bool {{ function_prefix }}_delete(
  * An iterator is a struct which holds enough state that it allows a loop to visit
  * each key/value pair in the hash map.
  *
- * Iterating over a hash map while adding items does not have guaranteed
- * correctness. Deleting items will iterating over this map does have the
- * correct behavior.
+ * Iterating over a hash map while modifying it does not have guaranteed
+ * correctness. Any insertion or deletion after the iterator is created will
+ * invalidate the iteration.
  *
  * Example usage:
  * @code
