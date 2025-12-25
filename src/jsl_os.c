@@ -526,6 +526,21 @@ JSLWriteFileResultEnum jsl_write_file_contents(
     return res;
 }
 
+int64_t jsl_write_to_c_file(FILE* out, JSLFatPtr data)
+{
+    if (out == NULL || data.data == NULL || data.length < 0)
+        return -1;
+
+    int64_t written = (int64_t) fwrite(
+        data.data,
+        sizeof(uint8_t),
+        (size_t) data.length,
+        out
+    );
+    return written;
+}
+
+
 struct JSL__FormatOutContext
 {
     FILE* out;
@@ -554,7 +569,8 @@ static uint8_t* format_out_callback(uint8_t *buf, void *user, int64_t len)
     }
 }
 
-JSL__ASAN_OFF bool jsl_format_to_file(FILE* out, JSLFatPtr fmt, ...)
+// TODO: incomplete, refactor to return number of bytes written
+JSL__ASAN_OFF bool jsl_format_to_c_file(FILE* out, JSLFatPtr fmt, ...)
 {
     if (out == NULL || fmt.data == NULL || fmt.length < 0)
         return false;

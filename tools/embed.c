@@ -54,7 +54,7 @@ static int32_t entrypoint(
     {
         if (jsl_cmd_line_pop_arg_list(cmd, &file_path))
         {
-            jsl_format_to_file(
+            jsl_format_to_c_file(
                 stderr,
                 JSL_FATPTR_EXPRESSION("Only provide zero or one file path\n")
             );
@@ -70,7 +70,7 @@ static int32_t entrypoint(
 
         if (load_result != JSL_FILE_LOAD_SUCCESS)
         {
-            jsl_format_to_file(
+            jsl_format_to_c_file(
                 stderr,
                 JSL_FATPTR_EXPRESSION("Failed to load template file %y (errno %d)\n"),
                 file_contents,
@@ -104,7 +104,7 @@ static int32_t entrypoint(
     }
     else
     {
-        jsl_format_to_file(stdout, help_message);
+        jsl_format_to_c_file(stdout, help_message);
         return EXIT_FAILURE;
     }
 
@@ -131,14 +131,14 @@ static int32_t entrypoint(
             if (slice.data == NULL)
                 break;
 
-            jsl_format_to_file(stdout, slice);
+            jsl_format_to_c_file(stdout, slice);
         }
 
         return EXIT_SUCCESS;
     }
     else
     {
-        jsl_format_to_file(stdout, help_message);
+        jsl_format_to_c_file(stdout, help_message);
         return EXIT_FAILURE;
     }
 }
@@ -208,13 +208,13 @@ static int32_t entrypoint(
         JSLCmdLine cmd;
         if (!jsl_cmd_line_init(&cmd, &arena))
         {
-            jsl_format_to_file(stderr, JSL_FATPTR_EXPRESSION("Command line input exceeds memory limit"));
+            jsl_format_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Command line input exceeds memory limit"));
             return EXIT_FAILURE;
         }
 
         if (!jsl_cmd_line_parse(&cmd, argc, argv))
         {
-            jsl_format_to_file(stderr, JSL_FATPTR_EXPRESSION("Parsing failure"));
+            jsl_format_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Parsing failure"));
             return EXIT_FAILURE;
         }
 

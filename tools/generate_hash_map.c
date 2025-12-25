@@ -36,6 +36,7 @@
 #include "../src/jsl_core.c"
 #include "../src/jsl_string_builder.c"
 #include "../src/jsl_str_to_str_map.c"
+#include "../src/jsl_str_to_str_multimap.c"
 #include "../src/jsl_os.c"
 #include "../src/jsl_cmd_line.c"
 
@@ -79,7 +80,6 @@ JSLFatPtr help_message = JSL_FATPTR_INITIALIZER(
 static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
 {
     bool show_help = false;
-    bool print_header = false;
     JSLFatPtr name = {0};
     JSLFatPtr function_prefix = {0};
     JSLFatPtr key_type = {0};
@@ -89,75 +89,141 @@ static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
     JSLFatPtr* header_includes = NULL;
     int32_t header_includes_count = 0;
 
-    JSLFatPtr help_flag_str = JSL_FATPTR_INITIALIZER("help");
-    JSLFatPtr name_flag_str = JSL_FATPTR_INITIALIZER("name");
-    JSLFatPtr function_prefix_flag_str = JSL_FATPTR_INITIALIZER("function-prefix");
-    JSLFatPtr key_type_flag_str = JSL_FATPTR_INITIALIZER("key-type");
-    JSLFatPtr value_type_flag_str = JSL_FATPTR_INITIALIZER("value-type");
-    JSLFatPtr fixed_flag_str = JSL_FATPTR_INITIALIZER("fixed");
-    JSLFatPtr dynamic_flag_str = JSL_FATPTR_INITIALIZER("dynamic");
-    JSLFatPtr header_flag_str = JSL_FATPTR_INITIALIZER("header");
-    JSLFatPtr source_flag_str = JSL_FATPTR_INITIALIZER("source");
-    JSLFatPtr add_header_flag_str = JSL_FATPTR_INITIALIZER("add-header");
-    JSLFatPtr custom_hash_flag_str = JSL_FATPTR_INITIALIZER("custom-hash");
+    static JSLFatPtr help_flag_str = JSL_FATPTR_INITIALIZER("help");
+    static JSLFatPtr name_flag_str = JSL_FATPTR_INITIALIZER("name");
+    static JSLFatPtr function_prefix_flag_str = JSL_FATPTR_INITIALIZER("function-prefix");
+    static JSLFatPtr key_type_flag_str = JSL_FATPTR_INITIALIZER("key-type");
+    static JSLFatPtr value_type_flag_str = JSL_FATPTR_INITIALIZER("value-type");
+    static JSLFatPtr fixed_flag_str = JSL_FATPTR_INITIALIZER("fixed");
+    static JSLFatPtr dynamic_flag_str = JSL_FATPTR_INITIALIZER("dynamic");
+    static JSLFatPtr header_flag_str = JSL_FATPTR_INITIALIZER("header");
+    static JSLFatPtr source_flag_str = JSL_FATPTR_INITIALIZER("source");
+    static JSLFatPtr add_header_flag_str = JSL_FATPTR_INITIALIZER("add-header");
+    static JSLFatPtr custom_hash_flag_str = JSL_FATPTR_INITIALIZER("custom-hash");
     
+    //
+    // Parsing command line
+    //
 
-    if (jsl_cmd_line_has_short_flag(cmd, 'h') || jsl_cmd_line_has_flag(cmd, help_flag_str))
-    {
-        show_help = true;
-    }
+    show_help = jsl_cmd_line_has_short_flag(cmd, 'h')
+        || jsl_cmd_line_has_flag(cmd, help_flag_str);
 
     jsl_cmd_line_pop_flag_with_value(cmd, name_flag_str, &name);
     jsl_cmd_line_pop_flag_with_value(cmd, function_prefix_flag_str, &function_prefix);
     jsl_cmd_line_pop_flag_with_value(cmd, key_type_flag_str, &key_type);
-    jsl_cmd_line_pop_flag_with_value(cmd, value_type_flag_str, &function_prefix);
-    jsl_cmd_line_pop_flag_with_value(cmd, add_header_flag_str, &function_prefix);
+    jsl_cmd_line_pop_flag_with_value(cmd, value_type_flag_str, &value_type);
     jsl_cmd_line_pop_flag_with_value(cmd, custom_hash_flag_str, &hash_function_name);
-    
-    bool has = jsl_cmd_line_has_flag(cmd, fixed_flag_str);
-    bool has = jsl_cmd_line_has_flag(cmd, dynamic_flag_str);
-    bool has = jsl_cmd_line_has_flag(cmd, header_flag_str);
-    bool has = jsl_cmd_line_has_flag(cmd, source_flag_str);
+
+    JSLFatPtr custom_header = {0};
+    while (jsl_cmd_line_pop_flag_with_value(cmd, add_header_flag_str, &custom_header))
+    {
+        ++header_includes_count;
+        header_includes = realloc(
+            header_includes,
+            sizeof(JSLFatPtr) * (size_t) header_includes_count
+        );
+        header_includes[header_includes_count - 1] = custom_header;
+    }
+
+    bool fixed_flag_set = jsl_cmd_line_has_flag(cmd, fixed_flag_str);
+    bool dynamic_flag_set = jsl_cmd_line_has_flag(cmd, dynamic_flag_str);
+    bool header_flag_set = jsl_cmd_line_has_flag(cmd, header_flag_str);
+    bool source_flag_set = jsl_cmd_line_has_flag(cmd, source_flag_str);
 
     if (show_help)
     {
-        jsl_format_to_file(stdout, help_message);
+        jsl_write_to_c_file(stdout, help_message);
         return EXIT_SUCCESS;
     }
+    
+    //
     // Check that all required parameters are provided
-    else if (name.data == NULL)
+    //
+
+    if (name.data == NULL)
     {
-        jsl_format_to_file(stderr, JSL_FATPTR_EXPRESSION("Error: --name is required\n"));
+        jsl_format_to_c_file(
+            stderr,
+            JSL_FATPTR_EXPRESSION("Error: --%y is required\n"),
+            name_flag_str
+        );
         return EXIT_FAILURE;
     }
-
-    if (function_prefix.data == NULL)
-    {
-        jsl_format_to_file(stderr, JSL_FATPTR_EXPRESSION("Error: --function_prefix is required\n"));
-        return EXIT_FAILURE;
-    }
-
     if (key_type.data == NULL)
     {
-        jsl_format_to_file(stderr, JSL_FATPTR_EXPRESSION("Error: --key_type is required\n"));
+        jsl_format_to_c_file(
+            stderr,
+            JSL_FATPTR_EXPRESSION("Error: --%y is required\n"),
+            key_type_flag_str
+        );
         return EXIT_FAILURE;
     }
-
     if (value_type.data == NULL)
     {
-        jsl_format_to_file(stderr, JSL_FATPTR_EXPRESSION("Error: --value_type is required\n"));
+        jsl_format_to_c_file(
+            stderr,
+            JSL_FATPTR_EXPRESSION("Error: --%y is required\n"),
+            value_type_flag_str
+        );
+        return EXIT_FAILURE;
+    }
+    if (function_prefix.data == NULL)
+    {
+        jsl_format_to_c_file(
+            stderr,
+            JSL_FATPTR_EXPRESSION("Error: --%y is required\n"),
+            function_prefix_flag_str
+        );
+        return EXIT_FAILURE;
+    }
+    if (fixed_flag_set && dynamic_flag_set)
+    {
+        jsl_format_to_c_file(
+            stderr,
+            JSL_FATPTR_EXPRESSION("Error: cannot set both --%y and --%y\n"),
+            fixed_flag_str,
+            dynamic_flag_str
+        );
+        return EXIT_FAILURE;
+    }
+    if (!fixed_flag_set && !dynamic_flag_set)
+    {
+        jsl_format_to_c_file(
+            stderr,
+            JSL_FATPTR_EXPRESSION("Error: you must provide either --%y or --%y\n"),
+            fixed_flag_str,
+            dynamic_flag_str
+        );
+        return EXIT_FAILURE;
+    }
+    if (header_flag_set && source_flag_set)
+    {
+        jsl_format_to_c_file(
+            stderr,
+            JSL_FATPTR_EXPRESSION("Error: cannot set both --%y and --%y\n"),
+            header_flag_str,
+            source_flag_str
+        );
+        return EXIT_FAILURE;
+    }
+    if (!header_flag_set && !source_flag_set)
+    {
+        jsl_format_to_c_file(
+            stderr,
+            JSL_FATPTR_EXPRESSION("Error: you must provide either --%y or --%y\n"),
+            header_flag_str,
+            source_flag_str
+        );
         return EXIT_FAILURE;
     }
 
-    if (impl == IMPL_ERROR)
-    {
-        impl = IMPL_DYNAMIC;
-    }
+    if (fixed_flag_set) impl = IMPL_FIXED;
+    if (fixed_flag_set) impl = IMPL_DYNAMIC;
 
     JSLStringBuilder builder;
-    jsl_string_builder_init2(&builder, arena, 1024, 8);
+    jsl_string_builder_init(&builder, arena);
 
-    if (print_header)
+    if (header_flag_set)
     {
         write_hash_map_header(
             arena,
@@ -194,7 +260,7 @@ static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
     JSLFatPtr slice;
     while (jsl_string_builder_iterator_next(&iterator, &slice))
     {
-        jsl_format_to_file(stdout, slice);
+        jsl_write_to_c_file(stdout, slice);
     }
 
 
@@ -250,13 +316,13 @@ static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
         JSLCmdLine cmd;
         if (!jsl_cmd_line_init(&cmd, &arena))
         {
-            jsl_format_to_file(stderr, JSL_FATPTR_EXPRESSION("Command line input exceeds memory limit"));
+            jsl_format_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Command line input exceeds memory limit"));
             return EXIT_FAILURE;
         }
 
         if (!jsl_cmd_line_parse(&cmd, argc, argv))
         {
-            jsl_format_to_file(stderr, JSL_FATPTR_EXPRESSION("Parsing failure"));
+            jsl_format_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Parsing failure"));
             return EXIT_FAILURE;
         }
 

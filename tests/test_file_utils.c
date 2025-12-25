@@ -205,7 +205,7 @@ static void test_jsl_format_file_formats_and_writes_output(void)
     if (file == NULL)
         return;
 
-    bool res = jsl_format_to_file(
+    bool res = jsl_format_to_c_file(
         file,
         JSL_FATPTR_EXPRESSION("Hello %s %d"),
         "World",
@@ -232,7 +232,7 @@ static void test_jsl_format_file_accepts_empty_format(void)
     if (file == NULL)
         return;
 
-    bool res = jsl_format_to_file(file, JSL_FATPTR_EXPRESSION(""));
+    bool res = jsl_format_to_c_file(file, JSL_FATPTR_EXPRESSION(""));
     TEST_BOOL(res == true);
 
     TEST_BOOL(fflush(file) == 0);
@@ -245,7 +245,7 @@ static void test_jsl_format_file_accepts_empty_format(void)
 
 static void test_jsl_format_file_null_out_parameter(void)
 {
-    bool res = jsl_format_to_file(NULL, JSL_FATPTR_EXPRESSION("Hello"));
+    bool res = jsl_format_to_c_file(NULL, JSL_FATPTR_EXPRESSION("Hello"));
     TEST_BOOL(!res);
 }
 
@@ -256,7 +256,7 @@ static void test_jsl_format_file_null_format_pointer(void)
         .length = 5
     };
 
-    bool res = jsl_format_to_file(stdout, fmt);
+    bool res = jsl_format_to_c_file(stdout, fmt);
     TEST_BOOL(!res);
 }
 
@@ -267,7 +267,7 @@ static void test_jsl_format_file_negative_length(void)
         .length = -1
     };
 
-    bool res = jsl_format_to_file(stdout, fmt);
+    bool res = jsl_format_to_c_file(stdout, fmt);
     TEST_BOOL(!res);
 }
 
@@ -285,7 +285,7 @@ static void test_jsl_format_file_write_failure(void)
         {
             TEST_BOOL(setvbuf(writer, NULL, _IONBF, 0) == 0);
             void (*previous_handler)(int) = signal(SIGPIPE, SIG_IGN);
-            bool res = jsl_format_to_file(writer, JSL_FATPTR_EXPRESSION("Hello"));
+            bool res = jsl_format_to_c_file(writer, JSL_FATPTR_EXPRESSION("Hello"));
             TEST_BOOL(!res);
             fclose(writer);
             if (previous_handler == SIG_ERR)
@@ -307,7 +307,7 @@ static void test_jsl_format_file_write_failure(void)
 
     if (file != NULL)
     {
-        bool res = jsl_format_to_file(file, JSL_FATPTR_EXPRESSION("Hello"));
+        bool res = jsl_format_to_c_file(file, JSL_FATPTR_EXPRESSION("Hello"));
         TEST_BOOL(!res);
         fclose(file);
         return;
@@ -326,7 +326,7 @@ static void test_jsl_format_file_write_failure(void)
         return;
     }
 
-    bool res = jsl_format_to_file(read_only, JSL_FATPTR_EXPRESSION("Hello"));
+    bool res = jsl_format_to_c_file(read_only, JSL_FATPTR_EXPRESSION("Hello"));
     TEST_BOOL(!res);
 
     fclose(read_only);
@@ -345,12 +345,12 @@ int main(void)
     RUN_TEST_FUNCTION("Test jsl_get_file_size", test_jsl_get_file_size);
     RUN_TEST_FUNCTION("Test jsl_fatptr_load_file_contents_buffer", test_jsl_load_file_contents_buffer);
 
-    RUN_TEST_FUNCTION("Test jsl_format_to_file formats and writes output", test_jsl_format_file_formats_and_writes_output);
-    RUN_TEST_FUNCTION("Test jsl_format_to_file accepts empty format", test_jsl_format_file_accepts_empty_format);
-    RUN_TEST_FUNCTION("Test jsl_format_to_file null out parameter", test_jsl_format_file_null_out_parameter);
-    RUN_TEST_FUNCTION("Test jsl_format_to_file null format pointer", test_jsl_format_file_null_format_pointer);
-    RUN_TEST_FUNCTION("Test jsl_format_to_file negative length", test_jsl_format_file_negative_length);
-    RUN_TEST_FUNCTION("Test jsl_format_to_file write failure", test_jsl_format_file_write_failure);
+    RUN_TEST_FUNCTION("Test jsl_format_to_c_file formats and writes output", test_jsl_format_file_formats_and_writes_output);
+    RUN_TEST_FUNCTION("Test jsl_format_to_c_file accepts empty format", test_jsl_format_file_accepts_empty_format);
+    RUN_TEST_FUNCTION("Test jsl_format_to_c_file null out parameter", test_jsl_format_file_null_out_parameter);
+    RUN_TEST_FUNCTION("Test jsl_format_to_c_file null format pointer", test_jsl_format_file_null_format_pointer);
+    RUN_TEST_FUNCTION("Test jsl_format_to_c_file negative length", test_jsl_format_file_negative_length);
+    RUN_TEST_FUNCTION("Test jsl_format_to_c_file write failure", test_jsl_format_file_write_failure);
 
     TEST_RESULTS();
     return lfails != 0;

@@ -567,9 +567,9 @@ int32_t main(int32_t argc, char **argv)
             &write_hash_map_header,
             generate_hash_map_run_exe_command,
             "--name", decl->name,
-            "--function_prefix", decl->prefix,
-            "--key_type", decl->key_type,
-            "--value_type", decl->value_type,
+            "--function-prefix", decl->prefix,
+            "--key-type", decl->key_type,
+            "--value-type", decl->value_type,
             decl->impl_type,
             "--header"
         );
@@ -603,9 +603,9 @@ int32_t main(int32_t argc, char **argv)
             &write_hash_map_source,
             generate_hash_map_run_exe_command,
             "--name", decl->name,
-            "--function_prefix", decl->prefix,
-            "--key_type", decl->key_type,
-            "--value_type", decl->value_type,
+            "--function-prefix", decl->prefix,
+            "--key-type", decl->key_type,
+            "--value-type", decl->value_type,
             decl->impl_type,
             "--source"
         );

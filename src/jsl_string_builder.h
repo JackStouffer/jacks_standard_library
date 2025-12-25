@@ -252,7 +252,7 @@ JSL_STRING_BUILDER_DEF void jsl_string_builder_iterator_init(JSLStringBuilder* b
  * JSLFatPtr str;
  * while (jsl_string_builder_iterator_next(&iter. &str))
  * {
- *      jsl_format_to_file(stdout, str);
+ *      jsl_format_to_c_file(stdout, str);
  * }
  * ```
  *
