@@ -136,6 +136,21 @@ static size_t lfails = 0;
      && fabs((double)(a)-(double)(b)) == fabs((double)(a)-(double)(b)), (double)(a), (double)(b), "%f")
 
 
+#define TEST_POINTERS_EQUAL(a, b) do {\
+    ++ltests;\
+    const void *const _lm_pa = (const void *)(a);\
+    const void *const _lm_pb = (const void *)(b);\
+    if (_lm_pa != _lm_pb) {\
+        ++lfails;\
+        const uintptr_t _lm_ua = (uintptr_t)_lm_pa;\
+        const uintptr_t _lm_ub = (uintptr_t)_lm_pb;\
+        const intptr_t _lm_diff = (_lm_ua >= _lm_ub)\
+            ? (intptr_t)(_lm_ua - _lm_ub)\
+            : -(intptr_t)(_lm_ub - _lm_ua);\
+        printf("%s:%d (%p != %p, diff=%" PRIdPTR ")\n", __FILE__, __LINE__, _lm_pa, _lm_pb, _lm_diff);\
+    }} while (0)
+
+
 #define TEST_BUFFERS_EQUAL(buf_a, buf_b, buf_len) do {\
     ++ltests;\
     const unsigned char *const _lm_a = (const unsigned char *)(buf_a);\

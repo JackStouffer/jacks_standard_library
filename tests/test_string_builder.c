@@ -54,14 +54,14 @@ static void test_jsl_string_builder_init(void)
     JSLStringBuilder builder;
     bool ok = jsl_string_builder_init(&builder, &global_arena);
     TEST_BOOL(ok);
-    TEST_BOOL(builder.arena == &global_arena);
+    TEST_POINTERS_EQUAL(builder.arena, &global_arena);
     TEST_INT64_EQUAL(builder.chunk_size, 1024);
     TEST_BOOL(builder.alignment == 8);
     TEST_BOOL(builder.head != NULL);
-    TEST_BOOL(builder.tail == builder.head);
+    TEST_POINTERS_EQUAL(builder.tail, builder.head);
     TEST_INT64_EQUAL(builder.head->buffer.length, builder.chunk_size);
     TEST_INT64_EQUAL(builder.head->writer.length, builder.chunk_size);
-    TEST_BOOL(builder.head->buffer.data == builder.head->writer.data);
+    TEST_POINTERS_EQUAL(builder.head->buffer.data, builder.head->writer.data);
 }
 
 static void test_jsl_string_builder_init2(void)
@@ -243,7 +243,7 @@ static void test_jsl_string_builder_iterator_behavior(void)
 
     JSLStringBuilderIterator iterator;
     jsl_string_builder_iterator_init(&builder, &iterator);
-    TEST_BOOL(iterator.current == builder.head);
+    TEST_POINTERS_EQUAL(iterator.current, builder.head);
 
     JSLFatPtr slice;
     jsl_string_builder_iterator_next(&iterator, &slice);
@@ -262,7 +262,7 @@ static void test_jsl_string_builder_iterator_behavior(void)
 
     JSLFatPtr end;
     jsl_string_builder_iterator_next(&iterator, &end);
-    TEST_BOOL(end.data == NULL);
+    TEST_POINTERS_EQUAL(end.data, NULL);
     TEST_INT64_EQUAL(end.length, (int64_t) 0);
 
     JSLStringBuilder invalid = {0};

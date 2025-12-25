@@ -62,7 +62,7 @@ static void test_jsl_str_to_str_multimap_init_success(void)
     JSLStrToStrMultimap map = {0};
     bool ok = jsl_str_to_str_multimap_init2(&map, &global_arena, 0xDEADBEEFUL, 8, 0.5f);
     TEST_BOOL(ok);
-    TEST_BOOL(map.arena == &global_arena);
+    TEST_POINTERS_EQUAL(map.arena, &global_arena);
 }
 
 static void test_jsl_str_to_str_multimap_init_invalid_arguments(void)
@@ -195,8 +195,8 @@ static void test_jsl_str_to_str_multimap_static_lifetime_no_copy(void)
     TEST_BOOL(found);
     if (!found) return;
 
-    TEST_BOOL(out_key.data == key.data);
-    TEST_BOOL(out_value.data == value.data);
+    TEST_POINTERS_EQUAL(out_key.data, key.data);
+    TEST_POINTERS_EQUAL(out_value.data, value.data);
     TEST_BOOL(jsl_fatptr_memory_compare(out_key, key));
     TEST_BOOL(jsl_fatptr_memory_compare(out_value, value));
 }

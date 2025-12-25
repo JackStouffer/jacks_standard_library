@@ -172,7 +172,7 @@ static void test_fixed_get(void)
         TEST_BOOL(insert_res == true);
 
         int32_t* get_res = fixed_int32_to_int32_map_get(&hashmap, 1112);
-        TEST_BOOL(get_res == NULL);
+        TEST_POINTERS_EQUAL(get_res, NULL);
 
         get_res = fixed_int32_to_int32_map_get(&hashmap, 8976);
         TEST_BOOL(*get_res == 1111);
@@ -192,7 +192,7 @@ static void test_fixed_get(void)
         TEST_BOOL(insert_res == true);
 
         CompositeType1* get_res = fixed_int32_to_comp1_map_get(&hashmap, 809367483);
-        TEST_BOOL(get_res == NULL);
+        TEST_POINTERS_EQUAL(get_res, NULL);
 
         get_res = fixed_int32_to_comp1_map_get(&hashmap, 585678435);
         TEST_BOOL(memcmp(get_res, &value, sizeof(CompositeType1)) == 0);
@@ -215,7 +215,7 @@ static void test_fixed_get(void)
         bad_key.a = 36463453;
         bad_key.b = false;
         int32_t* get_res = fixed_comp2_to_int_map_get(&hashmap, bad_key);
-        TEST_BOOL(get_res == NULL);
+        TEST_POINTERS_EQUAL(get_res, NULL);
 
         get_res = fixed_comp2_to_int_map_get(&hashmap, key);
         TEST_BOOL(*get_res == 777777);
@@ -248,7 +248,7 @@ static void test_fixed_get(void)
         CompositeType3 bad_key = key;
         bad_key.a = 36463453;
         CompositeType2* get_res = fixed_comp3_to_comp2_map_get(&hashmap, bad_key);
-        TEST_BOOL(get_res == NULL);
+        TEST_POINTERS_EQUAL(get_res, NULL);
 
         get_res = fixed_comp3_to_comp2_map_get(&hashmap, key);
         TEST_BOOL(memcmp(get_res, &value, sizeof(CompositeType2)) == 0);
@@ -685,7 +685,7 @@ static void test_jsl_str_to_str_map_init_success(void)
     TEST_BOOL(ok);
     if (!ok) return;
 
-    TEST_BOOL(map.arena == &global_arena);
+    TEST_POINTERS_EQUAL(map.arena, &global_arena);
     TEST_BOOL(map.entry_lookup_table != NULL);
     int64_t expected_length = JSL_MAX(32L, jsl_next_power_of_two_i64(65));
     TEST_INT64_EQUAL(map.entry_lookup_table_length, expected_length);
@@ -880,8 +880,8 @@ static void test_jsl_str_to_str_map_fixed_lifetime_uses_original_pointers(void)
     TEST_BOOL(found);
     if (!found) return;
 
-    TEST_BOOL(out_key.data == expected_key_ptr);
-    TEST_BOOL(out_value.data == expected_val_ptr);
+    TEST_POINTERS_EQUAL(out_key.data, expected_key_ptr);
+    TEST_POINTERS_EQUAL(out_value.data, expected_val_ptr);
     TEST_BOOL(jsl_fatptr_memory_compare(out_key, key));
     TEST_BOOL(jsl_fatptr_memory_compare(out_value, value));
 }

@@ -74,7 +74,7 @@ static void test_jsl_fatptr_from_cstr(void)
 
     JSLFatPtr str = jsl_fatptr_from_cstr(c_str);
 
-    TEST_BOOL((void*) str.data == (void*) c_str);
+    TEST_POINTERS_EQUAL(str.data, c_str);
     TEST_BOOL((int64_t) str.length == (int64_t) length);
     TEST_BOOL(memcmp(c_str, str.data, (size_t) str.length) == 0);
 }
@@ -90,7 +90,7 @@ static void test_jsl_fatptr_cstr_memory_copy(void)
     int64_t memcpy_res = jsl_fatptr_cstr_memory_copy(&writer, str, false);
     TEST_INT64_EQUAL(memcpy_res, (int64_t) 22);
 
-    TEST_BOOL(writer.data == buffer.data + length);
+    TEST_POINTERS_EQUAL(writer.data, buffer.data + length);
     TEST_BOOL(writer.length == 1024 - length);
     TEST_BOOL((int64_t) buffer.length == (int64_t) 1024);
 
@@ -203,7 +203,7 @@ static void test_jsl_fatptr_auto_slice(void)
 
         JSLFatPtr slice = jsl_fatptr_auto_slice(original, writer);
         TEST_INT64_EQUAL(slice.length, (int64_t) 10);
-        TEST_BOOL(slice.data == original.data);
+        TEST_POINTERS_EQUAL(slice.data, original.data);
         TEST_BOOL(memcmp(slice.data, "HelloWorld", 10) == 0);
     }
 
@@ -214,7 +214,7 @@ static void test_jsl_fatptr_auto_slice(void)
 
         JSLFatPtr slice = jsl_fatptr_auto_slice(original, writer);
         TEST_INT64_EQUAL(slice.length, (int64_t) 0);
-        TEST_BOOL(slice.data == original.data);
+        TEST_POINTERS_EQUAL(slice.data, original.data);
     }
 
     {
@@ -224,7 +224,7 @@ static void test_jsl_fatptr_auto_slice(void)
 
         JSLFatPtr slice = jsl_fatptr_auto_slice(original, writer);
         TEST_INT64_EQUAL(slice.length, (int64_t) 4);
-        TEST_BOOL(slice.data == original.data);
+        TEST_POINTERS_EQUAL(slice.data, original.data);
         TEST_BOOL(memcmp(slice.data, "xyzw", 4) == 0);
     }
 }
@@ -249,7 +249,7 @@ static void test_jsl_fatptr_auto_slice_arena_reallocate(void)
     // First grow should keep the pointer stable
     buffer = jsl_arena_reallocate(&arena, buffer, 8192);
     TEST_BOOL(buffer.data != NULL);
-    TEST_BOOL(buffer.data == original_ptr);
+    TEST_POINTERS_EQUAL(buffer.data, original_ptr);
     TEST_INT64_EQUAL(buffer.length, (int64_t) 8192);
     writer.length += 4096;
 
@@ -260,13 +260,13 @@ static void test_jsl_fatptr_auto_slice_arena_reallocate(void)
     // Second grow must still stay in place; otherwise auto_slice asserts
     buffer = jsl_arena_reallocate(&arena, buffer, 12288);
     TEST_BOOL(buffer.data != NULL);
-    TEST_BOOL(buffer.data == original_ptr);
+    TEST_POINTERS_EQUAL(buffer.data, original_ptr);
     TEST_INT64_EQUAL(buffer.length, (int64_t) 12288);
     writer.length += 4096;
 
     JSLFatPtr slice = jsl_fatptr_auto_slice(buffer, writer);
     TEST_INT64_EQUAL(slice.length, (int64_t) 8192);
-    TEST_BOOL(slice.data == buffer.data);
+    TEST_POINTERS_EQUAL(slice.data, buffer.data);
 }
 
 static void test_jsl_fatptr_strip_whitespace_left(void)
@@ -299,7 +299,7 @@ static void test_jsl_fatptr_strip_whitespace_left(void)
 
         int64_t res = jsl_fatptr_strip_whitespace_left(&str);
         TEST_INT64_EQUAL(res, (int64_t) 3);
-        TEST_BOOL(str.data == original.data + 3);
+        TEST_POINTERS_EQUAL(str.data, original.data + 3);
         TEST_INT64_EQUAL(str.length, (int64_t) 5);
         TEST_BOOL(jsl_fatptr_cstr_compare(str, "Hello"));
     }
@@ -310,7 +310,7 @@ static void test_jsl_fatptr_strip_whitespace_left(void)
 
         int64_t res = jsl_fatptr_strip_whitespace_left(&str);
         TEST_INT64_EQUAL(res, (int64_t) original.length);
-        TEST_BOOL(str.data == original.data + original.length);
+        TEST_POINTERS_EQUAL(str.data, original.data + original.length);
         TEST_INT64_EQUAL(str.length, (int64_t) 0);
     }
 }
@@ -345,7 +345,7 @@ static void test_jsl_fatptr_strip_whitespace_right(void)
 
         int64_t res = jsl_fatptr_strip_whitespace_right(&str);
         TEST_INT64_EQUAL(res, (int64_t) 3);
-        TEST_BOOL(str.data == original.data);
+        TEST_POINTERS_EQUAL(str.data, original.data);
         TEST_INT64_EQUAL(str.length, original.length - 3);
         TEST_BOOL(jsl_fatptr_cstr_compare(str, "Hello"));
     }
@@ -356,7 +356,7 @@ static void test_jsl_fatptr_strip_whitespace_right(void)
 
         int64_t res = jsl_fatptr_strip_whitespace_right(&str);
         TEST_INT64_EQUAL(res, (int64_t) original.length);
-        TEST_BOOL(str.data == original.data);
+        TEST_POINTERS_EQUAL(str.data, original.data);
         TEST_INT64_EQUAL(str.length, (int64_t) 0);
     }
 }
@@ -391,7 +391,7 @@ static void test_jsl_fatptr_strip_whitespace(void)
 
         int64_t res = jsl_fatptr_strip_whitespace(&str);
         TEST_INT64_EQUAL(res, (int64_t) 5);
-        TEST_BOOL(str.data == original.data + 2);
+        TEST_POINTERS_EQUAL(str.data, original.data + 2);
         TEST_INT64_EQUAL(str.length, original.length - 5);
         TEST_BOOL(jsl_fatptr_cstr_compare(str, "Hello World"));
     }
@@ -402,7 +402,7 @@ static void test_jsl_fatptr_strip_whitespace(void)
 
         int64_t res = jsl_fatptr_strip_whitespace(&str);
         TEST_INT64_EQUAL(res, (int64_t) original.length);
-        TEST_BOOL(str.data == original.data + original.length);
+        TEST_POINTERS_EQUAL(str.data, original.data + original.length);
         TEST_INT64_EQUAL(str.length, (int64_t) 0);
     }
 }
@@ -619,7 +619,7 @@ static void test_jsl_fatptr_get_file_extension(void)
 {
     JSLFatPtr buffer1 = JSL_FATPTR_INITIALIZER("");
     JSLFatPtr res1 = jsl_fatptr_get_file_extension(buffer1);
-    TEST_BOOL(res1.data == NULL);
+    TEST_POINTERS_EQUAL(res1.data, NULL);
 
     JSLFatPtr buffer2 = JSL_FATPTR_INITIALIZER(".");
     JSLFatPtr res2 = jsl_fatptr_get_file_extension(buffer2);
@@ -946,7 +946,7 @@ static void test_jsl_fatptr_to_cstr(void)
     {
         JSLFatPtr fatptr = {0};
         char* cstr = jsl_fatptr_to_cstr(&arena, fatptr);
-        TEST_BOOL(cstr == NULL);
+        TEST_POINTERS_EQUAL(cstr, NULL);
     }
 
     jsl_arena_reset(&arena);
