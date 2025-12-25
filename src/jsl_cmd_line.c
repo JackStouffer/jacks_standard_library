@@ -23,6 +23,20 @@
 
 static const JSLFatPtr JSL__CMD_LINE_EMPTY_VALUE = JSL_FATPTR_INITIALIZER("");
 
+static void jsl__cmd_line_set_error(JSLCmdLine* cmd_line, JSLFatPtr* out_error, JSLFatPtr message)
+{
+    bool params_valid = (
+        cmd_line != NULL
+        && out_error != NULL
+        && (message.data != NULL || message.length == 0)
+    );
+
+    if (params_valid)
+    {
+        *out_error = message;
+    }
+}
+
 static void jsl__cmd_line_set_short_flag(JSLCmdLine* cmd_line, uint8_t flag)
 {
     uint32_t bucket_index = (uint32_t) flag >> 6;
@@ -396,7 +410,12 @@ static bool jsl__cmd_line_copy_arg(JSLCmdLine* cmd_line, JSLFatPtr raw, JSLFatPt
     return res;
 }
 
-static bool jsl__cmd_line_add_command(JSLCmdLine* cmd_line, JSLFatPtr command)
+static bool jsl__cmd_line_add_command(
+    JSLCmdLine* cmd_line,
+    JSLFatPtr command,
+    int32_t arg_index,
+    JSLFatPtr* out_error
+)
 {
     bool res = false;
 
@@ -423,6 +442,20 @@ static bool jsl__cmd_line_add_command(JSLCmdLine* cmd_line, JSLFatPtr command)
             JSL_STRING_LIFETIME_STATIC
         );
 
+    if (params_valid && !inserted && out_error != NULL)
+    {
+        jsl__cmd_line_set_error(
+            cmd_line,
+            out_error,
+            jsl_format(
+                cmd_line->arena,
+                JSL_FATPTR_EXPRESSION("Unable to store argument %d: %y"),
+                arg_index,
+                command
+            )
+        );
+    }
+
     if (params_valid && inserted)
     {
         res = true;
@@ -436,7 +469,9 @@ static bool jsl__cmd_line_handle_long_option(
     JSLFatPtr arg,
     JSLFatPtr separate_value,
     bool has_separate_value,
-    bool* out_consumed_separate
+    bool* out_consumed_separate,
+    int32_t arg_index,
+    JSLFatPtr* out_error
 )
 {
     bool res = false;
@@ -452,6 +487,18 @@ static bool jsl__cmd_line_handle_long_option(
     {
         flag_body = jsl_fatptr_slice(arg, 2, arg.length);
         params_valid = flag_body.data != NULL && flag_body.length > 0;
+        if (!params_valid && out_error != NULL)
+        {
+            jsl__cmd_line_set_error(
+                cmd_line,
+                out_error,
+                jsl_format(
+                    cmd_line->arena,
+                    JSL_FATPTR_EXPRESSION("Expected a flag name after \"--\" in argument %d"),
+                    arg_index
+                )
+            );
+        }
     }
 
     int64_t equals_index = -1;
@@ -460,6 +507,18 @@ static bool jsl__cmd_line_handle_long_option(
         equals_index = jsl_fatptr_index_of(flag_body, '=');
         if (equals_index == 0)
         {
+            if (out_error != NULL)
+            {
+                jsl__cmd_line_set_error(
+                    cmd_line,
+                    out_error,
+                    jsl_format(
+                        cmd_line->arena,
+                        JSL_FATPTR_EXPRESSION("Expected a flag name before '=' in argument %d"),
+                        arg_index
+                    )
+                );
+            }
             params_valid = false;
         }
     }
@@ -483,6 +542,19 @@ static bool jsl__cmd_line_handle_long_option(
                 JSL__CMD_LINE_EMPTY_VALUE,
                 JSL_STRING_LIFETIME_STATIC
             );
+
+            if (out_error != NULL && !inserted)
+            {
+                jsl__cmd_line_set_error(
+                    cmd_line,
+                    out_error,
+                    jsl_format(
+                        cmd_line->arena,
+                        JSL_FATPTR_EXPRESSION("Unable to record flag --%y"),
+                        flag_body
+                    )
+                );
+            }
 
             if (inserted)
             {
@@ -514,6 +586,18 @@ static bool jsl__cmd_line_handle_long_option(
         }
 
         bool key_valid = key.data != NULL && key.length > -1;
+        if (!key_valid && out_error != NULL)
+        {
+            jsl__cmd_line_set_error(
+                cmd_line,
+                out_error,
+                jsl_format(
+                    cmd_line->arena,
+                    JSL_FATPTR_EXPRESSION("Expected a flag name before value in argument %d"),
+                    arg_index
+                )
+            );
+        }
         bool inserted = key_valid
             && jsl_str_to_str_multimap_insert(
                 &cmd_line->flags_with_values,
@@ -522,6 +606,19 @@ static bool jsl__cmd_line_handle_long_option(
                 value,
                 JSL_STRING_LIFETIME_STATIC
             );
+
+        if (out_error != NULL && key_valid && !inserted)
+        {
+            jsl__cmd_line_set_error(
+                cmd_line,
+                out_error,
+                jsl_format(
+                    cmd_line->arena,
+                    JSL_FATPTR_EXPRESSION("Unable to store value for --%y"),
+                    key
+                )
+            );
+        }
 
         if (inserted)
         {
@@ -537,7 +634,12 @@ static bool jsl__cmd_line_handle_long_option(
     return res;
 }
 
-static bool jsl__cmd_line_handle_short_option(JSLCmdLine* cmd_line, JSLFatPtr arg)
+static bool jsl__cmd_line_handle_short_option(
+    JSLCmdLine* cmd_line,
+    JSLFatPtr arg,
+    int32_t arg_index,
+    JSLFatPtr* out_error
+)
 {
     bool res = false;
 
@@ -560,6 +662,19 @@ static bool jsl__cmd_line_handle_short_option(JSLCmdLine* cmd_line, JSLFatPtr ar
         equals_index = jsl_fatptr_index_of(flags, '=');
         if (equals_index >= 0)
         {
+            if (out_error != NULL)
+            {
+                jsl__cmd_line_set_error(
+                    cmd_line,
+                    out_error,
+                    jsl_format(
+                        cmd_line->arena,
+                        JSL_FATPTR_EXPRESSION("Short flags cannot use '=' (argument %d: %y)"),
+                        arg_index,
+                        arg
+                    )
+                );
+            }
             return false;
         }
     }
@@ -578,6 +693,20 @@ static bool jsl__cmd_line_handle_short_option(JSLCmdLine* cmd_line, JSLFatPtr ar
             }
         }
 
+        if (!ascii_valid && out_error != NULL)
+        {
+            jsl__cmd_line_set_error(
+                cmd_line,
+                out_error,
+                jsl_format(
+                    cmd_line->arena,
+                    JSL_FATPTR_EXPRESSION("Short flags must be ASCII (argument %d: %y)"),
+                    arg_index,
+                    arg
+                )
+            );
+        }
+
         if (ascii_valid)
         {
             res = true;
@@ -593,7 +722,9 @@ static bool jsl__cmd_line_process_arg(
     JSLFatPtr next_arg,
     bool has_next_arg,
     bool* stop_parsing,
-    bool* consumed_next
+    bool* consumed_next,
+    int32_t arg_index,
+    JSLFatPtr* out_error
 )
 {
     bool res = false;
@@ -604,6 +735,19 @@ static bool jsl__cmd_line_process_arg(
         && stored_arg.data != NULL
         && stored_arg.length > -1
     );
+
+    if (!params_valid && out_error != NULL && cmd_line != NULL && cmd_line->arena != NULL)
+    {
+        jsl__cmd_line_set_error(
+            cmd_line,
+            out_error,
+            jsl_format(
+                cmd_line->arena,
+                JSL_FATPTR_EXPRESSION("Invalid argument at position %d"),
+                arg_index
+            )
+        );
+    }
 
     bool parsing_done = params_valid && *stop_parsing;
     bool needs_stop = params_valid
@@ -620,7 +764,7 @@ static bool jsl__cmd_line_process_arg(
     bool handled = params_valid && parsing_done;
     if (handled && !needs_stop)
     {
-        handled = jsl__cmd_line_add_command(cmd_line, stored_arg);
+        handled = jsl__cmd_line_add_command(cmd_line, stored_arg, arg_index, out_error);
     }
 
     bool is_long_flag = params_valid
@@ -637,7 +781,9 @@ static bool jsl__cmd_line_process_arg(
             stored_arg,
             next_arg,
             has_next_arg,
-            &consumed_next_arg
+            &consumed_next_arg,
+            arg_index,
+            out_error
         );
     }
 
@@ -649,7 +795,7 @@ static bool jsl__cmd_line_process_arg(
 
     if (is_short_flag)
     {
-        handled = jsl__cmd_line_handle_short_option(cmd_line, stored_arg);
+        handled = jsl__cmd_line_handle_short_option(cmd_line, stored_arg, arg_index, out_error);
     }
 
     bool is_command = params_valid
@@ -659,7 +805,7 @@ static bool jsl__cmd_line_process_arg(
 
     if (is_command)
     {
-        handled = jsl__cmd_line_add_command(cmd_line, stored_arg);
+        handled = jsl__cmd_line_add_command(cmd_line, stored_arg, arg_index, out_error);
     }
 
     if (params_valid)
@@ -674,6 +820,320 @@ static bool jsl__cmd_line_process_arg(
     if (params_valid && handled)
     {
         res = true;
+    }
+    else if (params_valid && !handled && out_error != NULL && out_error->data == NULL)
+    {
+        jsl__cmd_line_set_error(
+            cmd_line,
+            out_error,
+            jsl_format(
+                cmd_line->arena,
+                JSL_FATPTR_EXPRESSION("Could not parse argument %d: %y"),
+                arg_index,
+                stored_arg
+            )
+        );
+    }
+
+    return res;
+}
+
+typedef bool (*JSL__CmdLinePrepareArg)(
+    JSLCmdLine* cmd_line,
+    void* argv,
+    int32_t index,
+    JSLFatPtr* out_arg,
+    JSLFatPtr* out_error
+);
+
+typedef bool (*JSL__CmdLineIsFlag)(void* argv, int32_t index);
+
+static bool jsl__cmd_line_is_narrow_flag(void* argv, int32_t index)
+{
+    bool res = false;
+
+    if (argv != NULL)
+    {
+        char** args = (char**) argv;
+        char* value = args[index];
+        res = value != NULL && value[0] == '-' && value[1] != '\0';
+    }
+
+    return res;
+}
+
+static bool jsl__cmd_line_is_wide_flag(void* argv, int32_t index)
+{
+    bool res = false;
+
+    if (argv != NULL)
+    {
+        wchar_t** args = (wchar_t**) argv;
+        wchar_t* value = args[index];
+        res = value != NULL && value[0] == L'-' && value[1] != 0;
+    }
+
+    return res;
+}
+
+static bool jsl__cmd_line_prepare_utf8_arg(
+    JSLCmdLine* cmd_line,
+    void* argv,
+    int32_t index,
+    JSLFatPtr* out_arg,
+    JSLFatPtr* out_error
+)
+{
+    bool res = false;
+
+    bool params_valid = (
+        cmd_line != NULL
+        && argv != NULL
+        && out_arg != NULL
+    );
+
+    JSLFatPtr raw = {0};
+    if (params_valid)
+    {
+        char** args = (char**) argv;
+        raw = jsl_fatptr_from_cstr(args[index]);
+        params_valid = raw.data != NULL;
+        if (!params_valid && out_error != NULL)
+        {
+            jsl__cmd_line_set_error(
+                cmd_line,
+                out_error,
+                jsl_format(
+                    cmd_line->arena,
+                    JSL_FATPTR_EXPRESSION("Argument %d is missing"),
+                    index
+                )
+            );
+        }
+    }
+
+    bool utf8_ok = params_valid && jsl__cmd_line_validate_utf8(raw);
+    if (params_valid && !utf8_ok && out_error != NULL)
+    {
+        jsl__cmd_line_set_error(
+            cmd_line,
+            out_error,
+            jsl_format(
+                cmd_line->arena,
+                JSL_FATPTR_EXPRESSION("Argument %d is not valid UTF-8"),
+                index
+            )
+        );
+    }
+
+    JSLFatPtr stored = {0};
+    bool copied = utf8_ok && jsl__cmd_line_copy_arg(cmd_line, raw, &stored);
+    if (utf8_ok && !copied && out_error != NULL)
+    {
+        jsl__cmd_line_set_error(
+            cmd_line,
+            out_error,
+            jsl_format(
+                cmd_line->arena,
+                JSL_FATPTR_EXPRESSION("Unable to store argument %d"),
+                index
+            )
+        );
+    }
+
+    if (utf8_ok && copied)
+    {
+        *out_arg = stored;
+        res = true;
+    }
+
+    return res;
+}
+
+static bool jsl__cmd_line_prepare_wide_arg(
+    JSLCmdLine* cmd_line,
+    void* argv,
+    int32_t index,
+    JSLFatPtr* out_arg,
+    JSLFatPtr* out_error
+)
+{
+    bool res = false;
+
+    bool params_valid = (
+        cmd_line != NULL
+        && argv != NULL
+        && out_arg != NULL
+    );
+
+    JSLFatPtr utf8_arg = {0};
+    wchar_t* wide_arg = NULL;
+    if (params_valid)
+    {
+        wchar_t** args = (wchar_t**) argv;
+        wide_arg = args[index];
+        params_valid = wide_arg != NULL;
+        if (!params_valid && out_error != NULL)
+        {
+            jsl__cmd_line_set_error(
+                cmd_line,
+                out_error,
+                jsl_format(
+                    cmd_line->arena,
+                    JSL_FATPTR_EXPRESSION("Argument %d is missing"),
+                    index
+                )
+            );
+        }
+    }
+
+    if (params_valid)
+    {
+        bool converted = jsl__cmd_line_utf16_to_utf8(cmd_line->arena, wide_arg, &utf8_arg)
+            && jsl__cmd_line_validate_utf8(utf8_arg);
+
+        if (!converted && out_error != NULL)
+        {
+            jsl__cmd_line_set_error(
+                cmd_line,
+                out_error,
+                jsl_format(
+                    cmd_line->arena,
+                    JSL_FATPTR_EXPRESSION("Argument %d is not valid UTF-16"),
+                    index
+                )
+            );
+        }
+
+        res = converted;
+    }
+
+    if (res)
+    {
+        *out_arg = utf8_arg;
+    }
+
+    return res;
+}
+
+static bool jsl__cmd_line_parse_common(
+    JSLCmdLine* cmd_line,
+    int32_t argc,
+    void* argv,
+    JSL__CmdLinePrepareArg prepare_arg,
+    JSL__CmdLineIsFlag is_flag_like,
+    JSLFatPtr* out_error
+)
+{
+    bool res = false;
+
+    if (out_error != NULL)
+    {
+        *out_error = (JSLFatPtr) {0};
+    }
+
+    bool params_valid = (
+        cmd_line != NULL
+        && cmd_line->arena != NULL
+        && argv != NULL
+        && argc > -1
+        && prepare_arg != NULL
+        && is_flag_like != NULL
+    );
+
+    if (!params_valid)
+    {
+        return false;
+    }
+
+    jsl__cmd_line_reset(cmd_line);
+
+    int64_t capacity_needed = (int64_t) argc;
+    bool capacity_ok = jsl__cmd_line_ensure_arg_capacity(cmd_line, capacity_needed);
+
+    if (!capacity_ok)
+    {
+        if (out_error != NULL)
+        {
+            jsl__cmd_line_set_error(
+                cmd_line,
+                out_error,
+                jsl_format(
+                    cmd_line->arena,
+                    JSL_FATPTR_EXPRESSION("Command line input exceeds memory limit")
+                )
+            );
+        }
+        return false;
+    }
+
+    bool parse_ok = true;
+    bool stop_parsing = false;
+
+    for (int32_t index = 1; parse_ok && index < argc; ++index)
+    {
+        JSLFatPtr stored = {0};
+        parse_ok = prepare_arg(cmd_line, argv, index, &stored, out_error);
+
+        bool has_next_raw = parse_ok && (index + 1) < argc;
+        bool next_is_flag = has_next_raw && is_flag_like(argv, index + 1);
+
+        bool should_prepare_next = parse_ok
+            && !stop_parsing
+            && has_next_raw
+            && stored.length > 2
+            && stored.data[0] == '-'
+            && stored.data[1] == '-'
+            && jsl_fatptr_index_of(stored, '=') < 0
+            && !next_is_flag;
+
+        JSLFatPtr next_stored = {0};
+        bool next_available = false;
+        if (should_prepare_next)
+        {
+            next_available = prepare_arg(cmd_line, argv, index + 1, &next_stored, out_error);
+            parse_ok = next_available;
+        }
+
+        bool consumed_next = false;
+        bool processed = parse_ok
+            && jsl__cmd_line_process_arg(
+                cmd_line,
+                stored,
+                next_stored,
+                next_available,
+                &stop_parsing,
+                &consumed_next,
+                index,
+                out_error
+            );
+
+        if (processed && consumed_next)
+        {
+            ++index;
+        }
+
+        parse_ok = processed;
+    }
+
+    if (parse_ok)
+    {
+        res = true;
+    }
+    else
+    {
+        jsl__cmd_line_reset(cmd_line);
+        if (out_error != NULL && out_error->data == NULL)
+        {
+            jsl__cmd_line_set_error(
+                cmd_line,
+                out_error,
+                jsl_format(
+                    cmd_line->arena,
+                    JSL_FATPTR_EXPRESSION("Failed to parse command line input")
+                )
+            );
+        }
     }
 
     return res;
@@ -703,190 +1163,28 @@ bool jsl_cmd_line_init(JSLCmdLine* cmd_line, JSLArena* arena)
     return res;
 }
 
-bool jsl_cmd_line_parse(JSLCmdLine* cmd_line, int32_t argc, char** argv)
+bool jsl_cmd_line_parse(JSLCmdLine* cmd_line, int32_t argc, char** argv, JSLFatPtr* out_error)
 {
-    bool res = false;
-
-    bool params_valid = (
-        cmd_line != NULL
-        && cmd_line->arena != NULL
-        && argv != NULL
-        && argc > -1
+    return jsl__cmd_line_parse_common(
+        cmd_line,
+        argc,
+        (void*) argv,
+        jsl__cmd_line_prepare_utf8_arg,
+        jsl__cmd_line_is_narrow_flag,
+        out_error
     );
-
-    bool reset = params_valid;
-    if (reset)
-    {
-        jsl__cmd_line_reset(cmd_line);
-    }
-
-    int64_t capacity_needed = params_valid ? (int64_t) argc : 0;
-    bool capacity_ok = params_valid && jsl__cmd_line_ensure_arg_capacity(cmd_line, capacity_needed);
-
-    bool parse_ok = params_valid && capacity_ok;
-    bool stop_parsing = false;
-
-    int32_t index = 1;
-    while (parse_ok && index < argc)
-    {
-        JSLFatPtr raw = jsl_fatptr_from_cstr(argv[index]);
-        bool utf8_ok = raw.data != NULL && jsl__cmd_line_validate_utf8(raw);
-
-        JSLFatPtr stored = {0};
-        bool copied = utf8_ok && jsl__cmd_line_copy_arg(cmd_line, raw, &stored);
-
-        bool has_next_raw = (index + 1) < argc;
-        bool next_is_flag = false;
-        if (has_next_raw)
-        {
-            char* next_cstr = argv[index + 1];
-            next_is_flag = next_cstr != NULL && next_cstr[0] == '-' && next_cstr[1] != '\0';
-        }
-
-        bool should_prepare_next = !stop_parsing
-            && has_next_raw
-            && stored.length > 2
-            && stored.data[0] == '-'
-            && stored.data[1] == '-'
-            && jsl_fatptr_index_of(stored, '=') < 0
-            && !next_is_flag;
-
-        JSLFatPtr next_stored = {0};
-        bool next_available = false;
-        if (should_prepare_next)
-        {
-            JSLFatPtr next_raw = jsl_fatptr_from_cstr(argv[index + 1]);
-            bool next_utf8_ok = next_raw.data != NULL && jsl__cmd_line_validate_utf8(next_raw);
-            next_available = next_utf8_ok && jsl__cmd_line_copy_arg(cmd_line, next_raw, &next_stored);
-        }
-
-        bool consumed_next = false;
-        bool processed = copied && jsl__cmd_line_process_arg(
-            cmd_line,
-            stored,
-            next_stored,
-            next_available,
-            &stop_parsing,
-            &consumed_next
-        );
-
-        if (processed && consumed_next)
-        {
-            ++index;
-        }
-
-        parse_ok = processed;
-        ++index;
-    }
-
-    if (params_valid && capacity_ok && parse_ok)
-    {
-        res = true;
-    }
-
-    if (params_valid && !res)
-    {
-        jsl__cmd_line_reset(cmd_line);
-    }
-
-    return res;
 }
 
-bool jsl_cmd_line_parse_wide(JSLCmdLine* cmd_line, int32_t argc, wchar_t** argv)
+bool jsl_cmd_line_parse_wide(JSLCmdLine* cmd_line, int32_t argc, wchar_t** argv, JSLFatPtr* out_error)
 {
-    bool res = false;
-
-    bool params_valid = (
-        cmd_line != NULL
-        && cmd_line->arena != NULL
-        && argv != NULL
-        && argc > -1
+    return jsl__cmd_line_parse_common(
+        cmd_line,
+        argc,
+        (void*) argv,
+        jsl__cmd_line_prepare_wide_arg,
+        jsl__cmd_line_is_wide_flag,
+        out_error
     );
-
-    if (params_valid)
-    {
-        jsl__cmd_line_reset(cmd_line);
-    }
-
-    int64_t capacity_needed = params_valid ? (int64_t) argc : 0;
-    bool capacity_ok = params_valid && jsl__cmd_line_ensure_arg_capacity(cmd_line, capacity_needed);
-
-    bool parse_ok = params_valid && capacity_ok;
-    bool stop_parsing = false;
-
-    int32_t index = 1;
-    while (parse_ok && index < argc)
-    {
-        wchar_t* wide_arg = argv[index];
-
-        JSLFatPtr utf8_arg = {0};
-        bool converted = wide_arg != NULL
-            && jsl__cmd_line_utf16_to_utf8(cmd_line->arena, wide_arg, &utf8_arg)
-            && jsl__cmd_line_validate_utf8(utf8_arg);
-
-        bool has_next_raw = (index + 1) < argc;
-        bool next_is_flag = false;
-        if (has_next_raw)
-        {
-            wchar_t* next_wide = argv[index + 1];
-            next_is_flag = next_wide != NULL && next_wide[0] == L'-' && next_wide[1] != 0;
-        }
-
-        bool should_prepare_next = !stop_parsing
-            && has_next_raw
-            && utf8_arg.length > 2
-            && utf8_arg.data[0] == '-'
-            && utf8_arg.data[1] == '-'
-            && jsl_fatptr_index_of(utf8_arg, '=') < 0
-            && !next_is_flag;
-
-        JSLFatPtr next_utf8 = {0};
-        bool next_available = false;
-        if (should_prepare_next)
-        {
-            JSLFatPtr temp = {0};
-            bool next_converted = argv[index + 1] != NULL
-                && jsl__cmd_line_utf16_to_utf8(cmd_line->arena, argv[index + 1], &temp)
-                && jsl__cmd_line_validate_utf8(temp);
-
-            if (next_converted)
-            {
-                next_utf8 = temp;
-                next_available = true;
-            }
-        }
-
-        bool consumed_next = false;
-        bool processed = converted
-            && jsl__cmd_line_process_arg(
-                cmd_line,
-                utf8_arg,
-                next_utf8,
-                next_available,
-                &stop_parsing,
-                &consumed_next
-            );
-
-        if (processed && consumed_next)
-        {
-            ++index;
-        }
-
-        parse_ok = processed;
-        ++index;
-    }
-
-    if (params_valid && capacity_ok && parse_ok)
-    {
-        res = true;
-    }
-
-    if (params_valid && !res)
-    {
-        jsl__cmd_line_reset(cmd_line);
-    }
-
-    return res;
 }
 
 bool jsl_cmd_line_has_short_flag(JSLCmdLine* cmd_line, uint8_t flag)

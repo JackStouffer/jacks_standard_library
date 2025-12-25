@@ -62,10 +62,10 @@ JSLFatPtr help_message = JSL_FATPTR_INITIALIZER(
     "This program generates both a C source and header file for a hash map with the given\n"
     "key and value types. More documentation is included in the source file.\n\n"
     "USAGE:\n\n"
-    "\tgenerate_hash_map --name TYPE_NAME --function_prefix PREFIX --key_type TYPE --value_type TYPE [--static | --dynamic] [--header | --source] [--add-header=FILE]...\n\n"
+    "\tgenerate_hash_map --name TYPE_NAME --function-prefix PREFIX --key-type TYPE --value-type TYPE [--static | --dynamic] [--header | --source] [--add-header=FILE]...\n\n"
     "Required arguments:\n"
     "\t--name\t\t\tThe name to give the hash map container type\n"
-    "\t--function_prefix\tThe prefix added to each of the functions for the hash map\n"
+    "\t--function-prefix\tThe prefix added to each of the functions for the hash map\n"
     "\t--key_type\t\tThe C type name for the key\n"
     "\t--value_type\t\tThe C type name for the value\n\n"
     "Optional arguments:\n"
@@ -296,7 +296,20 @@ static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
 
         JSLCmdLine cmd;
         jsl_cmd_line_init(&cmd, &arena);
-        jsl_cmd_line_parse_wide(&cmd, argc, argv);
+        JSLFatPtr error_message = {0};
+        if (!jsl_cmd_line_parse_wide(&cmd, argc, argv, &error_message))
+        {
+            if (error_message.data != NULL)
+            {
+                jsl_format_to_c_file(stderr, error_message);
+            }
+            else
+            {
+                jsl_format_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Parsing failure"));
+            }
+            jsl_format_to_c_file(stderr, JSL_FATPTR_EXPRESSION("\n"));
+            return EXIT_FAILURE;
+        }
 
         return entrypoint(&arena, &cmd);
     }
@@ -320,9 +333,18 @@ static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
             return EXIT_FAILURE;
         }
 
-        if (!jsl_cmd_line_parse(&cmd, argc, argv))
+        JSLFatPtr error_message = {0};
+        if (!jsl_cmd_line_parse(&cmd, argc, argv, &error_message))
         {
-            jsl_format_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Parsing failure"));
+            if (error_message.data != NULL)
+            {
+                jsl_format_to_c_file(stderr, error_message);
+            }
+            else
+            {
+                jsl_format_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Parsing failure"));
+            }
+            jsl_format_to_c_file(stderr, JSL_FATPTR_EXPRESSION("\n"));
             return EXIT_FAILURE;
         }
 

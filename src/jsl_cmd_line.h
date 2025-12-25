@@ -78,12 +78,18 @@ bool jsl_cmd_line_init(JSLCmdLine* cmd_line, JSLArena* arena);
  *
  * This functions parses and stores the flags, arguments, and commands
  * from the user input for easy querying with the other functions in this
- * module.
+ * module. If `out_error` is not NULL it will be set to a
+ * user-friendly message on failure.
  * 
  * @returns false if the arena is out of memory or the passed in strings
  * were not valid utf-8.
  */
-bool jsl_cmd_line_parse(JSLCmdLine* cmd_line, int32_t argc, char** argv);
+bool jsl_cmd_line_parse(
+    JSLCmdLine* cmd_line,
+    int32_t argc,
+    char** argv,
+    JSLFatPtr* out_error
+);
 
 /**
  * Parse the given command line arguments that are in the POSIX style.
@@ -92,12 +98,18 @@ bool jsl_cmd_line_parse(JSLCmdLine* cmd_line, int32_t argc, char** argv);
  *
  * This functions parses and stores the flags, arguments, and commands
  * from the user input for easy querying with the other functions in this
- * module.
+ * module. If `out_error` is not NULL it will be set to a
+ * user-friendly message on failure.
  * 
  * @returns false if the arena is out of memory or the passed in strings
  * were not valid utf-16.
  */
-bool jsl_cmd_line_parse_wide(JSLCmdLine* cmd_line, int32_t argc, wchar_t** argv);
+bool jsl_cmd_line_parse_wide(
+    JSLCmdLine* cmd_line,
+    int32_t argc,
+    wchar_t** argv,
+    JSLFatPtr* out_error
+);
 
 /**
  * Checks if the user passed in the given short flag.

@@ -47,7 +47,7 @@ static void test_short_flags_grouping(void)
         "--output=result.txt",
     };
 
-    TEST_BOOL(jsl_cmd_line_parse(&cmd, 5, argv));
+    TEST_BOOL(jsl_cmd_line_parse(&cmd, 5, argv, NULL));
 
     TEST_BOOL(jsl_cmd_line_has_short_flag(&cmd, 'a'));
     TEST_BOOL(jsl_cmd_line_has_short_flag(&cmd, 'b'));
@@ -83,7 +83,10 @@ static void test_short_flag_equals_is_invalid(void)
         "run"
     };
 
-    TEST_BOOL(!jsl_cmd_line_parse(&cmd, 3, argv));
+    JSLFatPtr error = {0};
+    TEST_BOOL(!jsl_cmd_line_parse(&cmd, 3, argv, &error));
+    TEST_BOOL(error.data != NULL && error.length > 0);
+    TEST_BOOL(jsl_fatptr_index_of(error, '=') >= 0);
 }
 
 static void test_long_flags_and_commands(void)
@@ -103,7 +106,7 @@ static void test_long_flags_and_commands(void)
         "--not-a-flag",
     };
 
-    TEST_BOOL(jsl_cmd_line_parse(&cmd, 6, argv));
+    TEST_BOOL(jsl_cmd_line_parse(&cmd, 6, argv, NULL));
 
     TEST_BOOL(jsl_cmd_line_has_flag(&cmd, JSL_FATPTR_EXPRESSION("verbose")));
     TEST_BOOL(!jsl_cmd_line_has_flag(&cmd, JSL_FATPTR_EXPRESSION("output")));
@@ -153,7 +156,7 @@ static void test_long_values_equals_and_space(void)
         "clean",
     };
 
-    TEST_BOOL(jsl_cmd_line_parse(&cmd, 7, argv));
+    TEST_BOOL(jsl_cmd_line_parse(&cmd, 7, argv, NULL));
 
     JSLFatPtr collected[3] = {0};
     int32_t collected_count = 0;
@@ -202,7 +205,7 @@ static void test_wide_parsing(void)
         arg3
     };
 
-    TEST_BOOL(jsl_cmd_line_parse_wide(&cmd, 4, argv));
+    TEST_BOOL(jsl_cmd_line_parse_wide(&cmd, 4, argv, NULL));
 
     JSLFatPtr value = {0};
     TEST_BOOL(jsl_cmd_line_pop_flag_with_value(

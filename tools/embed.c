@@ -170,7 +170,20 @@ static int32_t entrypoint(
 
         JSLCmdLine cmd;
         jsl_cmd_line_init(&cmd, &arena);
-        jsl_cmd_line_parse_wide(&cmd, argc, argv);
+        JSLFatPtr error_message = {0};
+        if (!jsl_cmd_line_parse_wide(&cmd, argc, argv, &error_message))
+        {
+            if (error_message.data != NULL)
+            {
+                jsl_format_to_c_file(stderr, error_message);
+            }
+            else
+            {
+                jsl_format_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Parsing failure"));
+            }
+            jsl_format_to_c_file(stderr, JSL_FATPTR_EXPRESSION("\n"));
+            return EXIT_FAILURE;
+        }
 
         HANDLE stdin_handle = GetStdHandle(STD_INPUT_HANDLE);
         DWORD stdin_type = GetFileType(stdin_handle);
@@ -212,9 +225,18 @@ static int32_t entrypoint(
             return EXIT_FAILURE;
         }
 
-        if (!jsl_cmd_line_parse(&cmd, argc, argv))
+        JSLFatPtr error_message = {0};
+        if (!jsl_cmd_line_parse(&cmd, argc, argv, &error_message))
         {
-            jsl_format_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Parsing failure"));
+            if (error_message.data != NULL)
+            {
+                jsl_format_to_c_file(stderr, error_message);
+            }
+            else
+            {
+                jsl_format_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Parsing failure"));
+            }
+            jsl_format_to_c_file(stderr, JSL_FATPTR_EXPRESSION("\n"));
             return EXIT_FAILURE;
         }
 
