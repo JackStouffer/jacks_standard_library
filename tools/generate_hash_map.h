@@ -12,6 +12,7 @@
 
     #include <stdint.h>
     #include <stddef.h>
+    #include <inttypes.h>
     #if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L
         #include <stdbool.h>
     #endif
@@ -172,6 +173,21 @@
     static JSLFatPtr unsigned_long_long_str = JSL_FATPTR_INITIALIZER("unsigned long long");
     static JSLFatPtr unsigned_long_long_int_str = JSL_FATPTR_INITIALIZER("unsigned long long int");
 
+    static uint64_t rand_u64(void)
+    {
+        uint64_t value = 0;
+
+        value = (value << 8) | (uint64_t)(rand() & 0xFF);
+        value = (value << 8) | (uint64_t)(rand() & 0xFF);
+        value = (value << 8) | (uint64_t)(rand() & 0xFF);
+        value = (value << 8) | (uint64_t)(rand() & 0xFF);
+        value = (value << 8) | (uint64_t)(rand() & 0xFF);
+        value = (value << 8) | (uint64_t)(rand() & 0xFF);
+        value = (value << 8) | (uint64_t)(rand() & 0xFF);
+        value = (value << 8) | (uint64_t)(rand() & 0xFF);
+
+        return value;
+    }
 
     static void render_template(
         JSLStringBuilder* str_builder,
@@ -186,45 +202,42 @@
         while (template_reader.length > 0)
         {
             int64_t index_of_open = jsl_fatptr_substring_search(template_reader, open_param);
-            int64_t index_of_close = jsl_fatptr_substring_search(template_reader, close_param);
 
             // No more variables, write everything
             if (index_of_open == -1)
             {
                 jsl_string_builder_insert_fatptr(str_builder, template_reader);
-                JSL_FATPTR_ADVANCE(template_reader, template_reader.length);
+                break;
             }
-            // Improperly closed template param, write everything
-            else if (index_of_open > -1 && index_of_close == -1)
+
+            if (index_of_open > 0)
             {
+                JSLFatPtr slice = jsl_fatptr_slice(template_reader, 0, index_of_open);
+                jsl_string_builder_insert_fatptr(str_builder, slice);
+            }
+
+            JSL_FATPTR_ADVANCE(template_reader, index_of_open + open_param.length);
+
+            int64_t index_of_close = jsl_fatptr_substring_search(template_reader, close_param);
+
+            // Improperly closed template param, write everything including the open marker
+            if (index_of_close == -1)
+            {
+                jsl_string_builder_insert_fatptr(str_builder, open_param);
                 jsl_string_builder_insert_fatptr(str_builder, template_reader);
-                JSL_FATPTR_ADVANCE(template_reader, template_reader.length);
+                break;
             }
-            // Close before open, write everything up to the next open
-            else if (index_of_open > -1 && index_of_close > -1 && index_of_close < index_of_open)
+
+            JSLFatPtr var_name = jsl_fatptr_slice(template_reader, 0, index_of_close);
+            jsl_fatptr_strip_whitespace(&var_name);
+
+            JSLFatPtr var_value;
+            if (jsl_str_to_str_map_get(variables, var_name, &var_value))
             {
-                JSLFatPtr slice = jsl_fatptr_slice(template_reader, 0, index_of_open);
-                jsl_string_builder_insert_fatptr(str_builder, slice);
-                JSL_FATPTR_ADVANCE(template_reader, index_of_open);
+                jsl_string_builder_insert_fatptr(str_builder, var_value);
             }
-            // properly formed
-            else if (index_of_open > -1 && index_of_close > -1 && index_of_close > index_of_open)
-            {
-                JSLFatPtr slice = jsl_fatptr_slice(template_reader, 0, index_of_open);
-                jsl_string_builder_insert_fatptr(str_builder, slice);
-                JSL_FATPTR_ADVANCE(template_reader, index_of_open + 2);
 
-                JSLFatPtr var_name = jsl_fatptr_slice(template_reader, 0, index_of_close);
-                jsl_fatptr_strip_whitespace(&var_name);
-
-                JSLFatPtr var_value;
-                if (jsl_str_to_str_map_get(variables, var_name, &var_value))
-                {
-                    jsl_string_builder_insert_fatptr(str_builder, var_value);
-                }
-
-                JSL_FATPTR_ADVANCE(template_reader, index_of_close + 2);
-            }
+            JSL_FATPTR_ADVANCE(template_reader, index_of_close + close_param.length);
         }
     }
 
@@ -290,6 +303,15 @@
         {
             jsl_string_builder_format(builder, JSL_FATPTR_EXPRESSION("#include \"%y\"\n"), include_header_array[i]);
         }
+
+        jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("\n"));
+        
+        jsl_string_builder_format(
+            builder,
+            JSL_FATPTR_EXPRESSION("#define PRIVATE_SENTINEL_%y %" PRIu64 "U \n"),
+            hash_map_name,
+            rand_u64()
+        );
 
         jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("\n"));
 

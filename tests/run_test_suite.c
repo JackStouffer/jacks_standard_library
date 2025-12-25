@@ -343,6 +343,7 @@ static UnitTestDecl unit_test_declarations[] = {
         "test_hash_map",
         (char*[]) {
             "tests/test_hash_map.c",
+            "src/jsl_core.c",
             "src/jsl_str_to_str_map.c",
             "tests/hash_maps/fixed_comp2_to_int_map.c",
             "tests/hash_maps/fixed_comp3_to_comp2_map.c",
@@ -719,8 +720,8 @@ int32_t main(int32_t argc, char **argv)
                 nob_cmd_append(&compile_command, source_file);
             }
 
-            if (!nob_cmd_run(&compile_command)) return 1;
-            // if (!nob_cmd_run(&compile_command, .async = &compile_procs, .max_procs = (size_t)logical_processors)) return 1;
+            // if (!nob_cmd_run(&compile_command)) return 1;
+            if (!nob_cmd_run(&compile_command, .async = &compile_procs, .max_procs = (size_t)logical_processors)) return 1;
 
             cstring_array_insert(&executables, exe_name);
         }
@@ -795,8 +796,8 @@ int32_t main(int32_t argc, char **argv)
                     nob_cmd_append(&compile_command, source_file);
                 }
 
-                if (!nob_cmd_run(&compile_command)) return 1;
-                // if (!nob_cmd_run(&compile_command, .async = &compile_procs, .max_procs = (size_t)logical_processors)) return 1;
+                // if (!nob_cmd_run(&compile_command)) return 1;
+                if (!nob_cmd_run(&compile_command, .async = &compile_procs, .max_procs = (size_t)logical_processors)) return 1;
 
                 cstring_array_insert(&executables, exe_name);
             }

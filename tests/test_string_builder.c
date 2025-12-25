@@ -55,12 +55,12 @@ static void test_jsl_string_builder_init(void)
     bool ok = jsl_string_builder_init(&builder, &global_arena);
     TEST_BOOL(ok);
     TEST_BOOL(builder.arena == &global_arena);
-    TEST_BOOL(builder.chunk_size == 256);
+    TEST_INT64_EQUAL(builder.chunk_size, 1024);
     TEST_BOOL(builder.alignment == 8);
     TEST_BOOL(builder.head != NULL);
     TEST_BOOL(builder.tail == builder.head);
-    TEST_BOOL(builder.head->buffer.length == builder.chunk_size);
-    TEST_BOOL(builder.head->writer.length == builder.chunk_size);
+    TEST_INT64_EQUAL(builder.head->buffer.length, builder.chunk_size);
+    TEST_INT64_EQUAL(builder.head->writer.length, builder.chunk_size);
     TEST_BOOL(builder.head->buffer.data == builder.head->writer.data);
 }
 

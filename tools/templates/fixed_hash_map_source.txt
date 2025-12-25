@@ -6,11 +6,12 @@
  *
  * This file was auto generated from the hash map generation utility that's part of
  * the "Jack's Standard Library" project. The utility generates a header file and a
- * C file for a type safe, open addressed, hash map. By generating the code rather
- * than using macros, two benefits are gained. One, the code is much easier to debug.
- * Two, it's much more obvious how much code you're generating, which means you are
- * much less likely to accidentally create the combinatoric explosion of code that's
- * so common in C++ projects. Adding friction to things is actually good sometimes.
+ * C file for a type safe, open addressed, linear probed, hash map. By generating
+ * the code rather than using macros, two benefits are gained. One, the code is much
+ * easier to debug. Two, it's much more obvious how much code you're generating,
+ * which means you are much less likely to accidentally create the combinatoric
+ * explosion of code that's so common in C++ projects. Sometimes, adding friction
+ * to things is good.
  *
  * Much like the arena allocator it uses, this hash map is designed for situations where
  * you can set an upper bound on the number of items you will have and that upper bound is
@@ -72,6 +73,7 @@ bool {{ function_prefix }}_init(
     if (hash_map->hashes_array == NULL)
         return false;
 
+    hash_map->sentinel = PRIVATE_SENTINEL_{{ hash_map_name }};
     return true;
 }
 
@@ -88,59 +90,64 @@ static inline void {{ function_prefix }}_probe(
 
     int64_t first_tombstone = -1;
     bool tombstone_seen = false;
-    bool searching = true;
 
     {{ hash_function }};
 
     int64_t total_checked = 0;
+    uint64_t slot_mask = (uint64_t) hash_map->arrays_length - 1u;
     // Since our slot array length is always a pow 2, we can avoid a modulo
-    int64_t slot = (int64_t) (*out_hash & ((uint64_t) hash_map->arrays_length - 1u));
+    int64_t slot = (int64_t) (*out_hash & slot_mask);
 
     while (total_checked < hash_map->arrays_length)
     {
-        uint64_t slot_hash = hash_map->hashes_array[slot];
+        uint64_t slot_hash_value = hash_map->hashes_array[slot];
 
-        bool is_empty = slot_hash == JSL__HASHMAP_EMPTY;
-        bool is_tombstone = slot_hash == JSL__HASHMAP_TOMBSTONE;
+        bool is_empty = slot_hash_value == JSL__HASHMAP_EMPTY;
+        bool is_tombstone = slot_hash_value == JSL__HASHMAP_TOMBSTONE;
 
-        if (is_slot_set == 0 && is_insert)
+        if (is_empty)
         {
-            return_value.value_index = slot_index;
-            return_value.is_update = false;
+            *out_slot = tombstone_seen ? first_tombstone : slot;
             break;
         }
-        /* Updating value */
-        else if (is_slot_set == 1)
+
+        if (is_tombstone && !tombstone_seen)
         {
-            int32_t memcmp_res = JSL_MEMCMP(
-                &hash_map->keys_array[slot_index],
-                &key,
-                sizeof({{ key_type_name }})
-            );
-            if (memcmp_res == 0)
-            {
-                return_value.value_index = slot_index;
-                return_value.is_update = true;
-                break;
-            }
+            first_tombstone = slot;
+            tombstone_seen = true;
         }
 
-        // Collision. Move to the next spot with linear probing
+        bool slot_has_value = !is_empty && !is_tombstone;
+        bool matches = slot_has_value
+            && *out_hash == slot_hash_value
+            && JSL_MEMCMP(&key, &hash_map->keys_array[slot], sizeof({{ key_type_name }}));
 
+        if (matches)
+        {
+            *out_found = true;
+            *out_slot = slot;
+            break;
+        }
+
+        if (!slot_has_value)
+        {
+            hash_map->hashes_array[slot] = JSL__HASHMAP_TOMBSTONE;
+        }
+
+        if (!slot_has_value && !tombstone_seen)
+        {
+            first_tombstone = slot;
+            tombstone_seen = true;
+        }
+
+        slot = (int64_t) (((uint64_t) slot + 1u) & slot_mask);
         ++total_checked;
-        ++slot_index;
-
-
-        // Loop all the way back around
-        if (slot_index == hash_map->arrays_length)
-        {
-            slot_index = 0;
-            return_value.is_set_array_bit = 0;
-            return_value.is_set_array_index = 0;
-        }
     }
 
-    return return_value;
+    if (total_checked >= hash_map->arrays_length)
+    {
+        *out_slot = tombstone_seen ? first_tombstone : -1;
+    }
 }
 
 bool {{ function_prefix }}_insert(
@@ -153,43 +160,37 @@ bool {{ function_prefix }}_insert(
 
     if (
         hash_map == NULL
+        || hash_map->sentinel != PRIVATE_SENTINEL_{{ hash_map_name }}
         || hash_map->values_array == NULL
         || hash_map->keys_array == NULL
-        || hash_map->is_set_flags_array == NULL
-        || hash_map->item_count == hash_map->max_item_count
+        || hash_map->hashes_array == NULL
+        || hash_map->item_count >= hash_map->max_item_count
     )
         return insert_success;
 
-    if (hash_map->item_count == hash_map->arrays_length)
+    uint64_t hash = 0;
+    int64_t slot = -1;
+    bool existing_found = false;
+    {{ function_prefix }}_probe(hash_map, key, &slot, &hash, &existing_found);
+
+    // new key
+    if (slot > -1 && !existing_found)
     {
-        return insert_success;
+        hash_map->keys_array[slot] = key;
+        hash_map->values_array[slot] = value;
+        hash_map->hashes_array[slot] = hash;
+        ++hash_map->item_count;
+        insert_success = true;
+    }
+    // update
+    else if (slot > -1 && existing_found)
+    {
+        hash_map->values_array[slot] = value;
+        insert_success = true;
     }
 
-    struct {{ hash_map_name }}FindRes find_res = {{ function_prefix }}_hash_and_find_slot(
-        hash_map,
-        key,
-        true
-    );
-    if (find_res.value_index != -1)
+    if (insert_success)
     {
-        if (find_res.is_update)
-        {
-            hash_map->values_array[find_res.value_index] = value;
-            insert_success = true;
-        }
-        else
-        {
-            hash_map->keys_array[find_res.value_index] = key;
-            hash_map->values_array[find_res.value_index] = value;
-            uint32_t bit_flag = JSL_MAKE_BITFLAG(find_res.is_set_array_bit);
-            JSL_SET_BITFLAG(
-                &hash_map->is_set_flags_array[find_res.is_set_array_index],
-                bit_flag
-            );
-            ++hash_map->item_count;
-            insert_success = true;
-        }
-
         ++hash_map->generational_id;
     }
 
@@ -205,16 +206,21 @@ bool {{ function_prefix }}_insert(
 
     if (
         hash_map == NULL
+        || hash_map->sentinel != PRIVATE_SENTINEL_{{ hash_map_name }}
         || hash_map->values_array == NULL
         || hash_map->keys_array == NULL
-        || hash_map->is_set_flags_array == NULL
+        || hash_map->hashes_array == NULL
     )
         return res;
 
-    struct {{ hash_map_name }}FindRes find_res = {{ function_prefix }}_hash_and_find_slot(hash_map, key, false);
-    if (find_res.value_index != -1 && find_res.is_update)
+    uint64_t hash = 0;
+    int64_t slot = -1;
+    bool existing_found = false;
+    {{ function_prefix }}_probe(hash_map, key, &slot, &hash, &existing_found);
+    
+    if (slot > -1 && existing_found)
     {
-        res = &hash_map->values_array[find_res.value_index];
+        res = &hash_map->values_array[slot];
     }
 
     return res;
@@ -229,21 +235,21 @@ bool {{ function_prefix }}_delete(
 
     if (
         hash_map == NULL
+        || hash_map->sentinel != PRIVATE_SENTINEL_{{ hash_map_name }}
         || hash_map->values_array == NULL
         || hash_map->keys_array == NULL
-        || hash_map->is_set_flags_array == NULL
+        || hash_map->hashes_array == NULL
     )
         return success;
 
-    struct {{ hash_map_name }}FindRes find_res = {{ function_prefix }}_hash_and_find_slot(hash_map, key, false);
+    uint64_t hash = 0;
+    int64_t slot = -1;
+    bool existing_found = false;
+    {{ function_prefix }}_probe(hash_map, key, &slot, &hash, &existing_found);
 
-    if (find_res.value_index != -1 && find_res.is_update)
+    if (slot > -1 && existing_found)
     {
-        uint32_t bit_flag = JSL_MAKE_BITFLAG(find_res.is_set_array_bit);
-        JSL_UNSET_BITFLAG(
-            &hash_map->is_set_flags_array[find_res.is_set_array_index],
-            bit_flag
-        );
+        hash_map->hashes_array[slot] = JSL__HASHMAP_TOMBSTONE;
         --hash_map->item_count;
         success = true;
     }
@@ -260,14 +266,15 @@ bool {{ function_prefix }}_iterator_start(
 
     if (
         hash_map == NULL
+        || hash_map->sentinel != PRIVATE_SENTINEL_{{ hash_map_name }}
         || hash_map->values_array == NULL
         || hash_map->keys_array == NULL
-        || hash_map->is_set_flags_array == NULL
+        || hash_map->hashes_array == NULL
     )
         return success;
 
     iterator->hash_map = hash_map;
-    iterator->current_slot_index = 0;
+    iterator->current_slot = 0;
     iterator->generational_id = hash_map->generational_id;
 
     return iterator;
@@ -275,63 +282,55 @@ bool {{ function_prefix }}_iterator_start(
 
 bool {{ function_prefix }}_iterator_next(
     {{ hash_map_name }}Iterator* iterator,
-    {{ key_type_name }}* key,
-    {{ value_type_name }}* value
+    {{ key_type_name }}* out_key,
+    {{ value_type_name }}* out_value
 )
 {
-    bool result = false;
+    bool found = false;
 
     if (
         iterator == NULL
         || iterator->hash_map == NULL
+        || iterator->hash_map->sentinel != PRIVATE_SENTINEL_{{ hash_map_name }}
+        || iterator->hash_map->generational_id != iterator->generational_id
         || iterator->hash_map->values_array == NULL
         || iterator->hash_map->keys_array == NULL
-        || iterator->hash_map->is_set_flags_array == NULL
+        || iterator->hash_map->hashes_array == NULL
     )
-        return result;
+        return found;
 
-    while (iterator->current_slot_index < iterator->hash_map->arrays_length)
+    int64_t found_entry = -1;
+
+    while (iterator->current_slot < iterator->hash_map->arrays_length)
     {
-        int64_t is_set_flags_index = JSL__HASH_MAP_GET_SET_FLAG_INDEX(iterator->current_slot_index);
-        uint32_t is_set_flags = iterator->hash_map->is_set_flags_array[is_set_flags_index];
-        bool at_start_of_flags = (iterator->current_slot_index & 31) == 0;  // modulo 32
+        uint64_t hash_value = iterator->hash_map->hashes_array[iterator->current_slot];
 
-        if (at_start_of_flags && is_set_flags == 0)
+        bool occupied = hash_value != JSL__HASHMAP_EMPTY
+            && hash_value != JSL__HASHMAP_TOMBSTONE;
+
+        if (occupied)
         {
-            iterator->current_slot_index += 32;
-        }
-        else if (at_start_of_flags)
-        {
-            iterator->current_slot_index += JSL_PLATFORM_COUNT_TRAILING_ZEROS(is_set_flags);
-
-            *key = iterator->hash_map->keys_array[iterator->current_slot_index];
-            *value = iterator->hash_map->values_array[iterator->current_slot_index];
-
-            ++iterator->current_slot_index;
-            result = true;
+            found_entry = iterator->current_slot;
             break;
         }
         else
         {
-            uint32_t current_is_set_flags_bit = (uint32_t) (iterator->current_slot_index - (is_set_flags_index * 32));
-            uint32_t bitflag = JSL_MAKE_BITFLAG(current_is_set_flags_bit);
-            bool is_set = JSL_IS_BITFLAG_SET(is_set_flags, bitflag);
-
-            if (is_set)
-            {
-                *key = iterator->hash_map->keys_array[iterator->current_slot_index];
-                *value = iterator->hash_map->values_array[iterator->current_slot_index];
-
-                ++iterator->current_slot_index;
-                result = true;
-                break;
-            }
-            else
-            {
-                ++iterator->current_slot_index;
-            }
+            ++iterator->current_slot;
         }
     }
 
-    return result;
+    if (found_entry > -1)
+    {
+        *out_key = iterator->hash_map->keys_array[iterator->current_slot];
+        *out_value = iterator->hash_map->values_array[iterator->current_slot];
+        ++iterator->current_slot;
+        found = true;
+    }
+    else
+    {
+        iterator->current_slot = iterator->hash_map->arrays_length;
+        found = false;
+    }
+
+    return found;
 }
