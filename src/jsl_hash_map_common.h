@@ -308,7 +308,8 @@ enum JSL__HashmapFlags
 enum JSL__ProbeState
 {
     JSL__HASHMAP_EMPTY = 0,
-    JSL__HASHMAP_TOMBSTONE = 1
+    JSL__HASHMAP_TOMBSTONE = 1,
+    JSL__HASHMAP_VALUE_OK
 };
 
 typedef enum JSLStringLifeTime {

@@ -312,6 +312,8 @@ bool jsl_string_builder_iterator_next(JSLStringBuilderIterator* iterator, JSLFat
     if (iterator == NULL || out_chunk == NULL)
         return false;
 
+    *out_chunk = (JSLFatPtr){0};
+
     struct JSL__StringBuilderChunk* current = iterator->current;
     if (current == NULL || current->buffer.data == NULL)
         return false;

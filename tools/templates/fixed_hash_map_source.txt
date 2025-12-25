@@ -68,7 +68,7 @@ bool {{ function_prefix }}_init(
         arena,
         ((int64_t) sizeof(uint64_t)) * hash_map->arrays_length,
         (int32_t) _Alignof(uint64_t),
-        false
+        true
     ).data;
     if (hash_map->hashes_array == NULL)
         return false;
@@ -92,6 +92,12 @@ static inline void {{ function_prefix }}_probe(
     bool tombstone_seen = false;
 
     {{ hash_function }};
+
+    // Avoid clashing with empty/tombstone sentinels
+    if (*out_hash <= (uint64_t) JSL__HASHMAP_TOMBSTONE)
+    {
+        *out_hash = (uint64_t) JSL__HASHMAP_VALUE_OK;
+    }
 
     int64_t total_checked = 0;
     uint64_t slot_mask = (uint64_t) hash_map->arrays_length - 1u;
@@ -120,7 +126,7 @@ static inline void {{ function_prefix }}_probe(
         bool slot_has_value = !is_empty && !is_tombstone;
         bool matches = slot_has_value
             && *out_hash == slot_hash_value
-            && JSL_MEMCMP(&key, &hash_map->keys_array[slot], sizeof({{ key_type_name }}));
+            && JSL_MEMCMP(&key, &hash_map->keys_array[slot], sizeof({{ key_type_name }})) == 0;
 
         if (matches)
         {

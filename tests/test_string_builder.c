@@ -255,7 +255,7 @@ static void test_jsl_string_builder_iterator_behavior(void)
     TEST_BOOL(jsl_string_builder_insert_char(&builder, '3'));
 
     jsl_string_builder_iterator_init(&builder, &iterator);
-    jsl_string_builder_iterator_next(&iterator, &slice);
+    TEST_BOOL(jsl_string_builder_iterator_next(&iterator, &slice));
 
     TEST_BOOL(slice.length == 3);
     TEST_BUFFERS_EQUAL(slice.data, "123", 3);
