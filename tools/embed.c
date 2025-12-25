@@ -125,13 +125,10 @@ static int32_t entrypoint(
         JSLStringBuilderIterator iterator;
         jsl_string_builder_iterator_init(&builder, &iterator);
 
-        while (true)
+        JSLFatPtr slice;
+        while (jsl_string_builder_iterator_next(&iterator, &slice))
         {
-            JSLFatPtr slice = jsl_string_builder_iterator_next(&iterator);
-            if (slice.data == NULL)
-                break;
-
-            jsl_format_to_c_file(stdout, slice);
+            jsl_write_to_c_file(stdout, slice);
         }
 
         return EXIT_SUCCESS;

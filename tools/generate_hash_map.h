@@ -172,6 +172,62 @@
     static JSLFatPtr unsigned_long_long_str = JSL_FATPTR_INITIALIZER("unsigned long long");
     static JSLFatPtr unsigned_long_long_int_str = JSL_FATPTR_INITIALIZER("unsigned long long int");
 
+
+    static void render_template(
+        JSLStringBuilder* str_builder,
+        JSLFatPtr template,
+        JSLStrToStrMap* variables
+    )
+    {
+        static JSLFatPtr open_param = JSL_FATPTR_INITIALIZER("{{");
+        static JSLFatPtr close_param = JSL_FATPTR_INITIALIZER("}}");
+        JSLFatPtr template_reader = template;
+        
+        while (template_reader.length > 0)
+        {
+            int64_t index_of_open = jsl_fatptr_substring_search(template_reader, open_param);
+            int64_t index_of_close = jsl_fatptr_substring_search(template_reader, close_param);
+
+            // No more variables, write everything
+            if (index_of_open == -1)
+            {
+                jsl_string_builder_insert_fatptr(str_builder, template_reader);
+                JSL_FATPTR_ADVANCE(template_reader, template_reader.length);
+            }
+            // Improperly closed template param, write everything
+            else if (index_of_open > -1 && index_of_close == -1)
+            {
+                jsl_string_builder_insert_fatptr(str_builder, template_reader);
+                JSL_FATPTR_ADVANCE(template_reader, template_reader.length);
+            }
+            // Close before open, write everything up to the next open
+            else if (index_of_open > -1 && index_of_close > -1 && index_of_close < index_of_open)
+            {
+                JSLFatPtr slice = jsl_fatptr_slice(template_reader, 0, index_of_open);
+                jsl_string_builder_insert_fatptr(str_builder, slice);
+                JSL_FATPTR_ADVANCE(template_reader, index_of_open);
+            }
+            // properly formed
+            else if (index_of_open > -1 && index_of_close > -1 && index_of_close > index_of_open)
+            {
+                JSLFatPtr slice = jsl_fatptr_slice(template_reader, 0, index_of_open);
+                jsl_string_builder_insert_fatptr(str_builder, slice);
+                JSL_FATPTR_ADVANCE(template_reader, index_of_open + 2);
+
+                JSLFatPtr var_name = jsl_fatptr_slice(template_reader, 0, index_of_close);
+                jsl_fatptr_strip_whitespace(&var_name);
+
+                JSLFatPtr var_value;
+                if (jsl_str_to_str_map_get(variables, var_name, &var_value))
+                {
+                    jsl_string_builder_insert_fatptr(str_builder, var_value);
+                }
+
+                JSL_FATPTR_ADVANCE(template_reader, index_of_close + 2);
+            }
+        }
+    }
+
     /**
      * Generates the header file data for your hash map. This file includes all the typedefs
      * and function signatures for this hash map.

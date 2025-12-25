@@ -40,11 +40,8 @@
 #include "../src/jsl_os.c"
 #include "../src/jsl_cmd_line.c"
 
-#include "templates/static_hash_map_header.h"
-#include "templates/static_hash_map_source.h"
-
-#define SIMPLE_TEMPLATE_IMPLEMENTATION
-#include "simple_template.h"
+#include "templates/fixed_hash_map_header.h"
+#include "templates/fixed_hash_map_source.h"
 
 #define GENERATE_HASH_MAP_IMPLEMENTATION
 #include "generate_hash_map.h"
