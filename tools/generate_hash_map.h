@@ -1,11 +1,87 @@
 /**
- * TODO: docs
+ * # Generate Hash Map Tool
+ * 
+ * Generate the C header and source files for a hash map before compilation.
+ * 
+ * The utility generates a header file and a C file for a type safe, open addressed,
+ * linear probed, hash map. By generating the code rather than using macros, two
+ * benefits are gained. One, the code is much easier to debug. Two, it's much more
+ * obvious how much code you're generating, which means you are much less likely to
+ * accidentally create the combinatoric explosion of code that's so common in C++
+ * projects. Sometimes, adding friction to things is good.
+ * 
+ * There are two implementations of hash map that this utility can generate.
+ * 
+ * 1. A fixed size hash map that cannot grow. You set the max item count at
+ *    init. This reduces memory fragmentation in arenas and it reduces failure
+ *    modes in later parts of the program
+ * 2. A standard dynamic hash map.
+ * 
+ * ## Usage
+ * 
+ * This tool is usable as both a command line tool and a C library. Use the
+ * command line tool for traditional GNU make style builds and use the C
+ * library for "metaprogram" style builds.
+ * 
+ * ### CLI Program
+ * 
+ * Compile the program with
+ * 
+ * ```
+ * $ cc -o generate_hash_map tools/generate_hash_map.c
+ * ```
+ * 
+ * or on Windows with
+ * 
+ * ```
+ * > cl.exe /Fegenerate_hash_map tools\generate_hash_map.c
+ * ```
+ * 
+ * Get the help message with
+ * 
+ * ```
+ * $ ./generate_hash_map --help
+ * ```
+ * 
+ * ### Library
+ * 
+ * The `generate_hash_map.h` file is a single-header-file library. In
+ * every file that uses the code include the header normally.
+ * 
+ * ```
+ * #include "generate_hash_map.h"
+ * ```
+ * 
+ * Then in one, and only one, file define the implementation macro
+ * 
+ * ```
+ * #define GENERATE_HASH_MAP_IMPLEMENTATION
+ * #include "generate_hash_map.h"
+ * ```
+ * 
+ * The two relevent functions are write_hash_map_header and write_hash_map_source
  * 
  * ## License
  *
- * YOUR LICENSE HERE 
+ * Copyright (c) 2025 Jack Stouffer
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the “Software”),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the Software
+ * is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
-
 
 #ifndef GENERATE_HASH_MAP_H_INCLUDED
     #define GENERATE_HASH_MAP_H_INCLUDED
@@ -42,6 +118,20 @@
         IMPL_DYNAMIC
     } HashMapImplementation;
 
+    /**
+     * Generate the text of the C header and insert it into the string builder.
+     * 
+     * @param arena Used for all memory allocations
+     * @param builder Used to insert the generated text
+     * @param impl Which hash map implementation to use
+     * @param hash_map_name The name of the container type
+     * @param function_prefix The prefix plus "_" for each function
+     * @param key_type_name The type of the hash map key
+     * @param value_type_name The type of the hash map value
+     * @param hash_function_name If you have a custom hash function, put it here, otherwise pass NULL
+     * @param include_header_array If you need custom header includes then set this, otherwise pass NULL
+     * @param include_header_count The length of the header array
+     */
     GENERATE_HASH_MAP_DEF void write_hash_map_header(
         JSLArena* arena,
         JSLStringBuilder* builder,
@@ -55,6 +145,20 @@
         int32_t include_header_count
     );
 
+    /**
+     * Generate the text of the C source and insert it into the string builder.
+     * 
+     * @param arena Used for all memory allocations
+     * @param builder Used to insert the generated text
+     * @param impl Which hash map implementation to use
+     * @param hash_map_name The name of the container type
+     * @param function_prefix The prefix plus "_" for each function
+     * @param key_type_name The type of the hash map key
+     * @param value_type_name The type of the hash map value
+     * @param hash_function_name If you have a custom hash function, put it here, otherwise pass NULL
+     * @param include_header_array If you need custom header includes then set this, otherwise pass NULL
+     * @param include_header_count The length of the header array
+     */
     GENERATE_HASH_MAP_DEF void write_hash_map_source(
         JSLArena* arena,
         JSLStringBuilder* builder,
