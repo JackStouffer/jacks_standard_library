@@ -70,12 +70,6 @@
 extern "C" {
 #endif
 
-
-enum JSLStrSetKeyState {
-    JSL__SET_EMPTY = 0UL,
-    JSL__SET_TOMBSTONE = 1UL
-};
-
 #define JSL__SET_SSO_LENGTH 16
 
 struct JSL__StrSetEntry {
@@ -118,7 +112,7 @@ struct JSL__StrSet {
 
 /**
  * This is an open addressed hash set with linear probing that maps
- * JSLFatPtr keys to JSLFatPtr values. This set uses rapidhash, which
+ *  This set uses rapidhash, which
  * is a avalanche hash with a configurable seed value for protection
  * against hash flooding attacks.
  * 
@@ -131,18 +125,15 @@ struct JSL__StrSet {
  * JSLStrSet set;
  * jsl_str_set_init(&set, &stack_arena, 0);
  *
- * JSLFatPtr key = JSL_FATPTR_INITIALIZER("hello-key");
+ * JSLFatPtr value = JSL_FATPTR_INITIALIZER("hello-key");
  * 
  * jsl_str_to_str_multimap_insert(
  *     &set,
- *     key,
- *     JSL_STRING_LIFETIME_STATIC,
- *     JSL_FATPTR_EXPRESSION("hello-value"),
+ *     value,
  *     JSL_STRING_LIFETIME_STATIC
  * );
  * 
- * JSLFatPtr value
- * jsl_str_set_get(&set, key, &value);
+ * jsl_str_set_get(&set, value);
  * ```
  * 
  * ## Functions
@@ -150,11 +141,10 @@ struct JSL__StrSet {
  *  * jsl_str_set_init
  *  * jsl_str_set_init2
  *  * jsl_str_set_item_count
- *  * jsl_str_set_has_key
+ *  * jsl_str_set_has
  *  * jsl_str_set_insert
- *  * jsl_str_set_get
- *  * jsl_str_set_key_value_iterator_init
- *  * jsl_str_set_key_value_iterator_next
+ *  * jsl_str_set_iterator_init
+ *  * jsl_str_set_iterator_next
  *  * jsl_str_set_delete
  *  * jsl_str_set_clear
  *
@@ -237,7 +227,7 @@ JSL_STR_SET_DEF int64_t jsl_str_set_item_count(
  * @param set Pointer to the set.
  * @return `true` if yes, `false` if no or error
  */
-JSL_STR_SET_DEF bool jsl_str_set_has_value(
+JSL_STR_SET_DEF bool jsl_str_set_has(
     JSLStrSet* set,
     JSLFatPtr value
 );
