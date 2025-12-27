@@ -339,12 +339,15 @@ static UnitTestDecl unit_test_declarations[] = {
         "src/jsl_str_to_str_multimap.c",
         NULL
     } },
-    { "test_str_set", (char*[]) {
-        "tests/test_str_set.c",
-        "src/jsl_core.c",
-        "src/jsl_str_set.c",
-        NULL
-    } },
+    {
+        "test_hash_set",
+        (char*[]) {
+            "tests/test_hash_set.c",
+            "src/jsl_core.c",
+            "src/jsl_str_set.c",
+            NULL
+        }
+    },
     {
         "test_hash_map",
         (char*[]) {

@@ -80,8 +80,114 @@ static bool jsl__str_set_rehash(
     JSLStrSet* set
 )
 {
-    (void) set;
-    return false;
+    bool res = false;
+
+    bool params_valid = (
+        set != NULL
+        && set->arena != NULL
+        && set->sentinel == JSL__SET_PRIVATE_SENTINEL
+        && set->entry_lookup_table != NULL
+        && set->entry_lookup_table_length > 0
+    );
+
+    uintptr_t* old_table = params_valid ? set->entry_lookup_table : NULL;
+    int64_t old_length = params_valid ? set->entry_lookup_table_length : 0;
+
+    int64_t new_length = params_valid ? jsl_next_power_of_two_i64(old_length + 1) : 0;
+    bool length_valid = params_valid && new_length > old_length && new_length > 0;
+
+    bool bytes_possible = length_valid
+        && new_length <= (INT64_MAX / (int64_t) sizeof(uintptr_t));
+
+    int64_t bytes_needed = bytes_possible
+        ? (int64_t) sizeof(uintptr_t) * new_length
+        : 0;
+
+    JSLFatPtr new_table_mem = {0};
+    if (bytes_possible)
+    {
+        new_table_mem = jsl_arena_allocate_aligned(
+            set->arena,
+            bytes_needed,
+            _Alignof(uintptr_t),
+            true
+        );
+    }
+
+    uintptr_t* new_table = (bytes_possible && new_table_mem.data != NULL)
+        ? (uintptr_t*) new_table_mem.data
+        : NULL;
+
+    uint64_t lut_mask = new_length > 0 ? ((uint64_t) new_length - 1u) : 0;
+    int64_t old_index = 0;
+    bool migrate_ok = new_table != NULL;
+
+    while (migrate_ok && old_index < old_length)
+    {
+        uintptr_t lut_res = old_table[old_index];
+
+        bool occupied = (
+            lut_res != 0
+            && lut_res != JSL__HASHMAP_EMPTY
+            && lut_res != JSL__HASHMAP_TOMBSTONE
+        );
+
+        struct JSL__StrSetEntry* entry = occupied
+            ? (struct JSL__StrSetEntry*) lut_res
+            : NULL;
+
+        int64_t probe_index = entry != NULL
+            ? (int64_t) (entry->hash & lut_mask)
+            : 0;
+
+        int64_t probes = 0;
+
+        bool insert_needed = entry != NULL;
+        while (migrate_ok && insert_needed && probes < new_length)
+        {
+            uintptr_t probe_res = new_table[probe_index];
+            bool slot_free = (
+                probe_res == JSL__HASHMAP_EMPTY
+                || probe_res == JSL__HASHMAP_TOMBSTONE
+            );
+
+            if (slot_free)
+            {
+                new_table[probe_index] = (uintptr_t) entry;
+                insert_needed = false;
+                break;
+            }
+
+            probe_index = (int64_t) (((uint64_t) probe_index + 1u) & lut_mask);
+            ++probes;
+        }
+
+        bool placement_failed = insert_needed;
+        if (placement_failed)
+        {
+            migrate_ok = false;
+        }
+
+        ++old_index;
+    }
+
+    bool should_commit = migrate_ok && new_table != NULL && length_valid;
+    if (should_commit)
+    {
+        set->entry_lookup_table = new_table;
+        set->entry_lookup_table_length = new_length;
+        set->tombstone_count = 0;
+        ++set->generational_id;
+        res = true;
+    }
+
+    bool failed = !should_commit;
+    if (failed)
+    {
+        res = false;
+    }
+
+    return res;
 }
 
 static inline void jsl__str_set_probe(
@@ -349,9 +455,22 @@ JSL_STR_SET_DEF bool jsl_str_set_iterator_init(
     JSLStrSetKeyValueIter* iterator
 )
 {
-    (void) set;
-    (void) iterator;
-    return false;
+    bool res = false;
+
+    if (
+        set != NULL
+        && set->sentinel == JSL__SET_PRIVATE_SENTINEL
+        && iterator != NULL
+    )
+    {
+        iterator->set = set;
+        iterator->current_lut_index = 0;
+        iterator->sentinel = JSL__SET_PRIVATE_SENTINEL;
+        iterator->generational_id = set->generational_id;
+        res = true;
+    }
+
+    return res;
 }
 
 JSL_STR_SET_DEF bool jsl_str_set_iterator_next(
@@ -359,9 +478,53 @@ JSL_STR_SET_DEF bool jsl_str_set_iterator_next(
     JSLFatPtr* out_value
 )
 {
-    (void) iterator;
-    (void) out_value;
-    return false;
+    bool found = false;
+
+    bool params_valid = (
+        iterator != NULL
+        && out_value != NULL
+        && iterator->sentinel == JSL__SET_PRIVATE_SENTINEL
+        && iterator->set != NULL
+        && iterator->set->sentinel == JSL__SET_PRIVATE_SENTINEL
+        && iterator->set->entry_lookup_table != NULL
+        && iterator->generational_id == iterator->set->generational_id
+    );
+
+    int64_t lut_length = params_valid ? iterator->set->entry_lookup_table_length : 0;
+    int64_t lut_index = iterator->current_lut_index;
+    struct JSL__StrSetEntry* found_entry = NULL;
+
+    while (params_valid && lut_index < lut_length)
+    {
+        uintptr_t lut_res = iterator->set->entry_lookup_table[lut_index];
+        bool occupied = lut_res != JSL__HASHMAP_EMPTY && lut_res != JSL__HASHMAP_TOMBSTONE;
+
+        if (occupied)
+        {
+            found_entry = (struct JSL__StrSetEntry*) lut_res;
+            break;
+        }
+        else
+        {
+            ++lut_index;
+        }
+    }
+
+    if (found_entry != NULL)
+    {
+        iterator->current_lut_index = lut_index + 1;
+        *out_value = found_entry->value;
+        found = true;
+    }
+
+    bool exhausted = params_valid && found_entry == NULL;
+    if (exhausted)
+    {
+        iterator->current_lut_index = lut_length;
+        found = false;
+    }
+
+    return found;
 }
 
 JSL_STR_SET_DEF bool jsl_str_set_delete(
@@ -369,16 +532,83 @@ JSL_STR_SET_DEF bool jsl_str_set_delete(
     JSLFatPtr value
 )
 {
-    (void) set;
-    (void) value;
-    return false;
+    bool res = false;
+
+    bool params_valid = (
+        set != NULL
+        && set->sentinel == JSL__SET_PRIVATE_SENTINEL
+        && set->entry_lookup_table != NULL
+        && value.data != NULL
+        && value.length > -1
+    );
+
+    uint64_t hash = 0;
+    int64_t lut_index = -1;
+    bool existing_found = false;
+    if (params_valid)
+    {
+        jsl__str_set_probe(set, value, &lut_index, &hash, &existing_found);
+    }
+
+    if (existing_found && lut_index > -1)
+    {
+        struct JSL__StrSetEntry* entry =
+            (struct JSL__StrSetEntry*) set->entry_lookup_table[lut_index];
+
+        entry->next = set->entry_free_list;
+        set->entry_free_list = entry;
+
+        --set->item_count;
+        ++set->generational_id;
+
+        set->entry_lookup_table[lut_index] = JSL__HASHMAP_TOMBSTONE;
+        ++set->tombstone_count;
+
+        res = true;
+    }
+
+    return res;
 }
 
 JSL_STR_SET_DEF void jsl_str_set_clear(
     JSLStrSet* set
 )
 {
-    (void) set;
+    bool params_valid = (
+        set != NULL
+        && set->sentinel == JSL__SET_PRIVATE_SENTINEL
+        && set->entry_lookup_table != NULL
+    );
+
+    int64_t lut_length = params_valid ? set->entry_lookup_table_length : 0;
+    int64_t index = 0;
+
+    while (params_valid && index < lut_length)
+    {
+        uintptr_t lut_res = set->entry_lookup_table[index];
+
+        if (lut_res != JSL__HASHMAP_EMPTY && lut_res != JSL__HASHMAP_TOMBSTONE)
+        {
+            struct JSL__StrSetEntry* entry = (struct JSL__StrSetEntry*) lut_res;
+            entry->next = set->entry_free_list;
+            set->entry_free_list = entry;
+            set->entry_lookup_table[index] = JSL__HASHMAP_EMPTY;
+        }
+        else if (lut_res == JSL__HASHMAP_TOMBSTONE)
+        {
+            set->entry_lookup_table[index] = JSL__HASHMAP_EMPTY;
+        }
+
+        ++index;
+    }
+
+    if (params_valid)
+    {
+        set->item_count = 0;
+        set->tombstone_count = 0;
+        ++set->generational_id;
+    }
+
     return;
 }
 

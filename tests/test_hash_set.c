@@ -386,37 +386,37 @@ int main(void)
 {
     jsl_arena_init(&global_arena, malloc(arena_size), arena_size);
 
-    RUN_TEST_FUNCTION("init success", test_jsl_str_set_init_success);
+    RUN_TEST_FUNCTION("String set init success", test_jsl_str_set_init_success);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("init invalid args", test_jsl_str_set_init_invalid_arguments);
+    RUN_TEST_FUNCTION("String set init invalid args", test_jsl_str_set_init_invalid_arguments);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("insert and has", test_jsl_str_set_insert_and_has);
+    RUN_TEST_FUNCTION("String set insert and has", test_jsl_str_set_insert_and_has);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("lifetime rules", test_jsl_str_set_respects_lifetime_rules);
+    RUN_TEST_FUNCTION("String Set lifetime rules", test_jsl_str_set_respects_lifetime_rules);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("iterator covers all", test_jsl_str_set_iterator_covers_all_values);
+    RUN_TEST_FUNCTION("String Set iterator covers all", test_jsl_str_set_iterator_covers_all_values);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("iterator invalidation", test_jsl_str_set_iterator_invalidated_on_mutation);
+    RUN_TEST_FUNCTION("String Set iterator invalidation", test_jsl_str_set_iterator_invalidated_on_mutation);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("delete behavior", test_jsl_str_set_delete);
+    RUN_TEST_FUNCTION("String Set delete behavior", test_jsl_str_set_delete);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("clear behavior", test_jsl_str_set_clear);
+    RUN_TEST_FUNCTION("String Set clear behavior", test_jsl_str_set_clear);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("empty and binary values", test_jsl_str_set_handles_empty_and_binary_values);
+    RUN_TEST_FUNCTION("String Set empty and binary values", test_jsl_str_set_handles_empty_and_binary_values);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("rehash preserves entries", test_jsl_str_set_rehash_preserves_entries);
+    RUN_TEST_FUNCTION("String Set rehash preserves entries", test_jsl_str_set_rehash_preserves_entries);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("rejects invalid parameters", test_jsl_str_set_rejects_invalid_parameters);
+    RUN_TEST_FUNCTION("String Set rejects invalid parameters", test_jsl_str_set_rejects_invalid_parameters);
     jsl_arena_reset(&global_arena);
 
     TEST_RESULTS();
