@@ -324,7 +324,7 @@ JSL_STR_SET_DEF bool jsl_str_set_iterator_next(
  */
 JSL_STR_SET_DEF bool jsl_str_set_delete(
     JSLStrSet* set,
-    JSLFatPtr key
+    JSLFatPtr value
 );
 
 /**
