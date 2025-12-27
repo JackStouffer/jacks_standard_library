@@ -646,10 +646,13 @@ JSL_STR_SET_DEF bool jsl_str_set_union(
     );
 
     JSLStrSetKeyValueIter a_iterator = {0};
-    jsl_str_set_iterator_init(a, &a_iterator);
-
     JSLStrSetKeyValueIter b_iterator = {0};
-    jsl_str_set_iterator_init(b, &b_iterator);
+
+    if (params_valid)
+    {
+        jsl_str_set_iterator_init(a, &a_iterator);
+        jsl_str_set_iterator_init(b, &b_iterator);
+    }
 
     bool success = true;
     JSLFatPtr out_value = {0};
@@ -662,7 +665,7 @@ JSL_STR_SET_DEF bool jsl_str_set_union(
         }
     }
 
-    if (success)
+    if (params_valid && success)
     {
         while (jsl_str_set_iterator_next(&b_iterator, &out_value))
         {
@@ -671,6 +674,42 @@ JSL_STR_SET_DEF bool jsl_str_set_union(
                 success = false;
                 break;
             }
+        }
+    }
+
+    return params_valid && success;
+}
+
+JSL_STR_SET_DEF bool jsl_str_set_difference(
+    JSLStrSet* a,
+    JSLStrSet* b,
+    JSLStrSet* out
+)
+{
+    bool params_valid = (
+        a != NULL
+        && b != NULL
+        && out != NULL
+        && a->sentinel == JSL__SET_PRIVATE_SENTINEL
+        && a->entry_lookup_table != NULL
+        && b->sentinel == JSL__SET_PRIVATE_SENTINEL
+        && b->entry_lookup_table != NULL
+        && out->sentinel == JSL__SET_PRIVATE_SENTINEL
+        && out->entry_lookup_table != NULL
+    );
+
+    JSLStrSetKeyValueIter iterator = {0};
+    jsl_str_set_iterator_init(a, &iterator);
+
+    bool success = true;
+    JSLFatPtr out_value = {0};
+    while (jsl_str_set_iterator_next(&iterator, &out_value))
+    {
+        bool do_insert = jsl_str_set_has(b, out_value) == false;
+        if (do_insert && !jsl_str_set_insert(out, out_value, JSL_STRING_LIFETIME_TRANSIENT))
+        {
+            success = false;
+            break;
         }
     }
 

@@ -42,6 +42,20 @@ typedef struct ExpectedValue {
     bool seen;
 } ExpectedValue;
 
+static bool insert_values(JSLStrSet* set, const char** values, size_t count)
+{
+    for (size_t i = 0; i < count; i++)
+    {
+        JSLFatPtr value = jsl_fatptr_from_cstr(values[i]);
+        if (!jsl_str_set_insert(set, value, JSL_STRING_LIFETIME_STATIC))
+        {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 static void test_jsl_str_set_init_success(void)
 {
     JSLStrSet set = {0};
@@ -322,6 +336,228 @@ static void test_jsl_str_set_handles_empty_and_binary_values(void)
     }
 }
 
+static void test_jsl_str_set_intersection_basic(void)
+{
+    JSLStrSet a = {0};
+    JSLStrSet b = {0};
+    JSLStrSet out = {0};
+    bool ok = (
+        jsl_str_set_init2(&a, &global_arena, 101, 8, 0.75f)
+        && jsl_str_set_init2(&b, &global_arena, 202, 8, 0.75f)
+        && jsl_str_set_init2(&out, &global_arena, 303, 4, 0.75f)
+    );
+    TEST_BOOL(ok);
+    if (!ok) return;
+
+    const char* a_values[] = {"alpha", "beta", "common-one", "common-two"};
+    const char* b_values[] = {"common-two", "gamma", "common-one"};
+
+    TEST_BOOL(insert_values(&a, a_values, sizeof(a_values) / sizeof(a_values[0])));
+    TEST_BOOL(insert_values(&b, b_values, sizeof(b_values) / sizeof(b_values[0])));
+
+    TEST_BOOL(jsl_str_set_intersection(&a, &b, &out));
+    TEST_INT64_EQUAL(jsl_str_set_item_count(&out), (int64_t) 2);
+    TEST_BOOL(jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("common-one")));
+    TEST_BOOL(jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("common-two")));
+    TEST_BOOL(!jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("alpha")));
+    TEST_BOOL(!jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("beta")));
+    TEST_BOOL(!jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("gamma")));
+}
+
+static void test_jsl_str_set_intersection_with_empty_sets(void)
+{
+    JSLStrSet filled = {0};
+    JSLStrSet empty = {0};
+    JSLStrSet out_one = {0};
+    JSLStrSet out_two = {0};
+    bool ok = (
+        jsl_str_set_init(&filled, &global_arena, 404)
+        && jsl_str_set_init(&empty, &global_arena, 505)
+        && jsl_str_set_init(&out_one, &global_arena, 606)
+        && jsl_str_set_init(&out_two, &global_arena, 707)
+    );
+    TEST_BOOL(ok);
+    if (!ok) return;
+
+    const char* values[] = {"lonely", "spare"};
+    TEST_BOOL(insert_values(&filled, values, sizeof(values) / sizeof(values[0])));
+
+    TEST_BOOL(jsl_str_set_intersection(&filled, &empty, &out_one));
+    TEST_INT64_EQUAL(jsl_str_set_item_count(&out_one), (int64_t) 0);
+
+    TEST_BOOL(jsl_str_set_intersection(&empty, &filled, &out_two));
+    TEST_INT64_EQUAL(jsl_str_set_item_count(&out_two), (int64_t) 0);
+}
+
+static void test_jsl_str_set_union_collects_all_unique_values(void)
+{
+    JSLStrSet a = {0};
+    JSLStrSet b = {0};
+    JSLStrSet out = {0};
+    bool ok = (
+        jsl_str_set_init2(&a, &global_arena, 808, 6, 0.6f)
+        && jsl_str_set_init2(&b, &global_arena, 909, 6, 0.6f)
+        && jsl_str_set_init2(&out, &global_arena, 1001, 12, 0.75f)
+    );
+    TEST_BOOL(ok);
+    if (!ok) return;
+
+    const char* a_values[] = {"alpha", "beta", "shared", "shared-two"};
+    const char* b_values[] = {"shared", "gamma", "shared-two", "delta"};
+
+    TEST_BOOL(insert_values(&a, a_values, sizeof(a_values) / sizeof(a_values[0])));
+    TEST_BOOL(insert_values(&b, b_values, sizeof(b_values) / sizeof(b_values[0])));
+
+    TEST_BOOL(jsl_str_set_union(&a, &b, &out));
+    TEST_INT64_EQUAL(jsl_str_set_item_count(&out), (int64_t) 6);
+
+    TEST_BOOL(jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("alpha")));
+    TEST_BOOL(jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("beta")));
+    TEST_BOOL(jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("shared")));
+    TEST_BOOL(jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("shared-two")));
+    TEST_BOOL(jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("gamma")));
+    TEST_BOOL(jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("delta")));
+}
+
+static void test_jsl_str_set_union_with_empty_sets(void)
+{
+    JSLStrSet filled = {0};
+    JSLStrSet empty = {0};
+    JSLStrSet out_one = {0};
+    JSLStrSet out_two = {0};
+    JSLStrSet out_three = {0};
+
+    bool ok = (
+        jsl_str_set_init(&filled, &global_arena, 1111)
+        && jsl_str_set_init(&empty, &global_arena, 1222)
+        && jsl_str_set_init(&out_one, &global_arena, 1333)
+        && jsl_str_set_init(&out_two, &global_arena, 1444)
+        && jsl_str_set_init(&out_three, &global_arena, 1555)
+    );
+    TEST_BOOL(ok);
+    if (!ok) return;
+
+    const char* values[] = {"solo", "duo"};
+    TEST_BOOL(insert_values(&filled, values, sizeof(values) / sizeof(values[0])));
+
+    TEST_BOOL(jsl_str_set_union(&filled, &empty, &out_one));
+    TEST_INT64_EQUAL(jsl_str_set_item_count(&out_one), (int64_t) 2);
+    TEST_BOOL(jsl_str_set_has(&out_one, JSL_FATPTR_EXPRESSION("solo")));
+    TEST_BOOL(jsl_str_set_has(&out_one, JSL_FATPTR_EXPRESSION("duo")));
+
+    TEST_BOOL(jsl_str_set_union(&empty, &filled, &out_two));
+    TEST_INT64_EQUAL(jsl_str_set_item_count(&out_two), (int64_t) 2);
+    TEST_BOOL(jsl_str_set_has(&out_two, JSL_FATPTR_EXPRESSION("solo")));
+    TEST_BOOL(jsl_str_set_has(&out_two, JSL_FATPTR_EXPRESSION("duo")));
+
+    TEST_BOOL(jsl_str_set_union(&empty, &empty, &out_three));
+    TEST_INT64_EQUAL(jsl_str_set_item_count(&out_three), (int64_t) 0);
+}
+
+static void test_jsl_str_set_difference_basic(void)
+{
+    JSLStrSet a = {0};
+    JSLStrSet b = {0};
+    JSLStrSet out = {0};
+    bool ok = (
+        jsl_str_set_init2(&a, &global_arena, 1666, 6, 0.6f)
+        && jsl_str_set_init2(&b, &global_arena, 1777, 6, 0.6f)
+        && jsl_str_set_init2(&out, &global_arena, 1888, 6, 0.6f)
+    );
+    TEST_BOOL(ok);
+    if (!ok) return;
+
+    const char* a_values[] = {"keep-one", "keep-two", "drop-me", "shared"};
+    const char* b_values[] = {"drop-me", "shared", "other"};
+
+    TEST_BOOL(insert_values(&a, a_values, sizeof(a_values) / sizeof(a_values[0])));
+    TEST_BOOL(insert_values(&b, b_values, sizeof(b_values) / sizeof(b_values[0])));
+
+    TEST_BOOL(jsl_str_set_difference(&a, &b, &out));
+    TEST_INT64_EQUAL(jsl_str_set_item_count(&out), (int64_t) 2);
+    TEST_BOOL(jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("keep-one")));
+    TEST_BOOL(jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("keep-two")));
+    TEST_BOOL(!jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("drop-me")));
+    TEST_BOOL(!jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("shared")));
+    TEST_BOOL(!jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("other")));
+}
+
+static void test_jsl_str_set_difference_with_empty_sets(void)
+{
+    JSLStrSet filled = {0};
+    JSLStrSet empty = {0};
+    JSLStrSet superset = {0};
+    JSLStrSet out_one = {0};
+    JSLStrSet out_two = {0};
+    JSLStrSet out_three = {0};
+    bool ok = (
+        jsl_str_set_init2(&filled, &global_arena, 1999, 4, 0.5f)
+        && jsl_str_set_init2(&empty, &global_arena, 2110, 4, 0.5f)
+        && jsl_str_set_init2(&superset, &global_arena, 2221, 6, 0.75f)
+        && jsl_str_set_init2(&out_one, &global_arena, 2332, 4, 0.5f)
+        && jsl_str_set_init2(&out_two, &global_arena, 2443, 4, 0.5f)
+        && jsl_str_set_init2(&out_three, &global_arena, 2554, 6, 0.75f)
+    );
+    TEST_BOOL(ok);
+    if (!ok) return;
+
+    const char* base_values[] = {"a", "b"};
+    const char* superset_values[] = {"a", "b", "c"};
+
+    TEST_BOOL(insert_values(&filled, base_values, sizeof(base_values) / sizeof(base_values[0])));
+    TEST_BOOL(insert_values(&superset, superset_values, sizeof(superset_values) / sizeof(superset_values[0])));
+
+    TEST_BOOL(jsl_str_set_difference(&filled, &empty, &out_one));
+    TEST_INT64_EQUAL(jsl_str_set_item_count(&out_one), (int64_t) 2);
+    TEST_BOOL(jsl_str_set_has(&out_one, JSL_FATPTR_EXPRESSION("a")));
+    TEST_BOOL(jsl_str_set_has(&out_one, JSL_FATPTR_EXPRESSION("b")));
+
+    TEST_BOOL(jsl_str_set_difference(&empty, &filled, &out_two));
+    TEST_INT64_EQUAL(jsl_str_set_item_count(&out_two), (int64_t) 0);
+
+    TEST_BOOL(jsl_str_set_difference(&filled, &superset, &out_three));
+    TEST_INT64_EQUAL(jsl_str_set_item_count(&out_three), (int64_t) 0);
+}
+
+static void test_jsl_str_set_set_operations_invalid_parameters(void)
+{
+    JSLStrSet a = {0};
+    JSLStrSet b = {0};
+    JSLStrSet out = {0};
+    bool ok = (
+        jsl_str_set_init(&a, &global_arena, 3000)
+        && jsl_str_set_init(&b, &global_arena, 4000)
+        && jsl_str_set_init(&out, &global_arena, 5000)
+    );
+    TEST_BOOL(ok);
+    if (!ok) return;
+
+    JSLStrSet uninitialized = {0};
+
+    TEST_BOOL(!jsl_str_set_intersection(NULL, &b, &out));
+    TEST_BOOL(!jsl_str_set_intersection(&a, NULL, &out));
+    TEST_BOOL(!jsl_str_set_intersection(&a, &b, NULL));
+    TEST_BOOL(!jsl_str_set_intersection(&uninitialized, &b, &out));
+    TEST_BOOL(!jsl_str_set_intersection(&a, &uninitialized, &out));
+    TEST_BOOL(!jsl_str_set_intersection(&a, &b, &uninitialized));
+
+    TEST_BOOL(!jsl_str_set_union(NULL, &b, &out));
+    TEST_BOOL(!jsl_str_set_union(&a, NULL, &out));
+    TEST_BOOL(!jsl_str_set_union(&a, &b, NULL));
+    TEST_BOOL(!jsl_str_set_union(&uninitialized, &b, &out));
+    TEST_BOOL(!jsl_str_set_union(&a, &uninitialized, &out));
+    TEST_BOOL(!jsl_str_set_union(&a, &b, &uninitialized));
+
+    TEST_BOOL(!jsl_str_set_difference(NULL, &b, &out));
+    TEST_BOOL(!jsl_str_set_difference(&a, NULL, &out));
+    TEST_BOOL(!jsl_str_set_difference(&a, &b, NULL));
+    TEST_BOOL(!jsl_str_set_difference(&uninitialized, &b, &out));
+    TEST_BOOL(!jsl_str_set_difference(&a, &uninitialized, &out));
+    TEST_BOOL(!jsl_str_set_difference(&a, &b, &uninitialized));
+
+    TEST_INT64_EQUAL(jsl_str_set_item_count(&out), (int64_t) 0);
+}
+
 static void test_jsl_str_set_rehash_preserves_entries(void)
 {
     JSLStrSet set = {0};
@@ -411,6 +647,27 @@ int main(void)
     jsl_arena_reset(&global_arena);
 
     RUN_TEST_FUNCTION("String Set empty and binary values", test_jsl_str_set_handles_empty_and_binary_values);
+    jsl_arena_reset(&global_arena);
+
+    RUN_TEST_FUNCTION("String Set intersection basic cases", test_jsl_str_set_intersection_basic);
+    jsl_arena_reset(&global_arena);
+
+    RUN_TEST_FUNCTION("String Set intersection empty sets", test_jsl_str_set_intersection_with_empty_sets);
+    jsl_arena_reset(&global_arena);
+
+    RUN_TEST_FUNCTION("String Set union collects uniques", test_jsl_str_set_union_collects_all_unique_values);
+    jsl_arena_reset(&global_arena);
+
+    RUN_TEST_FUNCTION("String Set union with empty sets", test_jsl_str_set_union_with_empty_sets);
+    jsl_arena_reset(&global_arena);
+
+    RUN_TEST_FUNCTION("String Set difference basic cases", test_jsl_str_set_difference_basic);
+    jsl_arena_reset(&global_arena);
+
+    RUN_TEST_FUNCTION("String Set difference with empty sets", test_jsl_str_set_difference_with_empty_sets);
+    jsl_arena_reset(&global_arena);
+
+    RUN_TEST_FUNCTION("String Set operations invalid parameters", test_jsl_str_set_set_operations_invalid_parameters);
     jsl_arena_reset(&global_arena);
 
     RUN_TEST_FUNCTION("String Set rehash preserves entries", test_jsl_str_set_rehash_preserves_entries);
