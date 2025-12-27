@@ -336,6 +336,21 @@ JSL_STR_SET_DEF void jsl_str_set_clear(
     JSLStrSet* set
 );
 
+/**
+ * Fill a set `out` with all of the values which are present in both sets `a` and `b`.
+ * All of the values inserted into out are copied with `JSL_STRING_LIFETIME_TRANSIENT`.
+ * 
+ * @param a A string set
+ * @param b A string set
+ * @param out The string set to fill
+ * @returns if all of the values present in both sets were successfully added to `out`
+ */
+JSL_STR_SET_DEF bool jsl_str_set_intersection(
+    JSLStrSet* a,
+    JSLStrSet* b,
+    JSLStrSet* out
+);
+
 #ifdef __cplusplus
 }
 #endif

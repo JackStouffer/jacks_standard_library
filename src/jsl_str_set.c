@@ -305,6 +305,10 @@ static JSL__FORCE_INLINE bool jsl__str_set_add(
     struct JSL__StrSetEntry* entry = NULL;
     bool replacing_tombstone = set->entry_lookup_table[lut_index] == JSL__HASHMAP_TOMBSTONE;
 
+    // 
+    // Allocate a new entry or copy one from the free list
+    // 
+
     if (set->entry_free_list == NULL)
     {
         entry = JSL_ARENA_TYPED_ALLOCATE(struct JSL__StrSetEntry, set->arena);
@@ -359,38 +363,6 @@ static JSL__FORCE_INLINE bool jsl__str_set_add(
     return entry != NULL;
 }
 
-static JSL__FORCE_INLINE void jsl__str_set_update_value(
-    JSLStrSet* set,
-    JSLFatPtr value,
-    JSLStringLifeTime value_lifetime,
-    int64_t lut_index
-)
-{
-    uintptr_t lut_res = set->entry_lookup_table[lut_index];
-    struct JSL__StrSetEntry* entry = (struct JSL__StrSetEntry*) lut_res;
-
-    if (value_lifetime == JSL_STRING_LIFETIME_STATIC)
-    {
-        entry->value = value;
-    }
-    else if (
-        value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
-        && value.length <= JSL__SET_SSO_LENGTH
-    )
-    {
-        JSL_MEMCPY(entry->value_sso_buffer, value.data, (size_t) value.length);
-        entry->value.data = entry->value_sso_buffer;
-        entry->value.length = value.length;
-    }
-    else if (
-        value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
-        && value.length > JSL__SET_SSO_LENGTH
-    )
-    {
-        entry->value = jsl_fatptr_duplicate(set->arena, value);
-    }
-}
-
 JSL_STR_SET_DEF bool jsl_str_set_insert(
     JSLStrSet* set,
     JSLFatPtr value,
@@ -435,11 +407,6 @@ JSL_STR_SET_DEF bool jsl_str_set_insert(
             lut_index,
             hash
         );
-    }
-    // update
-    else if (lut_index > -1 && existing_found)
-    {
-        jsl__str_set_update_value(set, value, value_lifetime, lut_index);
     }
 
     if (res)
@@ -610,6 +577,54 @@ JSL_STR_SET_DEF void jsl_str_set_clear(
     }
 
     return;
+}
+
+JSL_STR_SET_DEF bool jsl_str_set_intersection(
+    JSLStrSet* a,
+    JSLStrSet* b,
+    JSLStrSet* out
+)
+{
+    bool params_valid = (
+        a != NULL
+        && b != NULL
+        && out != NULL
+        && a->sentinel == JSL__SET_PRIVATE_SENTINEL
+        && a->entry_lookup_table != NULL
+        && b->sentinel == JSL__SET_PRIVATE_SENTINEL
+        && b->entry_lookup_table != NULL
+        && out->sentinel == JSL__SET_PRIVATE_SENTINEL
+        && out->entry_lookup_table != NULL
+    );
+
+    JSLStrSet* smaller = NULL;
+    JSLStrSet* larger = NULL;
+
+    if (params_valid)
+    {
+        smaller = a->item_count <= b->item_count ? a : b;
+        larger = a->item_count > b->item_count ? a : b;
+    }
+
+    JSLStrSetKeyValueIter iterator = {0};
+    bool valid_iterator = false;
+    if (smaller != NULL && larger != NULL)
+    {
+        jsl_str_set_iterator_init(smaller, &iterator);
+    }
+
+    bool success = true;
+    JSLFatPtr out_value = {0};
+    while (jsl_str_set_iterator_next(&iterator, &out_value))
+    {
+        if (jsl_str_set_has(larger, out_value) && !jsl_str_set_insert(larger, out_value, JSL_STRING_LIFETIME_TRANSIENT))
+        {
+            success = false;
+            break;
+        }
+    }
+
+    return success;
 }
 
 #undef JSL__SET_PRIVATE_SENTINEL
