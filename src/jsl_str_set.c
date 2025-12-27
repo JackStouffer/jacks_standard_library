@@ -34,16 +34,13 @@ JSL_STR_SET_DEF bool jsl_str_set_init2(
     float load_factor
 )
 {
-    bool res = true;
-
-    if (
-        set == NULL
-        || arena == NULL
-        || item_count_guess <= 0
-        || load_factor <= 0.0f
-        || load_factor >= 1.0f
-    )
-        res = false;
+    bool res = (
+        set != NULL
+        && arena != NULL
+        && item_count_guess > 0
+        && load_factor > 0.0f
+        && load_factor < 1.0f
+    );
 
     if (res)
     {
@@ -74,17 +71,91 @@ JSL_STR_SET_DEF int64_t jsl_str_set_item_count(
     JSLStrSet* set
 )
 {
-    int64_t res = -1;
+    return set != NULL && set->sentinel == JSL__SET_PRIVATE_SENTINEL
+        ? set->item_count
+        : -1;
+}
 
-    if (
-        set != NULL
-        && set->sentinel == JSL__SET_PRIVATE_SENTINEL
-    )
+static inline void jsl__str_set_probe(
+    JSLStrSet* map,
+    JSLFatPtr value,
+    int64_t* out_lut_index,
+    uint64_t* out_hash,
+    bool* out_found
+)
+{
+    *out_lut_index = -1;
+    *out_found = false;
+
+    int64_t first_tombstone = -1;
+    bool tombstone_seen = false;
+    bool searching = true;
+
+    *out_hash = jsl__rapidhash_withSeed(value.data, (size_t) value.length, map->hash_seed);
+
+    int64_t lut_length = map->entry_lookup_table_length;
+    uint64_t lut_mask = (uint64_t) lut_length - 1u;
+    int64_t lut_index = (int64_t) (*out_hash & lut_mask);
+    int64_t num_probes = 0;
+
+    while (num_probes < lut_length)
     {
-        res = set->item_count;
+        uintptr_t lut_res = map->entry_lookup_table[lut_index];
+
+        bool is_empty = lut_res == JSL__HASHMAP_EMPTY;
+        bool is_tombstone = lut_res == JSL__HASHMAP_TOMBSTONE;
+
+        if (is_empty)
+        {
+            *out_lut_index = tombstone_seen ? first_tombstone : lut_index;
+            break;
+        }
+
+        if (is_tombstone && !tombstone_seen)
+        {
+            first_tombstone = lut_index;
+            tombstone_seen = true;
+        }
+
+        bool slot_has_entry = !is_empty && !is_tombstone;
+        struct JSL__StrSetEntry* entry = slot_has_entry
+            ? (struct JSL__StrSetEntry*) lut_res
+            : NULL;
+
+        bool matches = entry != NULL
+            && *out_hash == entry->hash
+            && jsl_fatptr_memory_compare(value, entry->value);
+
+        if (matches)
+        {
+            *out_found = true;
+            *out_lut_index = lut_index;
+            break;
+        }
+
+        if (entry == NULL)
+        {
+            map->entry_lookup_table[lut_index] = JSL__HASHMAP_TOMBSTONE;
+            ++map->tombstone_count;
+        }
+
+        if (entry == NULL && !tombstone_seen)
+        {
+            first_tombstone = lut_index;
+            tombstone_seen = true;
+        }
+
+        if (searching)
+        {
+            lut_index = (int64_t) (((uint64_t) lut_index + 1u) & lut_mask);
+            ++num_probes;
+        }
     }
 
-    return res;
+    if (num_probes >= lut_length)
+    {
+        *out_lut_index = tombstone_seen ? first_tombstone : -1;
+    }
 }
 
 JSL_STR_SET_DEF bool jsl_str_set_has(
@@ -92,10 +163,24 @@ JSL_STR_SET_DEF bool jsl_str_set_has(
     JSLFatPtr value
 )
 {
+    uint64_t hash = 0;
+    int64_t lut_index = -1;
+    bool existing_found = false;
 
+    if (
+        set != NULL
+        && set->sentinel == JSL__SET_PRIVATE_SENTINEL
+        && value.data != NULL
+        && value.length > -1
+    )
+    {
+        jsl__str_set_probe(set, value, &lut_index, &hash, &existing_found);
+    }
+
+    return lut_index > -1 && existing_found;
 }
 
-static JSL__FORCE_INLINE bool jsl__str_to_str_map_add(
+static JSL__FORCE_INLINE bool jsl__str_set_add(
     JSLStrSet* map,
     JSLFatPtr value,
     JSLStringLifeTime value_lifetime,
@@ -103,16 +188,16 @@ static JSL__FORCE_INLINE bool jsl__str_to_str_map_add(
     uint64_t hash
 )
 {
-    struct JSL__StrToStrMapEntry* entry = NULL;
+    struct JSL__StrSetEntry* entry = NULL;
     bool replacing_tombstone = map->entry_lookup_table[lut_index] == JSL__HASHMAP_TOMBSTONE;
 
     if (map->entry_free_list == NULL)
     {
-        entry = JSL_ARENA_TYPED_ALLOCATE(struct JSL__StrToStrMapEntry, map->arena);
+        entry = JSL_ARENA_TYPED_ALLOCATE(struct JSL__StrSetEntry, map->arena);
     }
     else
     {
-        struct JSL__StrToStrMapEntry* next = map->entry_free_list->next;
+        struct JSL__StrSetEntry* next = map->entry_free_list->next;
         entry = map->entry_free_list;
         map->entry_free_list = next;
     }
@@ -141,7 +226,7 @@ static JSL__FORCE_INLINE bool jsl__str_to_str_map_add(
     else if (
         entry != NULL
         && value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
-        && value.length <= JSL__MAP_SSO_LENGTH
+        && value.length <= JSL__SET_SSO_LENGTH
     )
     {
         JSL_MEMCPY(entry->value_sso_buffer, value.data, (size_t) value.length);
@@ -151,13 +236,45 @@ static JSL__FORCE_INLINE bool jsl__str_to_str_map_add(
     else if (
         entry != NULL
         && value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
-        && value.length > JSL__MAP_SSO_LENGTH
+        && value.length > JSL__SET_SSO_LENGTH
     )
     {
         entry->value = jsl_fatptr_duplicate(map->arena, value);
     }
 
     return entry != NULL;
+}
+
+static JSL__FORCE_INLINE void jsl__str_set_update_value(
+    JSLStrSet* map,
+    JSLFatPtr value,
+    JSLStringLifeTime value_lifetime,
+    int64_t lut_index
+)
+{
+    uintptr_t lut_res = map->entry_lookup_table[lut_index];
+    struct JSL__StrSetEntry* entry = (struct JSL__StrSetEntry*) lut_res;
+
+    if (value_lifetime == JSL_STRING_LIFETIME_STATIC)
+    {
+        entry->value = value;
+    }
+    else if (
+        value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+        && value.length <= JSL__SET_SSO_LENGTH
+    )
+    {
+        JSL_MEMCPY(entry->value_sso_buffer, value.data, (size_t) value.length);
+        entry->value.data = entry->value_sso_buffer;
+        entry->value.length = value.length;
+    }
+    else if (
+        value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+        && value.length > JSL__SET_SSO_LENGTH
+    )
+    {
+        entry->value = jsl_fatptr_duplicate(map->arena, value);
+    }
 }
 
 JSL_STR_SET_DEF bool jsl_str_set_insert(
@@ -198,9 +315,8 @@ JSL_STR_SET_DEF bool jsl_str_set_insert(
     // new key
     if (lut_index > -1 && !existing_found)
     {
-        res = jsl__str_to_str_map_add(
-            map,
-            key, key_lifetime,
+        res = jsl__str_set_add(
+            set,
             value, value_lifetime,
             lut_index,
             hash
