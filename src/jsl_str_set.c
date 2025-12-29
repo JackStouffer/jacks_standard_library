@@ -607,20 +607,15 @@ JSL_STR_SET_DEF bool jsl_str_set_intersection(
     }
 
     JSLStrSetKeyValueIter iterator = {0};
-    bool valid_iterator = false;
-    if (smaller != NULL && larger != NULL)
-    {
-        jsl_str_set_iterator_init(smaller, &iterator);
-    }
+    jsl_str_set_iterator_init(smaller, &iterator);
 
-    bool success = true;
+    bool success = params_valid;
     JSLFatPtr out_value = {0};
-    while (jsl_str_set_iterator_next(&iterator, &out_value))
+    while (success && jsl_str_set_iterator_next(&iterator, &out_value))
     {
         if (jsl_str_set_has(larger, out_value) && !jsl_str_set_insert(out, out_value, JSL_STRING_LIFETIME_TRANSIENT))
         {
             success = false;
-            break;
         }
     }
 
@@ -654,26 +649,21 @@ JSL_STR_SET_DEF bool jsl_str_set_union(
         jsl_str_set_iterator_init(b, &b_iterator);
     }
 
-    bool success = true;
+    bool success = params_valid;
     JSLFatPtr out_value = {0};
-    while (jsl_str_set_iterator_next(&a_iterator, &out_value))
+    while (success && jsl_str_set_iterator_next(&a_iterator, &out_value))
     {
         if (!jsl_str_set_insert(out, out_value, JSL_STRING_LIFETIME_TRANSIENT))
         {
             success = false;
-            break;
         }
     }
 
-    if (params_valid && success)
+    while (success && jsl_str_set_iterator_next(&b_iterator, &out_value))
     {
-        while (jsl_str_set_iterator_next(&b_iterator, &out_value))
+        if (!jsl_str_set_insert(out, out_value, JSL_STRING_LIFETIME_TRANSIENT))
         {
-            if (!jsl_str_set_insert(out, out_value, JSL_STRING_LIFETIME_TRANSIENT))
-            {
-                success = false;
-                break;
-            }
+            success = false;
         }
     }
 
@@ -699,17 +689,20 @@ JSL_STR_SET_DEF bool jsl_str_set_difference(
     );
 
     JSLStrSetKeyValueIter iterator = {0};
-    jsl_str_set_iterator_init(a, &iterator);
 
-    bool success = true;
+    if (params_valid)
+    {
+        jsl_str_set_iterator_init(a, &iterator);
+    }
+
+    bool success = params_valid;
     JSLFatPtr out_value = {0};
-    while (jsl_str_set_iterator_next(&iterator, &out_value))
+    while (success && jsl_str_set_iterator_next(&iterator, &out_value))
     {
         bool do_insert = jsl_str_set_has(b, out_value) == false;
         if (do_insert && !jsl_str_set_insert(out, out_value, JSL_STRING_LIFETIME_TRANSIENT))
         {
             success = false;
-            break;
         }
     }
 
