@@ -10,6 +10,7 @@
 #endif
 
 #include "jsl_cmd_line.h"
+#include "jsl_str_set.h"
 #include "jsl_str_to_str_map.h"
 #include "jsl_str_to_str_multimap.h"
 
@@ -328,7 +329,7 @@ static void jsl__cmd_line_reset(JSLCmdLine* cmd_line)
         cmd_line->arg_list_index = 0;
 
         jsl_str_to_str_map_clear(&cmd_line->long_flags);
-        jsl_str_to_str_map_clear(&cmd_line->commands);
+        jsl_str_set_clear(&cmd_line->commands);
         jsl_str_to_str_multimap_clear(&cmd_line->flags_with_values);
     }
 }
@@ -434,11 +435,9 @@ static bool jsl__cmd_line_add_command(
     }
 
     bool inserted = params_valid
-        && jsl_str_to_str_map_insert(
+        && jsl_str_set_insert(
             &cmd_line->commands,
             command,
-            JSL_STRING_LIFETIME_STATIC,
-            JSL__CMD_LINE_EMPTY_VALUE,
             JSL_STRING_LIFETIME_STATIC
         );
 
@@ -1152,7 +1151,7 @@ bool jsl_cmd_line_init(JSLCmdLine* cmd_line, JSLArena* arena)
 
         bool long_init = jsl_str_to_str_map_init(&cmd_line->long_flags, arena, 0);
         bool multimap_init = jsl_str_to_str_multimap_init(&cmd_line->flags_with_values, arena, 0);
-        bool commands_init = jsl_str_to_str_map_init(&cmd_line->commands, arena, 0);
+        bool commands_init = jsl_str_set_init(&cmd_line->commands, arena, 0);
 
         if (long_init && multimap_init && commands_init)
         {
@@ -1230,7 +1229,7 @@ bool jsl_cmd_line_has_command(JSLCmdLine* cmd_line, JSLFatPtr flag)
 
     if (params_valid)
     {
-        res = jsl_str_to_str_map_has_key(&cmd_line->commands, flag);
+        res = jsl_str_set_has(&cmd_line->commands, flag);
     }
 
     return res;

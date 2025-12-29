@@ -35,6 +35,7 @@
 
 #include "jsl_core.h"
 #include "jsl_cmd_line.h"
+#include "jsl_str_set.h"
 #include "jsl_str_to_str_map.h"
 #include "jsl_str_to_str_multimap.h"
 
@@ -53,7 +54,7 @@ struct JSL__CmdLine {
 
     JSLStrToStrMap long_flags;
     JSLStrToStrMultimap flags_with_values;
-    JSLStrToStrMap commands;
+    JSLStrSet commands;
 
     JSLFatPtr* arg_list;
     int64_t arg_list_length;
