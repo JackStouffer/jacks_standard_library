@@ -1005,6 +1005,27 @@ static JSL__FORCE_INLINE JSL__UNUSED int32_t jsl__find_first_set_u64(uint64_t x)
  * so:
  *
  * ```
+ * jsl_next_power_of_two_i32(
+ *      JSL_BETWEEN(2, x, 0x8000000u)
+ * );
+ * ```
+ *
+ * @param x The value to round up
+ * @returns the next power of two
+ */
+int32_t jsl_next_power_of_two_i32(int32_t x);
+
+/**
+ * Round x up to the next power of two. If x is a power of two it returns
+ * the same value.
+ *
+ * This function is designed to be used in tight loops and other performance
+ * critical areas. Therefore, both zero, one, and values greater than 2^31 not special
+ * cased. The return values for these cases are compiler, OS, and ISA specific.
+ * If you need consistent behavior, then you can easily call this function like
+ * so:
+ *
+ * ```
  * jsl_next_power_of_two_u32(
  *      JSL_BETWEEN(2u, x, 0x80000000u)
  * );
@@ -1078,6 +1099,70 @@ uint32_t jsl_previous_power_of_two_u32(uint32_t x);
  * @returns the next power of two
  */
 uint64_t jsl_previous_power_of_two_u64(uint64_t x);
+
+/**
+ * Round num up to the nearest multiple of multiple_of.
+ *
+ * @param num The value to round
+ * @param multiple_of A power-of-two multiple to round to
+ * @returns num rounded up to the given multiple
+ */
+int32_t jsl_round_up_i32(int32_t num, int32_t multiple_of);
+
+/**
+ * Round num up to the nearest multiple of multiple_of.
+ *
+ * @param num The value to round
+ * @param multiple_of A power-of-two multiple to round to
+ * @returns num rounded up to the given multiple
+ */
+uint32_t jsl_round_up_u32(uint32_t num, uint32_t multiple_of);
+
+/**
+ * Round num up to the nearest multiple of multiple_of.
+ *
+ * @param num The value to round
+ * @param multiple_of A power-of-two multiple to round to
+ * @returns num rounded up to the given multiple
+ */
+int64_t jsl_round_up_i64(int64_t num, int64_t multiple_of);
+
+/**
+ * Round num up to the nearest multiple of multiple_of.
+ *
+ * @param num The value to round
+ * @param multiple_of A power-of-two multiple to round to
+ * @returns num rounded up to the given multiple
+ */
+uint64_t jsl_round_up_u64(uint64_t num, uint64_t multiple_of);
+
+/**
+ * Round num up to the nearest multiple of multiple_of assuming multiple_of is
+ * a power of two.
+ *
+ * This function is optimized for speed and does not validate its arguments.
+ * Passing a non-power-of-two, zero, negative value, or values that would
+ * overflow will result in undefined behavior.
+ *
+ * @param num The value to round
+ * @param multiple_of A power-of-two multiple to round to
+ * @returns num rounded up to the given multiple
+ */
+int64_t jsl_round_up_pow2_i64(int64_t num, int64_t pow2);
+
+/**
+ * Round num up to the nearest multiple of multiple_of assuming multiple_of is
+ * a power of two.
+ *
+ * This function is optimized for speed and does not validate its arguments.
+ * Passing a non-power-of-two, zero, negative value, or values that would
+ * overflow will result in undefined behavior.
+ *
+ * @param num The value to round
+ * @param multiple_of A power-of-two multiple to round to
+ * @returns num rounded up to the given multiple
+ */
+uint64_t jsl_round_up_pow2_u64(uint64_t num, uint64_t pow2);
 
 /**
  * A fat pointer is a representation of a chunk of memory. It **is not** a container

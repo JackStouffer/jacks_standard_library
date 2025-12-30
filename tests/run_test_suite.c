@@ -317,6 +317,7 @@ static UnitTestDecl unit_test_declarations[] = {
     { "test_cmd_line", (char*[]) {
         "tests/test_cmd_line.c",
         "src/jsl_core.c",
+        "src/jsl_str_set.c",
         "src/jsl_str_to_str_map.c",
         "src/jsl_str_to_str_multimap.c",
         "src/jsl_cmd_line.c",

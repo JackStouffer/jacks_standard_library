@@ -81,6 +81,26 @@
     }
 #endif
 
+int32_t jsl_next_power_of_two_i32(int32_t x)
+{
+    #if JSL_IS_CLANG || JSL_IS_GCC
+
+        return 1 << (32 - (int32_t) JSL_PLATFORM_COUNT_LEADING_ZEROS(x - 1));
+
+    #else
+
+        x--;
+        x |= x >> 1;
+        x |= x >> 2;
+        x |= x >> 4;
+        x |= x >> 8;
+        x |= x >> 16;
+        x++;
+        return x;
+
+    #endif
+}
+
 uint32_t jsl_next_power_of_two_u32(uint32_t x)
 {
     #if JSL_IS_CLANG || JSL_IS_GCC
@@ -178,6 +198,74 @@ uint64_t jsl_previous_power_of_two_u64(uint64_t x)
         return x - (x >> 1);
 
     #endif
+}
+
+int32_t jsl_round_up_i32(int32_t num, int32_t multiple_of)
+{
+    if (multiple_of == 0)
+        return num;
+
+    int32_t remainder = num % multiple_of;
+
+    if (remainder == 0)
+        return num;
+
+    if ((multiple_of > 0 && remainder < 0) || (multiple_of < 0 && remainder > 0))
+        remainder += multiple_of;
+
+    return num - remainder + multiple_of;
+}
+
+uint32_t jsl_round_up_u32(uint32_t num, uint32_t multiple_of)
+{
+    if (multiple_of == 0)
+        return num;
+
+    uint32_t remainder = num % multiple_of;
+
+    if (remainder == 0)
+        return num;
+
+    return num - remainder + multiple_of;
+}
+
+int64_t jsl_round_up_i64(int64_t num, int64_t multiple_of)
+{
+    if (multiple_of == 0)
+        return num;
+
+    int64_t remainder = num % multiple_of;
+
+    if (remainder == 0)
+        return num;
+
+    if ((multiple_of > 0 && remainder < 0) || (multiple_of < 0 && remainder > 0))
+        remainder += multiple_of;
+
+    return num - remainder + multiple_of;
+}
+
+uint64_t jsl_round_up_u64(uint64_t num, uint64_t multiple_of)
+{
+    if (multiple_of == 0)
+        return num;
+
+    uint64_t remainder = num % multiple_of;
+
+    if (remainder == 0)
+        return num;
+
+    return num - remainder + multiple_of;
+}
+
+int64_t jsl_round_up_pow2_i64(int64_t num, int64_t pow2)
+{
+    return (num + (pow2 - 1)) & ~(pow2 - 1);
+}
+
+uint64_t jsl_round_up_pow2_u64(uint64_t num, uint64_t pow2)
+{
+    return (num + (pow2 - 1)) & ~(pow2 - 1);
 }
 
 JSLFatPtr jsl_fatptr_init(uint8_t* ptr, int64_t length)

@@ -157,11 +157,20 @@ static int32_t entrypoint(
         _setmode(_fileno(stdout), _O_BINARY);
         _setmode(_fileno(stderr), _O_BINARY);
 
-        int64_t arena_size = JSL_MEGABYTES(32);
+        SYSTEM_INFO si;
+        GetSystemInfo(&si);
+        int64_t ps = (int64_t) si.dwPageSize;
+        int64_t page_size = ps > 0 ? ps : 4096;
+
         JSLArena arena;
-        void* backing_data = malloc((size_t) arena_size);
+
+        int64_t arena_size = jsl_round_up_i64(JSL_MEGABYTES(64), page_size);
+        void* backing_data = VirtualAlloc(0, PAGE_SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
         if (backing_data == NULL)
+        {
+            jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Failed to allocate memory"));
             return EXIT_FAILURE;
+        }
 
         jsl_arena_init(&arena, backing_data, arena_size);
 
@@ -178,7 +187,8 @@ static int32_t entrypoint(
             {
                 jsl_format_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Parsing failure"));
             }
-            jsl_format_to_c_file(stderr, JSL_FATPTR_EXPRESSION("\n"));
+
+            jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("\n"));
             return EXIT_FAILURE;
         }
 
@@ -204,21 +214,29 @@ static int32_t entrypoint(
 
     #include <poll.h>
     #include <unistd.h>
+    #include <sys/mman.h>
 
     int32_t main(int32_t argc, char **argv)
     {
-        int64_t arena_size = JSL_MEGABYTES(32);
+        int64_t ps = (int64_t) sysconf(_SC_PAGESIZE);
+        int64_t page_size = ps > 0 ? ps : 4096;
+
+        int64_t arena_size = jsl_round_up_nearest_pow2_i64(JSL_MEGABYTES(64), page_size);
         JSLArena arena;
-        void* backing_data = malloc((size_t) arena_size);
+
+        void* backing_data = mmap(NULL, (size_t) arena_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
         if (backing_data == NULL)
+        {
+            jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Failed to allocate memory"));
             return EXIT_FAILURE;
+        }
 
         jsl_arena_init(&arena, backing_data, arena_size);
 
         JSLCmdLine cmd;
         if (!jsl_cmd_line_init(&cmd, &arena))
         {
-            jsl_format_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Command line input exceeds memory limit"));
+            jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Command line input exceeds memory limit"));
             return EXIT_FAILURE;
         }
 
@@ -227,13 +245,14 @@ static int32_t entrypoint(
         {
             if (error_message.data != NULL)
             {
-                jsl_format_to_c_file(stderr, error_message);
+                jsl_write_to_c_file(stderr, error_message);
             }
             else
             {
-                jsl_format_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Parsing failure"));
+                jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Parsing failure"));
             }
-            jsl_format_to_c_file(stderr, JSL_FATPTR_EXPRESSION("\n"));
+
+            jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("\n"));
             return EXIT_FAILURE;
         }
 
