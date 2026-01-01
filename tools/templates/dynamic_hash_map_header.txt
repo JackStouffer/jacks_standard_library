@@ -19,85 +19,6 @@ struct {{ hash_map_name }}Entry {
     {{ value_type_name }} value;
 };
 
-struct {{ hash_map_name }}Bucket {
-
-
-    {{ hash_map_name }}Entry* entries_array;
-};
-
-struct JSL__StrToStrMapKeyValueIter {
-    struct JSL__StrToStrMap* map;
-    int64_t current_lut_index;
-    int64_t generational_id;
-    uint64_t sentinel;
-};
-
-struct JSL__StrToStrMap {
-    // putting the sentinel first means it's much more likely to get
-    // corrupted from accidental overwrites, therefore making it
-    // more likely that memory bugs are caught.
-    uint64_t sentinel;
-
-    JSLArena* arena;
-
-    uintptr_t* entry_lookup_table;
-    int64_t entry_lookup_table_length;
-
-    int64_t item_count;
-    int64_t tombstone_count;
-
-    struct JSL__StrToStrMapEntry* entry_free_list;
-
-    uint64_t hash_seed;
-    float load_factor;
-    int32_t generational_id;
-};
-
-/**
- * This is an open addressed hash map with linear probing that maps
- * JSLFatPtr keys to JSLFatPtr values. This map uses rapidhash, which
- * is a avalanche hash with a configurable seed value for protection
- * against hash flooding attacks.
- * 
- * Example:
- *
- * ```
- * uint8_t buffer[JSL_KILOBYTES(16)];
- * JSLArena stack_arena = JSL_ARENA_FROM_STACK(buffer);
- *
- * JSLStrToStrMap map;
- * jsl_str_to_str_map_init(&map, &stack_arena, 0);
- *
- * JSLFatPtr key = JSL_FATPTR_INITIALIZER("hello-key");
- * 
- * jsl_str_to_str_multimap_insert(
- *     &map,
- *     key,
- *     JSL_STRING_LIFETIME_STATIC,
- *     JSL_FATPTR_EXPRESSION("hello-value"),
- *     JSL_STRING_LIFETIME_STATIC
- * );
- * 
- * JSLFatPtr value
- * jsl_str_to_str_map_get(&map, key, &value);
- * ```
- * 
- * ## Functions
- *
- *  * jsl_str_to_str_map_init
- *  * jsl_str_to_str_map_init2
- *  * jsl_str_to_str_map_item_count
- *  * jsl_str_to_str_map_has_key
- *  * jsl_str_to_str_map_insert
- *  * jsl_str_to_str_map_get
- *  * jsl_str_to_str_map_key_value_iterator_init
- *  * jsl_str_to_str_map_key_value_iterator_next
- *  * jsl_str_to_str_map_delete
- *  * jsl_str_to_str_map_clear
- *
- */
-typedef struct JSL__StrToStrMap JSLStrToStrMap;
-
 /**
  * State tracking struct for iterating over all of the keys and values
  * in the map.
@@ -111,7 +32,74 @@ typedef struct JSL__StrToStrMap JSLStrToStrMap;
  *  * jsl_str_to_str_map_key_value_iterator_init
  *  * jsl_str_to_str_map_key_value_iterator_next
  */
-typedef struct JSL__StrToStrMapKeyValueIter JSLStrToStrMapKeyValueIter;
+typedef struct {{ hash_map_name }}KeyValueIter {
+    struct JSL__StrToStrMap* map;
+    int64_t current_lut_index;
+    int64_t generational_id;
+    uint64_t sentinel;
+} {{ hash_map_name }}KeyValueIter;
+
+/**
+ * This is an open addressed hash map with linear probing that maps
+ * {{ key_type_name }} keys to {{ value_type_name }} values. This map uses
+ * rapidhash, which is a avalanche hash with a configurable seed
+ * value for protection against hash flooding attacks.
+ * 
+ * Example:
+ *
+ * ```
+ * uint8_t buffer[JSL_KILOBYTES(16)];
+ * JSLArena stack_arena = JSL_ARENA_FROM_STACK(buffer);
+ *
+ * {{ hash_map_name }} map;
+ * jsl_str_to_str_map_init(&map, &stack_arena, 0);
+ *
+ * JSLFatPtr key = JSL_FATPTR_INITIALIZER("hello-key");
+ * 
+ * jsl_str_to_str_multimap_insert(
+ *     &map,
+ *     key,
+ *     JSL_STRING_LIFETIME_STATIC,
+ *     JSL_FATPTR_EXPRESSION("hello-value"),
+ *     JSL_STRING_LIFETIME_STATIC
+ * );
+ * 
+ * {{ value_type_name }} value;
+ * jsl_str_to_str_map_get(&map, key, &value);
+ * ```
+ * 
+ * ## Functions
+ *
+ *  * {{ function_prefix }}_init
+ *  * {{ function_prefix }}_init2
+ *  * {{ function_prefix }}_item_count
+ *  * {{ function_prefix }}_has_key
+ *  * {{ function_prefix }}_insert
+ *  * {{ function_prefix }}_get
+ *  * {{ function_prefix }}_key_value_iterator_init
+ *  * {{ function_prefix }}_key_value_iterator_next
+ *  * {{ function_prefix }}_delete
+ *  * {{ function_prefix }}_clear
+ *
+ */
+typedef struct {{ hash_map_name }} {
+    // putting the sentinel first means it's much more likely to get
+    // corrupted from accidental overwrites, therefore making it
+    // more likely that memory bugs are caught.
+    uint64_t sentinel;
+
+    JSLArena* arena;
+
+    {{ hash_map_name }}Entry* entry_array;
+    int64_t entry_array_length;
+
+    int64_t item_count;
+    int64_t tombstone_count;
+
+    uint64_t seed;
+    float load_factor;
+    int32_t generational_id;
+} {{ hash_map_name }};
 
 /**
  * Initialize a map with default sizing parameters.
@@ -126,8 +114,8 @@ typedef struct JSL__StrToStrMapKeyValueIter JSLStrToStrMapKeyValueIter;
  * @param seed Arbitrary seed value for hashing.
  * @return `true` on success, `false` if any parameter is invalid or out of memory.
  */
-JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_init(
-    JSLStrToStrMap* map,
+bool {{ function_prefix }}_init(
+    {{ hash_map_name }}* map,
     JSLArena* arena,
     uint64_t seed
 );
@@ -150,22 +138,12 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_init(
  * @param load_factor Desired load factor before rehashing
  * @return `true` on success, `false` if any parameter is invalid or out of memory.
  */
-JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_init2(
-    JSLStrToStrMap* map,
+bool {{ function_prefix }}_init2(
+    {{ hash_map_name }}* map,
     JSLArena* arena,
     uint64_t seed,
     int64_t item_count_guess,
     float load_factor
-);
-
-/**
- * Get the number of items currently stored.
- *
- * @param map Pointer to the map.
- * @return Key count, or `-1` on error
- */
-JSL_STR_TO_STR_MAP_DEF int64_t jsl_str_to_str_map_item_count(
-    JSLStrToStrMap* map
 );
 
 /**
@@ -174,9 +152,9 @@ JSL_STR_TO_STR_MAP_DEF int64_t jsl_str_to_str_map_item_count(
  * @param map Pointer to the map.
  * @return `true` if yes, `false` if no or error
  */
-JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_has_key(
-    JSLStrToStrMap* map,
-    JSLFatPtr key
+bool {{ function_prefix }}_has_key(
+    {{ hash_map_name }}* map,
+    {{ key_type_name }} key
 );
 
 /**
@@ -189,12 +167,10 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_has_key(
  * @param value_lifetime Lifetime semantics for the value data.
  * @return `true` on success, `false` on invalid parameters or OOM.
  */
-JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_insert(
-    JSLStrToStrMap* map,
-    JSLFatPtr key,
-    JSLStringLifeTime key_lifetime,
-    JSLFatPtr value,
-    JSLStringLifeTime value_lifetime
+bool {{ function_prefix }}_insert(
+    {{ hash_map_name }}* map,
+    {{ key_type_name }} key,
+    {{ value_type_name }} value
 );
 
 /**
@@ -205,10 +181,10 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_insert(
  * @param out_value Output parameter that will be filled with the value if successful
  * @returns A bool indicating success or failure
  */
-JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_get(
-    JSLStrToStrMap* map,
-    JSLFatPtr key,
-    JSLFatPtr* out_value
+bool {{ function_prefix }}_get(
+    {{ hash_map_name }}* map,
+    {{ key_type_name }} key,
+    {{ value_type_name }}* out_value
 );
 
 /**
@@ -217,14 +193,14 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_get(
  * Example:
  *
  * ```
- * JSLStrToStrMapKeyValueIter iter;
- * jsl_str_to_str_map_key_value_iterator_init(
+ * {{ hash_map_name }}KeyValueIter iter;
+ * {{ function_prefix }}_key_value_iterator_init(
  *     &map, &iter
  * );
  * 
- * JSLFatPtr key;
- * JSLFatPtr value;
- * while (jsl_str_to_str_map_key_value_iterator_next(&iter, &key, &value))
+ * {{ key_type_name }} key;
+ * {{ value_type_name }} value;
+ * while ({{ function_prefix }}_key_value_iterator_next(&iter, &key, &value))
  * {
  *    ...
  * }
@@ -237,7 +213,7 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_get(
  * @param iterator Iterator instance to initialize.
  * @return `true` on success, `false` if parameters are invalid.
  */
-JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_key_value_iterator_init(
+bool {{ function_prefix }}_key_value_iterator_init(
     JSLStrToStrMap* map,
     JSLStrToStrMapKeyValueIter* iterator
 );
@@ -248,14 +224,14 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_key_value_iterator_init(
  * Example:
  *
  * ```
- * JSLStrToStrMapKeyValueIter iter;
- * jsl_str_to_str_map_key_value_iterator_init(
+ * {{ hash_map_name }}KeyValueIter iter;
+ * {{ function_prefix }}_key_value_iterator_init(
  *     &map, &iter
  * );
  * 
- * JSLFatPtr key;
- * JSLFatPtr value;
- * while (jsl_str_to_str_map_key_value_iterator_next(&iter, &key, &value))
+ * {{ key_type_name }} key;
+ * {{ value_type_name }} value;
+ * while ({{ function_prefix }}_key_value_iterator_next(&iter, &key, &value))
  * {
  *    ...
  * }
@@ -270,10 +246,10 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_key_value_iterator_init(
  * @param out_value Output for the current value.
  * @return `true` if a pair was produced, `false` if exhausted or invalid.
  */
-JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_key_value_iterator_next(
-    JSLStrToStrMapKeyValueIter* iterator,
-    JSLFatPtr* out_key,
-    JSLFatPtr* out_value
+bool {{ function_prefix }}_key_value_iterator_next(
+    {{ hash_map_name }}KeyValueIter* iterator,
+    {{ key_type_name }}* out_key,
+    {{ value_type_name }}* out_value
 );
 
 /**
@@ -286,9 +262,9 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_key_value_iterator_next(
  * @param key Key to remove.
  * @return `true` if the key existed and was removed, `false` otherwise.
  */
-JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_delete(
-    JSLStrToStrMap* map,
-    JSLFatPtr key
+bool {{ function_prefix }}_delete(
+    {{ hash_map_name }}* map,
+    {{ key_type_name }} key
 );
 
 /**
@@ -296,8 +272,8 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_delete(
  *
  * @param map Map to clear.
  */
-JSL_STR_TO_STR_MAP_DEF void jsl_str_to_str_map_clear(
-    JSLStrToStrMap* map
+void {{ function_prefix }}_clear(
+    {{ hash_map_name }}* map
 );
 
 #ifdef __cplusplus

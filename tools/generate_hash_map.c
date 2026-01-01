@@ -273,7 +273,7 @@ static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
     }
 
     if (fixed_flag_set) impl = IMPL_FIXED;
-    if (fixed_flag_set) impl = IMPL_DYNAMIC;
+    if (dynamic_flag_set) impl = IMPL_DYNAMIC;
 
     JSLStringBuilder builder;
     jsl_string_builder_init(&builder, arena);
@@ -349,7 +349,12 @@ static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
         JSLArena arena;
 
         int64_t arena_size = jsl_round_up_i64(JSL_MEGABYTES(32), page_size);
-        void* backing_data = VirtualAlloc(0, PAGE_SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+        void* backing_data = VirtualAlloc(
+            0,
+            (size_t) arena_size,
+            MEM_COMMIT | MEM_RESERVE,
+            PAGE_READWRITE
+        );
         if (backing_data == NULL)
             return EXIT_FAILURE;
 

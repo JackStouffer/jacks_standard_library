@@ -182,6 +182,10 @@
 
     #include <stdlib.h>
     #include <time.h>
+    #include <assert.h>
+
+    #include "../tools/templates/dynamic_hash_map_header.h"
+    #include "../tools/templates/dynamic_hash_map_source.h"
 
     static uint8_t __fixed_header_template_data[] = {
         0x2f, 0x2a, 0x2a, 0x0d, 0x0a, 0x20, 0x2a, 0x20, 0x41, 0x55, 0x54, 0x4f,
@@ -1861,7 +1865,6 @@
         int32_t include_header_count
     )
     {
-        (void) impl;
         (void) hash_function_name;
 
         srand((uint32_t) (time(NULL) % UINT32_MAX));
@@ -1928,7 +1931,12 @@
             JSL_STRING_LIFETIME_STATIC
         );
 
-        render_template(builder, fixed_header_template, &map);
+        if (impl == IMPL_FIXED)
+            render_template(builder, fixed_header_template, &map);
+        else if (impl == IMPL_DYNAMIC)
+            render_template(builder, dynamic_header_template, &map);
+        else
+            assert(0);
     }
 
     GENERATE_HASH_MAP_DEF void write_hash_map_source(

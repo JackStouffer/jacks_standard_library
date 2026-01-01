@@ -22,6 +22,7 @@
 #include "../src/jsl_core.c"
 #include "../src/jsl_string_builder.c"
 #include "../src/jsl_os.c"
+#include "../src/jsl_str_set.c"
 #include "../src/jsl_str_to_str_map.c"
 #include "../src/jsl_str_to_str_multimap.c"
 #include "../src/jsl_cmd_line.c"
@@ -165,7 +166,7 @@ static int32_t entrypoint(
         JSLArena arena;
 
         int64_t arena_size = jsl_round_up_i64(JSL_MEGABYTES(64), page_size);
-        void* backing_data = VirtualAlloc(0, PAGE_SIZE, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
+        void* backing_data = VirtualAlloc(0, arena_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
         if (backing_data == NULL)
         {
             jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Failed to allocate memory"));

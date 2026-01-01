@@ -85,7 +85,7 @@ int32_t jsl_next_power_of_two_i32(int32_t x)
 {
     #if JSL_IS_CLANG || JSL_IS_GCC
 
-        return 1 << (32 - (int32_t) JSL_PLATFORM_COUNT_LEADING_ZEROS(x - 1));
+        return 1 << (32 - (int32_t) JSL_PLATFORM_COUNT_LEADING_ZEROS((uint32_t) x - 1u));
 
     #else
 
