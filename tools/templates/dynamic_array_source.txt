@@ -1,0 +1,71 @@
+/**
+ * AUTO GENERATED FILE
+ *
+ * This file contains the header for a dynamic array `{{ array_type_name }}` of
+ * `{{ value_type_name }}` values.
+ *
+ * This file was auto generated from the array code generation utility that's part of
+ * the "Jack's Standard Library" project. The utility generates a header file and a
+ * C file for a type safe dynamic array . By generating the code rather than using macros,
+ * two benefits are gained. One, the code is much easier to debug. Two, it's much more
+ * obvious how much code you're generating, which means you are much less likely to accidentally
+ * create the combinatoric explosion of code that's so common in C++ projects. Adding friction 
+ * to things is actually good sometimes.
+ */
+
+
+#include <stdint.h>
+#include <stddef.h>
+#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L
+    #include <stdbool.h>
+#endif
+
+#include "jsl_core.h"
+
+bool {{ function_prefix }}_init(
+    {{ array_type_name }}* array,
+    JSLArena* arena,
+    int64_t initial_capacity
+)
+{
+
+}
+
+bool {{ function_prefix }}_insert(
+    {{ array_type_name }}* array,
+    {{ value_type_name }} value
+)
+{
+
+}
+
+bool {{ function_prefix }}_insert_at(
+    {{ array_type_name }}* array,
+    {{ value_type_name }} value,
+    int64_t index
+)
+{
+
+}
+
+{{ array_type_name }}FatPtr {{ function_prefix }}_get_fatptr(
+    {{ array_type_name }}* array
+)
+{
+
+}
+
+bool {{ function_prefix }}_delete_at(
+    {{ array_type_name }}* array,
+    int64_t index
+)
+{
+
+}
+
+void {{ function_prefix }}_clear(
+    {{ array_type_name }}* array
+)
+{
+
+}

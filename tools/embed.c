@@ -222,7 +222,7 @@ static int32_t entrypoint(
         int64_t ps = (int64_t) sysconf(_SC_PAGESIZE);
         int64_t page_size = ps > 0 ? ps : 4096;
 
-        int64_t arena_size = jsl_round_up_nearest_pow2_i64(JSL_MEGABYTES(64), page_size);
+        int64_t arena_size = jsl_round_up_pow2_i64(JSL_MEGABYTES(64), page_size);
         JSLArena arena;
 
         void* backing_data = mmap(NULL, (size_t) arena_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);

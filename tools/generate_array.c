@@ -101,8 +101,8 @@
 #include "../src/jsl_os.c"
 #include "../src/jsl_cmd_line.c"
 
-#define GENERATE_HASH_MAP_IMPLEMENTATION
-#include "generate_hash_map.h"
+#define GENERATE_ARRAY_IMPLEMENTATION
+#include "generate_array.h"
 
 
 #if JSL_IS_WINDOWS
@@ -137,24 +137,20 @@ static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
     bool show_help = false;
     JSLFatPtr name = {0};
     JSLFatPtr function_prefix = {0};
-    JSLFatPtr key_type = {0};
     JSLFatPtr value_type = {0};
-    JSLFatPtr hash_function_name = {0};
-    HashMapImplementation impl = IMPL_ERROR;
+    ArrayImplementation impl = IMPL_ERROR;
     JSLFatPtr* header_includes = NULL;
     int32_t header_includes_count = 0;
 
     static JSLFatPtr help_flag_str = JSL_FATPTR_INITIALIZER("help");
     static JSLFatPtr name_flag_str = JSL_FATPTR_INITIALIZER("name");
     static JSLFatPtr function_prefix_flag_str = JSL_FATPTR_INITIALIZER("function-prefix");
-    static JSLFatPtr key_type_flag_str = JSL_FATPTR_INITIALIZER("key-type");
     static JSLFatPtr value_type_flag_str = JSL_FATPTR_INITIALIZER("value-type");
     static JSLFatPtr fixed_flag_str = JSL_FATPTR_INITIALIZER("fixed");
     static JSLFatPtr dynamic_flag_str = JSL_FATPTR_INITIALIZER("dynamic");
     static JSLFatPtr header_flag_str = JSL_FATPTR_INITIALIZER("header");
     static JSLFatPtr source_flag_str = JSL_FATPTR_INITIALIZER("source");
     static JSLFatPtr add_header_flag_str = JSL_FATPTR_INITIALIZER("add-header");
-    static JSLFatPtr custom_hash_flag_str = JSL_FATPTR_INITIALIZER("custom-hash");
 
     //
     // Parsing command line
@@ -165,9 +161,7 @@ static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
 
     jsl_cmd_line_pop_flag_with_value(cmd, name_flag_str, &name);
     jsl_cmd_line_pop_flag_with_value(cmd, function_prefix_flag_str, &function_prefix);
-    jsl_cmd_line_pop_flag_with_value(cmd, key_type_flag_str, &key_type);
     jsl_cmd_line_pop_flag_with_value(cmd, value_type_flag_str, &value_type);
-    jsl_cmd_line_pop_flag_with_value(cmd, custom_hash_flag_str, &hash_function_name);
 
     JSLFatPtr custom_header = {0};
     while (jsl_cmd_line_pop_flag_with_value(cmd, add_header_flag_str, &custom_header))
@@ -201,15 +195,6 @@ static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
             stderr,
             JSL_FATPTR_EXPRESSION("Error: --%y is required\n"),
             name_flag_str
-        );
-        return EXIT_FAILURE;
-    }
-    if (key_type.data == NULL)
-    {
-        jsl_format_to_c_file(
-            stderr,
-            JSL_FATPTR_EXPRESSION("Error: --%y is required\n"),
-            key_type_flag_str
         );
         return EXIT_FAILURE;
     }
@@ -280,30 +265,26 @@ static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
 
     if (header_flag_set)
     {
-        write_hash_map_header(
+        write_array_header(
             arena,
             &builder,
             impl,
             name,
             function_prefix,
-            key_type,
             value_type,
-            hash_function_name,
             header_includes,
             header_includes_count
         );
     }
     else
     {
-        write_hash_map_source(
+        write_array_source(
             arena,
             &builder,
             impl,
             name,
             function_prefix,
-            key_type,
             value_type,
-            hash_function_name,
             header_includes,
             header_includes_count
         );
