@@ -57,6 +57,11 @@ typedef struct HashMapDecl {
     char** headers;
 } HashMapDecl;
 
+typedef struct ArrayDecl {
+    char *name, *prefix, *value_type, *impl_type;
+    char** headers;
+} ArrayDecl;
+
 typedef struct UnitTestDecl {
     char* executable_name;
     char** files;
@@ -411,6 +416,53 @@ static HashMapDecl hash_map_declarations[] = {
     }
 };
 
+static ArrayDecl array_declarations[] = {
+    {
+        "DynamicInt32Array",
+        "dynamic_int32_array",
+        "int32_t",
+        "--dynamic",
+        (char*[]) {
+            "../tests/hash_maps/dynamic_int32_array.h",
+            "../tests/test_hash_map_types.h",
+            NULL
+        }
+    },
+    {
+        "DynamicCompositeType1Map",
+        "dynamic_comp1_array",
+        "CompositeType1",
+        "--dynamic",
+        (char*[]) {
+            "../tests/hash_maps/dynamic_comp1_array.h",
+            "../tests/test_hash_map_types.h",
+            NULL
+        }
+    },
+    {
+        "DynamicCompositeType2ToIntMap",
+        "dynamic_comp2_array",
+        "CompositeType2",
+        "--dynamic",
+        (char*[]) {
+            "../tests/hash_maps/dynamic_comp2_array.h",
+            "../tests/test_hash_map_types.h",
+            NULL
+        }
+    },
+    {
+        "DynamicCompositeType3ToCompositeType2Map",
+        "dynamic_comp3_array",
+        "CompositeType3",
+        "--dynamic",
+        (char*[]) {
+            "../tests/hash_maps/dynamic_comp3_array.h",
+            "../tests/test_hash_map_types.h",
+            NULL
+        }
+    }
+};
+
 typedef struct CStringArray {
     char** array;
     int32_t length;
@@ -510,12 +562,148 @@ int32_t main(int32_t argc, char **argv)
     NOB_GO_REBUILD_URSELF(argc, argv);
 
     if (!nob_mkdir_if_not_exists("tests/bin")) return 1;
+    if (!nob_mkdir_if_not_exists("tests/arrays")) return 1;
     if (!nob_mkdir_if_not_exists("tests/hash_maps")) return 1;
 
     /**
      *
      *
-     *              HASH MAPS
+     *                         ARRAYS
+     *
+     *
+     */
+
+    nob_log(NOB_INFO, "Compiling generate array program");
+
+    #if JSL_IS_WINDOWS
+        char generate_array_exe_name[256] = "tests\\bin\\generate_array.exe";
+        char generate_array_run_exe_command[256] = ".\\tests\\bin\\generate_array.exe";
+    #elif JSL_IS_POSIX
+        char generate_array_exe_name[256] = "tests/bin/generate_array";
+        char generate_array_run_exe_command[256] = "./tests/bin/generate_array";
+    #else
+        #error "Unrecognized platform. Only windows and POSIX platforms are supported."
+    #endif
+
+    Nob_Cmd generate_array_compile_command = {0};
+    nob_cmd_append(
+        &generate_array_compile_command,
+        "clang",
+        "-DJSL_DEBUG",
+        "-fno-omit-frame-pointer",
+        "-fno-optimize-sibling-calls",
+        "-O0",
+        "-glldb",
+        "-std=c11"
+    );
+
+    // add clang warnings
+    for (int32_t flag_idx = 0;; ++flag_idx)
+    {
+        char* flag = clang_warning_flags[flag_idx];
+        if (flag == NULL)
+            break;
+
+        nob_cmd_append(&generate_array_compile_command, flag);
+    }
+
+    nob_cmd_append(
+        &generate_array_compile_command,
+        "-o", generate_array_exe_name,
+        "-Isrc/",
+        "tools/generate_array.c"
+    );
+
+    if (!nob_cmd_run(&generate_array_compile_command)) return 1;
+
+    int32_t array_test_count = sizeof(array_declarations) / sizeof(ArrayDecl);
+
+    nob_log(NOB_INFO, "Generating Array Files");
+
+    Nob_Procs array_procs = {0};
+
+    for (int32_t i = 0; i < array_test_count; ++i)
+    {
+        ArrayDecl* decl = &array_declarations[i];
+
+        Nob_Cmd write_array_header = {0};
+        nob_cmd_append(
+            &write_array_header,
+            generate_array_run_exe_command,
+            "--name", decl->name,
+            "--function-prefix", decl->prefix,
+            "--value-type", decl->value_type,
+            decl->impl_type,
+            "--header"
+        );
+
+        for (int32_t header_idx = 0;;++header_idx)
+        {
+            if (decl->headers == NULL)
+                break;
+            if (decl->headers[header_idx] == NULL)
+                break;
+
+            nob_cmd_append(
+                &write_array_header,
+                "--add-header",
+                decl->headers[header_idx]
+            );
+        }
+
+        char out_path_header[256] = "tests/arrays/";
+        strcat(out_path_header, decl->prefix);
+        strcat(out_path_header, ".h");
+
+        if (!nob_cmd_run(
+            &write_array_header,
+            .stdout_path = out_path_header,
+            .async = &array_procs
+        )) return 1;
+
+        Nob_Cmd write_array_source = {0};
+        nob_cmd_append(
+            &write_array_source,
+            generate_array_run_exe_command,
+            "--name", decl->name,
+            "--function-prefix", decl->prefix,
+            "--value-type", decl->value_type,
+            decl->impl_type,
+            "--source"
+        );
+
+        for (int32_t header_idx = 0;;++header_idx)
+        {
+            if (decl->headers == NULL)
+                break;
+            if (decl->headers[header_idx] == NULL)
+                break;
+
+            nob_cmd_append(
+                &write_array_source,
+                "--add-header",
+                decl->headers[header_idx]
+            );
+        }
+
+        char out_path_source[256] = "tests/arrays/";
+        strcat(out_path_source, decl->prefix);
+        strcat(out_path_source, ".c");
+
+        if (!nob_cmd_run(
+            &write_array_source,
+            .stdout_path = out_path_source,
+            .async = &array_procs
+        )) return 1;
+    }
+
+    if (!nob_procs_wait(array_procs)) return 1;
+    nob_da_free(array_procs);
+
+    /**
+     *
+     *
+     *                    HASH MAPS
      *
      *
      */

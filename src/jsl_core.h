@@ -579,6 +579,23 @@ static JSL__FORCE_INLINE JSL__UNUSED int32_t jsl__find_first_set_u64(uint64_t x)
     #define JSL_MEMSET memset
 #endif
 
+#ifndef JSL_MEMMOVE
+    #include <string.h>
+
+    /**
+     * Controls memmove calls in the library. By default this will include
+     * `string.h` and be an alias to C's `memmove`.
+     *
+     * Define this as a macro before importing the library to override this.
+     * Your macro must follow the libc `memcpy` signature of
+     *
+     * ```
+     * void your_memmove(void*, const void*, size_t);
+     * ```
+     */
+    #define JSL_MEMMOVE memmove
+#endif
+
 #ifndef JSL_STRLEN
     #include <string.h>
 

@@ -28,12 +28,6 @@
 extern "C" {
 #endif
 
-
-typedef struct {{ array_type_name }}FatPtr {
-    {{ value_type_name }}* data;
-    int64_t length;
-} {{ array_type_name }}FatPtr;
-
 /**
  * TODO: docs
  * 
@@ -45,10 +39,9 @@ typedef struct {{ array_type_name }}FatPtr {
  *
  * {{ function_prefix }}_insert(&array, ... );
  *
- * {{ array_type_name }}FatPtr slice = {{ function_prefix }}_get_fatptr(&array);
- * for (int64_t i = 0; i < slice.length; ++i)
+ * for (int64_t i = 0; i < array.length; ++i)
  * {
- *      {{ value_type_name }}* value = &slice.data[i];
+ *      {{ value_type_name }}* value = &array.data[i];
  *      ...
  * }
  * ```
@@ -67,7 +60,6 @@ typedef struct {{ array_type_name }} {
     {{ value_type_name }}* data;
     int64_t length;
     int64_t capacity;
-    int32_t generational_id;
 } {{ array_type_name }};
 
 /**
@@ -94,13 +86,6 @@ bool {{ function_prefix }}_insert_at(
     {{ array_type_name }}* array,
     {{ value_type_name }} value,
     int64_t index
-);
-
-/**
- * TODO: docs
- */
-{{ array_type_name }}FatPtr {{ function_prefix }}_get_fatptr(
-    {{ array_type_name }}* array
 );
 
 /**
