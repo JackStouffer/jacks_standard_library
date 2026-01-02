@@ -1,4 +1,6 @@
 /**
+ * TODO: docs
+ * 
  * # Generate Hash Map Tool
  * 
  * Generate the C header and source files for a hash map before compilation.

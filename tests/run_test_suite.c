@@ -355,6 +355,18 @@ static UnitTestDecl unit_test_declarations[] = {
         }
     },
     {
+        "test_array",
+        (char*[]) {
+            "tests/test_array.c",
+            "src/jsl_core.c",
+            "tests/arrays/dynamic_comp1_array.c",
+            "tests/arrays/dynamic_comp2_array.c",
+            "tests/arrays/dynamic_comp3_array.c",
+            "tests/arrays/dynamic_int32_array.c",
+            NULL
+        }
+    },
+    {
         "test_hash_map",
         (char*[]) {
             "tests/test_hash_map.c",
@@ -424,7 +436,7 @@ static ArrayDecl array_declarations[] = {
         "--dynamic",
         (char*[]) {
             "../tests/hash_maps/dynamic_int32_array.h",
-            "../tests/test_hash_map_types.h",
+            "",
             NULL
         }
     },
@@ -637,19 +649,11 @@ int32_t main(int32_t argc, char **argv)
             "--header"
         );
 
-        for (int32_t header_idx = 0;;++header_idx)
-        {
-            if (decl->headers == NULL)
-                break;
-            if (decl->headers[header_idx] == NULL)
-                break;
-
-            nob_cmd_append(
-                &write_array_header,
-                "--add-header",
-                decl->headers[header_idx]
-            );
-        }
+        nob_cmd_append(
+            &write_array_header,
+            "--add-header",
+            "../test_hash_map_types.h"
+        );
 
         char out_path_header[256] = "tests/arrays/";
         strcat(out_path_header, decl->prefix);
@@ -672,19 +676,20 @@ int32_t main(int32_t argc, char **argv)
             "--source"
         );
 
-        for (int32_t header_idx = 0;;++header_idx)
-        {
-            if (decl->headers == NULL)
-                break;
-            if (decl->headers[header_idx] == NULL)
-                break;
+        char header_name[256] = {0};
+        strcat(header_name, decl->prefix);
+        strcat(header_name, ".h");
 
-            nob_cmd_append(
-                &write_array_source,
-                "--add-header",
-                decl->headers[header_idx]
-            );
-        }
+        nob_cmd_append(
+            &write_array_source,
+            "--add-header",
+            "../test_hash_map_types.h"
+        );
+        nob_cmd_append(
+            &write_array_source,
+            "--add-header",
+            header_name
+        );
 
         char out_path_source[256] = "tests/arrays/";
         strcat(out_path_source, decl->prefix);
