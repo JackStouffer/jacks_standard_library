@@ -150,39 +150,25 @@ bool jsl_string_builder_init2(
     return res;
 }
 
-bool jsl_string_builder_insert_char(JSLStringBuilder* builder, char c)
+bool jsl_string_builder_insert_bool(JSLStringBuilder* builder, bool data)
 {
-    if (
-        builder == NULL
-        || builder->sentinel != JSL__BUILDER_PRIVATE_SENTINEL
-        || builder->head == NULL
-        || builder->tail == NULL
-    )
-        return false;
+    return jsl_string_builder_insert_u8(builder, data);
+}
 
-    bool res = false;
+bool jsl_string_builder_insert_i8(JSLStringBuilder* builder, int8_t data)
+{
+    bool res = (
+        builder != NULL
+        && builder->sentinel == JSL__BUILDER_PRIVATE_SENTINEL
+    );
 
-    bool needs_alloc = false;
-    if (builder->tail->writer.length > 0)
-    {
-        builder->tail->writer.data[0] = (uint8_t) c;
-        JSL_FATPTR_ADVANCE(builder->tail->writer, 1);
-        res = true;
-    }
-    else
-    {
-        needs_alloc = true;
-    }
+    bool alloc_success = res && (builder->tail->writer.length <= 0 ?
+        jsl__string_builder_add_chunk(builder)
+        : true);
 
-    bool has_new_chunk = false;
-    if (needs_alloc)
+    if (alloc_success)
     {
-        has_new_chunk = jsl__string_builder_add_chunk(builder);
-    }
-
-    if (has_new_chunk)
-    {
-        builder->tail->writer.data[0] = (uint8_t) c;
+        builder->tail->writer.data[0] = (uint8_t) data;
         JSL_FATPTR_ADVANCE(builder->tail->writer, 1);
         res = true;
     }
@@ -190,44 +176,73 @@ bool jsl_string_builder_insert_char(JSLStringBuilder* builder, char c)
     return res;
 }
 
-bool jsl_string_builder_insert_uint8_t(JSLStringBuilder* builder, uint8_t c)
+bool jsl_string_builder_insert_u8(JSLStringBuilder* builder, uint8_t data)
 {
-    if (
-        builder == NULL
-        || builder->sentinel != JSL__BUILDER_PRIVATE_SENTINEL
-        || builder->head == NULL
-        || builder->tail == NULL
-    )
-        return false;
+    bool res = (
+        builder != NULL
+        && builder->sentinel == JSL__BUILDER_PRIVATE_SENTINEL
+    );
 
-    bool res = false;
+    bool alloc_success = res && (builder->tail->writer.length <= 0 ?
+        jsl__string_builder_add_chunk(builder)
+        : true);
 
-    bool needs_alloc = false;
-    if (builder->tail->writer.length > 0)
+    if (alloc_success)
     {
-        builder->tail->writer.data[0] = c;
-        JSL_FATPTR_ADVANCE(builder->tail->writer, 1);
-        res = true;
-    }
-    else
-    {
-        needs_alloc = true;
-    }
-
-    bool has_new_chunk = false;
-    if (needs_alloc)
-    {
-        has_new_chunk = jsl__string_builder_add_chunk(builder);
-    }
-
-    if (has_new_chunk)
-    {
-        builder->tail->writer.data[0] = c;
+        builder->tail->writer.data[0] = data;
         JSL_FATPTR_ADVANCE(builder->tail->writer, 1);
         res = true;
     }
 
     return res;
+}
+
+bool jsl_string_builder_insert_i16(JSLStringBuilder* builder, int16_t data)
+{
+    JSLFatPtr fp = {(uint8_t*) &data, sizeof(int16_t)};
+    return jsl_string_builder_insert_fatptr(builder, fp);
+}
+
+bool jsl_string_builder_insert_u16(JSLStringBuilder* builder, uint16_t data)
+{
+    JSLFatPtr fp = {(uint8_t*) &data, sizeof(uint16_t)};
+    return jsl_string_builder_insert_fatptr(builder, fp);
+}
+
+bool jsl_string_builder_insert_i32(JSLStringBuilder* builder, int32_t data)
+{
+    JSLFatPtr fp = {(uint8_t*) &data, sizeof(int32_t)};
+    return jsl_string_builder_insert_fatptr(builder, fp);
+}
+
+bool jsl_string_builder_insert_u32(JSLStringBuilder* builder, uint32_t data)
+{
+    JSLFatPtr fp = {(uint8_t*) &data, sizeof(uint32_t)};
+    return jsl_string_builder_insert_fatptr(builder, fp);
+}
+
+bool jsl_string_builder_insert_i64(JSLStringBuilder* builder, int64_t data)
+{
+    JSLFatPtr fp = {(uint8_t*) &data, sizeof(int64_t)};
+    return jsl_string_builder_insert_fatptr(builder, fp);
+}
+
+bool jsl_string_builder_insert_u64(JSLStringBuilder* builder, uint64_t data)
+{
+    JSLFatPtr fp = {(uint8_t*) &data, sizeof(uint64_t)};
+    return jsl_string_builder_insert_fatptr(builder, fp);
+}
+
+bool jsl_string_builder_insert_f32(JSLStringBuilder* builder, float data)
+{
+    JSLFatPtr fp = {(uint8_t*) &data, sizeof(float)};
+    return jsl_string_builder_insert_fatptr(builder, fp);
+}
+
+bool jsl_string_builder_insert_f64(JSLStringBuilder* builder, double data)
+{
+    JSLFatPtr fp = {(uint8_t*) &data, sizeof(double)};
+    return jsl_string_builder_insert_fatptr(builder, fp);
 }
 
 bool jsl_string_builder_insert_fatptr(JSLStringBuilder* builder, JSLFatPtr data)

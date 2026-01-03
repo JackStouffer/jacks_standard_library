@@ -29,7 +29,7 @@ extern "C" {
 #endif
 
 /**
- * TODO: docs
+ * Dynamic array of {{ value_type_name }}.
  * 
  * Example:
  *
@@ -49,6 +49,10 @@ extern "C" {
  * ## Functions
  *
  *  * {{ function_prefix }}_init
+ *  * {{ function_prefix }}_insert
+ *  * {{ function_prefix }}_insert_at
+ *  * {{ function_prefix }}_delete_at
+ *  * {{ function_prefix }}_clear
  *
  */
 typedef struct {{ array_type_name }} {
@@ -63,7 +67,13 @@ typedef struct {{ array_type_name }} {
 } {{ array_type_name }};
 
 /**
- * TODO: docs
+ * Initialize an instance of {{ array_type_name }}. Enough room will be allocated
+ * for `initial_capacity` elements.
+ *
+ * @param array The pointer to the array instance to initialize
+ * @param arena The arena that this array will use to allocate memory
+ * @param initial_capacity Allocate enough space to hold this many elements 
+ * @returns If the allocation succeed
  */
 bool {{ function_prefix }}_init(
     {{ array_type_name }}* array,
@@ -72,7 +82,11 @@ bool {{ function_prefix }}_init(
 );
 
 /**
- * TODO: docs
+ * Insert an `{{ value_type_name }}` at the end of the array.
+ *
+ * @param array The pointer to the array
+ * @param value The value to add
+ * @returns If the insertion succeed
  */
 bool {{ function_prefix }}_insert(
     {{ array_type_name }}* array,
@@ -80,7 +94,13 @@ bool {{ function_prefix }}_insert(
 );
 
 /**
- * TODO: docs
+ * Insert an `{{ value_type_name }}` at the specified index, moving everything after
+ * that index to its index plus one.
+ *
+ * @param array The pointer to the array
+ * @param value The value to add
+ * @param index The index to place the element
+ * @returns If the insertion succeed
  */
 bool {{ function_prefix }}_insert_at(
     {{ array_type_name }}* array,
@@ -89,7 +109,12 @@ bool {{ function_prefix }}_insert_at(
 );
 
 /**
- * TODO: docs
+ * Delete the element at the specified index, moving everything after
+ * that index to its index minus one.
+ *
+ * @param array The pointer to the array
+ * @param index The index to delete
+ * @returns if deletion succeed
  */
 bool {{ function_prefix }}_delete_at(
     {{ array_type_name }}* array,
@@ -97,7 +122,9 @@ bool {{ function_prefix }}_delete_at(
 );
 
 /**
- * TODO: docs
+ * Set the length of the array back to zero.
+ *
+ * @param array The pointer to the array
  */
 void {{ function_prefix }}_clear(
     {{ array_type_name }}* array

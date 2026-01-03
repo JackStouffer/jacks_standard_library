@@ -90,15 +90,15 @@ static void test_jsl_string_builder_init_invalid_arguments(void)
     TEST_BOOL(!jsl_string_builder_init2(&builder, &global_arena, 16, 0));
 }
 
-static void test_jsl_string_builder_insert_char_basic(void)
+static void test_jsl_string_builder_insert_i8_basic(void)
 {
     JSLStringBuilder builder;
     bool ok = jsl_string_builder_init(&builder, &global_arena);
     TEST_BOOL(ok);
 
-    TEST_BOOL(jsl_string_builder_insert_char(&builder, 'A'));
-    TEST_BOOL(jsl_string_builder_insert_char(&builder, 'B'));
-    TEST_BOOL(jsl_string_builder_insert_char(&builder, 'C'));
+    TEST_BOOL(jsl_string_builder_insert_i8(&builder, 'A'));
+    TEST_BOOL(jsl_string_builder_insert_i8(&builder, 'B'));
+    TEST_BOOL(jsl_string_builder_insert_i8(&builder, 'C'));
 
     uint8_t actual[16] = {0};
     JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(actual);
@@ -112,18 +112,18 @@ static void test_jsl_string_builder_insert_char_basic(void)
     TEST_BOOL(actual[2] == 'C');
 
     JSLStringBuilder uninitialized = {0};
-    TEST_BOOL(!jsl_string_builder_insert_char(&uninitialized, 'Z'));
+    TEST_BOOL(!jsl_string_builder_insert_i8(&uninitialized, 'Z'));
 }
 
-static void test_jsl_string_builder_insert_char_grows_chunks(void)
+static void test_jsl_string_builder_insert_i8_grows_chunks(void)
 {
     JSLStringBuilder builder;
     bool ok = jsl_string_builder_init2(&builder, &global_arena, 2, 2);
     TEST_BOOL(ok);
 
-    TEST_BOOL(jsl_string_builder_insert_char(&builder, 'X'));
-    TEST_BOOL(jsl_string_builder_insert_char(&builder, 'Y'));
-    TEST_BOOL(jsl_string_builder_insert_char(&builder, 'Z'));
+    TEST_BOOL(jsl_string_builder_insert_i8(&builder, 'X'));
+    TEST_BOOL(jsl_string_builder_insert_i8(&builder, 'Y'));
+    TEST_BOOL(jsl_string_builder_insert_i8(&builder, 'Z'));
 
     TEST_BOOL(builder.head != builder.tail);
 
@@ -142,15 +142,15 @@ static void test_jsl_string_builder_insert_char_grows_chunks(void)
     TEST_BOOL(!jsl_string_builder_iterator_next(&iterator, &second));
 }
 
-static void test_jsl_string_builder_insert_uint8_t_binary(void)
+static void test_jsl_string_builder_insert_u8(void)
 {
     JSLStringBuilder builder;
     bool ok = jsl_string_builder_init2(&builder, &global_arena, 8, 4);
     TEST_BOOL(ok);
 
-    TEST_BOOL(jsl_string_builder_insert_uint8_t(&builder, 0x00));
-    TEST_BOOL(jsl_string_builder_insert_uint8_t(&builder, 0xFF));
-    TEST_BOOL(jsl_string_builder_insert_uint8_t(&builder, 0x7F));
+    TEST_BOOL(jsl_string_builder_insert_u8(&builder, 0x00));
+    TEST_BOOL(jsl_string_builder_insert_u8(&builder, 0xFF));
+    TEST_BOOL(jsl_string_builder_insert_u8(&builder, 0x7F));
 
     uint8_t expected[] = {0x00, 0xFF, 0x7F};
     uint8_t actual[8] = {0};
@@ -163,7 +163,87 @@ static void test_jsl_string_builder_insert_uint8_t_binary(void)
     TEST_BOOL(memcmp(actual, expected, 3) == 0);
 
     JSLStringBuilder uninitialized = {0};
-    TEST_BOOL(!jsl_string_builder_insert_uint8_t(&uninitialized, 0xAA));
+    TEST_BOOL(!jsl_string_builder_insert_u8(&uninitialized, 0xAA));
+}
+
+static void test_jsl_string_builder_insert_u32_basic(void)
+{
+    JSLStringBuilder builder;
+    bool ok = jsl_string_builder_init2(&builder, &global_arena, 16, 4);
+    TEST_BOOL(ok);
+
+    uint32_t first = 0x11223344;
+    uint32_t second = 0xAABBCCDD;
+
+    TEST_BOOL(jsl_string_builder_insert_u32(&builder, first));
+    TEST_BOOL(jsl_string_builder_insert_u32(&builder, second));
+
+    uint8_t expected[sizeof(uint32_t) * 2] = {0};
+    memcpy(expected, &first, sizeof(uint32_t));
+    memcpy(expected + sizeof(uint32_t), &second, sizeof(uint32_t));
+
+    uint8_t actual[32] = {0};
+    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(actual);
+    JSLFatPtr writer = buffer;
+
+    debug_concatenate_builder(&builder, &writer);
+    int64_t len = jsl_fatptr_total_write_length(buffer, writer);
+
+    TEST_INT64_EQUAL(len, (int64_t) sizeof(expected));
+    TEST_BUFFERS_EQUAL(actual, expected, len);
+
+    JSLStringBuilder uninitialized = {0};
+    TEST_BOOL(!jsl_string_builder_insert_u32(&uninitialized, first));
+}
+
+static void test_jsl_string_builder_insert_u32_multi_chunk(void)
+{
+    JSLStringBuilder builder;
+    bool ok = jsl_string_builder_init2(&builder, &global_arena, 5, 1);
+    TEST_BOOL(ok);
+
+    uint32_t first = 0x11223344;
+    uint32_t second = 0xAABBCCDD;
+    uint32_t third = 0x01020304;
+
+    TEST_BOOL(jsl_string_builder_insert_u32(&builder, first));
+    TEST_BOOL(jsl_string_builder_insert_u32(&builder, second));
+    TEST_BOOL(jsl_string_builder_insert_u32(&builder, third));
+
+    uint8_t expected[sizeof(uint32_t) * 3] = {0};
+    memcpy(expected, &first, sizeof(uint32_t));
+    memcpy(expected + sizeof(uint32_t), &second, sizeof(uint32_t));
+    memcpy(expected + (sizeof(uint32_t) * 2), &third, sizeof(uint32_t));
+
+    uint8_t actual[64] = {0};
+    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(actual);
+    JSLFatPtr writer = buffer;
+
+    debug_concatenate_builder(&builder, &writer);
+    int64_t len = jsl_fatptr_total_write_length(buffer, writer);
+
+    TEST_INT64_EQUAL(len, (int64_t) sizeof(expected));
+    TEST_BUFFERS_EQUAL(actual, expected, len);
+
+    JSLStringBuilderIterator iterator;
+    jsl_string_builder_iterator_init(&builder, &iterator);
+
+    JSLFatPtr first_chunk;
+    TEST_BOOL(jsl_string_builder_iterator_next(&iterator, &first_chunk));
+    TEST_INT64_EQUAL(first_chunk.length, (int64_t) 5);
+    TEST_BOOL(memcmp(first_chunk.data, expected, 5) == 0);
+
+    JSLFatPtr second_chunk;
+    TEST_BOOL(jsl_string_builder_iterator_next(&iterator, &second_chunk));
+    TEST_INT64_EQUAL(second_chunk.length, (int64_t) 5);
+    TEST_BOOL(memcmp(second_chunk.data, expected + 5, 5) == 0);
+
+    JSLFatPtr third_chunk;
+    TEST_BOOL(jsl_string_builder_iterator_next(&iterator, &third_chunk));
+    TEST_INT64_EQUAL(third_chunk.length, (int64_t) 2);
+    TEST_BOOL(memcmp(third_chunk.data, expected + 10, 2) == 0);
+
+    TEST_BOOL(!jsl_string_builder_iterator_next(&iterator, &third_chunk));
 }
 
 static void test_jsl_string_builder_insert_fatptr_multi_chunk(void)
@@ -250,9 +330,9 @@ static void test_jsl_string_builder_iterator_behavior(void)
     TEST_BOOL(slice.data != NULL);
     TEST_BOOL(slice.length == 0);
 
-    TEST_BOOL(jsl_string_builder_insert_char(&builder, '1'));
-    TEST_BOOL(jsl_string_builder_insert_char(&builder, '2'));
-    TEST_BOOL(jsl_string_builder_insert_char(&builder, '3'));
+    TEST_BOOL(jsl_string_builder_insert_i8(&builder, '1'));
+    TEST_BOOL(jsl_string_builder_insert_i8(&builder, '2'));
+    TEST_BOOL(jsl_string_builder_insert_i8(&builder, '3'));
 
     jsl_string_builder_iterator_init(&builder, &iterator);
     TEST_BOOL(jsl_string_builder_iterator_next(&iterator, &slice));
@@ -334,13 +414,19 @@ int main(void)
     RUN_TEST_FUNCTION("Test invalid init args", test_jsl_string_builder_init_invalid_arguments);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("Test insert char", test_jsl_string_builder_insert_char_basic);
+    RUN_TEST_FUNCTION("Test insert char", test_jsl_string_builder_insert_i8_basic);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("Test small chunk size", test_jsl_string_builder_insert_char_grows_chunks);
+    RUN_TEST_FUNCTION("Test small chunk size", test_jsl_string_builder_insert_i8_grows_chunks);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("Test binary data", test_jsl_string_builder_insert_uint8_t_binary);
+    RUN_TEST_FUNCTION("Test u8 insertion", test_jsl_string_builder_insert_u8);
+    jsl_arena_reset(&global_arena);
+
+    RUN_TEST_FUNCTION("Test u32 insertion", test_jsl_string_builder_insert_u32_basic);
+    jsl_arena_reset(&global_arena);
+
+    RUN_TEST_FUNCTION("Test u32 insertion across chunks", test_jsl_string_builder_insert_u32_multi_chunk);
     jsl_arena_reset(&global_arena);
 
     RUN_TEST_FUNCTION("Test empty string and null bytes", test_jsl_string_builder_insert_fatptr_edge_cases);
