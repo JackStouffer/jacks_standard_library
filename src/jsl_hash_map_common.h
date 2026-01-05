@@ -20,7 +20,7 @@ static inline uint64_t murmur3_fmix_u64(uint64_t x, uint64_t seed)
 *
 * Based on 'wyhash', by Wang Yi <godspeed_china@yeah.net>
 *
-* Copyright (C) 2025 Nicolas De Carli
+* Copyright (C) 2026 Nicolas De Carli
 *
 * Permission is hereby granted, free of charge, to any person obtaining a copy
 * of this software and associated documentation files (the "Software"), to deal
