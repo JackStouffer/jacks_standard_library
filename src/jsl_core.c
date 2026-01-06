@@ -1091,19 +1091,21 @@ char* jsl_fatptr_to_cstr(JSLAllocatorInterface* allocator, JSLFatPtr str)
         return NULL;
 
     int64_t allocation_size = str.length + 1;
-    JSLFatPtr allocation = jsl_allocator_interface_alloc(
+    void* allocation = jsl_allocator_interface_alloc(
         allocator,
         allocation_size,
         JSL_DEFAULT_ALLOCATION_ALIGNMENT,
         false
     );
 
-    if (allocation.data == NULL || allocation.length < allocation_size)
+    if (allocation == NULL)
         return NULL;
 
-    JSL_MEMCPY(allocation.data, str.data, (size_t) str.length);
-    allocation.data[str.length] = '\0';
-    return (char*) allocation.data;
+    JSL_MEMCPY(allocation, str.data, (size_t) str.length);
+
+    char* ret = allocation;
+    ret[str.length] = '\0';
+    return ret;
 }
 
 JSLFatPtr jsl_cstr_to_fatptr(JSLAllocatorInterface* allocator, char* str)
@@ -1117,16 +1119,17 @@ JSLFatPtr jsl_cstr_to_fatptr(JSLAllocatorInterface* allocator, char* str)
         return ret;
 
     int64_t allocation_size = length * (int64_t) sizeof(uint8_t);
-    JSLFatPtr allocation = jsl_allocator_interface_alloc(
+    void* allocation = jsl_allocator_interface_alloc(
         allocator,
         allocation_size,
         JSL_DEFAULT_ALLOCATION_ALIGNMENT,
         false
     );
-    if (allocation.data == NULL || allocation.length < length)
+    if (allocation == NULL)
         return ret;
 
-    ret = allocation;
+    ret.data = allocation;
+    ret.length = allocation_size;
     JSL_MEMCPY(ret.data, str, (size_t) length);
     return ret;
 }
@@ -1137,15 +1140,16 @@ JSLFatPtr jsl_fatptr_duplicate(JSLAllocatorInterface* allocator, JSLFatPtr str)
     if (allocator == NULL || str.data == NULL || str.length < 1)
         return res;
 
-    JSLFatPtr allocation = jsl_allocator_interface_alloc(
+    void* allocation = jsl_allocator_interface_alloc(
         allocator, str.length, JSL_DEFAULT_ALLOCATION_ALIGNMENT, false
     );
 
-    if (allocation.data == NULL || allocation.length < str.length)
+    if (allocation == NULL)
         return res;
 
-    JSL_MEMCPY(allocation.data, str.data, (size_t) str.length);
-    res = allocation;
+    JSL_MEMCPY(allocation, str.data, (size_t) str.length);
+    res.data = allocation;
+    res.length = str.length;
     return res;
 }
 
@@ -2790,12 +2794,13 @@ static uint8_t* format_allocator_callback(uint8_t *buf, void *user, int64_t len)
     // First call
     if (context->cursor == NULL)
     {
-        context->current_allocation = jsl_allocator_interface_alloc(
+        context->current_allocation.data = jsl_allocator_interface_alloc(
             context->allocator,
             len,
             JSL_DEFAULT_ALLOCATION_ALIGNMENT,
             false
         );
+        context->current_allocation.length = len;
         if (context->current_allocation.data == NULL)
             return 0;
 
@@ -2804,12 +2809,13 @@ static uint8_t* format_allocator_callback(uint8_t *buf, void *user, int64_t len)
     else
     {
         int64_t new_length = context->current_allocation.length + len;
-        context->current_allocation = jsl_allocator_interface_realloc(
+        context->current_allocation.data = jsl_allocator_interface_realloc(
             context->allocator,
-            context->current_allocation,
+            context->current_allocation.data,
             new_length,
             JSL_DEFAULT_ALLOCATION_ALIGNMENT
         );
+        context->current_allocation.length = new_length;
         if (context->current_allocation.data == NULL)
             return 0;
     }

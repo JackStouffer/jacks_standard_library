@@ -9,16 +9,21 @@
 
 /**
  * TODO: docs
+ * 
+ * Assumptions:
+ * - The returned memory is at least bytes long, can be more
+ * - if size request by the user isn't available this returns null
+ * - if the allocator is not ready/initialized this returns null
  */
-typedef JSLFatPtr (*JSLAllocateFP)(void* ctx, int64_t bytes, int32_t alignment, bool zeroed);
+typedef void* (*JSLAllocateFP)(void* ctx, int64_t bytes, int32_t alignment, bool zeroed);
 /**
  * TODO: docs
  */
-typedef JSLFatPtr (*JSLReallocateFP)(void* ctx, JSLFatPtr allocation, int64_t new_bytes, int32_t alignment);
+typedef void* (*JSLReallocateFP)(void* ctx, void* allocation, int64_t new_bytes, int32_t alignment);
 /**
  * TODO: docs
  */
-typedef bool (*JSLFreeFP)(void* ctx, JSLFatPtr allocation);
+typedef bool (*JSLFreeFP)(void* ctx, void* allocation);
 /**
  * TODO: docs
  */
@@ -29,6 +34,7 @@ typedef bool (*JSLFreeAllFP)(void* ctx);
  */
 typedef struct JSLAllocatorInterface
 {
+    uint64_t sentinel;
     JSLAllocateFP allocate;
     JSLReallocateFP reallocate;
     JSLFreeFP free;
@@ -56,7 +62,7 @@ void jsl_allocator_interface_init(
 /**
  * TODO: docs
  */
-JSLFatPtr jsl_allocator_interface_alloc(
+void* jsl_allocator_interface_alloc(
     JSLAllocatorInterface* allocator,
     int64_t bytes,
     int32_t alignment,
@@ -66,9 +72,9 @@ JSLFatPtr jsl_allocator_interface_alloc(
 /**
  * TODO: docs
  */
-JSLFatPtr jsl_allocator_interface_realloc(
+void* jsl_allocator_interface_realloc(
     JSLAllocatorInterface* allocator,
-    JSLFatPtr allocation,
+    void* allocation,
     int64_t new_bytes,
     int32_t alignment
 );
@@ -78,13 +84,26 @@ JSLFatPtr jsl_allocator_interface_realloc(
  */
 bool jsl_allocator_interface_free(
     JSLAllocatorInterface* allocator,
-    JSLFatPtr allocation
+    void* allocation
 );
 
 /**
  * TODO: docs
  */
 bool jsl_allocator_interface_free_all(
-    JSLAllocatorInterface* allocator,
-    JSLFatPtr allocation
+    JSLAllocatorInterface* allocator
 );
+
+/**
+ * Macro to make it easier to allocate an instance of `T`.
+ *
+ * @param T Type to allocate.
+ * @param allocator allocator.
+ * @return Pointer to the allocated object or `NULL` on failure.
+ *
+ * ```
+ * struct MyStruct { uint64_t the_data; };
+ * struct MyStruct* thing = JSL_TYPED_ALLOCATE(struct MyStruct, arena);
+ * ```
+ */
+#define JSL_TYPED_ALLOCATE(T, allocator) (T*) jsl_allocator_interface_alloc(allocator, sizeof(T), _Alignof(T), false)

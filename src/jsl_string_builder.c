@@ -68,22 +68,25 @@
 #endif
 
 #include "jsl_core.h"
+#include "jsl_allocator.h"
 #include "jsl_string_builder.h"
 
 #define JSL__BUILDER_PRIVATE_SENTINEL 4401537694999363085U
 
 static bool jsl__string_builder_add_chunk(JSLStringBuilder* builder)
 {
-    struct JSL__StringBuilderChunk* chunk = JSL_ARENA_TYPED_ALLOCATE(
+    struct JSL__StringBuilderChunk* chunk = JSL_TYPED_ALLOCATE(
         struct JSL__StringBuilderChunk,
-        builder->arena
+        builder->allocator
     );
     chunk->next = NULL;
-    chunk->buffer = jsl_arena_allocate_aligned(
-        builder->arena, builder->chunk_size,
-        builder->alignment,
+    chunk->buffer.data = jsl_allocator_interface_alloc(
+        builder->allocator,
+        builder->chunk_size,
+        builder->chunk_alignment,
         false
     );
+    chunk->buffer.length = builder->chunk_size;
 
     if (chunk->buffer.data != NULL)
     {
@@ -109,11 +112,11 @@ static bool jsl__string_builder_add_chunk(JSLStringBuilder* builder)
     }
 }
 
-bool jsl_string_builder_init(JSLStringBuilder* builder, JSLArena* arena)
+bool jsl_string_builder_init(JSLStringBuilder* builder, JSLAllocatorInterface* alocator)
 {
     return jsl_string_builder_init2(
         builder,
-        arena,
+        alocator,
         1024,
         8
     );
@@ -121,9 +124,9 @@ bool jsl_string_builder_init(JSLStringBuilder* builder, JSLArena* arena)
 
 bool jsl_string_builder_init2(
     JSLStringBuilder* builder,
-    JSLArena* arena,
+    JSLAllocatorInterface* allocator,
     int32_t chunk_size,
-    int32_t alignment
+    int32_t chunk_alignment
 )
 {
     bool res = false;
@@ -135,15 +138,15 @@ bool jsl_string_builder_init2(
     
     if (
         builder != NULL
-        && arena != NULL
+        && allocator != NULL
         && chunk_size > 0
-        && alignment > 0
+        && chunk_alignment > 0
     )
     {
         builder->sentinel = JSL__BUILDER_PRIVATE_SENTINEL;
-        builder->arena = arena;
+        builder->allocator = allocator;
         builder->chunk_size = chunk_size;
-        builder->alignment = alignment;
+        builder->chunk_alignment = chunk_alignment;
         res = jsl__string_builder_add_chunk(builder);
     }
 
@@ -400,7 +403,28 @@ bool jsl_string_builder_clear(
     JSLStringBuilder* builder
 )
 {
-    // TODO: add a implementation here which frees all of the builder chunks in a loop using the allocator interface and then resets the internal state back to init
+    if (
+        builder == NULL
+        || builder->sentinel != JSL__BUILDER_PRIVATE_SENTINEL
+        || builder->allocator == NULL
+    )
+        return false;
+
+    JSLAllocatorInterface* allocator = builder->allocator;
+    int32_t chunk_size = builder->chunk_size;
+    int32_t chunk_alignment = builder->chunk_alignment;
+
+    struct JSL__StringBuilderChunk* current = builder->head;
+    while (current != NULL)
+    {
+        struct JSL__StringBuilderChunk* next = current->next;
+        if (current->buffer.data != NULL)
+            jsl_allocator_interface_free(allocator, current->buffer.data);
+        jsl_allocator_interface_free(allocator, current);
+        current = next;
+    }
+
+    return jsl_string_builder_init2(builder, allocator, chunk_size, chunk_alignment);
 }
 
 #undef JSL__BUILDER_PRIVATE_SENTINEL

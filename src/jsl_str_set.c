@@ -13,13 +13,13 @@
 
 JSL_STR_SET_DEF bool jsl_str_set_init(
     JSLStrSet* set,
-    JSLArena* arena,
+    JSLAllocatorInterface* allocator,
     uint64_t seed
 )
 {
     return jsl_str_set_init2(
         set,
-        arena,
+        allocator,
         seed,
         32,
         0.75f
@@ -28,7 +28,7 @@ JSL_STR_SET_DEF bool jsl_str_set_init(
 
 JSL_STR_SET_DEF bool jsl_str_set_init2(
     JSLStrSet* set,
-    JSLArena* arena,
+    JSLAllocatorInterface* allocator,
     uint64_t seed,
     int64_t item_count_guess,
     float load_factor
@@ -36,7 +36,7 @@ JSL_STR_SET_DEF bool jsl_str_set_init2(
 {
     bool res = (
         set != NULL
-        && arena != NULL
+        && allocator != NULL
         && item_count_guess > 0
         && load_factor > 0.0f
         && load_factor < 1.0f
@@ -45,19 +45,19 @@ JSL_STR_SET_DEF bool jsl_str_set_init2(
     if (res)
     {
         JSL_MEMSET(set, 0, sizeof(JSLStrSet));
-        set->arena = arena;
+        set->allocator = allocator;
         set->load_factor = load_factor;
         set->hash_seed = seed;
 
         item_count_guess = JSL_MAX(32L, item_count_guess);
         int64_t items = jsl_next_power_of_two_i64(item_count_guess + 1);
 
-        set->entry_lookup_table = (uintptr_t*) jsl_arena_allocate_aligned(
-            arena,
+        set->entry_lookup_table = (uintptr_t*) jsl_allocator_interface_alloc(
+            allocator,
             (int64_t) sizeof(uintptr_t) * items,
             _Alignof(uintptr_t),
             true
-        ).data;
+        );
         
         set->entry_lookup_table_length = items;
 
@@ -84,10 +84,7 @@ static bool jsl__str_set_rehash(
 
     bool params_valid = (
         set != NULL
-        && set->arena != NULL
         && set->sentinel == JSL__SET_PRIVATE_SENTINEL
-        && set->entry_lookup_table != NULL
-        && set->entry_lookup_table_length > 0
     );
 
     uintptr_t* old_table = params_valid ? set->entry_lookup_table : NULL;
@@ -103,20 +100,16 @@ static bool jsl__str_set_rehash(
         ? (int64_t) sizeof(uintptr_t) * new_length
         : 0;
 
-    JSLFatPtr new_table_mem = {0};
+    uintptr_t* new_table = NULL;
     if (bytes_possible)
     {
-        new_table_mem = jsl_arena_allocate_aligned(
-            set->arena,
+        new_table = jsl_allocator_interface_alloc(
+            set->allocator,
             bytes_needed,
             _Alignof(uintptr_t),
             true
         );
     }
-
-    uintptr_t* new_table = (bytes_possible && new_table_mem.data != NULL)
-        ? (uintptr_t*) new_table_mem.data
-        : NULL;
 
     uint64_t lut_mask = new_length > 0 ? ((uint64_t) new_length - 1u) : 0;
     int64_t old_index = 0;
@@ -311,7 +304,7 @@ static JSL__FORCE_INLINE bool jsl__str_set_add(
 
     if (set->entry_free_list == NULL)
     {
-        entry = JSL_ARENA_TYPED_ALLOCATE(struct JSL__StrSetEntry, set->arena);
+        entry = JSL_TYPED_ALLOCATE(struct JSL__StrSetEntry, set->allocator);
     }
     else
     {
@@ -357,7 +350,7 @@ static JSL__FORCE_INLINE bool jsl__str_set_add(
         && value.length > JSL__SET_SSO_LENGTH
     )
     {
-        entry->value = jsl_fatptr_duplicate(set->arena, value);
+        entry->value = jsl_fatptr_duplicate(set->allocator, value);
     }
 
     return entry != NULL;

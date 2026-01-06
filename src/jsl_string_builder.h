@@ -107,7 +107,7 @@ struct JSL__StringBuilder
     JSLAllocatorInterface* allocator;
     struct JSL__StringBuilderChunk* head;
     struct JSL__StringBuilderChunk* tail;
-    int32_t alignment;
+    int32_t chunk_alignment;
     int32_t chunk_size;
 };
 

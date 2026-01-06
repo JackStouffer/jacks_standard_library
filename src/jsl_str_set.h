@@ -51,6 +51,7 @@
 #endif
 
 #include "jsl_core.h"
+#include "jsl_allocator.h"
 #include "jsl_hash_map_common.h"
 
 /* Versioning to catch mismatches across deps */
@@ -73,13 +74,23 @@ extern "C" {
 #define JSL__SET_SSO_LENGTH 16
 
 struct JSL__StrSetEntry {
-    uint8_t value_sso_buffer[JSL__SET_SSO_LENGTH];
 
-    JSLFatPtr value;
+    union
+    {
+        struct
+        {
+            uint8_t value_sso_buffer[JSL__SET_SSO_LENGTH];
+            int64_t value_sso_buffer_len;
+        };
+
+        JSLFatPtr value;
+
+        /// @brief Used to store in the free list, ignored otherwise
+        struct JSL__StrSetEntry* next;
+    };
+
     uint64_t hash;
 
-    /// @brief Used to store in the free list, ignored otherwise
-    struct JSL__StrSetEntry* next;
 };
 
 struct JSL__StrSetKeyValueIter {
@@ -95,7 +106,7 @@ struct JSL__StrSet {
     // more likely that memory bugs are caught.
     uint64_t sentinel;
 
-    JSLArena* arena;
+    JSLAllocatorInterface* allocator;
 
     uintptr_t* entry_lookup_table;
     int64_t entry_lookup_table_length;
@@ -181,7 +192,7 @@ typedef struct JSL__StrSetKeyValueIter JSLStrSetKeyValueIter;
  */
 JSL_STR_SET_DEF bool jsl_str_set_init(
     JSLStrSet* set,
-    JSLArena* arena,
+    JSLAllocatorInterface* allocator,
     uint64_t seed
 );
 
@@ -205,7 +216,7 @@ JSL_STR_SET_DEF bool jsl_str_set_init(
  */
 JSL_STR_SET_DEF bool jsl_str_set_init2(
     JSLStrSet* set,
-    JSLArena* arena,
+    JSLAllocatorInterface* allocator,
     uint64_t seed,
     int64_t item_count_guess,
     float load_factor
