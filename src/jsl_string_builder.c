@@ -396,4 +396,11 @@ JSL__ASAN_OFF bool jsl_string_builder_format(JSLStringBuilder* builder, JSLFatPt
     return !context.failure_flag;
 }
 
+bool jsl_string_builder_clear(
+    JSLStringBuilder* builder
+)
+{
+    // TODO: add a implementation here which frees all of the builder chunks in a loop using the allocator interface and then resets the internal state back to init
+}
+
 #undef JSL__BUILDER_PRIVATE_SENTINEL

@@ -69,6 +69,7 @@
 #endif
 
 #include "jsl_core.h"
+#include "jsl_allocator.h"
 
 /* Versioning to catch mismatches across deps */
 #ifndef JSL_STRING_BUILDER_VERSION
@@ -103,7 +104,7 @@ struct JSL__StringBuilder
     // more likely that memory bugs are caught.
     uint64_t sentinel;
 
-    JSLArena* arena;
+    JSLAllocatorInterface* allocator;
     struct JSL__StringBuilderChunk* head;
     struct JSL__StringBuilderChunk* tail;
     int32_t alignment;
@@ -149,10 +150,10 @@ typedef struct JSLStringBuilderIterator
  * fails this returns false.
  *
  * @param builder The builder instance to initialize; must not be NULL.
- * @param arena The arena that backs all allocations made by the builder; must not be NULL.
+ * @param allocator The allocator that backs all allocations made by the builder; must not be NULL.
  * @return `true` if the builder was initialized successfully, otherwise `false`.
  */
-JSL_STRING_BUILDER_DEF bool jsl_string_builder_init(JSLStringBuilder* builder, JSLArena* arena);
+JSL_STRING_BUILDER_DEF bool jsl_string_builder_init(JSLStringBuilder* builder, JSLAllocatorInterface* allocator);
 
 /**
  * Initialize a JSLStringBuilder with a custom chunk size and chunk allocation alignment.
@@ -160,12 +161,17 @@ JSL_STRING_BUILDER_DEF bool jsl_string_builder_init(JSLStringBuilder* builder, J
  * right away and if that fails this returns false.
  *
  * @param builder The builder instance to initialize; must not be NULL.
- * @param arena The arena that backs all allocations made by the builder; must not be NULL.
+ * @param allocator The allocator that backs all allocations made by the builder; must not be NULL.
  * @param chunk_size The number of bytes that are allocated each time the container needs to grow
  * @param alignment The allocation alignment of the chunks of data
  * @returns `true` if the builder was initialized successfully, otherwise `false`.
  */
-JSL_STRING_BUILDER_DEF bool jsl_string_builder_init2(JSLStringBuilder* builder, JSLArena* arena, int32_t chunk_size, int32_t alignment);
+JSL_STRING_BUILDER_DEF bool jsl_string_builder_init2(
+    JSLStringBuilder* builder,
+    JSLAllocatorInterface* allocator,
+    int32_t chunk_size,
+    int32_t chunk_alignment
+);
 
 /**
  * Add boolean to the string builder as an unsigned 8 bit int. Each append may result in an
@@ -319,6 +325,13 @@ JSL_STRING_BUILDER_DEF bool jsl_string_builder_insert_cstr(JSLStringBuilder* bui
  * @returns `true` if formatting succeeded and the formatted bytes were appended, otherwise `false`.
  */
 JSL_STRING_BUILDER_DEF bool jsl_string_builder_format(JSLStringBuilder* builder, JSLFatPtr fmt, ...);
+
+/**
+ * TODO: docs
+ */
+JSL_STRING_BUILDER_DEF bool jsl_string_builder_clear(
+    JSLStringBuilder* builder
+);
 
 /**
  * Initialize an iterator instance so it will traverse the given string builder
