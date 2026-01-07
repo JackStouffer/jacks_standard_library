@@ -54,6 +54,7 @@
 
 #include "jsl_core.h"
 #include "jsl_hash_map_common.h"
+#include "jsl_allocator.h"
 
 /* Versioning to catch mismatches across deps */
 #ifndef JSL_STR_TO_STR_MAP_VERSION
@@ -80,17 +81,37 @@ enum JSLStrToStrMapKeyState {
 
 #define JSL__MAP_SSO_LENGTH 8
 
-struct JSL__StrToStrMapEntry {
-    uint8_t key_sso_buffer[JSL__MAP_SSO_LENGTH];
-    uint8_t value_sso_buffer[JSL__MAP_SSO_LENGTH];
+struct JSL__StrToStrMapEntry
+{
+    union
+    {
+        struct
+        {
+            uint8_t key_sso_buffer[JSL__MAP_SSO_LENGTH];
+            int64_t key_sso_buffer_length;
+        };
+        JSLFatPtr key;
+        /// @brief Used to store in the free list, ignored otherwise
+        struct JSL__StrToStrMapEntry* next;
+    };
 
-    JSLFatPtr key;
-    JSLFatPtr value;
+    union
+    {
+        struct
+        {
+            uint8_t value_sso_buffer[JSL__MAP_SSO_LENGTH];
+            int64_t value_sso_buffer_length;
+        };
+        JSLFatPtr value;
+    };
+    
     uint64_t hash;
 
-    /// @brief Used to store in the free list, ignored otherwise
-    struct JSL__StrToStrMapEntry* next;
+    uint8_t key_lifetime;
+    uint8_t value_lifetime;
 };
+
+const int a = sizeof(struct JSL__StrToStrMapEntry);
 
 struct JSL__StrToStrMapKeyValueIter {
     struct JSL__StrToStrMap* map;
@@ -105,7 +126,7 @@ struct JSL__StrToStrMap {
     // more likely that memory bugs are caught.
     uint64_t sentinel;
 
-    JSLArena* arena;
+    JSLAllocatorInterface* allocator;
 
     uintptr_t* entry_lookup_table;
     int64_t entry_lookup_table_length;
@@ -195,7 +216,7 @@ typedef struct JSL__StrToStrMapKeyValueIter JSLStrToStrMapKeyValueIter;
  */
 JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_init(
     JSLStrToStrMap* map,
-    JSLArena* arena,
+    JSLAllocatorInterface* allocator,
     uint64_t seed
 );
 
@@ -219,7 +240,7 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_init(
  */
 JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_init2(
     JSLStrToStrMap* map,
-    JSLArena* arena,
+    JSLAllocatorInterface* allocator,
     uint64_t seed,
     int64_t item_count_guess,
     float load_factor
