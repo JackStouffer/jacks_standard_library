@@ -90,7 +90,8 @@ struct JSL__StrSetEntry
     };
 
     uint64_t hash;
-    uint8_t state;
+    uint8_t status;
+    uint8_t lifetime;
 };
 
 struct JSL__StrSetKeyValueIter {
@@ -339,11 +340,26 @@ JSL_STR_SET_DEF bool jsl_str_set_delete(
 );
 
 /**
- * Remove all keys and values from the set.  Iterators become invalid.
+ * Remove all values from the set. Each stored value is checked and if was
+ * stored in the set using `JSL_STRING_LIFETIME_TRANSIENT`, the  the memory
+ * is freed. The set will keep the memory it used for it's internal value
+ * bookkeeping and it will not shrink. Iterators become invalid.
+ * 
+ * If you want to completely free all memory for this set, use `jsl_str_set_free`.
  *
  * @param set Map to clear.
  */
 JSL_STR_SET_DEF void jsl_str_set_clear(
+    JSLStrSet* set
+);
+
+/**
+ * Frees all of the memory for this set and sets in an invalid state from the set.
+ * If you wish to reuse this set after calling this function, you must call init again.
+ *
+ * @param set Map to free.
+ */
+JSL_STR_SET_DEF void jsl_str_set_free(
     JSLStrSet* set
 );
 
