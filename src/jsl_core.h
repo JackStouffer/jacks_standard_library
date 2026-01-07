@@ -197,7 +197,7 @@ typedef struct JSLAllocatorInterface JSLAllocatorInterface;
         #elif JSL__IS_CLANG_VAL || JSL__IS_GCC_VAL
             #define JSL__FORCE_INLINE inline __attribute__((__always_inline__))
         #else
-            #define JSL__FORCE_INLINE
+            #define JSL__FORCE_INLINE inline
         #endif
 
     #endif

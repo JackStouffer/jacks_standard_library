@@ -73,7 +73,7 @@ bool jsl_allocator_interface_free(
 )
 {
     if (allocator == NULL || allocator->sentinel != JSL__ALLOCATOR_PRIVATE_SENTINEL || allocation == NULL)
-        return NULL;
+        return false;
 
     return allocator->allocate(allocator->context, allocation);
 }
@@ -83,7 +83,7 @@ bool jsl_allocator_interface_free_all(
 )
 {
     if (allocator == NULL || allocator->sentinel != JSL__ALLOCATOR_PRIVATE_SENTINEL)
-        return NULL;
+        return false;
 
     return allocator->allocate(allocator->context);
 }

@@ -11,6 +11,14 @@
 
 #define JSL__SET_PRIVATE_SENTINEL 4086971745778309672U
 
+#define JSL__SET_STATE_MASK 0x0Fu
+#define JSL__SET_STATE_LIFETIME_MASK 0xF0u
+#define JSL__SET_STATE_LIFETIME_SHIFT 4
+
+#define JSL__STATE_VALUE_IS_SET 1
+#define JSL__STATE_SSO_IS_SET 2
+#define JSL__STATE_IN_FREE_LIST 3
+
 JSL_STR_SET_DEF bool jsl_str_set_init(
     JSLStrSet* set,
     JSLAllocatorInterface* allocator,
@@ -74,6 +82,110 @@ JSL_STR_SET_DEF int64_t jsl_str_set_item_count(
     return set != NULL && set->sentinel == JSL__SET_PRIVATE_SENTINEL
         ? set->item_count
         : -1;
+}
+
+/// @brief Get the base occupancy state for an entry without lifetime bits.
+static JSL__FORCE_INLINE uint8_t get_entry_state_status(
+    struct JSL__StrSetEntry* entry
+)
+{
+    return entry == NULL
+        ? 0
+        : (uint8_t) (entry->state & JSL__SET_STATE_MASK);
+}
+
+/// @brief Make a new entry state value with both the status and lifetime bits.
+static JSL__FORCE_INLINE uint8_t make_combined_entry_state_value(
+    uint8_t status,
+    JSLStringLifeTime lifetime
+)
+{
+    uint8_t lifetime_bits = (uint8_t) (
+        (((uint32_t) (uint8_t) lifetime) << JSL__SET_STATE_LIFETIME_SHIFT)
+        & (uint32_t) JSL__SET_STATE_LIFETIME_MASK
+    );
+
+    return (uint8_t) (lifetime_bits | (status & JSL__SET_STATE_MASK));
+}
+
+/// @brief Preserve lifetime bits while overwriting the base occupancy state.
+/// @param current_state Existing state byte containing lifetime bits.
+/// @param base_state New base state to store in the lower nibble.
+/// @return State byte with lifetime from current_state and updated base state.
+static JSL__FORCE_INLINE uint8_t make_entry_state_with_status(
+    uint8_t current_state,
+    uint8_t base_state
+)
+{
+    return (uint8_t) (
+        (current_state & JSL__SET_STATE_LIFETIME_MASK)
+        | (base_state & JSL__SET_STATE_MASK)
+    );
+}
+
+/// @brief Extract the lifetime information from an entry's state byte.
+/// @param entry Entry containing the encoded state.
+/// @return Lifetime value decoded from the upper nibble.
+static JSL__FORCE_INLINE JSLStringLifeTime get_entry_state_lifetime(
+    struct JSL__StrSetEntry* entry
+)
+{
+    return (JSLStringLifeTime) (
+        (entry->state & JSL__SET_STATE_LIFETIME_MASK)
+        >> JSL__SET_STATE_LIFETIME_SHIFT
+    );
+}
+
+static JSL__FORCE_INLINE void jsl__str_set_entry_free_value(
+    JSLStrSet* set,
+    struct JSL__StrSetEntry* entry
+)
+{
+    if (set == NULL || entry == NULL)
+        return;
+
+    uint8_t state = get_entry_state_status(entry);
+    JSLStringLifeTime lifetime = get_entry_state_lifetime(entry);
+
+    bool should_free = (
+        state == JSL__STATE_VALUE_IS_SET
+        && lifetime == JSL_STRING_LIFETIME_TRANSIENT
+        && entry->value.data != NULL
+        && entry->value.length > 0
+    );
+
+    if (should_free)
+    {
+        jsl_allocator_interface_free(set->allocator, entry->value.data);
+        entry->value.data = NULL;
+        entry->value.length = 0;
+    }
+}
+
+static JSL__FORCE_INLINE JSLFatPtr jsl__get_entry_value(
+    struct JSL__StrSetEntry* entry
+)
+{
+    JSLFatPtr res = {0};
+
+    if (entry == NULL)
+    {
+        return res;
+    }
+
+    uint8_t state = get_entry_state_status(entry);
+
+    if (state == JSL__STATE_SSO_IS_SET)
+    {
+        res.data = entry->value_sso_buffer;
+        res.length = entry->value_sso_buffer_len;
+    }
+    else if (state == JSL__STATE_VALUE_IS_SET)
+    {
+        res = entry->value;
+    }
+
+    return res;
 }
 
 static bool jsl__str_set_rehash(
@@ -167,17 +279,21 @@ static bool jsl__str_set_rehash(
     bool should_commit = migrate_ok && new_table != NULL && length_valid;
     if (should_commit)
     {
+        uintptr_t* old_table_to_free = set->entry_lookup_table;
         set->entry_lookup_table = new_table;
         set->entry_lookup_table_length = new_length;
         set->tombstone_count = 0;
         ++set->generational_id;
         res = true;
+
+        jsl_allocator_interface_free(set->allocator, old_table_to_free);
     }
 
     bool failed = !should_commit;
     if (failed)
     {
         res = false;
+        jsl_allocator_interface_free(set->allocator, new_table);
     }
 
     return res;
@@ -229,9 +345,13 @@ static inline void jsl__str_set_probe(
             ? (struct JSL__StrSetEntry*) lut_res
             : NULL;
 
+        JSLFatPtr entry_value = jsl__get_entry_value(entry);
+        uint8_t state = get_entry_state_status(entry);
+
         bool matches = entry != NULL
+            && (state == JSL__STATE_VALUE_IS_SET || state == JSL__STATE_SSO_IS_SET)
             && *out_hash == entry->hash
-            && jsl_fatptr_memory_compare(value, entry->value);
+            && jsl_fatptr_memory_compare(value, entry_value);
 
         if (matches)
         {
@@ -333,24 +453,35 @@ static JSL__FORCE_INLINE bool jsl__str_set_add(
     if (entry != NULL && value_lifetime == JSL_STRING_LIFETIME_STATIC)
     {
         entry->value = value;
+        entry->state = make_combined_entry_state_value(
+            JSL__STATE_VALUE_IS_SET,
+            value_lifetime
+        );
     }
     else if (
         entry != NULL
         && value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
-        && value.length <= JSL__SET_SSO_LENGTH
+        && value.length <= JSL__STR_SET_SSO_LENGTH
     )
     {
         JSL_MEMCPY(entry->value_sso_buffer, value.data, (size_t) value.length);
-        entry->value.data = entry->value_sso_buffer;
-        entry->value.length = value.length;
+        entry->value_sso_buffer_len = value.length;
+        entry->state = make_combined_entry_state_value(
+            JSL__STATE_SSO_IS_SET,
+            value_lifetime
+        );
     }
     else if (
         entry != NULL
         && value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
-        && value.length > JSL__SET_SSO_LENGTH
+        && value.length > JSL__STR_SET_SSO_LENGTH
     )
     {
         entry->value = jsl_fatptr_duplicate(set->allocator, value);
+        entry->state = make_combined_entry_state_value(
+            JSL__STATE_VALUE_IS_SET,
+            value_lifetime
+        );
     }
 
     return entry != NULL;
@@ -462,7 +593,21 @@ JSL_STR_SET_DEF bool jsl_str_set_iterator_next(
         if (occupied)
         {
             found_entry = (struct JSL__StrSetEntry*) lut_res;
-            break;
+            uint8_t state = get_entry_state_status(found_entry);
+            bool has_value = (
+                state == JSL__STATE_VALUE_IS_SET
+                || state == JSL__STATE_SSO_IS_SET
+            );
+
+            if (has_value)
+            {
+                break;
+            }
+            else
+            {
+                found_entry = NULL;
+                ++lut_index;
+            }
         }
         else
         {
@@ -473,7 +618,7 @@ JSL_STR_SET_DEF bool jsl_str_set_iterator_next(
     if (found_entry != NULL)
     {
         iterator->current_lut_index = lut_index + 1;
-        *out_value = found_entry->value;
+        *out_value = jsl__get_entry_value(found_entry);
         found = true;
     }
 
@@ -515,7 +660,12 @@ JSL_STR_SET_DEF bool jsl_str_set_delete(
         struct JSL__StrSetEntry* entry =
             (struct JSL__StrSetEntry*) set->entry_lookup_table[lut_index];
 
+        jsl__str_set_entry_free_value(set, entry);
         entry->next = set->entry_free_list;
+        entry->state = make_entry_state_with_status(
+            entry->state,
+            JSL__STATE_IN_FREE_LIST
+        );
         set->entry_free_list = entry;
 
         --set->item_count;
@@ -550,7 +700,12 @@ JSL_STR_SET_DEF void jsl_str_set_clear(
         if (lut_res != JSL__HASHMAP_EMPTY && lut_res != JSL__HASHMAP_TOMBSTONE)
         {
             struct JSL__StrSetEntry* entry = (struct JSL__StrSetEntry*) lut_res;
+            jsl__str_set_entry_free_value(set, entry);
             entry->next = set->entry_free_list;
+            entry->state = make_entry_state_with_status(
+                entry->state,
+                JSL__STATE_IN_FREE_LIST
+            );
             set->entry_free_list = entry;
             set->entry_lookup_table[index] = JSL__HASHMAP_EMPTY;
         }
@@ -703,3 +858,9 @@ JSL_STR_SET_DEF bool jsl_str_set_difference(
 }
 
 #undef JSL__SET_PRIVATE_SENTINEL
+#undef JSL__SET_STATE_MASK
+#undef JSL__SET_STATE_LIFETIME_MASK
+#undef JSL__SET_STATE_LIFETIME_SHIFT
+#undef JSL__STATE_VALUE_IS_SET
+#undef JSL__STATE_SSO_IS_SET
+#undef JSL__STATE_IN_FREE_LIST

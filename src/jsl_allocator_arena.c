@@ -39,6 +39,11 @@ static JSLFatPtr alloc_interface_realloc(void* ctx, JSLFatPtr allocation, int64_
 
 static bool alloc_interface_free(void* ctx, JSLFatPtr allocation)
 {
+    // TODO:
+    // #ifdef JSL_DEBUG
+    //     JSL_MEMSET();
+    // #endif
+
     return true;
 }
 

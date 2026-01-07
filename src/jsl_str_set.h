@@ -71,15 +71,15 @@
 extern "C" {
 #endif
 
-#define JSL__SET_SSO_LENGTH 16
+#define JSL__STR_SET_SSO_LENGTH 16
 
-struct JSL__StrSetEntry {
-
+struct JSL__StrSetEntry
+{
     union
     {
         struct
         {
-            uint8_t value_sso_buffer[JSL__SET_SSO_LENGTH];
+            uint8_t value_sso_buffer[JSL__STR_SET_SSO_LENGTH];
             int64_t value_sso_buffer_len;
         };
 
@@ -90,7 +90,7 @@ struct JSL__StrSetEntry {
     };
 
     uint64_t hash;
-
+    uint8_t state;
 };
 
 struct JSL__StrSetKeyValueIter {
