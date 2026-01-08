@@ -54,6 +54,7 @@
 
 #include "jsl_core.h"
 #include "jsl_hash_map_common.h"
+#include "jsl_allocator.h"
 
 /* Versioning to catch mismatches across deps */
 #ifndef JSL_STR_TO_STR_MULTIMAP_VERSION
@@ -77,33 +78,51 @@ enum JSLStrToStrMultimapKeyState {
     JSL__MULTIMAP_TOMBSTONE = 2UL
 };
 
-#define JSL__MULTIMAP_SSO_LENGTH 16
-#define JSL__MULTIMAP_PRIVATE_SENTINEL 15280798434051232421UL
+#define JSL__MULTIMAP_KEY_SSO_LENGTH 24
+#define JSL__MULTIMAP_VALUE_SSO_LENGTH 32
 
-struct JSL__StrToStrMultimapValue {
-    uint8_t small_string_buffer[JSL__MULTIMAP_SSO_LENGTH];
-
-    JSLFatPtr value;
+struct JSL__StrToStrMultimapValue
+{
+    union
+    {
+        struct
+        {
+            int64_t sso_len;
+            uint8_t small_string_buffer[JSL__MULTIMAP_VALUE_SSO_LENGTH];
+        };
+        JSLFatPtr value;
+    };
+    
     struct JSL__StrToStrMultimapValue* next;
+    uint8_t value_state;
 };
 
 struct JSL__StrToStrMultimapEntry {
-    /// @brief small string optimization buffer to hold the key if len < 16
-    uint8_t small_string_buffer[JSL__MULTIMAP_SSO_LENGTH];
-
-    // TODO: docs
-    JSLFatPtr key;
+    union
+    {
+        struct
+        {
+            /// @brief small string optimization buffer to hold the key if len < JSL__MULTIMAP_SSO_LENGTH
+            uint8_t small_string_buffer[JSL__MULTIMAP_KEY_SSO_LENGTH];
+            int64_t sso_len;
+        };
+        // TODO: docs
+        JSLFatPtr key;
+        /// @brief Used to store in the free list, ignored otherwise
+        struct JSL__StrToStrMultimapEntry* next;
+    };
+    
     // TODO: docs
     uint64_t hash;
-
-    /// @brief Used to store in the free list, ignored otherwise
-    struct JSL__StrToStrMultimapEntry* next;
 
     // TODO: docs
     struct JSL__StrToStrMultimapValue* values_head;
 
     int64_t value_count;
+    uint8_t key_state;
 };
+
+const int a = sizeof(struct JSL__StrToStrMultimapValue);
 
 struct JSL__StrToStrMultimapKeyValueIter {
     struct JSL__StrToStrMultimap* map;
@@ -128,7 +147,7 @@ struct JSL__StrToStrMultimap {
     // more likely that memory bugs are caught.
     uint64_t sentinel;
 
-    JSLArena* arena;
+    JSLAllocatorInterface* allocator;
 
     uintptr_t* entry_lookup_table;
     int64_t entry_lookup_table_length;
@@ -243,7 +262,7 @@ typedef struct JSL__StrToStrMultimapValueIter JSLStrToStrMultimapValueIter;
  */
 JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_init(
     JSLStrToStrMultimap* map,
-    JSLArena* arena,
+    JSLAllocatorInterface* allocator,
     uint64_t seed
 );
 
@@ -267,7 +286,7 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_init(
  */
 JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_init2(
     JSLStrToStrMultimap* map,
-    JSLArena* arena,
+    JSLAllocatorInterface* allocator,
     uint64_t seed,
     int64_t item_count_guess,
     float load_factor

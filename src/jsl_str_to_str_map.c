@@ -115,7 +115,7 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_init2(
     return res;
 }
 
-static bool rehash(
+static bool jsl__str_to_str_map_rehash(
     JSLStrToStrMap* map
 )
 {
@@ -222,7 +222,7 @@ static bool rehash(
     return res;
 }
 
-static JSL__FORCE_INLINE void store_key(
+static JSL__FORCE_INLINE void jsl__str_to_str_map_store_key(
     JSLStrToStrMap* map,
     struct JSL__StrToStrMapEntry* entry,
     JSLFatPtr key,
@@ -349,7 +349,7 @@ static JSL__FORCE_INLINE bool add_new_entry(
         map->entry_lookup_table[lut_index] = (uintptr_t) entry;
         ++map->item_count;
 
-        store_key(map, entry, key, key_lifetime);
+        jsl__str_to_str_map_store_key(map, entry, key, key_lifetime);
         store_value(map, entry, value, value_lifetime);
     }
 
@@ -361,7 +361,7 @@ static JSL__FORCE_INLINE bool add_new_entry(
     return entry != NULL;
 }
 
-static inline void probe(
+static inline void jsl__str_to_str_map_probe(
     JSLStrToStrMap* map,
     JSLFatPtr key,
     int64_t* out_lut_index,
@@ -412,7 +412,7 @@ static inline void probe(
         if (entry != NULL)
         {
             JSLFatPtr entry_key = get_entry_key(entry);
-            bool matches = *out_hash == entry->hash && jsl_fatptr_memory_compare(key, entry_key);
+            matches = *out_hash == entry->hash && jsl_fatptr_memory_compare(key, entry_key);
         }
 
         if (matches)
@@ -476,7 +476,7 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_insert(
 
     if (JSL__UNLIKELY(needs_rehash))
     {
-        res = rehash(map);
+        res = jsl__str_to_str_map_rehash(map);
     }
 
     uint64_t hash = 0;
@@ -484,7 +484,7 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_insert(
     bool existing_found = false;
     if (res)
     {
-        probe(map, key, &lut_index, &hash, &existing_found);
+        jsl__str_to_str_map_probe(map, key, &lut_index, &hash, &existing_found);
     }
     
     // new key
@@ -531,7 +531,7 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_has_key(
         && key.length > -1
     )
     {
-        probe(map, key, &lut_index, &hash, &existing_found);
+        jsl__str_to_str_map_probe(map, key, &lut_index, &hash, &existing_found);
     }
 
     return lut_index > -1 && existing_found;
@@ -560,7 +560,7 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_get(
 
     if (params_valid)
     {
-        probe(map, key, &lut_index, &hash, &existing_found);
+        jsl__str_to_str_map_probe(map, key, &lut_index, &hash, &existing_found);
     }
 
     if (params_valid && existing_found && lut_index > -1)
@@ -695,7 +695,7 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_delete(
     bool existing_found = false;
     if (params_valid)
     {
-        probe(map, key, &lut_index, &hash, &existing_found);
+        jsl__str_to_str_map_probe(map, key, &lut_index, &hash, &existing_found);
     }
 
     if (existing_found && lut_index > -1)

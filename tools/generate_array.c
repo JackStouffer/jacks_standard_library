@@ -95,13 +95,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#include "../src/jsl_core.c"
-#include "../src/jsl_string_builder.c"
-#include "../src/jsl_str_set.c"
-#include "../src/jsl_str_to_str_map.c"
-#include "../src/jsl_str_to_str_multimap.c"
-#include "../src/jsl_os.c"
-#include "../src/jsl_cmd_line.c"
+#include "../src/jsl_everything.c"
 
 #define GENERATE_ARRAY_IMPLEMENTATION
 #include "generate_array.h"

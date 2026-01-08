@@ -111,8 +111,6 @@ struct JSL__StrToStrMapEntry
     uint8_t value_lifetime;
 };
 
-const int a = sizeof(struct JSL__StrToStrMapEntry);
-
 struct JSL__StrToStrMapKeyValueIter {
     struct JSL__StrToStrMap* map;
     int64_t current_lut_index;

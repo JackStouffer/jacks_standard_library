@@ -9,6 +9,8 @@
     #include <stdbool.h>
 #endif
 
+#include "jsl_core.h"
+#include "jsl_allocator.h"
 #include "jsl_cmd_line.h"
 #include "jsl_str_set.h"
 #include "jsl_str_to_str_map.h"
@@ -149,12 +151,12 @@ static bool jsl__cmd_line_validate_utf8(JSLFatPtr str)
     return res;
 }
 
-static bool jsl__cmd_line_utf16_to_utf8(JSLArena* arena, wchar_t* wide, JSLFatPtr* out_utf8)
+static bool jsl__cmd_line_utf16_to_utf8(JSLAllocatorInterface* allocator, wchar_t* wide, JSLFatPtr* out_utf8)
 {
     bool res = false;
 
     bool params_valid = (
-        arena != NULL
+        allocator != NULL
         && out_utf8 != NULL
         && wide != NULL
     );
@@ -244,7 +246,8 @@ static bool jsl__cmd_line_utf16_to_utf8(JSLArena* arena, wchar_t* wide, JSLFatPt
     JSLFatPtr buffer = {0};
     if (allocation_ok)
     {
-        buffer = jsl_arena_allocate(arena, total_bytes, false);
+        buffer.data = jsl_allocator_interface_alloc(allocator, total_bytes, JSL_DEFAULT_ALLOCATION_ALIGNMENT, false);
+        buffer.length = total_bytes;
         allocation_ok = (buffer.data != NULL || total_bytes == 0) && buffer.length >= total_bytes;
     }
 
@@ -340,7 +343,7 @@ static bool jsl__cmd_line_ensure_arg_capacity(JSLCmdLine* cmd_line, int64_t capa
 
     bool params_valid = (
         cmd_line != NULL
-        && cmd_line->arena != NULL
+        && cmd_line->allocator != NULL
         && capacity_needed > -1
     );
 
@@ -357,17 +360,16 @@ static bool jsl__cmd_line_ensure_arg_capacity(JSLCmdLine* cmd_line, int64_t capa
         if (can_multiply)
         {
             int64_t bytes = capacity_needed * (int64_t) sizeof(JSLFatPtr);
-            JSLFatPtr allocation = jsl_arena_allocate_aligned(
-                cmd_line->arena,
+            JSLFatPtr* allocation = jsl_allocator_interface_alloc(
+                cmd_line->allocator,
                 bytes,
                 _Alignof(JSLFatPtr),
                 false
             );
 
-            bool allocation_ok = allocation.data != NULL && allocation.length >= bytes;
-            if (allocation_ok)
+            if (allocation != NULL)
             {
-                cmd_line->arg_list = (JSLFatPtr*) allocation.data;
+                cmd_line->arg_list = allocation;
                 cmd_line->arg_list_capacity = capacity_needed;
                 res = true;
             }
@@ -383,7 +385,7 @@ static bool jsl__cmd_line_copy_arg(JSLCmdLine* cmd_line, JSLFatPtr raw, JSLFatPt
 
     bool params_valid = (
         cmd_line != NULL
-        && cmd_line->arena != NULL
+        && cmd_line->allocator != NULL
         && out_copy != NULL
         && raw.length > -1
         && (raw.data != NULL || raw.length == 0)
@@ -393,7 +395,13 @@ static bool jsl__cmd_line_copy_arg(JSLCmdLine* cmd_line, JSLFatPtr raw, JSLFatPt
     bool allocated = false;
     if (params_valid)
     {
-        copy = jsl_arena_allocate(cmd_line->arena, raw.length, false);
+        copy.data = jsl_allocator_interface_alloc(
+            cmd_line->allocator,
+            raw.length,
+            JSL_DEFAULT_ALLOCATION_ALIGNMENT,
+            false
+        );
+        copy.length = raw.length;
         allocated = (copy.data != NULL || raw.length == 0) && copy.length >= raw.length;
     }
 
@@ -447,7 +455,7 @@ static bool jsl__cmd_line_add_command(
             cmd_line,
             out_error,
             jsl_format(
-                cmd_line->arena,
+                cmd_line->allocator,
                 JSL_FATPTR_EXPRESSION("Unable to store argument %d: %y"),
                 arg_index,
                 command
@@ -492,7 +500,7 @@ static bool jsl__cmd_line_handle_long_option(
                 cmd_line,
                 out_error,
                 jsl_format(
-                    cmd_line->arena,
+                    cmd_line->allocator,
                     JSL_FATPTR_EXPRESSION("Expected a flag name after \"--\" in argument %d"),
                     arg_index
                 )
@@ -512,7 +520,7 @@ static bool jsl__cmd_line_handle_long_option(
                     cmd_line,
                     out_error,
                     jsl_format(
-                        cmd_line->arena,
+                        cmd_line->allocator,
                         JSL_FATPTR_EXPRESSION("Expected a flag name before '=' in argument %d"),
                         arg_index
                     )
@@ -548,7 +556,7 @@ static bool jsl__cmd_line_handle_long_option(
                     cmd_line,
                     out_error,
                     jsl_format(
-                        cmd_line->arena,
+                        cmd_line->allocator,
                         JSL_FATPTR_EXPRESSION("Unable to record flag --%y"),
                         flag_body
                     )
@@ -591,7 +599,7 @@ static bool jsl__cmd_line_handle_long_option(
                 cmd_line,
                 out_error,
                 jsl_format(
-                    cmd_line->arena,
+                    cmd_line->allocator,
                     JSL_FATPTR_EXPRESSION("Expected a flag name before value in argument %d"),
                     arg_index
                 )
@@ -612,7 +620,7 @@ static bool jsl__cmd_line_handle_long_option(
                 cmd_line,
                 out_error,
                 jsl_format(
-                    cmd_line->arena,
+                    cmd_line->allocator,
                     JSL_FATPTR_EXPRESSION("Unable to store value for --%y"),
                     key
                 )
@@ -667,7 +675,7 @@ static bool jsl__cmd_line_handle_short_option(
                     cmd_line,
                     out_error,
                     jsl_format(
-                        cmd_line->arena,
+                        cmd_line->allocator,
                         JSL_FATPTR_EXPRESSION("Short flags cannot use '=' (argument %d: %y)"),
                         arg_index,
                         arg
@@ -698,7 +706,7 @@ static bool jsl__cmd_line_handle_short_option(
                 cmd_line,
                 out_error,
                 jsl_format(
-                    cmd_line->arena,
+                    cmd_line->allocator,
                     JSL_FATPTR_EXPRESSION("Short flags must be ASCII (argument %d: %y)"),
                     arg_index,
                     arg
@@ -735,13 +743,13 @@ static bool jsl__cmd_line_process_arg(
         && stored_arg.length > -1
     );
 
-    if (!params_valid && out_error != NULL && cmd_line != NULL && cmd_line->arena != NULL)
+    if (!params_valid && out_error != NULL && cmd_line != NULL && cmd_line->allocator != NULL)
     {
         jsl__cmd_line_set_error(
             cmd_line,
             out_error,
             jsl_format(
-                cmd_line->arena,
+                cmd_line->allocator,
                 JSL_FATPTR_EXPRESSION("Invalid argument at position %d"),
                 arg_index
             )
@@ -826,7 +834,7 @@ static bool jsl__cmd_line_process_arg(
             cmd_line,
             out_error,
             jsl_format(
-                cmd_line->arena,
+                cmd_line->allocator,
                 JSL_FATPTR_EXPRESSION("Could not parse argument %d: %y"),
                 arg_index,
                 stored_arg
@@ -903,7 +911,7 @@ static bool jsl__cmd_line_prepare_utf8_arg(
                 cmd_line,
                 out_error,
                 jsl_format(
-                    cmd_line->arena,
+                    cmd_line->allocator,
                     JSL_FATPTR_EXPRESSION("Argument %d is missing"),
                     index
                 )
@@ -918,7 +926,7 @@ static bool jsl__cmd_line_prepare_utf8_arg(
             cmd_line,
             out_error,
             jsl_format(
-                cmd_line->arena,
+                cmd_line->allocator,
                 JSL_FATPTR_EXPRESSION("Argument %d is not valid UTF-8"),
                 index
             )
@@ -933,7 +941,7 @@ static bool jsl__cmd_line_prepare_utf8_arg(
             cmd_line,
             out_error,
             jsl_format(
-                cmd_line->arena,
+                cmd_line->allocator,
                 JSL_FATPTR_EXPRESSION("Unable to store argument %d"),
                 index
             )
@@ -978,7 +986,7 @@ static bool jsl__cmd_line_prepare_wide_arg(
                 cmd_line,
                 out_error,
                 jsl_format(
-                    cmd_line->arena,
+                    cmd_line->allocator,
                     JSL_FATPTR_EXPRESSION("Argument %d is missing"),
                     index
                 )
@@ -988,7 +996,7 @@ static bool jsl__cmd_line_prepare_wide_arg(
 
     if (params_valid)
     {
-        bool converted = jsl__cmd_line_utf16_to_utf8(cmd_line->arena, wide_arg, &utf8_arg)
+        bool converted = jsl__cmd_line_utf16_to_utf8(cmd_line->allocator, wide_arg, &utf8_arg)
             && jsl__cmd_line_validate_utf8(utf8_arg);
 
         if (!converted && out_error != NULL)
@@ -997,7 +1005,7 @@ static bool jsl__cmd_line_prepare_wide_arg(
                 cmd_line,
                 out_error,
                 jsl_format(
-                    cmd_line->arena,
+                    cmd_line->allocator,
                     JSL_FATPTR_EXPRESSION("Argument %d is not valid UTF-16"),
                     index
                 )
@@ -1033,7 +1041,7 @@ static bool jsl__cmd_line_parse_common(
 
     bool params_valid = (
         cmd_line != NULL
-        && cmd_line->arena != NULL
+        && cmd_line->allocator != NULL
         && argv != NULL
         && argc > -1
         && prepare_arg != NULL
@@ -1058,7 +1066,7 @@ static bool jsl__cmd_line_parse_common(
                 cmd_line,
                 out_error,
                 jsl_format(
-                    cmd_line->arena,
+                    cmd_line->allocator,
                     JSL_FATPTR_EXPRESSION("Command line input exceeds memory limit")
                 )
             );
@@ -1128,7 +1136,7 @@ static bool jsl__cmd_line_parse_common(
                 cmd_line,
                 out_error,
                 jsl_format(
-                    cmd_line->arena,
+                    cmd_line->allocator,
                     JSL_FATPTR_EXPRESSION("Failed to parse command line input")
                 )
             );
@@ -1138,20 +1146,20 @@ static bool jsl__cmd_line_parse_common(
     return res;
 }
 
-bool jsl_cmd_line_init(JSLCmdLine* cmd_line, JSLArena* arena)
+bool jsl_cmd_line_init(JSLCmdLine* cmd_line, JSLAllocatorInterface* allocator)
 {
     bool res = false;
 
-    bool params_valid = cmd_line != NULL && arena != NULL;
+    bool params_valid = cmd_line != NULL && allocator != NULL;
 
     if (params_valid)
     {
         JSL_MEMSET(cmd_line, 0, sizeof(JSLCmdLine));
-        cmd_line->arena = arena;
+        cmd_line->allocator = allocator;
 
-        bool long_init = jsl_str_to_str_map_init(&cmd_line->long_flags, arena, 0);
-        bool multimap_init = jsl_str_to_str_multimap_init(&cmd_line->flags_with_values, arena, 0);
-        bool commands_init = jsl_str_set_init(&cmd_line->commands, arena, 0);
+        bool long_init = jsl_str_to_str_map_init(&cmd_line->long_flags, allocator, 0);
+        bool multimap_init = jsl_str_to_str_multimap_init(&cmd_line->flags_with_values, allocator, 0);
+        bool commands_init = jsl_str_set_init(&cmd_line->commands, allocator, 0);
 
         if (long_init && multimap_init && commands_init)
         {

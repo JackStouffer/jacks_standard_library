@@ -149,7 +149,7 @@ JSL_WARN_UNUSED JSLGetFileSizeResultEnum jsl_get_file_size(
     * If the arena does not have enough space,
     */
 JSL_WARN_UNUSED JSL_DEF JSLLoadFileResultEnum jsl_load_file_contents(
-    JSLArena* arena,
+    JSLAllocatorInterface* allocator,
     JSLFatPtr path,
     JSLFatPtr* out_contents,
     int32_t* out_errno

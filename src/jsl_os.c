@@ -50,6 +50,7 @@
 #endif
 
 #include "jsl_core.h"
+#include "jsl_allocator.h"
 #include "jsl_os.h"
 
 JSLGetFileSizeResultEnum jsl_get_file_size(
@@ -173,7 +174,7 @@ static inline int64_t jsl__get_file_size_from_fileno(int32_t file_descriptor)
 }
 
 JSLLoadFileResultEnum jsl_load_file_contents(
-    JSLArena* arena,
+    JSLAllocatorInterface* allocator,
     JSLFatPtr path,
     JSLFatPtr* out_contents,
     int32_t* out_errno
@@ -186,10 +187,7 @@ JSLLoadFileResultEnum jsl_load_file_contents(
     if (path.data != NULL
         && path.length > 0
         && path.length < FILENAME_MAX
-        && arena != NULL
-        && arena->current != NULL
-        && arena->start != NULL
-        && arena->end != NULL
+        && allocator != NULL
         && out_contents != NULL
     )
     {
@@ -239,7 +237,13 @@ JSLLoadFileResultEnum jsl_load_file_contents(
     bool got_memory = false;
     if (got_file_size)
     {
-        allocation = jsl_arena_allocate(arena, file_size, false);
+        allocation.data = jsl_allocator_interface_alloc(
+            allocator,
+            file_size,
+            JSL_DEFAULT_ALLOCATION_ALIGNMENT,
+            false
+        );
+        allocation.length = file_size;
         got_memory = allocation.data != NULL && allocation.length >= file_size;
     }
     else

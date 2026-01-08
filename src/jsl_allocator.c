@@ -42,6 +42,7 @@ void* jsl_allocator_interface_alloc(
         || allocator->sentinel != JSL__ALLOCATOR_PRIVATE_SENTINEL
         || bytes < 1
         || alignment < 1
+        || !jsl_is_power_of_two(alignment)
     )
         return NULL;
 
@@ -61,6 +62,7 @@ void* jsl_allocator_interface_realloc(
         || allocation == NULL
         || new_bytes < 1
         || alignment < 1
+        || !jsl_is_power_of_two(alignment)
     )
         return NULL;
 
@@ -75,7 +77,7 @@ bool jsl_allocator_interface_free(
     if (allocator == NULL || allocator->sentinel != JSL__ALLOCATOR_PRIVATE_SENTINEL || allocation == NULL)
         return false;
 
-    return allocator->allocate(allocator->context, allocation);
+    return allocator->free(allocator->context, allocation);
 }
 
 bool jsl_allocator_interface_free_all(
@@ -85,7 +87,7 @@ bool jsl_allocator_interface_free_all(
     if (allocator == NULL || allocator->sentinel != JSL__ALLOCATOR_PRIVATE_SENTINEL)
         return false;
 
-    return allocator->allocate(allocator->context);
+    return allocator->free_all(allocator->context);
 }
 
 void* jsl_align_ptr_upwards(void* ptr, int32_t alignment)

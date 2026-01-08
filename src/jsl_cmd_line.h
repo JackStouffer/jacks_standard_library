@@ -34,7 +34,7 @@
 #endif
 
 #include "jsl_core.h"
-#include "jsl_cmd_line.h"
+#include "jsl_allocator.h"
 #include "jsl_str_set.h"
 #include "jsl_str_to_str_map.h"
 #include "jsl_str_to_str_multimap.h"
@@ -48,7 +48,7 @@ extern "C" {
 #endif
 
 struct JSL__CmdLine {
-    JSLArena* arena;
+    JSLAllocatorInterface* allocator;
 
     uint64_t short_flag_bitset[JSL__CMD_LINE_SHORT_FLAG_BUCKETS];
 
@@ -70,7 +70,7 @@ typedef struct JSL__CmdLine JSLCmdLine;
 /**
  * Initialize an instance of the command line parser container.
  */
-bool jsl_cmd_line_init(JSLCmdLine* cmd_line, JSLArena* arena);
+bool jsl_cmd_line_init(JSLCmdLine* cmd_line, JSLAllocatorInterface* allocator);
 
 /**
  * Parse the given command line arguments that are in the POSIX style.

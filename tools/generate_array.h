@@ -131,7 +131,7 @@
      * @param include_header_count The length of the header array
      */
     GENERATE_ARRAY_DEF void write_array_header(
-        JSLArena* arena,
+        JSLAllocatorInterface* allocator,
         JSLStringBuilder* builder,
         ArrayImplementation impl,
         JSLFatPtr array_type_name,
@@ -154,7 +154,7 @@
      * @param include_header_count The length of the header array
      */
     GENERATE_ARRAY_DEF void write_array_source(
-        JSLArena* arena,
+        JSLAllocatorInterface* allocator,
         JSLStringBuilder* builder,
         ArrayImplementation impl,
         JSLFatPtr array_type_name,
@@ -997,7 +997,7 @@
     *          allocation failures during header generation.
     */
     GENERATE_ARRAY_DEF void write_array_header(
-        JSLArena* arena,
+        JSLAllocatorInterface* allocator,
         JSLStringBuilder* builder,
         ArrayImplementation impl,
         JSLFatPtr array_type_name,
@@ -1041,7 +1041,7 @@
         jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("\n"));
 
         JSLStrToStrMap map;
-        jsl_str_to_str_map_init(&map, arena, 0x123456789);
+        jsl_str_to_str_map_init(&map, allocator, 0x123456789);
 
         jsl_str_to_str_map_insert(
             &map,
@@ -1074,7 +1074,7 @@
     }
 
     GENERATE_ARRAY_DEF void write_array_source(
-        JSLArena* arena,
+        JSLAllocatorInterface* allocator,
         JSLStringBuilder* builder,
         ArrayImplementation impl,
         JSLFatPtr array_type_name,
@@ -1116,7 +1116,7 @@
         jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("\n"));
 
         JSLStrToStrMap map;
-        jsl_str_to_str_map_init(&map, arena, 0x123456789);
+        jsl_str_to_str_map_init(&map, allocator, 0x123456789);
 
         jsl_str_to_str_map_insert(
             &map,
