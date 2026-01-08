@@ -28,6 +28,8 @@
 
 #include "../src/jsl_cmd_line.h"
 #include "../src/jsl_core.h"
+#include "../src/jsl_allocator.h"
+#include "../src/jsl_allocator_arena.h"
 
 #include "minctest.h"
 
@@ -35,9 +37,11 @@ static void test_short_flags_grouping(void)
 {
     uint8_t buffer[4096];
     JSLArena arena = JSL_ARENA_FROM_STACK(buffer);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
+
     JSLCmdLine cmd = {0};
 
-    TEST_BOOL(jsl_cmd_line_init(&cmd, &arena));
+    TEST_BOOL(jsl_cmd_line_init(&cmd, &allocator));
 
     char* argv[] = {
         "prog",
@@ -73,9 +77,11 @@ static void test_short_flag_equals_is_invalid(void)
 {
     uint8_t buffer[4096];
     JSLArena arena = JSL_ARENA_FROM_STACK(buffer);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
+
     JSLCmdLine cmd = {0};
 
-    TEST_BOOL(jsl_cmd_line_init(&cmd, &arena));
+    TEST_BOOL(jsl_cmd_line_init(&cmd, &allocator));
 
     char* argv[] = {
         "prog",
@@ -93,9 +99,11 @@ static void test_long_flags_and_commands(void)
 {
     uint8_t buffer[4096];
     JSLArena arena = JSL_ARENA_FROM_STACK(buffer);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
+
     JSLCmdLine cmd = {0};
 
-    TEST_BOOL(jsl_cmd_line_init(&cmd, &arena));
+    TEST_BOOL(jsl_cmd_line_init(&cmd, &allocator));
 
     char* argv[] = {
         "prog",
@@ -143,9 +151,11 @@ static void test_long_values_equals_and_space(void)
 {
     uint8_t buffer[4096];
     JSLArena arena = JSL_ARENA_FROM_STACK(buffer);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
+
     JSLCmdLine cmd = {0};
 
-    TEST_BOOL(jsl_cmd_line_init(&cmd, &arena));
+    TEST_BOOL(jsl_cmd_line_init(&cmd, &allocator));
 
     char* argv[] = {
         "prog",
@@ -189,9 +199,11 @@ static void test_wide_parsing(void)
 {
     uint8_t buffer[4096];
     JSLArena arena = JSL_ARENA_FROM_STACK(buffer);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
+
     JSLCmdLine cmd = {0};
 
-    TEST_BOOL(jsl_cmd_line_init(&cmd, &arena));
+    TEST_BOOL(jsl_cmd_line_init(&cmd, &allocator));
 
     wchar_t arg0[] = L"prog";
     wchar_t arg1[] = L"--name";

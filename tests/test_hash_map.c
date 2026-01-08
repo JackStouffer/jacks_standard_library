@@ -30,6 +30,8 @@
 #include <stdlib.h>
 
 #include "../src/jsl_core.h"
+#include "../src/jsl_allocator.h"
+#include "../src/jsl_allocator_arena.h"
 #include "../src/jsl_str_to_str_map.h"
 
 #include "minctest.h"
@@ -685,7 +687,7 @@ static void test_jsl_str_to_str_map_init_success(void)
     TEST_BOOL(ok);
     if (!ok) return;
 
-    TEST_POINTERS_EQUAL(map.arena, &global_arena);
+    TEST_POINTERS_EQUAL(map.allocator, &global_arena);
     TEST_BOOL(map.entry_lookup_table != NULL);
     int64_t expected_length = JSL_MAX(32L, jsl_next_power_of_two_i64(65));
     TEST_INT64_EQUAL(map.entry_lookup_table_length, expected_length);

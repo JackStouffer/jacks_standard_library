@@ -16,16 +16,10 @@
     #include <stdbool.h>
 #endif
 
+#include "../src/jsl_everything.c"
+
 #define EMBED_IMPLEMENTATION
 #include "embed.h"
-
-#include "../src/jsl_core.c"
-#include "../src/jsl_string_builder.c"
-#include "../src/jsl_os.c"
-#include "../src/jsl_str_set.c"
-#include "../src/jsl_str_to_str_map.c"
-#include "../src/jsl_str_to_str_multimap.c"
-#include "../src/jsl_cmd_line.c"
 
 static JSLFatPtr help_message = JSL_FATPTR_INITIALIZER(
     "OVERVIEW:\n\n"
@@ -41,7 +35,7 @@ static JSLFatPtr default_var_name = JSL_FATPTR_EXPRESSION("data");
 
 static int32_t entrypoint(
     JSLCmdLine* cmd,
-    JSLArena* arena,
+    JSLAllocatorInterface* allocator,
     bool stdin_has_data
 )
 {
@@ -63,7 +57,7 @@ static int32_t entrypoint(
         }
 
         JSLLoadFileResultEnum load_result = jsl_load_file_contents(
-            arena,
+            allocator,
             file_path,
             &file_contents,
             &load_errno
@@ -82,26 +76,31 @@ static int32_t entrypoint(
     }
     else if (stdin_has_data)
     {
-        JSLFatPtr stdin_buffer = jsl_arena_allocate(arena, 4096, false);
-        JSLFatPtr stdin_buffer_read_buffer = stdin_buffer;
+        // TODO: refactor to dynamic array
+
+        uint8_t* stdin_buffer = malloc(4096);
+        int64_t buffer_length = 4096;
+        int64_t cursor = 0;
 
         size_t n;
-        while ((n = fread(stdin_buffer_read_buffer.data, 1, stdin_buffer_read_buffer.length, stdin)) > 0)
+        while (true)
         {
-            JSL_FATPTR_ADVANCE(stdin_buffer_read_buffer, (int64_t) n);
-
-            if (stdin_buffer_read_buffer.length < 32)
+            size_t remaining = (size_t) (buffer_length - cursor);
+            if (remaining == 0)
             {
-                stdin_buffer = jsl_arena_reallocate(
-                    arena,
-                    stdin_buffer,
-                    stdin_buffer.length + 4096
-                );
-                stdin_buffer_read_buffer.length += 4096;
+                stdin_buffer = realloc(stdin_buffer, (size_t) (buffer_length + 4096));
+                buffer_length += 4096;
+                remaining = (size_t) (buffer_length - cursor);
             }
+
+            n = fread(stdin_buffer + cursor, 1, remaining, stdin);
+            if (n == 0)
+                break;
+
+            cursor += (int64_t) n;
         }
 
-        file_contents = jsl_fatptr_auto_slice(stdin_buffer, stdin_buffer_read_buffer);
+        file_contents = jsl_fatptr_init(stdin_buffer, cursor);
     }
     else
     {
@@ -112,7 +111,7 @@ static int32_t entrypoint(
     if (file_contents.length > 0)
     {
         JSLStringBuilder builder;
-        jsl_string_builder_init(&builder, arena);
+        jsl_string_builder_init(&builder, allocator);
 
         JSLFatPtr var_name = default_var_name;
         jsl_cmd_line_pop_flag_with_value(cmd, JSL_FATPTR_EXPRESSION("var-name"), &var_name);
@@ -174,9 +173,10 @@ static int32_t entrypoint(
         }
 
         jsl_arena_init(&arena, backing_data, arena_size);
+        JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
 
         JSLCmdLine cmd;
-        jsl_cmd_line_init(&cmd, &arena);
+        jsl_cmd_line_init(&cmd, &allocator);
         JSLFatPtr error_message = {0};
         if (!jsl_cmd_line_parse_wide(&cmd, argc, argv, &error_message))
         {
@@ -208,7 +208,7 @@ static int32_t entrypoint(
             stdin_has_data = true;
         }
 
-        return entrypoint(&cmd, &arena, stdin_has_data);
+        return entrypoint(&cmd, &allocator, stdin_has_data);
     }
 
 #elif JSL_IS_POSIX
@@ -233,9 +233,10 @@ static int32_t entrypoint(
         }
 
         jsl_arena_init(&arena, backing_data, arena_size);
+        JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
 
         JSLCmdLine cmd;
-        if (!jsl_cmd_line_init(&cmd, &arena))
+        if (!jsl_cmd_line_init(&cmd, &allocator))
         {
             jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Command line input exceeds memory limit"));
             return EXIT_FAILURE;
@@ -264,7 +265,7 @@ static int32_t entrypoint(
         int stdin_poll_result = poll(&stdin_poll, 1, 0);
         bool stdin_has_data = stdin_poll_result > 0 && (stdin_poll.revents & POLLIN);
 
-        return entrypoint(&cmd, &arena, stdin_has_data);
+        return entrypoint(&cmd, &allocator, stdin_has_data);
     }
 
 #else

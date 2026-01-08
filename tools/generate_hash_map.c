@@ -93,13 +93,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#include "../src/jsl_core.c"
-#include "../src/jsl_string_builder.c"
-#include "../src/jsl_str_set.c"
-#include "../src/jsl_str_to_str_map.c"
-#include "../src/jsl_str_to_str_multimap.c"
-#include "../src/jsl_os.c"
-#include "../src/jsl_cmd_line.c"
+#include "../src/jsl_everything.c"
 
 #define GENERATE_HASH_MAP_IMPLEMENTATION
 #include "generate_hash_map.h"
@@ -132,7 +126,7 @@ JSLFatPtr help_message = JSL_FATPTR_INITIALIZER(
     "\t--custom-hash\t\tOverride the included hash call with the given function name\n"
 );
 
-static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
+static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLine* cmd)
 {
     bool show_help = false;
     JSLFatPtr name = {0};
@@ -173,6 +167,7 @@ static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
     while (jsl_cmd_line_pop_flag_with_value(cmd, add_header_flag_str, &custom_header))
     {
         ++header_includes_count;
+        // TODO: replace with allocate interface
         header_includes = realloc(
             header_includes,
             sizeof(JSLFatPtr) * (size_t) header_includes_count
@@ -276,12 +271,12 @@ static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
     if (dynamic_flag_set) impl = IMPL_DYNAMIC;
 
     JSLStringBuilder builder;
-    jsl_string_builder_init(&builder, arena);
+    jsl_string_builder_init(&builder, allocator);
 
     if (header_flag_set)
     {
         write_hash_map_header(
-            arena,
+            allocator,
             &builder,
             impl,
             name,
@@ -296,7 +291,7 @@ static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
     else
     {
         write_hash_map_source(
-            arena,
+            allocator,
             &builder,
             impl,
             name,
@@ -359,9 +354,10 @@ static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
             return EXIT_FAILURE;
 
         jsl_arena_init(&arena, backing_data, arena_size);
+        JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
 
         JSLCmdLine cmd;
-        jsl_cmd_line_init(&cmd, &arena);
+        jsl_cmd_line_init(&cmd, &allocator);
         JSLFatPtr error_message = {0};
         if (!jsl_cmd_line_parse_wide(&cmd, argc, argv, &error_message))
         {
@@ -377,7 +373,7 @@ static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
             return EXIT_FAILURE;
         }
 
-        return entrypoint(&arena, &cmd);
+        return entrypoint(&allocator, &cmd);
     }
 
 #elif JSL_IS_POSIX
@@ -397,9 +393,10 @@ static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
             return EXIT_FAILURE;
 
         jsl_arena_init(&arena, backing_data, arena_size);
+        JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
 
         JSLCmdLine cmd;
-        if (!jsl_cmd_line_init(&cmd, &arena))
+        if (!jsl_cmd_line_init(&cmd, &allocator))
         {
             jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Command line input exceeds memory limit"));
             return EXIT_FAILURE;
@@ -420,7 +417,7 @@ static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
             return EXIT_FAILURE;
         }
 
-        return entrypoint(&arena, &cmd);
+        return entrypoint(&allocator, &cmd);
     }
 
 #else

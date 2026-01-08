@@ -29,6 +29,8 @@
 #include <stdlib.h>
 
 #include "../src/jsl_core.h"
+#include "../src/jsl_allocator.h"
+#include "../src/jsl_allocator_arena.h"
 #include "../src/jsl_string_builder.h"
 
 #include "minctest.h"
@@ -52,11 +54,13 @@ static void debug_concatenate_builder(JSLStringBuilder* builder, JSLFatPtr* writ
 static void test_jsl_string_builder_init(void)
 {
     JSLStringBuilder builder;
-    bool ok = jsl_string_builder_init(&builder, &global_arena);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    bool ok = jsl_string_builder_init(&builder, &allocator);
+
     TEST_BOOL(ok);
-    TEST_POINTERS_EQUAL(builder.arena, &global_arena);
+    TEST_POINTERS_EQUAL(builder.allocator, &global_arena);
     TEST_INT64_EQUAL(builder.chunk_size, 1024);
-    TEST_BOOL(builder.alignment == 8);
+    TEST_BOOL(builder.chunk_alignment == 8);
     TEST_BOOL(builder.head != NULL);
     TEST_POINTERS_EQUAL(builder.tail, builder.head);
     TEST_INT64_EQUAL(builder.head->buffer.length, builder.chunk_size);
@@ -67,14 +71,16 @@ static void test_jsl_string_builder_init(void)
 static void test_jsl_string_builder_init2(void)
 {
     JSLStringBuilder builder;
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
 
     const int32_t chunk_size = 64;
     const int32_t alignment = 16;
 
-    bool ok = jsl_string_builder_init2(&builder, &global_arena, chunk_size, alignment);
+    bool ok = jsl_string_builder_init2(&builder, &allocator, chunk_size, alignment);
+
     TEST_BOOL(ok);
     TEST_BOOL(builder.chunk_size == chunk_size);
-    TEST_BOOL(builder.alignment == alignment);
+    TEST_BOOL(builder.chunk_alignment == alignment);
     TEST_BOOL(builder.head != NULL && builder.tail != NULL);
     TEST_BOOL(builder.head->buffer.length == chunk_size);
     TEST_BOOL(builder.head->writer.length == chunk_size);
@@ -83,17 +89,21 @@ static void test_jsl_string_builder_init2(void)
 static void test_jsl_string_builder_init_invalid_arguments(void)
 {
     JSLStringBuilder builder;
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
 
-    TEST_BOOL(!jsl_string_builder_init2(NULL, &global_arena, 16, 8));
+    TEST_BOOL(!jsl_string_builder_init2(NULL, &allocator, 16, 8));
     TEST_BOOL(!jsl_string_builder_init2(&builder, NULL, 16, 8));
-    TEST_BOOL(!jsl_string_builder_init2(&builder, &global_arena, 0, 8));
-    TEST_BOOL(!jsl_string_builder_init2(&builder, &global_arena, 16, 0));
+    TEST_BOOL(!jsl_string_builder_init2(&builder, &allocator, 0, 8));
+    TEST_BOOL(!jsl_string_builder_init2(&builder, &allocator, 16, 0));
 }
 
 static void test_jsl_string_builder_insert_i8_basic(void)
 {
     JSLStringBuilder builder;
-    bool ok = jsl_string_builder_init(&builder, &global_arena);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+
+    bool ok = jsl_string_builder_init(&builder, &allocator);
+
     TEST_BOOL(ok);
 
     TEST_BOOL(jsl_string_builder_insert_i8(&builder, 'A'));
@@ -118,7 +128,9 @@ static void test_jsl_string_builder_insert_i8_basic(void)
 static void test_jsl_string_builder_insert_i8_grows_chunks(void)
 {
     JSLStringBuilder builder;
-    bool ok = jsl_string_builder_init2(&builder, &global_arena, 2, 2);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+
+    bool ok = jsl_string_builder_init2(&builder, &allocator, 2, 2);
     TEST_BOOL(ok);
 
     TEST_BOOL(jsl_string_builder_insert_i8(&builder, 'X'));
@@ -145,7 +157,9 @@ static void test_jsl_string_builder_insert_i8_grows_chunks(void)
 static void test_jsl_string_builder_insert_u8(void)
 {
     JSLStringBuilder builder;
-    bool ok = jsl_string_builder_init2(&builder, &global_arena, 8, 4);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+
+    bool ok = jsl_string_builder_init2(&builder, &allocator, 8, 4);
     TEST_BOOL(ok);
 
     TEST_BOOL(jsl_string_builder_insert_u8(&builder, 0x00));
@@ -169,7 +183,9 @@ static void test_jsl_string_builder_insert_u8(void)
 static void test_jsl_string_builder_insert_u32_basic(void)
 {
     JSLStringBuilder builder;
-    bool ok = jsl_string_builder_init2(&builder, &global_arena, 16, 4);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+
+    bool ok = jsl_string_builder_init2(&builder, &allocator, 16, 4);
     TEST_BOOL(ok);
 
     uint32_t first = 0x11223344;
@@ -199,7 +215,9 @@ static void test_jsl_string_builder_insert_u32_basic(void)
 static void test_jsl_string_builder_insert_u32_multi_chunk(void)
 {
     JSLStringBuilder builder;
-    bool ok = jsl_string_builder_init2(&builder, &global_arena, 5, 1);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+
+    bool ok = jsl_string_builder_init2(&builder, &allocator, 5, 1);
     TEST_BOOL(ok);
 
     uint32_t first = 0x11223344;
@@ -249,7 +267,9 @@ static void test_jsl_string_builder_insert_u32_multi_chunk(void)
 static void test_jsl_string_builder_insert_fatptr_multi_chunk(void)
 {
     JSLStringBuilder builder;
-    bool ok = jsl_string_builder_init2(&builder, &global_arena, 4, 4);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+
+    bool ok = jsl_string_builder_init2(&builder, &allocator, 4, 4);
     TEST_BOOL(ok);
 
     char text[] = "abcdefghij";
@@ -286,7 +306,9 @@ static void test_jsl_string_builder_insert_fatptr_multi_chunk(void)
 static void test_jsl_string_builder_insert_fatptr_edge_cases(void)
 {
     JSLStringBuilder builder;
-    bool ok = jsl_string_builder_init2(&builder, &global_arena, 8, 8);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+
+    bool ok = jsl_string_builder_init2(&builder, &allocator, 8, 8);
     TEST_BOOL(ok);
 
     JSLFatPtr empty = JSL_FATPTR_INITIALIZER("");
@@ -318,7 +340,9 @@ static void test_jsl_string_builder_insert_fatptr_edge_cases(void)
 static void test_jsl_string_builder_iterator_behavior(void)
 {
     JSLStringBuilder builder;
-    bool ok = jsl_string_builder_init2(&builder, &global_arena, 6, 2);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+
+    bool ok = jsl_string_builder_init2(&builder, &allocator, 6, 2);
     TEST_BOOL(ok);
 
     JSLStringBuilderIterator iterator;
@@ -355,7 +379,9 @@ static void test_jsl_string_builder_iterator_behavior(void)
 static void test_jsl_string_builder_format_success(void)
 {
     JSLStringBuilder builder;
-    bool ok = jsl_string_builder_init2(&builder, &global_arena, 32, 8);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+
+    bool ok = jsl_string_builder_init2(&builder, &allocator, 32, 8);
     TEST_BOOL(ok);
 
     TEST_BOOL(jsl_string_builder_format(&builder, JSL_FATPTR_EXPRESSION("%s-%d"), "alpha", 42));
@@ -377,7 +403,9 @@ static void test_jsl_string_builder_format_needs_multiple_chunks(void)
     uint8_t arena_buffer[256];
     JSLArena arena = JSL_ARENA_FROM_STACK(arena_buffer);
     JSLStringBuilder builder;
-    bool ok = jsl_string_builder_init2(&builder, &arena, 16, 8);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
+    
+    bool ok = jsl_string_builder_init2(&builder, &allocator, 16, 8);
     TEST_BOOL(ok);
 
     char long_fragment[] = "0123456789ABCDEF0123456789";

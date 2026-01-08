@@ -94,6 +94,8 @@
     #endif
 
     #include "../src/jsl_core.h"
+    #include "../src/jsl_allocator.h"
+    #include "../src/jsl_allocator_arena.h"
 
     /* Versioning to catch mismatches across deps */
     #ifndef GENERATE_HASH_MAP_VERSION
@@ -133,7 +135,7 @@
      * @param include_header_count The length of the header array
      */
     GENERATE_HASH_MAP_DEF void write_hash_map_header(
-        JSLArena* arena,
+        JSLAllocatorInterface* allocator,
         JSLStringBuilder* builder,
         HashMapImplementation impl,
         JSLFatPtr hash_map_name,
@@ -160,7 +162,7 @@
      * @param include_header_count The length of the header array
      */
     GENERATE_HASH_MAP_DEF void write_hash_map_source(
-        JSLArena* arena,
+        JSLAllocatorInterface* allocator,
         JSLStringBuilder* builder,
         HashMapImplementation impl,
         JSLFatPtr hash_map_name,
@@ -1853,7 +1855,7 @@
     *          allocation failures during header generation.
     */
     GENERATE_HASH_MAP_DEF void write_hash_map_header(
-        JSLArena* arena,
+        JSLAllocatorInterface* allocator,
         JSLStringBuilder* builder,
         HashMapImplementation impl,
         JSLFatPtr hash_map_name,
@@ -1900,7 +1902,7 @@
         jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("\n"));
 
         JSLStrToStrMap map;
-        jsl_str_to_str_map_init(&map, arena, 0x123456789);
+        jsl_str_to_str_map_init(&map, allocator, 0x123456789);
 
         jsl_str_to_str_map_insert(
             &map,
@@ -1940,7 +1942,7 @@
     }
 
     GENERATE_HASH_MAP_DEF void write_hash_map_source(
-        JSLArena* arena,
+        JSLAllocatorInterface* allocator,
         JSLStringBuilder* builder,
         HashMapImplementation impl,
         JSLFatPtr hash_map_name,
@@ -1990,7 +1992,7 @@
 
 
         JSLStrToStrMap map;
-        jsl_str_to_str_map_init(&map, arena, 0x123456789);
+        jsl_str_to_str_map_init(&map, allocator, 0x123456789);
 
         jsl_str_to_str_map_insert(
             &map,
@@ -2023,14 +2025,15 @@
 
         // hash and find slot
         {
-            uint8_t hash_function_call_buffer[4098];
+            uint8_t hash_function_call_buffer[JSL_KILOBYTES(4)];
             JSLArena hash_function_scratch_arena = JSL_ARENA_FROM_STACK(hash_function_call_buffer);
+            JSLAllocatorInterface scratch_interface = jsl_arena_get_allocator_interface(&hash_function_scratch_arena);
 
             JSLFatPtr resolved_hash_function_call;
             if (hash_function_name.data != NULL && hash_function_name.length > 0)
             {
                 resolved_hash_function_call = jsl_format(
-                    &hash_function_scratch_arena,
+                    &scratch_interface,
                     JSL_FATPTR_EXPRESSION("uint64_t hash = %y(&key, sizeof(%y), hash_map->seed)"),
                     hash_function_name,
                     key_type_name
@@ -2055,7 +2058,7 @@
             )
             {
                 resolved_hash_function_call = jsl_format(
-                    &hash_function_scratch_arena,
+                    &scratch_interface,
                     JSL_FATPTR_EXPRESSION("*out_hash = murmur3_fmix_u64((uint64_t) key, hash_map->seed)"),
                     key_type_name
                 );
@@ -2063,7 +2066,7 @@
             else
             {
                 resolved_hash_function_call = jsl_format(
-                    &hash_function_scratch_arena,
+                    &scratch_interface,
                     JSL_FATPTR_EXPRESSION("*out_hash = jsl__rapidhash_withSeed(&key, sizeof(%y), hash_map->seed)"),
                     key_type_name
                 );
@@ -2080,8 +2083,9 @@
 
         // key comparison
         {
-            uint8_t resolved_key_buffer[4098];
+            uint8_t resolved_key_buffer[JSL_KILOBYTES(4)];
             JSLArena scratch_arena = JSL_ARENA_FROM_STACK(resolved_key_buffer);
+            JSLAllocatorInterface scratch_interface = jsl_arena_get_allocator_interface(&scratch_arena);
 
             JSLFatPtr resolved_key_compare;
 
@@ -2104,7 +2108,7 @@
             )
             {
                 resolved_key_compare = jsl_format(
-                    &scratch_arena,
+                    &scratch_interface,
                     JSL_FATPTR_EXPRESSION("key == hash_map->keys_array[slot]"),
                     key_type_name
                 );
@@ -2112,7 +2116,7 @@
             else
             {
                 resolved_key_compare = jsl_format(
-                    &scratch_arena,
+                    &scratch_interface,
                     JSL_FATPTR_EXPRESSION("JSL_MEMCMP(&key, &hash_map->keys_array[slot], sizeof(%y)) == 0"),
                     key_type_name
                 );

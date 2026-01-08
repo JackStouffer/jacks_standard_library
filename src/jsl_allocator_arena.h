@@ -8,6 +8,12 @@
 #include "jsl_core.h"
 #include "jsl_allocator.h"
 
+// Stored immediately before every allocation so realloc can recover the length.
+struct JSL__ArenaAllocationHeader
+{
+    int64_t length;
+};
+
 /**
  * A bump allocator. Designed for situations in your program when you know a
  * definite lifetime and a good upper bound on how much memory that lifetime will
@@ -126,7 +132,7 @@ JSL_DEF JSLAllocatorInterface jsl_arena_get_allocator_interface(JSLArena* arena)
  * @param zeroed When true, zero-initialize the allocation.
  * @return Fat pointer describing the allocation or `{0}` on failure.
  */
-JSL_DEF JSLFatPtr jsl_arena_allocate(JSLArena* arena, int64_t bytes, bool zeroed);
+JSL_DEF void* jsl_arena_allocate(JSLArena* arena, int64_t bytes, bool zeroed);
 
 /**
  * Allocate a block of memory from the arena with the provided alignment.
@@ -137,7 +143,7 @@ JSL_DEF JSLFatPtr jsl_arena_allocate(JSLArena* arena, int64_t bytes, bool zeroed
  * @param zeroed When true, zero-initialize the allocation.
  * @return Fat pointer describing the allocation or `{0}` on failure.
  */
-JSL_DEF JSLFatPtr jsl_arena_allocate_aligned(JSLArena* arena, int64_t bytes, int32_t alignment, bool zeroed);
+JSL_DEF void* jsl_arena_allocate_aligned(JSLArena* arena, int64_t bytes, int32_t alignment, bool zeroed);
 
 /**
  * Macro to make it easier to allocate an instance of `T` within an arena.
@@ -151,7 +157,7 @@ JSL_DEF JSLFatPtr jsl_arena_allocate_aligned(JSLArena* arena, int64_t bytes, int
  * struct MyStruct* thing = JSL_ARENA_TYPED_ALLOCATE(struct MyStruct, arena);
  * ```
  */
-#define JSL_ARENA_TYPED_ALLOCATE(T, arena) (T*) jsl_arena_allocate_aligned(arena, sizeof(T), _Alignof(T), false).data
+#define JSL_ARENA_TYPED_ALLOCATE(T, arena) (T*) jsl_arena_allocate_aligned(arena, sizeof(T), _Alignof(T), false)
 
 /**
  * Macro to make it easier to allocate a zero filled array of `T` within an arena.
@@ -165,15 +171,15 @@ JSL_DEF JSLFatPtr jsl_arena_allocate_aligned(JSLArena* arena, int64_t bytes, int
  * struct MyStruct* thing_array = JSL_ARENA_TYPED_ALLOCATE(struct MyStruct, arena, 42);
  * @endcode
  */
-#define JSL_ARENA_TYPED_ARRAY_ALLOCATE(T, arena, length) (T*) jsl_arena_allocate_aligned(arena, (int64_t) sizeof(T) * length, _Alignof(T), true).data
+#define JSL_ARENA_TYPED_ARRAY_ALLOCATE(T, arena, length) (T*) jsl_arena_allocate_aligned(arena, (int64_t) sizeof(T) * length, _Alignof(T), true)
 
 /**
  * Resize the allocation if it was the last allocation, otherwise, allocate a new
  * chunk of memory and copy the old allocation's contents.
  */
-JSL_DEF JSLFatPtr jsl_arena_reallocate(
+JSL_DEF void* jsl_arena_reallocate(
     JSLArena* arena,
-    JSLFatPtr original_allocation,
+    void* original_allocation,
     int64_t new_num_bytes
 );
 
@@ -181,9 +187,9 @@ JSL_DEF JSLFatPtr jsl_arena_reallocate(
  * Resize the allocation if it was the last allocation, otherwise, allocate a new
  * chunk of memory and copy the old allocation's contents.
  */
-JSL_DEF JSLFatPtr jsl_arena_reallocate_aligned(
+JSL_DEF void* jsl_arena_reallocate_aligned(
     JSLArena* arena,
-    JSLFatPtr original_allocation,
+    void* original_allocation,
     int64_t new_num_bytes,
     int32_t align
 );

@@ -30,6 +30,8 @@
 #include <stdlib.h>
 
 #include "../src/jsl_core.h"
+#include "../src/jsl_allocator.h"
+#include "../src/jsl_allocator_arena.h"
 
 #include "minctest.h"
 
@@ -235,9 +237,10 @@ static void test_jsl_fatptr_auto_slice_arena_reallocate(void)
     JSLArena arena;
     jsl_arena_init(&arena, malloc((size_t) arena_size), arena_size);
 
-    JSLFatPtr buffer = jsl_arena_allocate(&arena, 4096, false);
+    JSLFatPtr buffer;
+    buffer.data = jsl_arena_allocate(&arena, 4096, false);
+    buffer.length = 4096;
     TEST_BOOL(buffer.data != NULL);
-    TEST_INT64_EQUAL(buffer.length, (int64_t) 4096);
     uint8_t* original_ptr = buffer.data;
 
     JSLFatPtr writer = buffer;
@@ -247,10 +250,10 @@ static void test_jsl_fatptr_auto_slice_arena_reallocate(void)
     TEST_INT64_EQUAL(writer.length, (int64_t) 0);
 
     // First grow should keep the pointer stable
-    buffer = jsl_arena_reallocate(&arena, buffer, 8192);
+    buffer.data = jsl_arena_reallocate(&arena, buffer.data, 8192);
     TEST_BOOL(buffer.data != NULL);
     TEST_POINTERS_EQUAL(buffer.data, original_ptr);
-    TEST_INT64_EQUAL(buffer.length, (int64_t) 8192);
+    buffer.length += 4096;
     writer.length += 4096;
 
     // Fill the grown region
@@ -258,10 +261,10 @@ static void test_jsl_fatptr_auto_slice_arena_reallocate(void)
     TEST_INT64_EQUAL(writer.length, (int64_t) 0);
 
     // Second grow must still stay in place; otherwise auto_slice asserts
-    buffer = jsl_arena_reallocate(&arena, buffer, 12288);
+    buffer.data = jsl_arena_reallocate(&arena, buffer.data, 12288);
     TEST_BOOL(buffer.data != NULL);
     TEST_POINTERS_EQUAL(buffer.data, original_ptr);
-    TEST_INT64_EQUAL(buffer.length, (int64_t) 12288);
+    buffer.length += 4096;
     writer.length += 4096;
 
     JSLFatPtr slice = jsl_fatptr_auto_slice(buffer, writer);
@@ -646,44 +649,45 @@ static void test_jsl_fatptr_to_lowercase_ascii(void)
 {
     JSLArena arena;
     jsl_arena_init(&arena, malloc(1024), 1024);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
 
-    JSLFatPtr buffer1 = jsl_cstr_to_fatptr(&arena, "10023");
+    JSLFatPtr buffer1 = jsl_cstr_to_fatptr(&allocator, "10023");
     jsl_fatptr_to_lowercase_ascii(buffer1);
     TEST_BOOL(jsl_fatptr_cstr_compare(buffer1, "10023"));
 
     jsl_arena_reset(&arena);
 
-    JSLFatPtr buffer2 = jsl_cstr_to_fatptr(&arena, "hello!@#$@*()");
+    JSLFatPtr buffer2 = jsl_cstr_to_fatptr(&allocator, "hello!@#$@*()");
     jsl_fatptr_to_lowercase_ascii(buffer2);
     TEST_BOOL(jsl_fatptr_cstr_compare(buffer2, "hello!@#$@*()"));
 
     jsl_arena_reset(&arena);
 
-    JSLFatPtr buffer3 = jsl_cstr_to_fatptr(&arena, "Population");
+    JSLFatPtr buffer3 = jsl_cstr_to_fatptr(&allocator, "Population");
     jsl_fatptr_to_lowercase_ascii(buffer3);
     TEST_BOOL(jsl_fatptr_cstr_compare(buffer3, "population"));
 
     jsl_arena_reset(&arena);
 
-    JSLFatPtr buffer4 = jsl_cstr_to_fatptr(&arena, "ENTRUSTED");
+    JSLFatPtr buffer4 = jsl_cstr_to_fatptr(&allocator, "ENTRUSTED");
     jsl_fatptr_to_lowercase_ascii(buffer4);
     TEST_BOOL(jsl_fatptr_cstr_compare(buffer4, "entrusted"));
 
     jsl_arena_reset(&arena);
 
-    JSLFatPtr buffer5 = jsl_cstr_to_fatptr(&arena, (char*) u8"Footnotes Ω≈ç√∫");
+    JSLFatPtr buffer5 = jsl_cstr_to_fatptr(&allocator, (char*) u8"Footnotes Ω≈ç√∫");
     jsl_fatptr_to_lowercase_ascii(buffer5);
     TEST_BOOL(jsl_fatptr_cstr_compare(buffer5, (char*) u8"footnotes Ω≈ç√∫"));
 
     jsl_arena_reset(&arena);
 
-    JSLFatPtr buffer6 = jsl_cstr_to_fatptr(&arena, (char*) u8"Ω≈ç√∫");
+    JSLFatPtr buffer6 = jsl_cstr_to_fatptr(&allocator, (char*) u8"Ω≈ç√∫");
     jsl_fatptr_to_lowercase_ascii(buffer6);
     TEST_BOOL(jsl_fatptr_cstr_compare(buffer6, (char*) u8"Ω≈ç√∫"));
 
     jsl_arena_reset(&arena);
 
-    JSLFatPtr buffer7 = jsl_cstr_to_fatptr(&arena, (char*) u8"Ω≈ç√∫ ENTRUSTED this is a longer string to activate the SIMD path!");
+    JSLFatPtr buffer7 = jsl_cstr_to_fatptr(&allocator, (char*) u8"Ω≈ç√∫ ENTRUSTED this is a longer string to activate the SIMD path!");
     jsl_fatptr_to_lowercase_ascii(buffer7);
     TEST_BOOL(jsl_fatptr_cstr_compare(buffer7, (char*) u8"Ω≈ç√∫ entrusted this is a longer string to activate the simd path!"));
 
@@ -942,10 +946,11 @@ static void test_jsl_fatptr_to_cstr(void)
 {
     JSLArena arena;
     jsl_arena_init(&arena, malloc(1024), 1024);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
 
     {
         JSLFatPtr fatptr = {0};
-        char* cstr = jsl_fatptr_to_cstr(&arena, fatptr);
+        char* cstr = jsl_fatptr_to_cstr(&allocator, fatptr);
         TEST_POINTERS_EQUAL(cstr, NULL);
     }
 
@@ -953,7 +958,7 @@ static void test_jsl_fatptr_to_cstr(void)
 
     {
         JSLFatPtr fatptr = JSL_FATPTR_INITIALIZER("10023");
-        char* cstr = jsl_fatptr_to_cstr(&arena, fatptr);
+        char* cstr = jsl_fatptr_to_cstr(&allocator, fatptr);
         TEST_BOOL(jsl_fatptr_cstr_compare(fatptr, cstr));
     }
 
@@ -961,7 +966,7 @@ static void test_jsl_fatptr_to_cstr(void)
 
     {
         JSLFatPtr fatptr = JSL_FATPTR_INITIALIZER(u8"Ω≈ç√∫");
-        char* cstr = jsl_fatptr_to_cstr(&arena, fatptr);
+        char* cstr = jsl_fatptr_to_cstr(&allocator, fatptr);
         TEST_BOOL(jsl_fatptr_cstr_compare(fatptr, cstr));
     }
 }

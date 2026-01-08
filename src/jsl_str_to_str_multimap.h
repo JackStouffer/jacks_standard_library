@@ -122,8 +122,6 @@ struct JSL__StrToStrMultimapEntry {
     uint8_t key_state;
 };
 
-const int a = sizeof(struct JSL__StrToStrMultimapValue);
-
 struct JSL__StrToStrMultimapKeyValueIter {
     struct JSL__StrToStrMultimap* map;
     struct JSL__StrToStrMultimapEntry* current_entry;

@@ -45,7 +45,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "../src/jsl_core.c"
+#include "../src/jsl_everything.c"
 
 #if JSL_IS_POSIX
     #include <sys/types.h>
@@ -73,6 +73,7 @@ typedef struct CompilerConfig {
 } CompilerConfig;
 
 static char* clang_warning_flags[] = {
+    "-Werror",
     "-Wall",
     "-Wextra",
     "-Wconversion",
@@ -303,53 +304,84 @@ static CompilerConfig msvc_configs[] = {
 };
 
 static UnitTestDecl unit_test_declarations[] = {
-    { "test_fatptr", (char*[]) {
-        "tests/test_fatptr.c",
-        "src/jsl_core.c",
-        NULL
-    } },
-    { "test_format", (char*[]) {
-        "tests/test_format.c",
-        "src/jsl_core.c",
-        NULL
-    } },
-    { "test_string_builder", (char*[]) {
-        "tests/test_string_builder.c",
-        "src/jsl_core.c",
-        "src/jsl_string_builder.c",
-        NULL
-    } },
-    { "test_cmd_line", (char*[]) {
-        "tests/test_cmd_line.c",
-        "src/jsl_core.c",
-        "src/jsl_str_set.c",
-        "src/jsl_str_to_str_map.c",
-        "src/jsl_str_to_str_multimap.c",
-        "src/jsl_cmd_line.c",
-        NULL
-    } },
+    {
+        "test_fatptr",
+        (char*[]) {
+            "tests/test_fatptr.c",
+            "src/jsl_core.c",
+            "src/jsl_allocator.c",
+            "src/jsl_allocator_arena.c",
+            NULL
+        }
+    },
+    {
+        "test_format",
+        (char*[]) {
+            "tests/test_format.c",
+            "src/jsl_core.c",
+            "src/jsl_allocator.c",
+            "src/jsl_allocator_arena.c",
+            NULL
+        }
+    },
+    {
+        "test_string_builder",
+        (char*[]) {
+            "tests/test_string_builder.c",
+            "src/jsl_core.c",
+            "src/jsl_allocator.c",
+            "src/jsl_allocator_arena.c",
+            "src/jsl_string_builder.c",
+            NULL
+        }
+    },
+    {
+        "test_cmd_line",
+        (char*[]) {
+            "tests/test_cmd_line.c",
+            "src/jsl_core.c",
+            "src/jsl_allocator.c",
+            "src/jsl_allocator_arena.c",
+            "src/jsl_str_set.c",
+            "src/jsl_str_to_str_map.c",
+            "src/jsl_str_to_str_multimap.c",
+            "src/jsl_cmd_line.c",
+            NULL
+        }
+    },
     { "test_intrinsics", (char*[]) {
         "tests/test_intrinsics.c",
         "src/jsl_core.c",
+        "src/jsl_allocator.c",
+        "src/jsl_allocator_arena.c",
         NULL
     } },
     { "test_file_utils", (char*[]) {
         "tests/test_file_utils.c",
         "src/jsl_core.c",
+        "src/jsl_allocator.c",
+        "src/jsl_allocator_arena.c",
         "src/jsl_os.c",
         NULL
     } },
-    { "test_str_to_str_multimap", (char*[]) {
-        "tests/test_str_to_str_multimap.c",
-        "src/jsl_core.c",
-        "src/jsl_str_to_str_multimap.c",
-        NULL
-    } },
+    {
+        "test_str_to_str_multimap",
+        (char*[]) {
+            "tests/test_str_to_str_multimap.c",
+            "src/jsl_core.c",
+            "src/jsl_allocator.c",
+            "src/jsl_allocator_arena.c",
+            "src/jsl_str_to_str_multimap.c",
+            NULL
+        }
+    },
     {
         "test_hash_set",
         (char*[]) {
             "tests/test_hash_set.c",
             "src/jsl_core.c",
+            "src/jsl_allocator.c",
+            "src/jsl_allocator_arena.c",
             "src/jsl_str_set.c",
             NULL
         }
@@ -359,6 +391,8 @@ static UnitTestDecl unit_test_declarations[] = {
         (char*[]) {
             "tests/test_array.c",
             "src/jsl_core.c",
+            "src/jsl_allocator.c",
+            "src/jsl_allocator_arena.c",
             "tests/arrays/dynamic_comp1_array.c",
             "tests/arrays/dynamic_comp2_array.c",
             "tests/arrays/dynamic_comp3_array.c",
@@ -371,6 +405,8 @@ static UnitTestDecl unit_test_declarations[] = {
         (char*[]) {
             "tests/test_hash_map.c",
             "src/jsl_core.c",
+            "src/jsl_allocator.c",
+            "src/jsl_allocator_arena.c",
             "src/jsl_str_to_str_map.c",
             "tests/hash_maps/fixed_comp2_to_int_map.c",
             "tests/hash_maps/fixed_comp3_to_comp2_map.c",

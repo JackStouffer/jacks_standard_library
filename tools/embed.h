@@ -82,12 +82,12 @@
             bool end_of_line = ((i + 1) % bytes_per_line) == 0;
 
             if (!is_last)
-                jsl_string_builder_insert_uint8_t(builder, ',');
+                jsl_string_builder_insert_u8(builder, ',');
 
             if (end_of_line || is_last)
-                jsl_string_builder_insert_uint8_t(builder, '\n');
+                jsl_string_builder_insert_u8(builder, '\n');
             else
-                jsl_string_builder_insert_uint8_t(builder, ' ');
+                jsl_string_builder_insert_u8(builder, ' ');
         }
 
         jsl_string_builder_insert_cstr(builder, "};\n\n");

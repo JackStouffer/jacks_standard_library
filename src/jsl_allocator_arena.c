@@ -1,3 +1,24 @@
+/**
+ * Copyright (c) 2026 Jack Stouffer
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the “Software”),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the Software
+ * is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
 #include <stdint.h>
 #if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L
     #include <stdbool.h>
@@ -6,6 +27,12 @@
 #include "jsl_core.h"
 #include "jsl_allocator.h"
 #include "jsl_allocator_arena.h"
+
+static JSL__FORCE_INLINE int32_t jsl__arena_effective_alignment(int32_t requested_alignment)
+{
+    int32_t header_alignment = (int32_t) _Alignof(struct JSL__ArenaAllocationHeader);
+    return requested_alignment > header_alignment ? requested_alignment : header_alignment;
+}
 
 void jsl_arena_init(JSLArena* arena, void* memory, int64_t length)
 {
@@ -25,20 +52,23 @@ void jsl_arena_init2(JSLArena* arena, JSLFatPtr memory)
     ASAN_POISON_MEMORY_REGION(memory.data, memory.length);
 }
 
-static JSLFatPtr alloc_interface_alloc(void* ctx, int64_t bytes, int32_t align, bool zeroed)
+static void* alloc_interface_alloc(void* ctx, int64_t bytes, int32_t align, bool zeroed)
 {
     JSLArena* arena = (JSLArena*) ctx;
     return jsl_arena_allocate_aligned(arena, bytes, align, zeroed);
 }
 
-static JSLFatPtr alloc_interface_realloc(void* ctx, JSLFatPtr allocation, int64_t new_bytes, int32_t alignment)
+static void* alloc_interface_realloc(void* ctx, void* allocation, int64_t new_bytes, int32_t alignment)
 {
     JSLArena* arena = (JSLArena*) ctx;
     return jsl_arena_reallocate_aligned(arena, allocation, new_bytes, alignment);
 }
 
-static bool alloc_interface_free(void* ctx, JSLFatPtr allocation)
+static bool alloc_interface_free(void* ctx, void* allocation)
 {
+    (void) ctx;
+    (void) allocation;
+
     // TODO:
     // #ifdef JSL_DEBUG
     //     JSL_MEMSET();
@@ -47,7 +77,7 @@ static bool alloc_interface_free(void* ctx, JSLFatPtr allocation)
     return true;
 }
 
-static bool alloc_interface_free_all(void* ctx, JSLFatPtr allocation)
+static bool alloc_interface_free_all(void* ctx)
 {
     JSLArena* arena = (JSLArena*) ctx;
     jsl_arena_reset(arena);
@@ -57,7 +87,7 @@ static bool alloc_interface_free_all(void* ctx, JSLFatPtr allocation)
 JSLAllocatorInterface jsl_arena_get_allocator_interface(JSLArena* arena)
 {
     JSLAllocatorInterface i;
-    jsl_allocator_init(
+    jsl_allocator_interface_init(
         &i,
         alloc_interface_alloc,
         alloc_interface_realloc,
@@ -68,35 +98,35 @@ JSLAllocatorInterface jsl_arena_get_allocator_interface(JSLArena* arena)
     return i;
 }
 
-JSLFatPtr jsl_arena_allocate(JSLArena* arena, int64_t bytes, bool zeroed)
+void* jsl_arena_allocate(JSLArena* arena, int64_t bytes, bool zeroed)
 {
-    return jsl_arena_allocate_aligned(arena, bytes, JSL_DEFAULT_ALLOCATION_ALIGNMENT, zeroed);
+    return jsl_arena_allocate_aligned(
+        arena,
+        bytes,
+        JSL_DEFAULT_ALLOCATION_ALIGNMENT,
+        zeroed
+    );
 }
 
-JSLFatPtr jsl_arena_allocate_aligned(JSLArena* arena, int64_t bytes, int32_t alignment, bool zeroed)
+void* jsl_arena_allocate_aligned(JSLArena* arena, int64_t bytes, int32_t alignment, bool zeroed)
 {
     JSL_ASSERT(
         alignment > 0
         && jsl_is_power_of_two(alignment)
     );
 
-    JSLFatPtr res = {0};
-
     #ifdef NDEBUG
         if (alignment < 1 || !jsl_is_power_of_two(alignment))
-        {
-            return res;
-        }
+            return NULL;
     #endif
 
-    if (bytes < 0)
-        return res;
+    if (bytes < 1)
+        return NULL;
 
+    const uintptr_t header_size = (uintptr_t) sizeof(struct JSL__ArenaAllocationHeader);
+    const int32_t effective_alignment = jsl__arena_effective_alignment(alignment);
     uintptr_t arena_end = (uintptr_t) arena->end;
-    uintptr_t aligned_current_addr = (uintptr_t) jsl_align_ptr_upwards(arena->current, alignment);
-
-    if (aligned_current_addr > arena_end)
-        return res;
+    uintptr_t arena_current_addr = (uintptr_t) arena->current;
 
     // When ASAN is enabled, we leave poisoned guard
     // zones between allocations to catch buffer overflows
@@ -106,68 +136,76 @@ JSLFatPtr jsl_arena_allocate_aligned(JSLArena* arena, int64_t bytes, int32_t ali
         uintptr_t guard_size = 0;
     #endif
 
-    if ((uint64_t) bytes > UINTPTR_MAX - aligned_current_addr)
-        return res;
+    if (header_size > UINTPTR_MAX - arena_current_addr)
+        return NULL;
 
-    uintptr_t potential_end = aligned_current_addr + (uintptr_t) bytes;
-    uintptr_t next_current_addr = potential_end + guard_size;
+    uintptr_t base_after_header = arena_current_addr + header_size;
+    uintptr_t aligned_allocation_addr = (uintptr_t) jsl_align_ptr_upwards(
+        (void*) base_after_header,
+        effective_alignment
+    );
 
-    if (next_current_addr <= arena_end)
-    {
-        uint8_t* aligned_current = (uint8_t*) aligned_current_addr;
+    if (aligned_allocation_addr < base_after_header || aligned_allocation_addr > arena_end)
+        return NULL;
 
-        res.data = aligned_current;
-        res.length = bytes;
+    if ((uint64_t) bytes > UINTPTR_MAX - aligned_allocation_addr)
+        return NULL;
 
-        #if JSL__HAS_ASAN
-            arena->current = (uint8_t*) next_current_addr;
-            ASAN_UNPOISON_MEMORY_REGION(res.data, res.length);
-        #else
-            arena->current = (uint8_t*) next_current_addr;
-        #endif
+    uintptr_t allocation_end = aligned_allocation_addr + (uintptr_t) bytes;
 
-        if (zeroed)
-            JSL_MEMSET((void*) res.data, 0, (size_t) res.length);
-    }
+    if (guard_size > UINTPTR_MAX - allocation_end)
+        return NULL;
 
-    return res;
+    uintptr_t next_current_addr = allocation_end + guard_size;
+
+    if (next_current_addr > arena_end)
+        return NULL;
+
+    struct JSL__ArenaAllocationHeader* header = (struct JSL__ArenaAllocationHeader*) (aligned_allocation_addr - header_size);
+    header->length = bytes;
+
+    arena->current = (uint8_t*) next_current_addr;
+
+    ASAN_UNPOISON_MEMORY_REGION(header, header_size + (size_t) bytes);
+    ASAN_POISON_MEMORY_REGION((void*) allocation_end, guard_size);
+
+    if (zeroed)
+        JSL_MEMSET((void*) aligned_allocation_addr, 0, (size_t) bytes);
+
+    return (void*) aligned_allocation_addr;
 }
 
-JSLFatPtr jsl_arena_reallocate(JSLArena* arena, JSLFatPtr original_allocation, int64_t new_num_bytes)
+void* jsl_arena_reallocate(JSLArena* arena, void* original_allocation, int64_t new_num_bytes)
 {
     return jsl_arena_reallocate_aligned(
         arena, original_allocation, new_num_bytes, JSL_DEFAULT_ALLOCATION_ALIGNMENT
     );
 }
 
-JSLFatPtr jsl_arena_reallocate_aligned(
+void* jsl_arena_reallocate_aligned(
     JSLArena* arena,
-    JSLFatPtr original_allocation,
+    void* original_allocation,
     int64_t new_num_bytes,
     int32_t align
 )
 {
     JSL_ASSERT(align > 0 && jsl_is_power_of_two(align));
 
-    JSLFatPtr res = {0};
-    bool should_continue = true;
-
     #ifdef NDEBUG
-        bool runtime_align_valid = (align > 0 && jsl_is_power_of_two(align));
-        if (!runtime_align_valid)
-        {
-            should_continue = false;
-        }
+        if (align < 1 || !jsl_is_power_of_two(align))
+            return NULL;
     #endif
 
-    bool sizes_non_negative = (new_num_bytes >= 0 && original_allocation.length >= 0);
-    if (!sizes_non_negative)
-    {
-        should_continue = false;
-    }
+    if (new_num_bytes < 1)
+        return NULL;
+    if (original_allocation == NULL)
+        return jsl_arena_allocate_aligned(arena, new_num_bytes, align, false);
 
+    const uintptr_t header_size = (uintptr_t) sizeof(struct JSL__ArenaAllocationHeader);
+    const int32_t effective_alignment = jsl__arena_effective_alignment(align);
     const uintptr_t arena_start = (uintptr_t) arena->start;
     const uintptr_t arena_end = (uintptr_t) arena->end;
+    const uintptr_t arena_current_addr = (uintptr_t) arena->current;
 
     #if JSL__HAS_ASAN
         const uintptr_t guard_size = (uintptr_t) JSL__ASAN_GUARD_SIZE;
@@ -175,107 +213,101 @@ JSLFatPtr jsl_arena_reallocate_aligned(
         const uintptr_t guard_size = 0;
     #endif
 
-    // Only resize if this given allocation was the last thing alloc-ed
-    uintptr_t original_data_addr = (uintptr_t) original_allocation.data;
-    uintptr_t aligned_original_addr = 0;
-    uintptr_t original_end_addr = 0;
-    uintptr_t arena_current_addr = (uintptr_t) arena->current;
+    uintptr_t allocation_addr = (uintptr_t) original_allocation;
 
-    bool original_length_fits = (uint64_t) original_allocation.length <= UINTPTR_MAX - original_data_addr;
-    bool original_addr_in_range = (
-        original_data_addr >= arena_start
-        && original_data_addr <= arena_end
-    );
-    bool pointer_checks_passed = should_continue && original_addr_in_range && original_length_fits;
+    if (allocation_addr < header_size)
+        return NULL;
 
-    if (pointer_checks_passed)
-    {
-        original_end_addr = original_data_addr + (uintptr_t) original_allocation.length;
-    }
+    uintptr_t header_addr = allocation_addr - header_size;
 
-    bool matches_no_guard = pointer_checks_passed && arena_current_addr == original_end_addr;
+    bool header_in_range = header_addr >= arena_start && allocation_addr <= arena_end;
+    if (!header_in_range)
+        return NULL;
 
-    bool guard_room_available = pointer_checks_passed && guard_size <= UINTPTR_MAX - original_end_addr;
+    if ((allocation_addr % (uintptr_t) effective_alignment) != 0)
+        return NULL;
+
+    struct JSL__ArenaAllocationHeader* header = (struct JSL__ArenaAllocationHeader*) header_addr;
+    int64_t original_length = header->length;
+
+    if (original_length < 0)
+        return NULL;
+
+    if ((uint64_t) original_length > UINTPTR_MAX - allocation_addr)
+        return NULL;
+
+    uintptr_t original_end_addr = allocation_addr + (uintptr_t) original_length;
+    if (original_end_addr > arena_end)
+        return NULL;
+
     uintptr_t guarded_end = original_end_addr;
-    if (guard_room_available)
-    {
+    bool guard_overflow = guard_size > UINTPTR_MAX - original_end_addr;
+    if (!guard_overflow)
         guarded_end = original_end_addr + guard_size;
-    }
 
-    bool matches_guard = guard_room_available && arena_current_addr == guarded_end;
-    bool same_pointer = pointer_checks_passed && (matches_no_guard || matches_guard);
+    bool matches_no_guard = arena_current_addr == original_end_addr;
+    bool matches_guard = !guard_overflow && arena_current_addr == guarded_end;
+    bool can_resize_in_place = matches_no_guard || matches_guard;
 
-    if (same_pointer)
-    {
-        aligned_original_addr = (uintptr_t) jsl_align_ptr_upwards(
-            (uint8_t*) original_data_addr,
-            align
-        );
-    }
+    bool new_size_overflow = (uint64_t) new_num_bytes > UINTPTR_MAX - allocation_addr;
+    if (new_size_overflow)
+        can_resize_in_place = false;
 
-    bool can_hold_bytes = same_pointer && ((uint64_t) new_num_bytes <= UINTPTR_MAX - aligned_original_addr);
-    uintptr_t potential_end = aligned_original_addr;
-    if (can_hold_bytes)
-    {
-        potential_end = aligned_original_addr + (uintptr_t) new_num_bytes;
-    }
+    uintptr_t potential_end = allocation_addr;
+    if (!new_size_overflow)
+        potential_end = allocation_addr + (uintptr_t) new_num_bytes;
 
-    bool guard_overflow = can_hold_bytes && guard_size > UINTPTR_MAX - potential_end;
-    bool can_advance_current = can_hold_bytes && !guard_overflow;
-
+    bool guard_overflow_new = guard_size > UINTPTR_MAX - potential_end;
     uintptr_t next_current_addr = potential_end;
-    if (can_advance_current)
-    {
+    if (!guard_overflow_new)
         next_current_addr = potential_end + guard_size;
-    }
+    else
+        can_resize_in_place = false;
 
-    bool is_space_left = can_advance_current && next_current_addr <= arena_end;
-    bool perform_in_place = is_space_left;
+    if (next_current_addr > arena_end)
+        can_resize_in_place = false;
 
-    if (perform_in_place)
+    if (can_resize_in_place)
     {
-        res.data = (uint8_t*) original_data_addr;
-        res.length = new_num_bytes;
+        header->length = new_num_bytes;
         arena->current = (uint8_t*) next_current_addr;
 
-        ASAN_UNPOISON_MEMORY_REGION(res.data, res.length);
+        ASAN_UNPOISON_MEMORY_REGION(header, header_size + (size_t) new_num_bytes);
+        ASAN_POISON_MEMORY_REGION((void*) potential_end, guard_size);
+
+        if (new_num_bytes < original_length)
+        {
+            ASAN_POISON_MEMORY_REGION(
+                (uint8_t*) original_allocation + new_num_bytes,
+                (size_t) (original_length - new_num_bytes)
+            );
+        }
+
+        return original_allocation;
     }
 
-    bool shrink_allocation = perform_in_place && new_num_bytes < original_allocation.length;
-    if (shrink_allocation)
-    {
-        ASAN_POISON_MEMORY_REGION(
-            res.data + new_num_bytes,
-            original_allocation.length - new_num_bytes
-        );
-    }
+    void* res = jsl_arena_allocate_aligned(arena, new_num_bytes, align, false);
+    if (res == NULL)
+        return NULL;
 
-    bool should_allocate_new = should_continue && !perform_in_place;
-    if (should_allocate_new)
-    {
-        res = jsl_arena_allocate_aligned(arena, new_num_bytes, align, false);
-    }
+    size_t bytes_to_copy = (size_t) (
+        new_num_bytes < original_length ? new_num_bytes : original_length
+    );
+    JSL_MEMCPY(res, original_allocation, bytes_to_copy);
 
-    bool allocation_successful = should_allocate_new && res.data != NULL;
-    if (allocation_successful)
-    {
-        JSL_MEMCPY(
-            res.data,
-            original_allocation.data,
-            (size_t) original_allocation.length
-        );
+    #ifdef JSL_DEBUG
+        int64_t* fake_array = (int64_t*) original_allocation;
+        int64_t fake_array_len = original_length / (int64_t) sizeof(int64_t);
+        for (int64_t i = 0; i < fake_array_len; ++i)
+        {
+            fake_array[i] = 0xfeeefeee;
+        }
+    #endif
 
-        #ifdef JSL_DEBUG
-            int64_t* fake_array = (int64_t*) original_allocation.data;
-            int64_t fake_array_len = original_allocation.length / (int64_t) sizeof(int64_t);
-            for (int64_t i = 0; i < fake_array_len; ++i)
-            {
-                fake_array[i] = 0xfeeefeee;
-            }
-        #endif
-
-        ASAN_POISON_MEMORY_REGION(original_allocation.data, original_allocation.length);
-    }
+    ASAN_POISON_MEMORY_REGION(
+        (uint8_t*) original_allocation - header_size,
+        header_size + (size_t) original_length
+    );
 
     return res;
 }

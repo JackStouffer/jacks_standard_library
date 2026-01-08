@@ -52,6 +52,8 @@ SOFTWARE.
 #include "minctest.h"
 
 #include "../src/jsl_core.h"
+#include "../src/jsl_allocator.h"
+#include "../src/jsl_allocator_arena.h"
 
 #define CHECK_END(str)                                                              \
     JSLFatPtr written = jsl_fatptr_slice(buffer, 0, ret);                           \

@@ -128,7 +128,7 @@ JSLFatPtr help_message = JSL_FATPTR_INITIALIZER(
     "\t--custom-hash\t\tOverride the included hash call with the given function name\n"
 );
 
-static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
+static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLine* cmd)
 {
     bool show_help = false;
     JSLFatPtr name = {0};
@@ -257,12 +257,12 @@ static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
     if (dynamic_flag_set) impl = IMPL_DYNAMIC;
 
     JSLStringBuilder builder;
-    jsl_string_builder_init(&builder, arena);
+    jsl_string_builder_init(&builder, allocator);
 
     if (header_flag_set)
     {
         write_array_header(
-            arena,
+            allocator,
             &builder,
             impl,
             name,
@@ -275,7 +275,7 @@ static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
     else
     {
         write_array_source(
-            arena,
+            allocator,
             &builder,
             impl,
             name,
@@ -336,6 +336,7 @@ static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
             return EXIT_FAILURE;
 
         jsl_arena_init(&arena, backing_data, arena_size);
+        JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
 
         JSLCmdLine cmd;
         jsl_cmd_line_init(&cmd, &arena);
@@ -354,7 +355,7 @@ static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
             return EXIT_FAILURE;
         }
 
-        return entrypoint(&arena, &cmd);
+        return entrypoint(&allocator, &cmd);
     }
 
 #elif JSL_IS_POSIX
@@ -374,9 +375,10 @@ static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
             return EXIT_FAILURE;
 
         jsl_arena_init(&arena, backing_data, arena_size);
+        JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
 
         JSLCmdLine cmd;
-        if (!jsl_cmd_line_init(&cmd, &arena))
+        if (!jsl_cmd_line_init(&cmd, &allocator))
         {
             jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Command line input exceeds memory limit"));
             return EXIT_FAILURE;
@@ -397,7 +399,7 @@ static int32_t entrypoint(JSLArena* arena, JSLCmdLine* cmd)
             return EXIT_FAILURE;
         }
 
-        return entrypoint(&arena, &cmd);
+        return entrypoint(&allocator, &cmd);
     }
 
 #else

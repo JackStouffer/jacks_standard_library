@@ -30,6 +30,8 @@
 #include <stdlib.h>
 
 #include "../src/jsl_core.h"
+#include "../src/jsl_allocator.h"
+#include "../src/jsl_allocator_arena.h"
 #include "../src/jsl_os.h"
 
 #include "minctest.h"
@@ -58,11 +60,12 @@ static void test_jsl_load_file_contents(void)
     }
 
     JSLArena arena;
-    jsl_arena_init(&arena, malloc(4*1024), 4*1024);
+    jsl_arena_init(&arena, malloc(JSL_KILOBYTES(4)), JSL_KILOBYTES(4));
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
 
     JSLFatPtr contents;
     JSLLoadFileResultEnum res = jsl_load_file_contents(
-        &arena,
+        &allocator,
         jsl_fatptr_from_cstr(path),
         &contents,
         NULL

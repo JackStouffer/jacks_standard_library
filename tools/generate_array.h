@@ -94,6 +94,7 @@
     #endif
 
     #include "../src/jsl_core.h"
+    #include "../src/jsl_allocator.h"
 
     /* Versioning to catch mismatches across deps */
     #ifndef GENERATE_ARRAY_VERSION
