@@ -90,6 +90,10 @@ static char* clang_warning_flags[] = {
     "-Wmissing-prototypes",
     "-Wundef",
     "-pedantic",
+
+    // Because the 4095 limit is DUMB
+    "-Wno-overlength-strings",
+
     NULL
 };
 

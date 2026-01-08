@@ -23,15 +23,20 @@
 
 static JSLFatPtr help_message = JSL_FATPTR_INITIALIZER(
     "OVERVIEW:\n\n"
-    "Embed a file into a C program by generating a header file with the binary data.\n"
-    "Pass in the file data as an argument or from stdin.\n\n"
+    "Embed a file into a C program by generating a header file.\n"
+    "Pass in the file path as an argument or pass in the file data from stdin.\n\n"
     "USAGE:\n"
-    "\tembed --var-name=VAR-NAME [file]\n\n"
+    "\tembed --var-name=VAR-NAME [--binary | --text] [file]\n\n"
     "Optional arguments:\n"
     "\t--var-name\t\tSet the name of the exported variable containing the binary data.\n"
+    "\t--binary\t\tThe output will be in bytes of hex data.\n"
+    "\t--text\t\tThe output will be a multiline C str with length. Expects text file input\n"
 );
-
-static JSLFatPtr default_var_name = JSL_FATPTR_EXPRESSION("data");
+static JSLFatPtr default_var_name = JSL_FATPTR_INITIALIZER("data");
+static JSLFatPtr help_flag_str = JSL_FATPTR_INITIALIZER("help");
+static JSLFatPtr binary_flag_str = JSL_FATPTR_INITIALIZER("binary");
+static JSLFatPtr text_flag_str = JSL_FATPTR_INITIALIZER("text");
+static JSLFatPtr var_name_flag_str = JSL_FATPTR_INITIALIZER("var-name");
 
 static int32_t entrypoint(
     JSLCmdLine* cmd,
@@ -41,11 +46,52 @@ static int32_t entrypoint(
 {
     JSLFatPtr file_path = {0};
     JSLFatPtr file_contents = {0};
+    JSLFatPtr var_name = default_var_name;
     int32_t load_errno = 0;
+    EmbedOuputTypeEnum output_type = OUTPUT_TYPE_INVALID;
+
+    bool show_help = jsl_cmd_line_has_short_flag(cmd, 'h')
+        || jsl_cmd_line_has_flag(cmd, help_flag_str);
+
+    bool output_binary = jsl_cmd_line_has_flag(cmd, binary_flag_str);
+    bool output_text = jsl_cmd_line_has_flag(cmd, text_flag_str);
+
+    jsl_cmd_line_pop_flag_with_value(cmd, var_name_flag_str, &var_name);
 
     jsl_cmd_line_pop_arg_list(cmd, &file_path);
 
-    if (file_path.data != NULL)
+    //
+    // check params
+    //
+    if (output_text && output_binary)
+    {
+        jsl_format_to_c_file(
+            stderr,
+            JSL_FATPTR_EXPRESSION("Error: cannot specify both --%y and --%y"),
+            binary_flag_str,
+            text_flag_str
+        );
+        return EXIT_FAILURE;
+    }
+    else if (!output_text && !output_binary)
+    {
+        output_type = OUTPUT_TYPE_BINARY;
+    }
+    else if (output_text)
+    {
+        output_type = OUTPUT_TYPE_TEXT;
+    }
+    else if (output_binary)
+    {
+        output_type = OUTPUT_TYPE_BINARY;
+    }
+
+    if (show_help)
+    {
+        jsl_write_to_c_file(stdout, help_message);
+        return EXIT_SUCCESS;
+    }
+    else if (file_path.data != NULL)
     {
         if (jsl_cmd_line_pop_arg_list(cmd, &file_path))
         {
@@ -113,13 +159,11 @@ static int32_t entrypoint(
         JSLStringBuilder builder;
         jsl_string_builder_init(&builder, allocator);
 
-        JSLFatPtr var_name = default_var_name;
-        jsl_cmd_line_pop_flag_with_value(cmd, JSL_FATPTR_EXPRESSION("var-name"), &var_name);
-
         generate_embed_header(
             &builder,
             var_name,
-            file_contents
+            file_contents,
+            output_type
         );
         
         JSLStringBuilderIterator iterator;
@@ -135,7 +179,7 @@ static int32_t entrypoint(
     }
     else
     {
-        jsl_format_to_c_file(stdout, help_message);
+        jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Error: no input data"));
         return EXIT_FAILURE;
     }
 }
