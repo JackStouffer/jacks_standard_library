@@ -23,6 +23,7 @@
 #endif
 
 #include "jsl_core.h"
+#include "jsl_allocator.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -60,7 +61,7 @@ typedef struct {{ array_type_name }} {
     // corrupted from accidental overwrites, therefore making it
     // more likely that memory bugs are caught.
     uint64_t sentinel;
-    JSLArena* arena;
+    JSLAllocatorInterface* allocator;
     {{ value_type_name }}* data;
     int64_t length;
     int64_t capacity;
@@ -77,7 +78,7 @@ typedef struct {{ array_type_name }} {
  */
 bool {{ function_prefix }}_init(
     {{ array_type_name }}* array,
-    JSLArena* arena,
+    JSLAllocatorInterface* allocator,
     int64_t initial_capacity
 );
 
@@ -91,6 +92,19 @@ bool {{ function_prefix }}_init(
 bool {{ function_prefix }}_insert(
     {{ array_type_name }}* array,
     {{ value_type_name }} value
+);
+
+/**
+ * Insert multiple `{{ value_type_name }}` at once at the end of the array.
+ *
+ * @param array The pointer to the array
+ * @param value The pointer to the start of the values
+ * @returns If the insertion succeed
+ */
+bool {{ function_prefix }}_insert_multiple(
+    {{ array_type_name }}* array,
+    {{ value_type_name }}* values,
+    int64_t value_count
 );
 
 /**
@@ -122,11 +136,21 @@ bool {{ function_prefix }}_delete_at(
 );
 
 /**
- * Set the length of the array back to zero.
+ * Set the length of the array back to zero. Does not shrink the underlying capacity.
  *
  * @param array The pointer to the array
  */
 void {{ function_prefix }}_clear(
+    {{ array_type_name }}* array
+);
+
+/**
+ * Free the underlying memory of the array. This sets the array into an invalid state.
+ * You will have to call init again if you wish to use this array instance.
+ *
+ * @param array The pointer to the array
+ */
+void {{ function_prefix }}_free(
     {{ array_type_name }}* array
 );
 

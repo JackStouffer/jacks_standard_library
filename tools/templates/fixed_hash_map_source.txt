@@ -31,12 +31,12 @@
 
 bool {{ function_prefix }}_init(
     {{ hash_map_name }}* hash_map,
-    JSLArena* arena,
+    JSLAllocatorInterface* allocator,
     int64_t max_item_count,
     uint64_t seed
 )
 {
-    if (hash_map == NULL || arena == NULL || max_item_count < 0)
+    if (hash_map == NULL || allocator == NULL || max_item_count < 0)
         return false;
 
     JSL_MEMSET(hash_map, 0, sizeof({{ hash_map_name }}));
@@ -49,30 +49,30 @@ bool {{ function_prefix }}_init(
     hash_map->arrays_length = jsl_next_power_of_two_i64(max_with_load_factor);
     hash_map->arrays_length = JSL_MAX(hash_map->arrays_length, 32);
 
-    hash_map->keys_array = ({{ key_type_name }}*) jsl_arena_allocate_aligned(
-       arena,
-       ((int64_t) sizeof({{ key_type_name }})) * hash_map->arrays_length,
-       (int32_t) _Alignof({{ key_type_name }}),
-       false
-    ).data;
+    hash_map->keys_array = ({{ key_type_name }}*) jsl_allocator_interface_alloc(
+        allocator,
+        ((int64_t) sizeof({{ key_type_name }})) * hash_map->arrays_length,
+        (int32_t) _Alignof({{ key_type_name }}),
+        false
+    );
     if (hash_map->keys_array == NULL)
         return false;
 
-    hash_map->values_array = ({{ value_type_name }}*) jsl_arena_allocate_aligned(
-        arena,
+    hash_map->values_array = ({{ value_type_name }}*) jsl_allocator_interface_alloc(
+        allocator,
         ((int64_t) sizeof({{ value_type_name }})) * hash_map->arrays_length,
         (int32_t) _Alignof({{ value_type_name }}),
         false
-    ).data;
+    );
     if (hash_map->values_array == NULL)
         return false;
 
-    hash_map->hashes_array = (uint64_t*) jsl_arena_allocate_aligned(
-        arena,
+    hash_map->hashes_array = (uint64_t*) jsl_allocator_interface_alloc(
+        allocator,
         ((int64_t) sizeof(uint64_t)) * hash_map->arrays_length,
         (int32_t) _Alignof(uint64_t),
         true
-    ).data;
+    );
     if (hash_map->hashes_array == NULL)
         return false;
 

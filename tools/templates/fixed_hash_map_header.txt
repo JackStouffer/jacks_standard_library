@@ -88,7 +88,7 @@ typedef struct {{ hash_map_name }}Iterator {
  */
 bool {{ function_prefix }}_init(
     {{ hash_map_name }}* hash_map,
-    JSLArena* arena,
+    JSLAllocatorInterface* allocator,
     int64_t max_item_count,
     uint64_t seed
 );

@@ -91,117 +91,121 @@ static bool comp3_equal(const CompositeType3* lhs, const CompositeType3* rhs)
 
 static void test_dynamic_array_init_success(void)
 {
-    jsl_arena_reset(&global_arena);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+
+    jsl_allocator_interface_free_all(&allocator);
 
     {
         DynamicInt32Array array = {0};
         const int64_t initial_capacity = 10;
-        bool ok = dynamic_int32_array_init(&array, &global_arena, initial_capacity);
+        bool ok = dynamic_int32_array_init(&array, &allocator, initial_capacity);
 
         TEST_BOOL(ok);
         if (!ok) return;
 
-        TEST_POINTERS_EQUAL(array.arena, &global_arena);
+        TEST_POINTERS_EQUAL(array.allocator, &allocator);
         TEST_UINT64_EQUAL(array.sentinel, PRIVATE_SENTINEL_DynamicInt32Array);
         TEST_INT64_EQUAL(array.length, (int64_t) 0);
         TEST_BOOL(array.data != NULL);
         TEST_INT64_EQUAL(array.capacity, jsl_next_power_of_two_i64(JSL_MAX(32L, initial_capacity)));
     }
 
-    jsl_arena_reset(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 
     {
         DynamicCompositeType1Map array = {0};
         const int64_t initial_capacity = 64;
-        bool ok = dynamic_comp1_array_init(&array, &global_arena, initial_capacity);
+        bool ok = dynamic_comp1_array_init(&array, &allocator, initial_capacity);
 
         TEST_BOOL(ok);
         if (!ok) return;
 
-        TEST_POINTERS_EQUAL(array.arena, &global_arena);
+        TEST_POINTERS_EQUAL(array.allocator, &allocator);
         TEST_UINT64_EQUAL(array.sentinel, PRIVATE_SENTINEL_DynamicCompositeType1Map);
         TEST_INT64_EQUAL(array.length, (int64_t) 0);
         TEST_BOOL(array.data != NULL);
         TEST_INT64_EQUAL(array.capacity, jsl_next_power_of_two_i64(JSL_MAX(32L, initial_capacity)));
     }
 
-    jsl_arena_reset(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 
     {
         DynamicCompositeType2ToIntMap array = {0};
         const int64_t initial_capacity = 1;
-        bool ok = dynamic_comp2_array_init(&array, &global_arena, initial_capacity);
+        bool ok = dynamic_comp2_array_init(&array, &allocator, initial_capacity);
 
         TEST_BOOL(ok);
         if (!ok) return;
 
-        TEST_POINTERS_EQUAL(array.arena, &global_arena);
+        TEST_POINTERS_EQUAL(array.allocator, &allocator);
         TEST_UINT64_EQUAL(array.sentinel, PRIVATE_SENTINEL_DynamicCompositeType2ToIntMap);
         TEST_INT64_EQUAL(array.length, (int64_t) 0);
         TEST_BOOL(array.data != NULL);
         TEST_INT64_EQUAL(array.capacity, jsl_next_power_of_two_i64(JSL_MAX(32L, initial_capacity)));
     }
 
-    jsl_arena_reset(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 
     {
         DynamicCompositeType3ToCompositeType2Map array = {0};
         const int64_t initial_capacity = 128;
-        bool ok = dynamic_comp3_array_init(&array, &global_arena, initial_capacity);
+        bool ok = dynamic_comp3_array_init(&array, &allocator, initial_capacity);
 
         TEST_BOOL(ok);
         if (!ok) return;
 
-        TEST_POINTERS_EQUAL(array.arena, &global_arena);
+        TEST_POINTERS_EQUAL(array.allocator, &allocator);
         TEST_UINT64_EQUAL(array.sentinel, PRIVATE_SENTINEL_DynamicCompositeType3ToCompositeType2Map);
         TEST_INT64_EQUAL(array.length, (int64_t) 0);
         TEST_BOOL(array.data != NULL);
         TEST_INT64_EQUAL(array.capacity, jsl_next_power_of_two_i64(JSL_MAX(32L, initial_capacity)));
     }
 
-    jsl_arena_reset(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 }
 
 static void test_dynamic_array_init_invalid_args(void)
 {
-    jsl_arena_reset(&global_arena);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 
     {
         DynamicInt32Array array = {0};
-        TEST_BOOL(!dynamic_int32_array_init(NULL, &global_arena, 8));
+        TEST_BOOL(!dynamic_int32_array_init(NULL, &allocator, 8));
         TEST_BOOL(!dynamic_int32_array_init(&array, NULL, 8));
-        TEST_BOOL(!dynamic_int32_array_init(&array, &global_arena, -1));
+        TEST_BOOL(!dynamic_int32_array_init(&array, &allocator, -1));
     }
 
     {
         DynamicCompositeType1Map array = {0};
-        TEST_BOOL(!dynamic_comp1_array_init(NULL, &global_arena, 8));
+        TEST_BOOL(!dynamic_comp1_array_init(NULL, &allocator, 8));
         TEST_BOOL(!dynamic_comp1_array_init(&array, NULL, 8));
-        TEST_BOOL(!dynamic_comp1_array_init(&array, &global_arena, -1));
+        TEST_BOOL(!dynamic_comp1_array_init(&array, &allocator, -1));
     }
 
     {
         DynamicCompositeType2ToIntMap array = {0};
-        TEST_BOOL(!dynamic_comp2_array_init(NULL, &global_arena, 8));
+        TEST_BOOL(!dynamic_comp2_array_init(NULL, &allocator, 8));
         TEST_BOOL(!dynamic_comp2_array_init(&array, NULL, 8));
-        TEST_BOOL(!dynamic_comp2_array_init(&array, &global_arena, -1));
+        TEST_BOOL(!dynamic_comp2_array_init(&array, &allocator, -1));
     }
 
     {
         DynamicCompositeType3ToCompositeType2Map array = {0};
-        TEST_BOOL(!dynamic_comp3_array_init(NULL, &global_arena, 8));
+        TEST_BOOL(!dynamic_comp3_array_init(NULL, &allocator, 8));
         TEST_BOOL(!dynamic_comp3_array_init(&array, NULL, 8));
-        TEST_BOOL(!dynamic_comp3_array_init(&array, &global_arena, -1));
+        TEST_BOOL(!dynamic_comp3_array_init(&array, &allocator, -1));
     }
 }
 
 static void test_dynamic_array_insert_appends_and_grows(void)
 {
-    jsl_arena_reset(&global_arena);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 
     {
         DynamicInt32Array array = {0};
-        bool ok = dynamic_int32_array_init(&array, &global_arena, 1);
+        bool ok = dynamic_int32_array_init(&array, &allocator, 1);
         TEST_BOOL(ok);
         if (!ok) return;
 
@@ -218,11 +222,11 @@ static void test_dynamic_array_insert_appends_and_grows(void)
         }
     }
 
-    jsl_arena_reset(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 
     {
         DynamicCompositeType1Map array = {0};
-        bool ok = dynamic_comp1_array_init(&array, &global_arena, 2);
+        bool ok = dynamic_comp1_array_init(&array, &allocator, 2);
         TEST_BOOL(ok);
         if (!ok) return;
 
@@ -241,11 +245,11 @@ static void test_dynamic_array_insert_appends_and_grows(void)
         }
     }
 
-    jsl_arena_reset(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 
     {
         DynamicCompositeType2ToIntMap array = {0};
-        bool ok = dynamic_comp2_array_init(&array, &global_arena, 4);
+        bool ok = dynamic_comp2_array_init(&array, &allocator, 4);
         TEST_BOOL(ok);
         if (!ok) return;
 
@@ -264,11 +268,11 @@ static void test_dynamic_array_insert_appends_and_grows(void)
         }
     }
 
-    jsl_arena_reset(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 
     {
         DynamicCompositeType3ToCompositeType2Map array = {0};
-        bool ok = dynamic_comp3_array_init(&array, &global_arena, 2);
+        bool ok = dynamic_comp3_array_init(&array, &allocator, 2);
         TEST_BOOL(ok);
         if (!ok) return;
 
@@ -287,16 +291,17 @@ static void test_dynamic_array_insert_appends_and_grows(void)
         }
     }
 
-    jsl_arena_reset(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 }
 
 static void test_dynamic_array_insert_at_inserts_and_shifts(void)
 {
-    jsl_arena_reset(&global_arena);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 
     {
         DynamicInt32Array array = {0};
-        bool ok = dynamic_int32_array_init(&array, &global_arena, 4);
+        bool ok = dynamic_int32_array_init(&array, &allocator, 4);
         TEST_BOOL(ok);
         if (!ok) return;
 
@@ -321,11 +326,11 @@ static void test_dynamic_array_insert_at_inserts_and_shifts(void)
         TEST_INT64_EQUAL(array.length, (int64_t) 6);
     }
 
-    jsl_arena_reset(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 
     {
         DynamicCompositeType1Map array = {0};
-        bool ok = dynamic_comp1_array_init(&array, &global_arena, 2);
+        bool ok = dynamic_comp1_array_init(&array, &allocator, 2);
         TEST_BOOL(ok);
         if (!ok) return;
 
@@ -357,11 +362,11 @@ static void test_dynamic_array_insert_at_inserts_and_shifts(void)
         TEST_INT64_EQUAL(array.length, (int64_t) 6);
     }
 
-    jsl_arena_reset(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 
     {
         DynamicCompositeType2ToIntMap array = {0};
-        bool ok = dynamic_comp2_array_init(&array, &global_arena, 3);
+        bool ok = dynamic_comp2_array_init(&array, &allocator, 3);
         TEST_BOOL(ok);
         if (!ok) return;
 
@@ -393,11 +398,11 @@ static void test_dynamic_array_insert_at_inserts_and_shifts(void)
         TEST_INT64_EQUAL(array.length, (int64_t) 6);
     }
 
-    jsl_arena_reset(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 
     {
         DynamicCompositeType3ToCompositeType2Map array = {0};
-        bool ok = dynamic_comp3_array_init(&array, &global_arena, 1);
+        bool ok = dynamic_comp3_array_init(&array, &allocator, 1);
         TEST_BOOL(ok);
         if (!ok) return;
 
@@ -429,16 +434,17 @@ static void test_dynamic_array_insert_at_inserts_and_shifts(void)
         TEST_INT64_EQUAL(array.length, (int64_t) 6);
     }
 
-    jsl_arena_reset(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 }
 
 static void test_dynamic_array_delete_at_removes_and_shifts(void)
 {
-    jsl_arena_reset(&global_arena);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 
     {
         DynamicInt32Array array = {0};
-        bool ok = dynamic_int32_array_init(&array, &global_arena, 8);
+        bool ok = dynamic_int32_array_init(&array, &allocator, 8);
         TEST_BOOL(ok);
         if (!ok) return;
 
@@ -468,11 +474,11 @@ static void test_dynamic_array_delete_at_removes_and_shifts(void)
         TEST_INT32_EQUAL(array.data[0], 30);
     }
 
-    jsl_arena_reset(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 
     {
         DynamicCompositeType1Map array = {0};
-        bool ok = dynamic_comp1_array_init(&array, &global_arena, 4);
+        bool ok = dynamic_comp1_array_init(&array, &allocator, 4);
         TEST_BOOL(ok);
         if (!ok) return;
 
@@ -508,11 +514,11 @@ static void test_dynamic_array_delete_at_removes_and_shifts(void)
         TEST_BOOL(comp1_equal(&array.data[0], &values[1]));
     }
 
-    jsl_arena_reset(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 
     {
         DynamicCompositeType2ToIntMap array = {0};
-        bool ok = dynamic_comp2_array_init(&array, &global_arena, 4);
+        bool ok = dynamic_comp2_array_init(&array, &allocator, 4);
         TEST_BOOL(ok);
         if (!ok) return;
 
@@ -548,11 +554,11 @@ static void test_dynamic_array_delete_at_removes_and_shifts(void)
         TEST_BOOL(comp2_equal(&array.data[0], &values[2]));
     }
 
-    jsl_arena_reset(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 
     {
         DynamicCompositeType3ToCompositeType2Map array = {0};
-        bool ok = dynamic_comp3_array_init(&array, &global_arena, 4);
+        bool ok = dynamic_comp3_array_init(&array, &allocator, 4);
         TEST_BOOL(ok);
         if (!ok) return;
 
@@ -588,16 +594,17 @@ static void test_dynamic_array_delete_at_removes_and_shifts(void)
         TEST_BOOL(comp3_equal(&array.data[0], &values[1]));
     }
 
-    jsl_arena_reset(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 }
 
 static void test_dynamic_array_clear_resets_length(void)
 {
-    jsl_arena_reset(&global_arena);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 
     {
         DynamicInt32Array array = {0};
-        bool ok = dynamic_int32_array_init(&array, &global_arena, 2);
+        bool ok = dynamic_int32_array_init(&array, &allocator, 2);
         TEST_BOOL(ok);
         if (!ok) return;
 
@@ -614,11 +621,11 @@ static void test_dynamic_array_clear_resets_length(void)
         TEST_POINTERS_EQUAL(array.data, data_ptr);
     }
 
-    jsl_arena_reset(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 
     {
         DynamicCompositeType1Map array = {0};
-        bool ok = dynamic_comp1_array_init(&array, &global_arena, 2);
+        bool ok = dynamic_comp1_array_init(&array, &allocator, 2);
         TEST_BOOL(ok);
         if (!ok) return;
 
@@ -635,11 +642,11 @@ static void test_dynamic_array_clear_resets_length(void)
         TEST_POINTERS_EQUAL(array.data, data_ptr);
     }
 
-    jsl_arena_reset(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 
     {
         DynamicCompositeType2ToIntMap array = {0};
-        bool ok = dynamic_comp2_array_init(&array, &global_arena, 2);
+        bool ok = dynamic_comp2_array_init(&array, &allocator, 2);
         TEST_BOOL(ok);
         if (!ok) return;
 
@@ -656,11 +663,11 @@ static void test_dynamic_array_clear_resets_length(void)
         TEST_POINTERS_EQUAL(array.data, data_ptr);
     }
 
-    jsl_arena_reset(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 
     {
         DynamicCompositeType3ToCompositeType2Map array = {0};
-        bool ok = dynamic_comp3_array_init(&array, &global_arena, 2);
+        bool ok = dynamic_comp3_array_init(&array, &allocator, 2);
         TEST_BOOL(ok);
         if (!ok) return;
 
@@ -677,15 +684,16 @@ static void test_dynamic_array_clear_resets_length(void)
         TEST_POINTERS_EQUAL(array.data, data_ptr);
     }
 
-    jsl_arena_reset(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 }
 
 static void test_dynamic_array_checks_sentinel(void)
 {
-    jsl_arena_reset(&global_arena);
+    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    jsl_allocator_interface_free_all(&allocator);
 
     DynamicInt32Array array = {0};
-    bool ok = dynamic_int32_array_init(&array, &global_arena, 2);
+    bool ok = dynamic_int32_array_init(&array, &allocator, 2);
     TEST_BOOL(ok);
     if (!ok) return;
 

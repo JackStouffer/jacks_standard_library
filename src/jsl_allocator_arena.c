@@ -30,7 +30,7 @@
 
 static JSL__FORCE_INLINE int32_t jsl__arena_effective_alignment(int32_t requested_alignment)
 {
-    int32_t header_alignment = (int32_t) _Alignof(struct JSL__ArenaAllocationHeader);
+    int32_t header_alignment = (int32_t) _Alignof(JSL__ArenaAllocationHeader);
     return requested_alignment > header_alignment ? requested_alignment : header_alignment;
 }
 
@@ -123,7 +123,7 @@ void* jsl_arena_allocate_aligned(JSLArena* arena, int64_t bytes, int32_t alignme
     if (bytes < 1)
         return NULL;
 
-    const uintptr_t header_size = (uintptr_t) sizeof(struct JSL__ArenaAllocationHeader);
+    const uintptr_t header_size = (uintptr_t) sizeof(JSL__ArenaAllocationHeader);
     const int32_t effective_alignment = jsl__arena_effective_alignment(alignment);
     uintptr_t arena_end = (uintptr_t) arena->end;
     uintptr_t arena_current_addr = (uintptr_t) arena->current;
@@ -161,12 +161,13 @@ void* jsl_arena_allocate_aligned(JSLArena* arena, int64_t bytes, int32_t alignme
     if (next_current_addr > arena_end)
         return NULL;
 
-    struct JSL__ArenaAllocationHeader* header = (struct JSL__ArenaAllocationHeader*) (aligned_allocation_addr - header_size);
+    JSL__ArenaAllocationHeader* header = (JSL__ArenaAllocationHeader*) (aligned_allocation_addr - header_size);
+
+    ASAN_UNPOISON_MEMORY_REGION(header, header_size + (size_t) bytes);
+
     header->length = bytes;
 
     arena->current = (uint8_t*) next_current_addr;
-
-    ASAN_UNPOISON_MEMORY_REGION(header, header_size + (size_t) bytes);
     ASAN_POISON_MEMORY_REGION((void*) allocation_end, guard_size);
 
     if (zeroed)
@@ -201,7 +202,7 @@ void* jsl_arena_reallocate_aligned(
     if (original_allocation == NULL)
         return jsl_arena_allocate_aligned(arena, new_num_bytes, align, false);
 
-    const uintptr_t header_size = (uintptr_t) sizeof(struct JSL__ArenaAllocationHeader);
+    const uintptr_t header_size = (uintptr_t) sizeof(JSL__ArenaAllocationHeader);
     const int32_t effective_alignment = jsl__arena_effective_alignment(align);
     const uintptr_t arena_start = (uintptr_t) arena->start;
     const uintptr_t arena_end = (uintptr_t) arena->end;
@@ -227,7 +228,7 @@ void* jsl_arena_reallocate_aligned(
     if ((allocation_addr % (uintptr_t) effective_alignment) != 0)
         return NULL;
 
-    struct JSL__ArenaAllocationHeader* header = (struct JSL__ArenaAllocationHeader*) header_addr;
+    JSL__ArenaAllocationHeader* header = (JSL__ArenaAllocationHeader*) header_addr;
     int64_t original_length = header->length;
 
     if (original_length < 0)

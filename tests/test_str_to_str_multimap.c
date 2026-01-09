@@ -66,7 +66,7 @@ static void test_jsl_str_to_str_multimap_init_success(void)
 
     bool ok = jsl_str_to_str_multimap_init2(&map, &allocator, 0xDEADBEEFUL, 8, 0.5f);
     TEST_BOOL(ok);
-    TEST_POINTERS_EQUAL(map.allocator, &global_arena);
+    TEST_POINTERS_EQUAL(map.allocator, &allocator);
 }
 
 static void test_jsl_str_to_str_multimap_init_invalid_arguments(void)

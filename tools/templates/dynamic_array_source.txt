@@ -22,6 +22,7 @@
 #include <string.h>
 
 #include "jsl_core.h"
+#include "jsl_allocator.h"
 
 static inline bool {{ function_prefix }}__ensure_capacity(
     {{ array_type_name }}* array,
@@ -35,35 +36,30 @@ static inline bool {{ function_prefix }}__ensure_capacity(
     int64_t target_capacity = jsl_next_power_of_two_i64(needed_capacity);
     int64_t new_bytes = ((int64_t) sizeof({{ value_type_name }})) * target_capacity;
 
-    JSLFatPtr new_mem = {0};
+    void* new_mem = NULL;
 
     if (array->data != NULL && array->capacity > 0)
     {
-        JSLFatPtr old_mem = {
-            (uint8_t*) array->data,
-            (int64_t) sizeof({{ value_type_name }}) * array->capacity
-        };
-
-        new_mem = jsl_arena_reallocate_aligned(
-            array->arena,
-            old_mem,
+        new_mem = jsl_allocator_interface_realloc(
+            array->allocator,
+            array->data,
             new_bytes,
             _Alignof({{ value_type_name }})
         );
     }
     else
     {
-        new_mem = jsl_arena_allocate_aligned(
-            array->arena,
+        new_mem = jsl_allocator_interface_alloc(
+            array->allocator,
             new_bytes,
             _Alignof({{ value_type_name }}),
             false
         );
     }
 
-    if (new_mem.data != NULL)
+    if (new_mem != NULL)
     {
-        array->data = ({{ value_type_name }}*) new_mem.data;
+        array->data = ({{ value_type_name }}*) new_mem;
         array->capacity = target_capacity;
         res = true;
     }
@@ -73,16 +69,16 @@ static inline bool {{ function_prefix }}__ensure_capacity(
 
 bool {{ function_prefix }}_init(
     {{ array_type_name }}* array,
-    JSLArena* arena,
+    JSLAllocatorInterface* allocator,
     int64_t initial_capacity
 )
 {
-    bool res = array != NULL && arena != NULL && initial_capacity > -1;
+    bool res = array != NULL && allocator != NULL && initial_capacity > -1;
 
     if (res)
     {
         JSL_MEMSET(array, 0, sizeof({{ array_type_name }}));
-        array->arena = arena;
+        array->allocator = allocator;
         array->sentinel = PRIVATE_SENTINEL_{{ array_type_name }};
 
         int64_t target_capacity = jsl_next_power_of_two_i64(JSL_MAX(32L, initial_capacity));
@@ -111,6 +107,34 @@ bool {{ function_prefix }}_insert(
     {
         array->data[array->length] = value;
         ++array->length;
+    }
+
+    return res;
+}
+
+bool {{ function_prefix }}_insert_multiple(
+    {{ array_type_name }}* array,
+    {{ value_type_name }}* values,
+    int64_t value_count
+)
+{
+    bool res = (
+        array != NULL
+        && array->sentinel == PRIVATE_SENTINEL_{{ array_type_name }}
+    );
+
+    if (res)
+    {
+        res = {{ function_prefix }}__ensure_capacity(array, array->length + value_count);
+    }
+
+    if (res)
+    {
+        for (int64_t i = 0; i < value_count; ++i)
+        {
+            array->data[array->length] = values[i];
+            ++array->length;    
+        }
     }
 
     return res;
@@ -197,5 +221,24 @@ void {{ function_prefix }}_clear(
     )
     {
         array->length = 0;
+    }
+}
+
+void {{ function_prefix }}_free(
+    {{ array_type_name }}* array
+)
+{
+    if (
+        array != NULL
+        && array->sentinel == PRIVATE_SENTINEL_{{ array_type_name }}
+    )
+    {
+        jsl_allocator_interface_free(
+            array->allocator,
+            array->data
+        );
+        array->length = 0;
+        array->capacity = 0;
+        array->sentinel = 0;
     }
 }

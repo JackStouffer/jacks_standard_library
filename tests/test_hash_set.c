@@ -67,7 +67,7 @@ static void test_jsl_str_set_init_success(void)
     TEST_BOOL(ok);
     if (!ok) return;
 
-    TEST_POINTERS_EQUAL(set.allocator, &global_arena);
+    TEST_POINTERS_EQUAL(set.allocator, &allocator);
     TEST_UINT64_EQUAL(set.hash_seed, 0xABCDULL);
     TEST_F32_EQUAL(set.load_factor, 0.5f);
     TEST_BOOL(set.entry_lookup_table != NULL);

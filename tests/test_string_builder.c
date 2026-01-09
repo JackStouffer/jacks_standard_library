@@ -58,7 +58,7 @@ static void test_jsl_string_builder_init(void)
     bool ok = jsl_string_builder_init(&builder, &allocator);
 
     TEST_BOOL(ok);
-    TEST_POINTERS_EQUAL(builder.allocator, &global_arena);
+    TEST_POINTERS_EQUAL(builder.allocator, &allocator);
     TEST_INT64_EQUAL(builder.chunk_size, 1024);
     TEST_BOOL(builder.chunk_alignment == 8);
     TEST_BOOL(builder.head != NULL);

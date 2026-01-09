@@ -280,7 +280,7 @@
         " */\n"
         "bool {{ function_prefix }}_init(\n"
         "    {{ hash_map_name }}* hash_map,\n"
-        "    JSLArena* arena,\n"
+        "    JSLAllocatorInterface* allocator,\n"
         "    int64_t max_item_count,\n"
         "    uint64_t seed\n"
         ");\n"
@@ -413,12 +413,12 @@
         "\n"
         "bool {{ function_prefix }}_init(\n"
         "    {{ hash_map_name }}* hash_map,\n"
-        "    JSLArena* arena,\n"
+        "    JSLAllocatorInterface* allocator,\n"
         "    int64_t max_item_count,\n"
         "    uint64_t seed\n"
         ")\n"
         "{\n"
-        "    if (hash_map == NULL || arena == NULL || max_item_count < 0)\n"
+        "    if (hash_map == NULL || allocator == NULL || max_item_count < 0)\n"
         "        return false;\n"
         "\n"
         "    JSL_MEMSET(hash_map, 0, sizeof({{ hash_map_name }}));\n"
@@ -431,30 +431,30 @@
         "    hash_map->arrays_length = jsl_next_power_of_two_i64(max_with_load_factor);\n"
         "    hash_map->arrays_length = JSL_MAX(hash_map->arrays_length, 32);\n"
         "\n"
-        "    hash_map->keys_array = ({{ key_type_name }}*) jsl_arena_allocate_aligned(\n"
-        "       arena,\n"
-        "       ((int64_t) sizeof({{ key_type_name }})) * hash_map->arrays_length,\n"
-        "       (int32_t) _Alignof({{ key_type_name }}),\n"
-        "       false\n"
-        "    ).data;\n"
+        "    hash_map->keys_array = ({{ key_type_name }}*) jsl_allocator_interface_alloc(\n"
+        "        allocator,\n"
+        "        ((int64_t) sizeof({{ key_type_name }})) * hash_map->arrays_length,\n"
+        "        (int32_t) _Alignof({{ key_type_name }}),\n"
+        "        false\n"
+        "    );\n"
         "    if (hash_map->keys_array == NULL)\n"
         "        return false;\n"
         "\n"
-        "    hash_map->values_array = ({{ value_type_name }}*) jsl_arena_allocate_aligned(\n"
-        "        arena,\n"
+        "    hash_map->values_array = ({{ value_type_name }}*) jsl_allocator_interface_alloc(\n"
+        "        allocator,\n"
         "        ((int64_t) sizeof({{ value_type_name }})) * hash_map->arrays_length,\n"
         "        (int32_t) _Alignof({{ value_type_name }}),\n"
         "        false\n"
-        "    ).data;\n"
+        "    );\n"
         "    if (hash_map->values_array == NULL)\n"
         "        return false;\n"
         "\n"
-        "    hash_map->hashes_array = (uint64_t*) jsl_arena_allocate_aligned(\n"
-        "        arena,\n"
+        "    hash_map->hashes_array = (uint64_t*) jsl_allocator_interface_alloc(\n"
+        "        allocator,\n"
         "        ((int64_t) sizeof(uint64_t)) * hash_map->arrays_length,\n"
         "        (int32_t) _Alignof(uint64_t),\n"
         "        true\n"
-        "    ).data;\n"
+        "    );\n"
         "    if (hash_map->hashes_array == NULL)\n"
         "        return false;\n"
         "\n"
@@ -877,7 +877,8 @@
 
         jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#pragma once\n\n"));
         jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include <stdint.h>\n"));
-        jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include \"jsl_hash_map_common.h\"\n\n"));
+        jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include \"jsl_allocator.h\"\n"));
+        jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include \"jsl_hash_map_common.h\"\n"));
         jsl_string_builder_insert_u8(
             builder,
             '\n'
@@ -976,6 +977,7 @@
             builder,
             JSL_FATPTR_EXPRESSION("#include \"jsl_core.h\"\n")
         );
+        jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include \"jsl_allocator.h\"\n"));
         jsl_string_builder_insert_fatptr(
             builder,
             JSL_FATPTR_EXPRESSION("#include \"jsl_hash_map_common.h\"\n\n")
