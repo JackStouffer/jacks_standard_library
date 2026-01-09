@@ -231,17 +231,21 @@ static bool jsl__str_to_str_multimap_rehash(
     bool should_commit = migrate_ok && allocation_ok && length_valid;
     if (should_commit)
     {
+        uintptr_t* old_table_to_free = map->entry_lookup_table;
         map->entry_lookup_table = new_table;
         map->entry_lookup_table_length = new_length;
         map->tombstone_count = 0;
         ++map->generational_id;
         res = true;
+
+        jsl_allocator_interface_free(map->allocator, old_table_to_free);
     }
 
     bool failed = !should_commit;
     if (failed)
     {
         res = false;
+        jsl_allocator_interface_free(map->allocator, new_table);
     }
 
     return res;
@@ -347,6 +351,50 @@ static JSL__FORCE_INLINE JSLFatPtr jsl__str_to_str_multimap_get_value(
     }
 
     return (JSLFatPtr) {0};
+}
+
+static JSL__FORCE_INLINE void jsl__str_to_str_multimap_free_key_if_needed(
+    JSLStrToStrMultimap* map,
+    struct JSL__StrToStrMultimapEntry* entry
+)
+{
+    if (map == NULL || entry == NULL)
+    {
+        return;
+    }
+
+    bool should_free = (
+        entry->key_state == JSL__DUPLICATED
+        && entry->key.data != NULL
+        && entry->key.length > 0
+    );
+
+    if (should_free)
+    {
+        jsl_allocator_interface_free(map->allocator, entry->key.data);
+    }
+}
+
+static JSL__FORCE_INLINE void jsl__str_to_str_multimap_free_value_if_needed(
+    JSLStrToStrMultimap* map,
+    struct JSL__StrToStrMultimapValue* value_record
+)
+{
+    if (map == NULL || value_record == NULL)
+    {
+        return;
+    }
+
+    bool should_free = (
+        value_record->value_state == JSL__DUPLICATED
+        && value_record->value.data != NULL
+        && value_record->value.length > 0
+    );
+
+    if (should_free)
+    {
+        jsl_allocator_interface_free(map->allocator, value_record->value.data);
+    }
 }
 
 static JSL__FORCE_INLINE bool jsl__str_to_str_multimap_add_key(
@@ -977,6 +1025,7 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_delete_key(
     while (entry_valid && value_record != NULL)
     {
         struct JSL__StrToStrMultimapValue* next = value_record->next;
+        jsl__str_to_str_multimap_free_value_if_needed(map, value_record);
         value_record->next = map->value_free_list;
         map->value_free_list = value_record;
         value_record = next;
@@ -991,6 +1040,7 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_delete_key(
         map->value_count -= removed_value_count;
         map->entry_lookup_table[lut_index] = JSL__MULTIMAP_TOMBSTONE;
 
+        jsl__str_to_str_multimap_free_key_if_needed(map, entry);
         entry->next = map->entry_free_list;
         map->entry_free_list = entry;
 
@@ -1089,6 +1139,7 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_delete_value(
 
     if (remove_from_list)
     {
+        jsl__str_to_str_multimap_free_value_if_needed(map, current);
         current->next = map->value_free_list;
         map->value_free_list = current;
         --entry->value_count;
@@ -1101,6 +1152,7 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_delete_value(
         map->entry_lookup_table[lut_index] = JSL__MULTIMAP_TOMBSTONE;
         ++map->tombstone_count;
 
+        jsl__str_to_str_multimap_free_key_if_needed(map, entry);
         entry->next = map->entry_free_list;
         map->entry_free_list = entry;
         --map->key_count;
@@ -1158,6 +1210,7 @@ JSL_STR_TO_STR_MULTIMAP_DEF void jsl_str_to_str_multimap_clear(
         while (entry_has_values && value_record != NULL)
         {
             struct JSL__StrToStrMultimapValue* next_value = value_record->next;
+            jsl__str_to_str_multimap_free_value_if_needed(map, value_record);
             value_record->next = map->value_free_list;
             map->value_free_list = value_record;
             value_record = next_value;
@@ -1172,6 +1225,7 @@ JSL_STR_TO_STR_MULTIMAP_DEF void jsl_str_to_str_multimap_clear(
         bool recycle_entry = occupied && entry != NULL;
         if (recycle_entry)
         {
+            jsl__str_to_str_multimap_free_key_if_needed(map, entry);
             entry->next = map->entry_free_list;
             map->entry_free_list = entry;
             map->entry_lookup_table[index] = JSL__MULTIMAP_EMPTY;

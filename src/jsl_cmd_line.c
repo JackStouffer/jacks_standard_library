@@ -46,7 +46,7 @@
 
 static const JSLFatPtr JSL__CMD_LINE_EMPTY_VALUE = JSL_FATPTR_INITIALIZER("");
 
-static void jsl__cmd_line_set_error(JSLCmdLine* cmd_line, JSLFatPtr* out_error, JSLFatPtr message)
+static JSL__FORCE_INLINE void jsl__cmd_line_set_error(JSLCmdLine* cmd_line, JSLFatPtr* out_error, JSLFatPtr message)
 {
     bool params_valid = (
         cmd_line != NULL
@@ -60,14 +60,14 @@ static void jsl__cmd_line_set_error(JSLCmdLine* cmd_line, JSLFatPtr* out_error, 
     }
 }
 
-static void jsl__cmd_line_set_short_flag(JSLCmdLine* cmd_line, uint8_t flag)
+static JSL__FORCE_INLINE void jsl__cmd_line_set_short_flag(JSLCmdLine* cmd_line, uint8_t flag)
 {
     uint32_t bucket_index = (uint32_t) flag >> 6;
     uint32_t bit_index = (uint32_t) flag & 63u;
     cmd_line->short_flag_bitset[bucket_index] |= (uint64_t) 1u << bit_index;
 }
 
-static bool jsl__cmd_line_short_flag_present(JSLCmdLine* cmd_line, uint8_t flag)
+static JSL__FORCE_INLINE bool jsl__cmd_line_short_flag_present(JSLCmdLine* cmd_line, uint8_t flag)
 {
     uint32_t bucket_index = (uint32_t) flag >> 6;
     uint32_t bit_index = (uint32_t) flag & 63u;

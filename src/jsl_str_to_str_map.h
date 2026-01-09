@@ -397,7 +397,7 @@ JSL_STR_TO_STR_MAP_DEF void jsl_str_to_str_map_clear(
  */
 JSL_STR_TO_STR_MAP_DEF void jsl_str_to_str_map_free(
     JSLStrToStrMap* map
-)
+);
 
 #ifdef __cplusplus
 }
