@@ -2,9 +2,8 @@ not finished yet
 
 # Jack's Standard Library
 
-A collection of single header file libraries designed to replace usage
-of the C Standard Library with more modern, safe, and simple alternatives
-for C11/C23.
+A source library designed to replace usage of the C Standard Library
+with more modern, safe, and simple alternatives for C11/C23.
 
 ## Why
 
@@ -53,15 +52,6 @@ See the DESIGN.md file for more info.
     * file reading, writing, and get file size
     * mkdir
     * a `fprintf` replacement
-
-### Jack's Standard Library Unicode
-
-`jsl_unicode.h`
-
-**WARNING** On MSVC you must pass `/utf-8` or else you will get incorrect code generation!
-
-* utf-8 to utf-16 conversion
-* utf-16 to utf-8 conversion
 
 ### Jack's Standard Library Templates
 
@@ -115,29 +105,27 @@ it. This will not work on other compilers on Windows without edits.
 
 ## Usage
 
-1. Copy the `jacks_standard_library.h` file into your repo
-2. Include the header like normally in each source file:
+Unlike most C libraries, JSL is designed to be a source library, i.e.
+copied directly into your project (a.k.a. vendored) and included into your
+build system the way that you desire. As such, JSL does not ship with a
+build script that produces a static library. If you desire such a thing,
+you can just `cc -O3 -c` and `ar rcs` all of the C files in the `src/` directory.
 
-```c
-#include "jacks_standard_library.h"
-```
+Using this as a source library comes with several advantages: TK
 
-3. Then, in ONE AND ONLY ONE file, do this:
+For easy inclusion in a unity build, `jsl_everything.c` includes all of the source
+files at once.
 
-```c
-#define JSL_IMPLEMENTATION
-#include "jacks_standard_library.h"
-```
+One note is that most of this library does not depend on the C standard library to
+be available at link time if you don't want to use it. However, it does require the
+"compile time" headers `stddef.h`, `stdint.h`, and `stdbool.h` (if using < C23). You'll
+also have to define the replacement functions for the C standard library functions like
+`assert` and `memcmp`. See the "Preprocessor Switches" section for more information.
 
-This should probably be in the "main" file for your program, but it doesn't have to be.
-You can also define an empty `.c` file with this as the only thing in it if that would
-more easily integrate into your build.
+Files that depend on libc:
 
-One note is that this library does not depend on the C standard library to be available
-at link time if you don't want to use it. However, it does require the "compile time"
-headers `stddef.h`, `stdint.h`, and `stdbool.h` (if using < C23). You'll also have to
-define the replacement functions for the C standard library functions like `assert` and
-`memcmp`. See the "Preprocessor Switches" section for more information.
+* `jsl_os.c`
+* `jsl_allocator_infinite_arena.c`
 
 ### Note On Compile Flags
 

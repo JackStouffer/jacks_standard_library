@@ -198,7 +198,7 @@ JSL_DEF void* jsl_arena_reallocate_aligned(
  * Set the current pointer back to the start of the arena.
  *
  * In debug mode, this function will set all of the memory that was
- * allocated to `0xfeeefeee` to help detect use after free bugs.
+ * allocated to `0xfeefee` to help detect use after free bugs.
  */
 JSL_DEF void jsl_arena_reset(JSLArena* arena);
 
@@ -220,7 +220,7 @@ JSL_DEF void jsl_arena_reset(JSLArena* arena);
  * kilobytes used.
  *
  * In debug mode, jsl_arena_load_restore_point function will set all of the memory
- * that was allocated to `0xfeeefeee` to help detect use after free bugs.
+ * that was allocated to `0xfeefee` to help detect use after free bugs.
  */
 JSL_DEF uint8_t* jsl_arena_save_restore_point(JSLArena* arena);
 
@@ -242,7 +242,7 @@ JSL_DEF uint8_t* jsl_arena_save_restore_point(JSLArena* arena);
  * kilobytes used.
  *
  * In debug mode, jsl_arena_load_restore_point function will set all of the memory
- * that was allocated to `0xfeeefeee` to help detect use after free bugs.
+ * that was allocated to `0xfeefee` to help detect use after free bugs.
  * 
  * This function will assert if you attempt to use a different restore point from an
  * arena different that the one passed in as the parameter.

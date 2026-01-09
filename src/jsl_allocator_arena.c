@@ -34,6 +34,28 @@ static JSL__FORCE_INLINE int32_t jsl__arena_effective_alignment(int32_t requeste
     return requested_alignment > header_alignment ? requested_alignment : header_alignment;
 }
 
+static JSL__FORCE_INLINE void jsl__arena_debug_memset_old_memory(void* allocation, int64_t num_bytes)
+{
+    int32_t* fake_array = (int32_t*) allocation;
+    int64_t fake_array_len = num_bytes / (int64_t) sizeof(int32_t);
+    for (int64_t i = 0; i < fake_array_len; ++i)
+    {
+        fake_array[i] = 0xfeefee;
+    }
+
+    int64_t trailing_bytes = num_bytes - (fake_array_len * (int64_t) sizeof(int32_t));
+    if (trailing_bytes > 0)
+    {
+        const uint32_t pattern = 0x00feefee;
+        const uint8_t* pattern_bytes = (const uint8_t*) &pattern;
+        uint8_t* trailing = (uint8_t*) (fake_array + fake_array_len);
+        for (int64_t i = 0; i < trailing_bytes; ++i)
+        {
+            trailing[i] = pattern_bytes[i];
+        }
+    }
+}
+
 void jsl_arena_init(JSLArena* arena, void* memory, int64_t length)
 {
     arena->start = memory;
@@ -67,14 +89,24 @@ static void* alloc_interface_realloc(void* ctx, void* allocation, int64_t new_by
 static bool alloc_interface_free(void* ctx, void* allocation)
 {
     (void) ctx;
-    (void) allocation;
 
-    // TODO:
-    // #ifdef JSL_DEBUG
-    //     JSL_MEMSET();
-    // #endif
+    #ifdef JSL_DEBUG
 
-    return true;
+        const uintptr_t header_size = (uintptr_t) sizeof(struct JSL__ArenaAllocationHeader);
+        struct JSL__ArenaAllocationHeader* header = (struct JSL__ArenaAllocationHeader*) (
+            (uint8_t*) allocation - header_size
+        );
+
+        jsl__arena_debug_memset_old_memory(allocation, header->length);
+        return true;
+
+    #else
+
+        (void) allocation;
+        return true;
+
+    #endif
+
 }
 
 static bool alloc_interface_free_all(void* ctx)
@@ -315,11 +347,7 @@ void jsl_arena_reset(JSLArena* arena)
     ASAN_UNPOISON_MEMORY_REGION(arena->start, arena->end - arena->start);
 
     #ifdef JSL_DEBUG
-        JSL_MEMSET(
-            (void*) arena->start,
-            (int32_t) 0xfeeefeee,
-            (size_t) (arena->current - arena->start)
-        );
+        jsl__arena_debug_memset_old_memory((void*) arena->start, arena->current - arena->start);
     #endif
 
     arena->current = arena->start;
@@ -354,11 +382,7 @@ void jsl_arena_load_restore_point(JSLArena* arena, uint8_t* restore_point)
     );
 
     #ifdef JSL_DEBUG
-        JSL_MEMSET(
-            (void*) restore_point,
-            (int32_t) 0xfeeefeee,
-            (size_t) (current_addr - restore_addr)
-        );
+        jsl__arena_debug_memset_old_memory((void*) restore_point, (current_addr - restore_addr));
     #endif
 
     ASAN_POISON_MEMORY_REGION(
