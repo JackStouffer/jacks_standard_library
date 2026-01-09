@@ -56,6 +56,9 @@
 #include "jsl_str_to_str_map.h"
 
 #define JSL__MAP_PRIVATE_SENTINEL 8973815015742603881U
+#define JSL__MAP_LIFETIME_STATIC 1u
+#define JSL__MAP_LIFETIME_DUPLICATED 2u
+#define JSL__MAP_LIFETIME_SSO 3u
 
 JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_init(
     JSLStrToStrMap* map,
@@ -233,8 +236,6 @@ static JSL__FORCE_INLINE void jsl__str_to_str_map_store_key(
     JSLStringLifeTime key_lifetime
 )
 {
-    entry->key_lifetime = (uint8_t) key_lifetime;
-
     if (
         key_lifetime == JSL_STRING_LIFETIME_TRANSIENT
         && key.length <= JSL__MAP_SSO_LENGTH
@@ -242,6 +243,7 @@ static JSL__FORCE_INLINE void jsl__str_to_str_map_store_key(
     {
         JSL_MEMCPY(entry->key_sso_buffer, key.data, (size_t) key.length);
         entry->key_sso_buffer_length = key.length;
+        entry->key_lifetime = JSL__MAP_LIFETIME_SSO;
     }
     else if (
         key_lifetime == JSL_STRING_LIFETIME_TRANSIENT
@@ -249,22 +251,58 @@ static JSL__FORCE_INLINE void jsl__str_to_str_map_store_key(
     )
     {
         entry->key = jsl_fatptr_duplicate(map->allocator, key);
+        entry->key_lifetime = JSL__MAP_LIFETIME_DUPLICATED;
     }
     else
     {
         entry->key = key;
+        entry->key_lifetime = JSL__MAP_LIFETIME_STATIC;
     }
 }
 
-static JSL__FORCE_INLINE void store_value(
+static JSL__FORCE_INLINE void jsl__str_to_str_map_entry_free_key(
+    JSLStrToStrMap* map,
+    struct JSL__StrToStrMapEntry* entry
+)
+{
+    if (map == NULL || entry == NULL)
+        return;
+
+    bool should_free = (
+        entry->key_lifetime == JSL__MAP_LIFETIME_DUPLICATED
+        && entry->key.data != NULL
+        && entry->key.length > 0
+    );
+
+    if (should_free)
+        jsl_allocator_interface_free(map->allocator, entry->key.data);
+}
+
+static JSL__FORCE_INLINE void jsl__str_to_str_map_entry_free_value(
+    JSLStrToStrMap* map,
+    struct JSL__StrToStrMapEntry* entry
+)
+{
+    if (map == NULL || entry == NULL)
+        return;
+
+    bool should_free = (
+        entry->value_lifetime == JSL__MAP_LIFETIME_DUPLICATED
+        && entry->value.data != NULL
+        && entry->value.length > 0
+    );
+
+    if (should_free)
+        jsl_allocator_interface_free(map->allocator, entry->value.data);
+}
+
+static JSL__FORCE_INLINE void jsl__str_to_str_map_store_value(
     JSLStrToStrMap* map,
     struct JSL__StrToStrMapEntry* entry,
     JSLFatPtr value,
     JSLStringLifeTime value_lifetime
 )
 {
-    entry->value_lifetime = (uint8_t) value_lifetime;
-
     if (
         value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
         && value.length <= JSL__MAP_SSO_LENGTH
@@ -272,6 +310,7 @@ static JSL__FORCE_INLINE void store_value(
     {
         JSL_MEMCPY(entry->value_sso_buffer, value.data, (size_t) value.length);
         entry->value_sso_buffer_length = value.length;
+        entry->value_lifetime = JSL__MAP_LIFETIME_SSO;
     }
     else if (
         value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
@@ -279,19 +318,21 @@ static JSL__FORCE_INLINE void store_value(
     )
     {
         entry->value = jsl_fatptr_duplicate(map->allocator, value);
+        entry->value_lifetime = JSL__MAP_LIFETIME_DUPLICATED;
     }
     else
     {
         entry->value = value;
+        entry->value_lifetime = JSL__MAP_LIFETIME_STATIC;
     }
 }
 
-static JSL__FORCE_INLINE JSLFatPtr get_entry_key(
+static JSL__FORCE_INLINE JSLFatPtr jsl__str_to_str_map_get_entry_key(
     struct JSL__StrToStrMapEntry* entry
 )
 {
     if (
-        entry->key_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+        entry->key_lifetime == JSL__MAP_LIFETIME_SSO
         && entry->key_sso_buffer_length <= JSL__MAP_SSO_LENGTH
     )
     {
@@ -304,12 +345,12 @@ static JSL__FORCE_INLINE JSLFatPtr get_entry_key(
     }
 }
 
-static JSL__FORCE_INLINE JSLFatPtr get_entry_value(
+static JSL__FORCE_INLINE JSLFatPtr jsl__str_to_str_map_get_entry_value(
     struct JSL__StrToStrMapEntry* entry
 )
 {
     if (
-        entry->value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+        entry->value_lifetime == JSL__MAP_LIFETIME_SSO
         && entry->value_sso_buffer_length <= JSL__MAP_SSO_LENGTH
     )
     {
@@ -322,7 +363,7 @@ static JSL__FORCE_INLINE JSLFatPtr get_entry_value(
     }
 }
 
-static JSL__FORCE_INLINE bool add_new_entry(
+static JSL__FORCE_INLINE bool jsl__str_to_str_map_add_new_entry(
     JSLStrToStrMap* map,
     JSLFatPtr key,
     JSLStringLifeTime key_lifetime,
@@ -354,7 +395,7 @@ static JSL__FORCE_INLINE bool add_new_entry(
         ++map->item_count;
 
         jsl__str_to_str_map_store_key(map, entry, key, key_lifetime);
-        store_value(map, entry, value, value_lifetime);
+        jsl__str_to_str_map_store_value(map, entry, value, value_lifetime);
     }
 
     if (entry != NULL && replacing_tombstone)
@@ -415,7 +456,7 @@ static inline void jsl__str_to_str_map_probe(
         bool matches = false;
         if (entry != NULL)
         {
-            JSLFatPtr entry_key = get_entry_key(entry);
+            JSLFatPtr entry_key = jsl__str_to_str_map_get_entry_key(entry);
             matches = *out_hash == entry->hash && jsl_fatptr_memory_compare(key, entry_key);
         }
 
@@ -494,7 +535,7 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_insert(
     // new key
     if (lut_index > -1 && !existing_found)
     {
-        res = add_new_entry(
+        res = jsl__str_to_str_map_add_new_entry(
             map,
             key, key_lifetime,
             value, value_lifetime,
@@ -508,7 +549,7 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_insert(
         uintptr_t lut_res = map->entry_lookup_table[lut_index];
         struct JSL__StrToStrMapEntry* entry = (struct JSL__StrToStrMapEntry*) lut_res;
 
-        store_value(map, entry, value, value_lifetime);
+        jsl__str_to_str_map_store_value(map, entry, value, value_lifetime);
     }
 
     if (res)
@@ -571,7 +612,7 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_get(
     {
         struct JSL__StrToStrMapEntry* entry =
             (struct JSL__StrToStrMapEntry*) map->entry_lookup_table[lut_index];
-        *out_value = get_entry_value(entry);
+        *out_value = jsl__str_to_str_map_get_entry_value(entry);
         res = true;
     }
     else if (out_value != NULL)
@@ -664,8 +705,8 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_key_value_iterator_next(
     if (found_entry != NULL)
     {
         iterator->current_lut_index = lut_index + 1;
-        *out_key = get_entry_key(found_entry);
-        *out_value = get_entry_value(found_entry);
+        *out_key = jsl__str_to_str_map_get_entry_key(found_entry);
+        *out_value = jsl__str_to_str_map_get_entry_value(found_entry);
         found = true;
     }
 
@@ -707,6 +748,9 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_delete(
         struct JSL__StrToStrMapEntry* entry =
             (struct JSL__StrToStrMapEntry*) map->entry_lookup_table[lut_index];
 
+        jsl__str_to_str_map_entry_free_key(map, entry);
+        jsl__str_to_str_map_entry_free_value(map, entry);
+
         entry->next = map->entry_free_list;
         map->entry_free_list = entry;
 
@@ -742,6 +786,8 @@ JSL_STR_TO_STR_MAP_DEF void jsl_str_to_str_map_clear(
         if (lut_res != JSL__MAP_EMPTY && lut_res != JSL__MAP_TOMBSTONE)
         {
             struct JSL__StrToStrMapEntry* entry = (struct JSL__StrToStrMapEntry*) lut_res;
+            jsl__str_to_str_map_entry_free_key(map, entry);
+            jsl__str_to_str_map_entry_free_value(map, entry);
             entry->next = map->entry_free_list;
             map->entry_free_list = entry;
             map->entry_lookup_table[index] = JSL__MAP_EMPTY;
@@ -764,5 +810,52 @@ JSL_STR_TO_STR_MAP_DEF void jsl_str_to_str_map_clear(
     return;
 }
 
+
+JSL_STR_TO_STR_MAP_DEF void jsl_str_to_str_map_free(
+    JSLStrToStrMap* map
+)
+{
+    bool params_valid = (
+        map != NULL
+        && map->sentinel == JSL__MAP_PRIVATE_SENTINEL
+    );
+
+    uintptr_t* lut = params_valid ? map->entry_lookup_table : NULL;
+    int64_t lut_length = params_valid ? map->entry_lookup_table_length : 0;
+
+    int64_t lut_index = 0;
+    while (params_valid && lut_index < lut_length)
+    {
+        uintptr_t lut_res = lut[lut_index];
+        if (lut_res != JSL__HASHMAP_EMPTY && lut_res != JSL__HASHMAP_TOMBSTONE)
+        {
+            struct JSL__StrToStrMapEntry* entry = (struct JSL__StrToStrMapEntry*) lut_res;
+            jsl__str_to_str_map_entry_free_key(map, entry);
+            jsl__str_to_str_map_entry_free_value(map, entry);
+            jsl_allocator_interface_free(map->allocator, entry);
+        }
+
+        ++lut_index;
+    }
+
+    struct JSL__StrToStrMapEntry* entry = params_valid ? map->entry_free_list : NULL;
+    while (entry != NULL)
+    {
+        struct JSL__StrToStrMapEntry* next = entry->next;
+        jsl_allocator_interface_free(map->allocator, entry);
+        entry = next;
+    }
+
+    if (params_valid)
+    {
+        jsl_allocator_interface_free(map->allocator, map->entry_lookup_table);
+    }
+
+    map->sentinel = 0;
+}
+
 #undef JSL__MAP_SSO_LENGTH
+#undef JSL__MAP_LIFETIME_STATIC
+#undef JSL__MAP_LIFETIME_DUPLICATED
+#undef JSL__MAP_LIFETIME_SSO
 #undef JSL__MAP_PRIVATE_SENTINEL

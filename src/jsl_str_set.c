@@ -515,7 +515,6 @@ JSL_STR_SET_DEF bool jsl_str_set_iterator_next(
         && iterator->sentinel == JSL__SET_PRIVATE_SENTINEL
         && iterator->set != NULL
         && iterator->set->sentinel == JSL__SET_PRIVATE_SENTINEL
-        && iterator->set->entry_lookup_table != NULL
         && iterator->generational_id == iterator->set->generational_id
     );
 
@@ -580,7 +579,6 @@ JSL_STR_SET_DEF bool jsl_str_set_delete(
     bool params_valid = (
         set != NULL
         && set->sentinel == JSL__SET_PRIVATE_SENTINEL
-        && set->entry_lookup_table != NULL
         && value.data != NULL
         && value.length > -1
     );
@@ -623,7 +621,6 @@ JSL_STR_SET_DEF void jsl_str_set_clear(
     bool params_valid = (
         set != NULL
         && set->sentinel == JSL__SET_PRIVATE_SENTINEL
-        && set->entry_lookup_table != NULL
     );
 
     int64_t lut_length = params_valid ? set->entry_lookup_table_length : 0;
@@ -668,7 +665,6 @@ JSL_STR_SET_DEF void jsl_str_set_free(
     bool params_valid = (
         set != NULL
         && set->sentinel == JSL__SET_PRIVATE_SENTINEL
-        && set->entry_lookup_table != NULL
     );
 
     uintptr_t* lut = params_valid ? set->entry_lookup_table : NULL;
@@ -699,8 +695,9 @@ JSL_STR_SET_DEF void jsl_str_set_free(
     if (params_valid)
     {
         jsl_allocator_interface_free(set->allocator, set->entry_lookup_table);
-        set->sentinel = 0;
     }
+
+    set->sentinel = 0;
 }
 
 JSL_STR_SET_DEF bool jsl_str_set_intersection(
@@ -714,11 +711,8 @@ JSL_STR_SET_DEF bool jsl_str_set_intersection(
         && b != NULL
         && out != NULL
         && a->sentinel == JSL__SET_PRIVATE_SENTINEL
-        && a->entry_lookup_table != NULL
         && b->sentinel == JSL__SET_PRIVATE_SENTINEL
-        && b->entry_lookup_table != NULL
         && out->sentinel == JSL__SET_PRIVATE_SENTINEL
-        && out->entry_lookup_table != NULL
     );
 
     JSLStrSet* smaller = NULL;
@@ -757,11 +751,8 @@ JSL_STR_SET_DEF bool jsl_str_set_union(
         && b != NULL
         && out != NULL
         && a->sentinel == JSL__SET_PRIVATE_SENTINEL
-        && a->entry_lookup_table != NULL
         && b->sentinel == JSL__SET_PRIVATE_SENTINEL
-        && b->entry_lookup_table != NULL
         && out->sentinel == JSL__SET_PRIVATE_SENTINEL
-        && out->entry_lookup_table != NULL
     );
 
     JSLStrSetKeyValueIter a_iterator = {0};
@@ -805,11 +796,8 @@ JSL_STR_SET_DEF bool jsl_str_set_difference(
         && b != NULL
         && out != NULL
         && a->sentinel == JSL__SET_PRIVATE_SENTINEL
-        && a->entry_lookup_table != NULL
         && b->sentinel == JSL__SET_PRIVATE_SENTINEL
-        && b->entry_lookup_table != NULL
         && out->sentinel == JSL__SET_PRIVATE_SENTINEL
-        && out->entry_lookup_table != NULL
     );
 
     JSLStrSetKeyValueIter iterator = {0};

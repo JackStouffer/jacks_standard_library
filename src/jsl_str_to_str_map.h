@@ -378,13 +378,26 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_delete(
 );
 
 /**
- * Remove all keys and values from the map.  Iterators become invalid.
+ * Remove all keys and values from the map. Internal bookkeeping storage does not
+ * change size. All cleared keys and values are freed if they were copied.
+ * Iterators become invalid.
  *
  * @param map Map to clear.
  */
 JSL_STR_TO_STR_MAP_DEF void jsl_str_to_str_map_clear(
     JSLStrToStrMap* map
 );
+
+/**
+ * Free all underlying memory allocated by this map. This map is then put into an
+ * invalid state. If you wish to use the map again you will need to call init.
+ * Iterators become invalid.
+ *
+ * @param map Map to free.
+ */
+JSL_STR_TO_STR_MAP_DEF void jsl_str_to_str_map_free(
+    JSLStrToStrMap* map
+)
 
 #ifdef __cplusplus
 }
