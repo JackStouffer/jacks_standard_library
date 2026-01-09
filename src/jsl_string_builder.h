@@ -329,7 +329,7 @@ JSL_STRING_BUILDER_DEF bool jsl_string_builder_format(JSLStringBuilder* builder,
 /**
  * TODO: docs
  */
-JSL_STRING_BUILDER_DEF bool jsl_string_builder_clear(
+JSL_STRING_BUILDER_DEF void jsl_string_builder_free(
     JSLStringBuilder* builder
 );
 

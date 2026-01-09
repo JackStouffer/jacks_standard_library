@@ -206,17 +206,21 @@ static bool jsl__str_to_str_map_rehash(
     bool should_commit = migrate_ok && new_table != NULL && length_valid;
     if (should_commit)
     {
+        uintptr_t* old_table_to_free = map->entry_lookup_table;
         map->entry_lookup_table = new_table;
         map->entry_lookup_table_length = new_length;
         map->tombstone_count = 0;
         ++map->generational_id;
         res = true;
+
+        jsl_allocator_interface_free(map->allocator, old_table_to_free);
     }
 
     bool failed = !should_commit;
     if (failed)
     {
         res = false;
+        jsl_allocator_interface_free(map->allocator, new_table);
     }
 
     return res;

@@ -9,10 +9,10 @@
 #include "jsl_allocator.h"
 
 // Stored immediately before every allocation so realloc can recover the length.
-typedef struct JSL__ArenaAllocationHeader
+struct JSL__ArenaAllocationHeader
 {
     int64_t length;
-} JSL__ArenaAllocationHeader;
+};
 
 /**
  * A bump allocator. Designed for situations in your program when you know a

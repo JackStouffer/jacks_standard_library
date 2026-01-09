@@ -1013,6 +1013,16 @@ static JSL__FORCE_INLINE JSL__UNUSED int32_t jsl__find_first_set_u64(uint64_t x)
 /**
  * TODO: docs
  */
+typedef enum JSLStringLifeTime {
+    /// @brief The string's lifetime is less than the container
+    JSL_STRING_LIFETIME_TRANSIENT = 0,
+    /// @brief The string is in static storage or can be assumed to be longer than the container
+    JSL_STRING_LIFETIME_STATIC = 1
+} JSLStringLifeTime;
+
+/**
+ * TODO: docs
+ */
 #define JSL_DEBUG_DONT_OPTIMIZE_AWAY(x) JSL__DONT_OPTIMIZE_AWAY_IMPL(x)
 
 /**

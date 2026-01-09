@@ -399,32 +399,28 @@ JSL__ASAN_OFF bool jsl_string_builder_format(JSLStringBuilder* builder, JSLFatPt
     return !context.failure_flag;
 }
 
-bool jsl_string_builder_clear(
+void jsl_string_builder_free(
     JSLStringBuilder* builder
 )
 {
     if (
         builder == NULL
         || builder->sentinel != JSL__BUILDER_PRIVATE_SENTINEL
-        || builder->allocator == NULL
     )
-        return false;
-
-    JSLAllocatorInterface* allocator = builder->allocator;
-    int32_t chunk_size = builder->chunk_size;
-    int32_t chunk_alignment = builder->chunk_alignment;
+        return;
 
     struct JSL__StringBuilderChunk* current = builder->head;
     while (current != NULL)
     {
         struct JSL__StringBuilderChunk* next = current->next;
         if (current->buffer.data != NULL)
-            jsl_allocator_interface_free(allocator, current->buffer.data);
-        jsl_allocator_interface_free(allocator, current);
+            jsl_allocator_interface_free(builder->allocator, current->buffer.data);
+
+        jsl_allocator_interface_free(builder->allocator, current);
         current = next;
     }
 
-    return jsl_string_builder_init2(builder, allocator, chunk_size, chunk_alignment);
+    builder->sentinel = 0;
 }
 
 #undef JSL__BUILDER_PRIVATE_SENTINEL

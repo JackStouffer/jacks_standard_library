@@ -294,27 +294,9 @@ RAPIDHASH_INLINE_CONSTEXPR uint64_t jsl__rapidhash_withSeed(
     return jsl__rapidhash_internal(key, len, seed, jsl__rapid_secret);
 }
 
-#define JSL__HASH_MAP_GET_SET_FLAG_INDEX(slot_number) slot_number >> 5L
-
-enum JSL__HashmapFlags
-{
-    JSL__HASHMAP_CANT_EXPAND = JSL_MAKE_BITFLAG(0),
-    JSL__HASHMAP_CANT_INSERT = JSL_MAKE_BITFLAG(1),
-    JSL__HASHMAP_DUPLICATE_KEYS = JSL_MAKE_BITFLAG(2),
-    JSL__HASHMAP_DUPLICATE_VALUES = JSL_MAKE_BITFLAG(3),
-    JSL__HASHMAP_NULL_VALUE_SET = JSL_MAKE_BITFLAG(4)
-};
-
 enum JSL__ProbeState
 {
     JSL__HASHMAP_EMPTY = 0,
     JSL__HASHMAP_TOMBSTONE = 1,
     JSL__HASHMAP_VALUE_OK
 };
-
-typedef enum JSLStringLifeTime {
-    /// @brief The string's lifetime is less than the container
-    JSL_STRING_LIFETIME_TRANSIENT = 0,
-    /// @brief The string is in static storage or can be assumed to be longer than the container
-    JSL_STRING_LIFETIME_STATIC = 1
-} JSLStringLifeTime;
