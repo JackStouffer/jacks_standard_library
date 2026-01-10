@@ -310,7 +310,8 @@ static CompilerConfig msvc_configs[] = {
 static UnitTestDecl unit_test_declarations[] = {
     {
         "test_fatptr",
-        (char*[]) {
+        (char*[])
+        {
             "tests/test_fatptr.c",
             "src/jsl_core.c",
             "src/jsl_allocator.c",
@@ -319,8 +320,20 @@ static UnitTestDecl unit_test_declarations[] = {
         }
     },
     {
+        "test_allocator_arena",
+        (char*[])
+        {
+            "tests/test_allocator_arena.c",
+            "src/jsl_core.c",
+            "src/jsl_allocator.c",
+            "src/jsl_allocator_arena.c",
+            NULL
+        }
+    },
+    {
         "test_format",
-        (char*[]) {
+        (char*[])
+        {
             "tests/test_format.c",
             "src/jsl_core.c",
             "src/jsl_allocator.c",
@@ -330,7 +343,8 @@ static UnitTestDecl unit_test_declarations[] = {
     },
     {
         "test_string_builder",
-        (char*[]) {
+        (char*[])
+        {
             "tests/test_string_builder.c",
             "src/jsl_core.c",
             "src/jsl_allocator.c",
@@ -341,7 +355,8 @@ static UnitTestDecl unit_test_declarations[] = {
     },
     {
         "test_cmd_line",
-        (char*[]) {
+        (char*[])
+        {
             "tests/test_cmd_line.c",
             "src/jsl_core.c",
             "src/jsl_allocator.c",
@@ -353,13 +368,17 @@ static UnitTestDecl unit_test_declarations[] = {
             NULL
         }
     },
-    { "test_intrinsics", (char*[]) {
-        "tests/test_intrinsics.c",
-        "src/jsl_core.c",
-        "src/jsl_allocator.c",
-        "src/jsl_allocator_arena.c",
-        NULL
-    } },
+    {
+        "test_intrinsics",
+        (char*[])
+        {
+            "tests/test_intrinsics.c",
+            "src/jsl_core.c",
+            "src/jsl_allocator.c",
+            "src/jsl_allocator_arena.c",
+            NULL
+        }
+    },
     { "test_file_utils", (char*[]) {
         "tests/test_file_utils.c",
         "src/jsl_core.c",
@@ -963,8 +982,8 @@ int32_t main(int32_t argc, char **argv)
                 nob_cmd_append(&compile_command, source_file);
             }
 
-            // if (!nob_cmd_run(&compile_command)) return 1;
-            if (!nob_cmd_run(&compile_command, .async = &compile_procs, .max_procs = (size_t)logical_processors)) return 1;
+            if (!nob_cmd_run(&compile_command)) return 1;
+            // if (!nob_cmd_run(&compile_command, .async = &compile_procs, .max_procs = (size_t)logical_processors)) return 1;
 
             cstring_array_insert(&executables, exe_name);
         }
@@ -1039,8 +1058,8 @@ int32_t main(int32_t argc, char **argv)
                     nob_cmd_append(&compile_command, source_file);
                 }
 
-                // if (!nob_cmd_run(&compile_command)) return 1;
-                if (!nob_cmd_run(&compile_command, .async = &compile_procs, .max_procs = (size_t)logical_processors)) return 1;
+                if (!nob_cmd_run(&compile_command)) return 1;
+                // if (!nob_cmd_run(&compile_command, .async = &compile_procs, .max_procs = (size_t)logical_processors)) return 1;
 
                 cstring_array_insert(&executables, exe_name);
             }
