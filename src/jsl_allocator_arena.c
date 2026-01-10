@@ -34,27 +34,31 @@ static JSL__FORCE_INLINE int32_t jsl__arena_effective_alignment(int32_t requeste
     return requested_alignment > header_alignment ? requested_alignment : header_alignment;
 }
 
-static JSL__FORCE_INLINE void jsl__arena_debug_memset_old_memory(void* allocation, int64_t num_bytes)
-{
-    int32_t* fake_array = (int32_t*) allocation;
-    int64_t fake_array_len = num_bytes / (int64_t) sizeof(int32_t);
-    for (int64_t i = 0; i < fake_array_len; ++i)
-    {
-        fake_array[i] = 0xfeefee;
-    }
+#ifdef JSL_DEBUG
 
-    int64_t trailing_bytes = num_bytes - (fake_array_len * (int64_t) sizeof(int32_t));
-    if (trailing_bytes > 0)
+    static JSL__FORCE_INLINE void jsl__arena_debug_memset_old_memory(void* allocation, int64_t num_bytes)
     {
-        const uint32_t pattern = 0x00feefee;
-        const uint8_t* pattern_bytes = (const uint8_t*) &pattern;
-        uint8_t* trailing = (uint8_t*) (fake_array + fake_array_len);
-        for (int64_t i = 0; i < trailing_bytes; ++i)
+        int32_t* fake_array = (int32_t*) allocation;
+        int64_t fake_array_len = num_bytes / (int64_t) sizeof(int32_t);
+        for (int64_t i = 0; i < fake_array_len; ++i)
         {
-            trailing[i] = pattern_bytes[i];
+            fake_array[i] = 0xfeefee;
+        }
+
+        int64_t trailing_bytes = num_bytes - (fake_array_len * (int64_t) sizeof(int32_t));
+        if (trailing_bytes > 0)
+        {
+            const uint32_t pattern = 0x00feefee;
+            const uint8_t* pattern_bytes = (const uint8_t*) &pattern;
+            uint8_t* trailing = (uint8_t*) (fake_array + fake_array_len);
+            for (int64_t i = 0; i < trailing_bytes; ++i)
+            {
+                trailing[i] = pattern_bytes[i];
+            }
         }
     }
-}
+
+#endif
 
 void jsl_arena_init(JSLArena* arena, void* memory, int64_t length)
 {

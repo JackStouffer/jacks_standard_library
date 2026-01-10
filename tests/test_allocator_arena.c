@@ -72,7 +72,7 @@ static void test_arena_init2_sets_pointers(void)
 
 static void test_arena_allocate_zeroed_and_alignment(void)
 {
-    uint8_t buffer[256];
+    uint8_t buffer[4096];
     JSLArena arena = {0};
     jsl_arena_init(&arena, buffer, (int64_t) sizeof(buffer));
 
@@ -91,6 +91,12 @@ static void test_arena_allocate_zeroed_and_alignment(void)
     if (!aligned) return;
 
     TEST_BOOL(((uintptr_t) aligned % 64) == 0);
+
+    aligned = jsl_arena_allocate_aligned(&arena, 8, 256, false);
+    TEST_BOOL(aligned != NULL);
+    if (!aligned) return;
+
+    TEST_BOOL(((uintptr_t) aligned % 256) == 0);
 }
 
 static void test_arena_allocate_invalid_sizes_return_null(void)
