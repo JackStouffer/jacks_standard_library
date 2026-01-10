@@ -382,7 +382,10 @@ void jsl_arena_load_restore_point(JSLArena* arena, uint8_t* restore_point)
     );
 
     #ifdef JSL_DEBUG
-        jsl__arena_debug_memset_old_memory((void*) restore_point, (current_addr - restore_addr));
+        jsl__arena_debug_memset_old_memory(
+            (void*) restore_point,
+            (int64_t) (current_addr - restore_addr)
+        );
     #endif
 
     ASAN_POISON_MEMORY_REGION(

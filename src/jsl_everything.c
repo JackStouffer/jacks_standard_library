@@ -26,6 +26,7 @@
 #include "jsl_core.c"
 #include "jsl_allocator.c"
 #include "jsl_allocator_arena.c"
+#include "jsl_allocator_infinite_arena.c"
 #include "jsl_os.c"
 #include "jsl_str_set.c"
 #include "jsl_str_to_str_map.c"

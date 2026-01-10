@@ -18,6 +18,7 @@ struct JSL__InfiniteArenaAllocationHeader
 struct JSL__InfiniteArenaChunk
 {
     struct JSL__InfiniteArenaChunk* next;
+    struct JSL__InfiniteArenaChunk* prev;
     // the pointer generated from virtualalloc and mmap
     uint8_t* start;
     uint8_t* current;
