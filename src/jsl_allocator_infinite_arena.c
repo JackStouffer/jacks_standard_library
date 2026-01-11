@@ -156,55 +156,50 @@ static bool jsl__infinite_arena_try_alloc_from_chunk(
 {
     bool success = false;
     void* allocation = NULL;
+    uintptr_t chunk_end = 0;
+    uintptr_t chunk_current = UINTPTR_MAX;
+    uintptr_t aligned_addr = UINTPTR_MAX;
+    uintptr_t next_current = UINTPTR_MAX;
+    uintptr_t allocation_end = 0;
 
     if (chunk != NULL)
     {
-        uintptr_t chunk_end = (uintptr_t) chunk->end;
-        uintptr_t chunk_current = (uintptr_t) chunk->current;
+        chunk_end = (uintptr_t) chunk->end;
+        chunk_current = (uintptr_t) chunk->current;
 
-        if (header_size <= UINTPTR_MAX - chunk_current)
-        {
-            uintptr_t base_after_header = chunk_current + header_size;
-            uintptr_t aligned_addr = (uintptr_t) jsl_align_ptr_upwards(
-                (void*) base_after_header,
-                effective_alignment
-            );
-
-            if (aligned_addr >= base_after_header && aligned_addr <= chunk_end)
-            {
-                if ((uint64_t) bytes <= UINTPTR_MAX - aligned_addr)
-                {
-                    uintptr_t allocation_end = aligned_addr + (uintptr_t) bytes;
-
-                    if (guard_size <= UINTPTR_MAX - allocation_end)
-                    {
-                        uintptr_t next_current = allocation_end + guard_size;
-
-                        if (next_current <= chunk_end)
-                        {
-                            struct JSL__InfiniteArenaAllocationHeader* header =
-                                (struct JSL__InfiniteArenaAllocationHeader*) (aligned_addr - header_size);
-
-                            ASAN_UNPOISON_MEMORY_REGION(header, header_size + (size_t) bytes);
-
-                            header->length = bytes;
-                            chunk->current = (uint8_t*) next_current;
-
-                            ASAN_POISON_MEMORY_REGION((void*) allocation_end, guard_size);
-
-                            if (zeroed)
-                                JSL_MEMSET((void*) aligned_addr, 0, (size_t) bytes);
-
-                            allocation = (void*) aligned_addr;
-                            success = true;
-                        }
-                    }
-                }
-            }
-        }
+        uintptr_t base_after_header = chunk_current + header_size;
+        aligned_addr = (uintptr_t) jsl_align_ptr_upwards(
+            (void*) base_after_header,
+            effective_alignment
+        );
     }
 
-    if (out_allocation != NULL)
+    if (aligned_addr <= chunk_end)
+    {
+        allocation_end = aligned_addr + (uintptr_t) bytes;
+        next_current = allocation_end + guard_size;
+    }
+
+    if (next_current <= chunk_end)
+    {
+        struct JSL__InfiniteArenaAllocationHeader* header =
+            (struct JSL__InfiniteArenaAllocationHeader*) (aligned_addr - header_size);
+
+        ASAN_UNPOISON_MEMORY_REGION(header, header_size + (size_t) bytes);
+
+        header->length = bytes;
+        chunk->current = (uint8_t*) next_current;
+
+        ASAN_POISON_MEMORY_REGION((void*) allocation_end, guard_size);
+
+        if (zeroed)
+            JSL_MEMSET((void*) aligned_addr, 0, (size_t) bytes);
+
+        allocation = (void*) aligned_addr;
+        success = true;
+    }
+
+    if (success && out_allocation != NULL)
         *out_allocation = allocation;
 
     return success;
