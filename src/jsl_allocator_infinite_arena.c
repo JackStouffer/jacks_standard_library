@@ -144,17 +144,15 @@ static struct JSL__InfiniteArenaChunk* jsl__infinite_arena_new_chunk(
     return chunk;
 }
 
-static bool jsl__infinite_arena_try_alloc_from_chunk(
+static void* jsl__infinite_arena_try_alloc_from_chunk(
     struct JSL__InfiniteArenaChunk* chunk,
     int64_t bytes,
     int32_t effective_alignment,
     uintptr_t header_size,
     uintptr_t guard_size,
-    bool zeroed,
-    void** out_allocation
+    bool zeroed
 )
 {
-    bool success = false;
     void* allocation = NULL;
     uintptr_t chunk_end = 0;
     uintptr_t chunk_current = UINTPTR_MAX;
@@ -310,16 +308,15 @@ void* jsl_infinite_arena_allocate_aligned(
     #endif
 
     struct JSL__InfiniteArenaChunk* chunk = NULL;
-    bool allocation_success = false;
-
     if (params_ok)
     {
         chunk = arena->tail;
     }
 
+    bool allocated_from_current = false;
     if (params_ok && chunk != NULL)
     {
-        allocation_success = jsl__infinite_arena_try_alloc_from_chunk(
+        allocated_from_current = jsl__infinite_arena_try_alloc_from_chunk(
             chunk,
             bytes,
             effective_alignment,
@@ -330,79 +327,33 @@ void* jsl_infinite_arena_allocate_aligned(
         );
     }
 
-    if (params_ok && !allocation_success)
+    struct JSL__InfiniteArenaChunk* new_chunk = NULL;
+    if (params_ok && !allocated_from_current)
     {
-        bool size_ok = true;
-        uint64_t payload_needed = 0;
-        uint64_t header_u = (uint64_t) header_size;
-        uint64_t slop_u = (uint64_t) (effective_alignment - 1);
-        uint64_t bytes_u = (uint64_t) bytes;
-        uint64_t guard_u = (uint64_t) guard_size;
+        int64_t slop = effective_alignment - 1;
+        int64_t payload_needed = header_size + slop + bytes + guard_size;
 
-        if (header_u > UINT64_MAX - slop_u)
-            size_ok = false;
-        else
-            payload_needed = header_u + slop_u;
+        int64_t chunk_payload = payload_needed <= chunk_payload ?
+            JSL__INFINITE_ARENA_CHUNK_BYTES
+            : jsl_round_up_pow2_i64(
+                payload_needed,
+                JSL__INFINITE_ARENA_CHUNK_BYTES
+            );
 
-        if (size_ok && payload_needed > UINT64_MAX - bytes_u)
-            size_ok = false;
-        else if (size_ok)
-            payload_needed += bytes_u;
+        new_chunk = jsl__infinite_arena_new_chunk(arena, chunk_payload);
+    }
 
-        if (size_ok && payload_needed > UINT64_MAX - guard_u)
-            size_ok = false;
-        else if (size_ok)
-            payload_needed += guard_u;
-
-        uint64_t chunk_payload_u = 0;
-        int64_t chunk_payload = 0;
-        if (size_ok)
-        {
-            chunk_payload_u = (uint64_t) JSL__INFINITE_ARENA_CHUNK_BYTES;
-            if (payload_needed > chunk_payload_u)
-            {
-                if (payload_needed > (uint64_t) INT64_MAX)
-                    size_ok = false;
-                else
-                    chunk_payload_u = (uint64_t) jsl_round_up_pow2_i64(
-                        (int64_t) payload_needed,
-                        JSL__INFINITE_ARENA_CHUNK_BYTES
-                    );
-            }
-        }
-
-        if (size_ok)
-        {
-            if (
-                chunk_payload_u > (uint64_t) SIZE_MAX
-                || chunk_payload_u > (uint64_t) UINTPTR_MAX
-                || chunk_payload_u > (uint64_t) INT64_MAX
-            )
-                size_ok = false;
-            else
-                chunk_payload = (int64_t) chunk_payload_u;
-        }
-
-        if (size_ok)
-        {
-            struct JSL__InfiniteArenaChunk* new_chunk =
-                jsl__infinite_arena_new_chunk(arena, chunk_payload);
-
-            if (new_chunk != NULL)
-            {
-                chunk = new_chunk;
-
-                jsl__infinite_arena_try_alloc_from_chunk(
-                    chunk,
-                    bytes,
-                    effective_alignment,
-                    header_size,
-                    guard_size,
-                    zeroed,
-                    &result
-                );
-            }
-        }
+    if (new_chunk != NULL)
+    {
+        jsl__infinite_arena_try_alloc_from_chunk(
+            new_chunk,
+            bytes,
+            effective_alignment,
+            header_size,
+            guard_size,
+            zeroed,
+            &result
+        );
     }
 
     return result;

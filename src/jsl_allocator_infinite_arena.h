@@ -26,7 +26,33 @@ struct JSL__InfiniteArenaChunk
 };
 
 /**
- * TODO: docs
+ * A bump allocator with a (conceptually) infinite amount of memory. Memory is pulled
+ * from the OS using `VirualAlloc`/`mmap` when ever it's needed with no limits.
+ * 
+ * This allocator is useful for two main situations. One programs that really don't
+ * need to care about memory at all, like batch scripts and tooling. It's perfectly
+ * legitimate to ask for a new piece of memory everytime you need something and never
+ * free. You're not going to exhaust the memory one your machine when writing tooling
+ * to process a small text file, for example. Two, this allocator 
+ *
+ * See the DESIGN.md file for detailed notes on arena implementation, their uses,
+ * and when they shouldn't be used.
+ *
+ * Functions and Macros:
+ *
+ * * jsl_arena_init
+ * * jsl_arena_init2
+ * * jsl_arena_allocate
+ * * jsl_arena_allocate_aligned
+ * * jsl_arena_reallocate
+ * * jsl_arena_reallocate_aligned
+ * * jsl_arena_reset
+ * * jsl_arena_save_restore_point
+ * * jsl_arena_load_restore_point
+ * * JSL_ARENA_TYPED_ALLOCATE
+ *
+ * @note The arena API is not thread safe. Arena memory is assumed to live in a
+ * single thread. If you want to share an arena between threads you need to lock.
  */
 typedef struct JSLInfiniteArena
 {
