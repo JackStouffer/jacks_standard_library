@@ -144,6 +144,33 @@ static struct JSL__InfiniteArenaChunk* jsl__infinite_arena_new_chunk(
     return chunk;
 }
 
+static JSL__FORCE_INLINE void jsl__infinite_arena_add_chunk_to_freelist(
+    JSLInfiniteArena* arena,
+    struct JSL__InfiniteArenaChunk* chunk
+)
+{
+    chunk->current = chunk->start;
+    chunk->next = arena->free_list;
+    chunk->prev = NULL;
+    arena->free_list = chunk;
+}
+
+static JSL__FORCE_INLINE struct JSL__InfiniteArenaChunk* jsl__infinite_arena_grab_chunk_from_freelist(
+    JSLInfiniteArena* arena,
+    int64_t allocation_bytes
+)
+{
+    struct JSL__InfiniteArenaChunk* chunk = arena->free_list;
+    for (; chunk != NULL; chunk = chunk->next)
+    {
+        uintptr_t available_size = (uintptr_t) chunk->end - (uintptr_t) chunk->start;
+        if (allocation_bytes <= (int64_t) available_size)
+            return chunk;
+    }
+
+    return NULL;
+}
+
 static void* jsl__infinite_arena_try_alloc_from_chunk(
     struct JSL__InfiniteArenaChunk* chunk,
     int64_t bytes,
@@ -190,17 +217,13 @@ static void* jsl__infinite_arena_try_alloc_from_chunk(
 
         ASAN_POISON_MEMORY_REGION((void*) allocation_end, guard_size);
 
-        if (zeroed)
-            JSL_MEMSET((void*) aligned_addr, 0, (size_t) bytes);
-
         allocation = (void*) aligned_addr;
-        success = true;
     }
 
-    if (success && out_allocation != NULL)
-        *out_allocation = allocation;
+    if (zeroed && allocation != NULL)
+        JSL_MEMSET(allocation, 0, (size_t) bytes);
 
-    return success;
+    return allocation;
 }
 
 void jsl_infinite_arena_init(JSLInfiniteArena* arena)
@@ -327,26 +350,33 @@ void* jsl_infinite_arena_allocate_aligned(
         );
     }
 
-    struct JSL__InfiniteArenaChunk* new_chunk = NULL;
+    int64_t chunk_payload = -1;
+    struct JSL__InfiniteArenaChunk* chunk_to_use = NULL;
+
     if (params_ok && !allocated_from_current)
     {
         int64_t slop = effective_alignment - 1;
         int64_t payload_needed = header_size + slop + bytes + guard_size;
 
-        int64_t chunk_payload = payload_needed <= chunk_payload ?
+        chunk_payload = payload_needed <= chunk_payload ?
             JSL__INFINITE_ARENA_CHUNK_BYTES
             : jsl_round_up_pow2_i64(
                 payload_needed,
                 JSL__INFINITE_ARENA_CHUNK_BYTES
             );
 
-        new_chunk = jsl__infinite_arena_new_chunk(arena, chunk_payload);
+        chunk_to_use = jsl__infinite_arena_grab_chunk_from_freelist(arena, chunk_payload);
     }
 
-    if (new_chunk != NULL)
+    if (params_ok && !allocated_from_current && chunk_to_use == NULL)
+    {
+        chunk_to_use = jsl__infinite_arena_new_chunk(arena, chunk_payload);
+    }
+
+    if (chunk_to_use != NULL)
     {
         jsl__infinite_arena_try_alloc_from_chunk(
-            new_chunk,
+            chunk_to_use,
             bytes,
             effective_alignment,
             header_size,
@@ -385,5 +415,20 @@ void* jsl_infinite_arena_reallocate_aligned(
 
 void jsl_infinite_arena_reset(JSLInfiniteArena* arena)
 {
-    
+    struct JSL__InfiniteArenaChunk* chunk = arena->head;
+    while (chunk != NULL)
+    {
+        struct JSL__InfiniteArenaChunk* next = chunk->next;
+
+        #ifdef JSL_DEBUG
+
+            uintptr_t size = (uintptr_t) chunk->end - (uintptr_t) chunk->start;
+            jsl__infinite_arena_debug_memset_old_memory(chunk->start, size);
+
+        #endif
+
+        jsl__infinite_arena_add_chunk_to_freelist(arena, chunk);
+
+        chunk = next;
+    }
 }

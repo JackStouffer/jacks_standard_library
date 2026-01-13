@@ -14,7 +14,7 @@ struct JSL__InfiniteArenaAllocationHeader
     int64_t length;
 };
 
-// TODO: docs
+// A single chunk of memory in the doubly linked list of arena chunks.
 struct JSL__InfiniteArenaChunk
 {
     struct JSL__InfiniteArenaChunk* next;
@@ -27,36 +27,41 @@ struct JSL__InfiniteArenaChunk
 
 /**
  * A bump allocator with a (conceptually) infinite amount of memory. Memory is pulled
- * from the OS using `VirualAlloc`/`mmap` when ever it's needed with no limits.
- * 
- * This allocator is useful for two main situations. One programs that really don't
- * need to care about memory at all, like batch scripts and tooling. It's perfectly
- * legitimate to ask for a new piece of memory everytime you need something and never
- * free. You're not going to exhaust the memory one your machine when writing tooling
- * to process a small text file, for example. Two, this allocator 
+ * from the OS using `VirualAlloc`/`mmap` whenever it's needed with no limits.
  *
- * See the DESIGN.md file for detailed notes on arena implementation, their uses,
- * and when they shouldn't be used.
+ * This allocator is useful for simple programs that can one, be a little sloppy with
+ * memory and two, have a single memory lifetime for the whole program. A couple examples
+ * of such programs would be batch scripts, developer tooling, and daemons. For these
+ * types of programs it's perfectly legitimate to ask for a new piece of memory every time
+ * you need something and never free until the program exits or the process starts over.
+ * You're not going to exhaust the memory one your dev machine when writing tooling to
+ * process a 30kb text file, for example.
+ * 
+ * This infinite arena is more useful than a conventional arena in these situations because
+ * you don't want the program to fail if you suddenly need way more memory than you
+ * anticipated. In contrast, a desktop GUI program needs to be way more careful about
+ * how much memory is used per lifetime and the reset points of those lifetimes. For
+ * such a program, it would be a bad idea to use an infinite arena since you want to
+ * have constraints as soon as possible in the development cycle to make sure that your
+ * program can run performantly on the minimum tech specs you plan on supporting. 
  *
  * Functions and Macros:
  *
- * * jsl_arena_init
- * * jsl_arena_init2
- * * jsl_arena_allocate
- * * jsl_arena_allocate_aligned
- * * jsl_arena_reallocate
- * * jsl_arena_reallocate_aligned
- * * jsl_arena_reset
- * * jsl_arena_save_restore_point
- * * jsl_arena_load_restore_point
- * * JSL_ARENA_TYPED_ALLOCATE
+ * * jsl_infinite_arena_init
+ * * jsl_infinite_arena_allocate
+ * * jsl_infinite_arena_allocate_aligned
+ * * jsl_infinite_arena_reallocate
+ * * jsl_infinite_arena_reallocate_aligned
+ * * jsl_infinite_arena_reset
+ * * JSL_INFINITE_ARENA_TYPED_ALLOCATE
  *
- * @note The arena API is not thread safe. Arena memory is assumed to live in a
+ * @note This API is not thread safe. Arena memory is assumed to live in a
  * single thread. If you want to share an arena between threads you need to lock.
  */
 typedef struct JSLInfiniteArena
 {
     struct JSL__InfiniteArenaChunk* head;
+    // the tail is the active chunk
     struct JSL__InfiniteArenaChunk* tail;
     struct JSL__InfiniteArenaChunk* free_list;
 } JSLInfiniteArena;
