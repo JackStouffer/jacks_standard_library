@@ -327,6 +327,7 @@ static UnitTestDecl unit_test_declarations[] = {
             "src/jsl_core.c",
             "src/jsl_allocator.c",
             "src/jsl_allocator_arena.c",
+            "src/jsl_allocator_infinite_arena.c",
             NULL
         }
     },
@@ -982,8 +983,8 @@ int32_t main(int32_t argc, char **argv)
                 nob_cmd_append(&compile_command, source_file);
             }
 
-            if (!nob_cmd_run(&compile_command)) return 1;
-            // if (!nob_cmd_run(&compile_command, .async = &compile_procs, .max_procs = (size_t)logical_processors)) return 1;
+            // if (!nob_cmd_run(&compile_command)) return 1;
+            if (!nob_cmd_run(&compile_command, .async = &compile_procs, .max_procs = (size_t)logical_processors)) return 1;
 
             cstring_array_insert(&executables, exe_name);
         }
@@ -1058,8 +1059,8 @@ int32_t main(int32_t argc, char **argv)
                     nob_cmd_append(&compile_command, source_file);
                 }
 
-                if (!nob_cmd_run(&compile_command)) return 1;
-                // if (!nob_cmd_run(&compile_command, .async = &compile_procs, .max_procs = (size_t)logical_processors)) return 1;
+                // if (!nob_cmd_run(&compile_command)) return 1;
+                if (!nob_cmd_run(&compile_command, .async = &compile_procs, .max_procs = (size_t)logical_processors)) return 1;
 
                 cstring_array_insert(&executables, exe_name);
             }

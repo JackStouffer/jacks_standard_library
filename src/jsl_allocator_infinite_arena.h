@@ -25,9 +25,19 @@ struct JSL__InfiniteArenaChunk
     uint8_t* end;
 };
 
+struct JSL__InfiniteArena
+{
+    uint64_t sentinel;
+
+    struct JSL__InfiniteArenaChunk* head;
+    // the tail is the active chunk
+    struct JSL__InfiniteArenaChunk* tail;
+    struct JSL__InfiniteArenaChunk* free_list;
+};
+
 /**
  * A bump allocator with a (conceptually) infinite amount of memory. Memory is pulled
- * from the OS using `VirualAlloc`/`mmap` whenever it's needed with no limits.
+ * from the OS using `VirtualAlloc`/`mmap` whenever it's needed with no limits.
  *
  * This allocator is useful for simple programs that can one, be a little sloppy with
  * memory and two, have a single memory lifetime for the whole program. A couple examples
@@ -43,9 +53,24 @@ struct JSL__InfiniteArenaChunk
  * how much memory is used per lifetime and the reset points of those lifetimes. For
  * such a program, it would be a bad idea to use an infinite arena since you want to
  * have constraints as soon as possible in the development cycle to make sure that your
- * program can run performantly on the minimum tech specs you plan on supporting. 
+ * program can run performantly on the minimum tech specs you plan on supporting.
+ * 
+ * ## Virtual Memory Behavior
+ * 
+ * You may be wondering, 
+ * 
+ * > Why not just mmap a giant chunk of memory, like 32 gb, and let the OS handle on
+ * > demand paging and overcommit?
+ * 
+ * Because of Windows.
+ * 
+ * The problem is that `VirtualAlloc` and `mmap` do not have the same semantics when it
+ * comes to on demand committing. `VirtualAlloc` with `MEM_COMMIT` commits the entire
+ * range of memory right away, even though the docs imply otherwise. Meaning if you try
+ * to reserve a big range you can easily hit Window's overcommit limit. There is a way
+ * to do sparse virtual memory on Windows like `mmap` but it's much slower.
  *
- * Functions and Macros:
+ * ## Functions and Macros
  *
  * * jsl_infinite_arena_init
  * * jsl_infinite_arena_allocate
@@ -58,28 +83,39 @@ struct JSL__InfiniteArenaChunk
  * @note This API is not thread safe. Arena memory is assumed to live in a
  * single thread. If you want to share an arena between threads you need to lock.
  */
-typedef struct JSLInfiniteArena
-{
-    struct JSL__InfiniteArenaChunk* head;
-    // the tail is the active chunk
-    struct JSL__InfiniteArenaChunk* tail;
-    struct JSL__InfiniteArenaChunk* free_list;
-} JSLInfiniteArena;
+typedef struct JSL__InfiniteArena JSLInfiniteArena;
 
 /**
- * TODO: docs
+ * Initialize an infinite arena to an empty state. This function
+ * does not allocate, as allocations are on demand, so this function
+ * cannot fail.
+ *
+ * @param arena The arena to initialize.
  */
 JSL_DEF void jsl_infinite_arena_init(JSLInfiniteArena* arena);
 
 /**
- * TODO: docs
+ * Create a `JSLAllocatorInterface` that routes allocations to the arena.
+ *
+ * The returned interface is valid as long as `arena` remains alive.
+ *
+ * @param arena The arena used for all allocator callbacks.
+ * @return Allocator interface that uses the infinite arena for allocate/reallocate/free.
  */
 JSL_DEF JSLAllocatorInterface jsl_infinite_arena_get_allocator_interface(
     JSLInfiniteArena* arena
 );
 
 /**
- * TODO: docs
+ * Allocate a block of memory from the arena using the default alignment.
+ *
+ * NULL is returned if `VirualAlloc`/`mmap` fail. When
+ * `zeroed` is true, the allocated bytes are zero-initialized.
+ *
+ * @param arena Arena to allocate from; must not be null.
+ * @param bytes Number of bytes to reserve.
+ * @param zeroed When true, zero-initialize the allocation.
+ * @return Fat pointer describing the allocation or `{0}` on failure.
  */
 JSL_DEF void* jsl_infinite_arena_allocate(
     JSLInfiniteArena* arena,
@@ -88,7 +124,16 @@ JSL_DEF void* jsl_infinite_arena_allocate(
 );
 
 /**
- * TODO: docs
+ * Allocate a block of memory from the arena with the provided alignment.
+ *
+ * `NULL` is returned if `VirualAlloc`/`mmap` fail. When
+ * `zeroed` is true, the allocated bytes are zero-initialized.
+ *
+ * @param arena Arena to allocate from; must not be null.
+ * @param bytes Number of bytes to reserve.
+ * @param alignment Desired alignment in bytes; must be a positive power of two.
+ * @param zeroed When true, zero-initialize the allocation.
+ * @return Fat pointer describing the allocation or `{0}` on failure.
  */
 JSL_DEF void* jsl_infinite_arena_allocate_aligned(
     JSLInfiniteArena* arena,
@@ -98,7 +143,33 @@ JSL_DEF void* jsl_infinite_arena_allocate_aligned(
 );
 
 /**
- * TODO: docs
+ * Macro to make it easier to allocate an instance of `T` within an arena.
+ *
+ * @param T Type to allocate.
+ * @param arena Arena to allocate from; must be initialized.
+ * @return Pointer to the allocated object or `NULL` on failure.
+ *
+ * ```
+ * struct MyStruct { uint64_t the_data; };
+ * struct MyStruct* thing = JSL_INFINITE_ARENA_TYPED_ALLOCATE(struct MyStruct, arena);
+ * ```
+ */
+#define JSL_INFINITE_ARENA_TYPED_ALLOCATE(T, arena) (T*) jsl_infinite_arena_allocate_aligned(arena, sizeof(T), _Alignof(T), false)
+
+/**
+ * Resize the current allocation if 
+ * 
+ * 1. It was the last allocation
+ * 2. The new size fits in the currently used range of reserved address space
+ * 3. `original_allocation` has the default alignment 
+ * 
+ * Otherwise, allocate a new chunk of memory and copy the old allocation's contents.
+ * 
+ * If `original_allocation` is null then this is treated as a call to
+ * `jsl_infinite_arena_allocate`.
+ * 
+ * If `new_num_bytes` is less than the size of the original allocation this is a
+ * no-op. 
  */
 JSL_DEF void* jsl_infinite_arena_reallocate(
     JSLInfiniteArena* arena,
@@ -107,7 +178,19 @@ JSL_DEF void* jsl_infinite_arena_reallocate(
 );
 
 /**
- * TODO: docs
+ * Resize the current allocation if 
+ * 
+ * 1. It was the last allocation
+ * 2. The new size fits in the currently used range of reserved address space
+ * 3. `original_allocation` has `align` alignment 
+ * 
+ * Otherwise, allocate a new chunk of memory and copy the old allocation's contents.
+ * 
+ * If `original_allocation` is null then this is treated as a call to
+ * `jsl_infinite_arena_allocate`.
+ * 
+ * If `new_num_bytes` is less than the size of the original allocation this is a
+ * no-op. 
  */
 JSL_DEF void* jsl_infinite_arena_reallocate_aligned(
     JSLInfiniteArena* arena,
@@ -117,6 +200,25 @@ JSL_DEF void* jsl_infinite_arena_reallocate_aligned(
 );
 
 /**
- * TODO: docs
+ * Set the arena to have zero active memory regions. This does not return
+ * the reserved virtual address ranges back to the OS. All memory is kept
+ * in a free list for future use. If you wish to return the memory to the
+ * OS you'll need to use `jsl_infinite_arena_release`.
+ *
+ * @param arena The arena to reset
  */
 JSL_DEF void jsl_infinite_arena_reset(JSLInfiniteArena* arena);
+
+/**
+ * Release all of the virtual memory back to the OS. This does not invalidate
+ * the infinite arena and it can be reused in future operations.
+ * 
+ * Note that it is not necessary to call this function before your program
+ * exits. All virtual memory is automatically freed by the OS when the process
+ * ends. The OS actually does this much faster than you can, all the freeing
+ * can be done in kernal space while this function has to be run in user space.
+ * Manually freeing is a waste of your user's time.
+ *
+ * @param arena The arena to release the memory from
+ */
+JSL_DEF void jsl_infinite_arena_release(JSLInfiniteArena* arena);

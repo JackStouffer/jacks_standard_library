@@ -123,9 +123,8 @@ JSL_DEF JSLAllocatorInterface jsl_arena_get_allocator_interface(JSLArena* arena)
 /**
  * Allocate a block of memory from the arena using the default alignment.
  *
- * The returned fat pointer contains a null data pointer if the arena does not
- * have enough capacity. When `zeroed` is true, the allocated bytes are
- * zero-initialized.
+ * NULL is returned if the arena does not have enough capacity. When
+ * `zeroed` is true, the allocated bytes are zero-initialized.
  *
  * @param arena Arena to allocate from; must not be null.
  * @param bytes Number of bytes to reserve.
@@ -136,6 +135,9 @@ JSL_DEF void* jsl_arena_allocate(JSLArena* arena, int64_t bytes, bool zeroed);
 
 /**
  * Allocate a block of memory from the arena with the provided alignment.
+ *
+ * NULL is returned if the arena does not have enough capacity. When
+ * `zeroed` is true, the allocated bytes are zero-initialized.
  *
  * @param arena Arena to allocate from; must not be null.
  * @param bytes Number of bytes to reserve.
