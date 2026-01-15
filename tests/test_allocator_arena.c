@@ -389,6 +389,18 @@ static void test_infinite_arena_reallocate_null_behaves_like_allocate(void)
     TEST_BOOL(((uintptr_t) allocation % JSL_DEFAULT_ALLOCATION_ALIGNMENT) == 0);
 }
 
+static void test_infinite_arena_reallocate_aligned_null_behaves_like_allocate(void)
+{
+    JSLInfiniteArena arena = {0};
+    jsl_infinite_arena_init(&arena);
+
+    void* allocation = jsl_infinite_arena_reallocate_aligned(&arena, NULL, 24, 64);
+    TEST_BOOL(allocation != NULL);
+    if (!allocation) return;
+
+    TEST_BOOL(((uintptr_t) allocation % 64) == 0);
+}
+
 static void test_infinite_arena_reallocate_in_place_when_last(void)
 {
     JSLInfiniteArena arena = {0};
@@ -447,7 +459,7 @@ static void test_infinite_arena_reallocate_not_last_allocates_new(void)
     TEST_BOOL(memcmp(moved, expected, sizeof(expected)) == 0);
 }
 
-static void test_infinite_arena_reallocate_aligned_preserves_alignment(void)
+static void test_infinite_arena_reallocate_aligned_in_place_when_last_and_fits(void)
 {
     JSLInfiniteArena arena = {0};
     jsl_infinite_arena_init(&arena);
@@ -456,20 +468,112 @@ static void test_infinite_arena_reallocate_aligned_preserves_alignment(void)
     TEST_BOOL(allocation != NULL);
     if (!allocation) return;
 
+    TEST_BOOL(((uintptr_t) allocation % 64) == 0);
     for (uint8_t i = 0; i < 16; ++i)
     {
         allocation[i] = (uint8_t) (50 + i);
     }
 
     uint8_t* grown = (uint8_t*) jsl_infinite_arena_reallocate_aligned(&arena, allocation, 32, 64);
-    TEST_BOOL(grown != NULL);
-    if (!grown) return;
-
+    TEST_POINTERS_EQUAL(grown, allocation);
     TEST_BOOL(((uintptr_t) grown % 64) == 0);
     for (uint8_t i = 0; i < 16; ++i)
     {
         TEST_BOOL(grown[i] == (uint8_t) (50 + i));
     }
+
+    void* shrunk = jsl_infinite_arena_reallocate_aligned(&arena, allocation, 8, 64);
+    TEST_POINTERS_EQUAL(shrunk, allocation);
+    for (uint8_t i = 0; i < 8; ++i)
+    {
+        TEST_BOOL(allocation[i] == (uint8_t) (50 + i));
+    }
+}
+
+static void test_infinite_arena_reallocate_aligned_not_last_allocates_new(void)
+{
+    JSLInfiniteArena arena = {0};
+    jsl_infinite_arena_init(&arena);
+
+    uint8_t expected[16];
+    for (uint8_t i = 0; i < 16; ++i)
+    {
+        expected[i] = (uint8_t) (120 + i);
+    }
+
+    uint8_t* first = (uint8_t*) jsl_infinite_arena_allocate_aligned(&arena, 16, 64, false);
+    TEST_BOOL(first != NULL);
+    if (!first) return;
+
+    memcpy(first, expected, sizeof(expected));
+
+    void* second = jsl_infinite_arena_allocate_aligned(&arena, 16, 64, false);
+    TEST_BOOL(second != NULL);
+    if (!second) return;
+
+    void* moved = jsl_infinite_arena_reallocate_aligned(&arena, first, 32, 64);
+    TEST_BOOL(moved != NULL);
+    if (!moved) return;
+
+    TEST_BOOL(moved != first);
+    TEST_BOOL(((uintptr_t) moved % 64) == 0);
+    TEST_BOOL(memcmp(moved, expected, sizeof(expected)) == 0);
+}
+
+static void test_infinite_arena_reallocate_aligned_alignment_mismatch_allocates_new(void)
+{
+    JSLInfiniteArena arena = {0};
+    jsl_infinite_arena_init(&arena);
+
+    uint8_t expected[16];
+    for (uint8_t i = 0; i < 16; ++i)
+    {
+        expected[i] = (uint8_t) (90 + i);
+    }
+
+    uint8_t* allocation = (uint8_t*) jsl_infinite_arena_allocate_aligned(&arena, 16, 16, false);
+    TEST_BOOL(allocation != NULL);
+    if (!allocation) return;
+
+    TEST_BOOL(((uintptr_t) allocation % 64) != 0);
+    memcpy(allocation, expected, sizeof(expected));
+
+    void* moved = jsl_infinite_arena_reallocate_aligned(&arena, allocation, 32, 64);
+    TEST_BOOL(moved != NULL);
+    if (!moved) return;
+
+    TEST_BOOL(moved != allocation);
+    TEST_BOOL(((uintptr_t) moved % 64) == 0);
+    TEST_BOOL(memcmp(moved, expected, sizeof(expected)) == 0);
+}
+
+static void test_infinite_arena_reallocate_aligned_out_of_space_allocates_new(void)
+{
+    JSLInfiniteArena arena = {0};
+    jsl_infinite_arena_init(&arena);
+
+    uint8_t expected[32];
+    for (uint8_t i = 0; i < 32; ++i)
+    {
+        expected[i] = (uint8_t) (30 + i);
+    }
+
+    uint8_t* allocation = (uint8_t*) jsl_infinite_arena_allocate_aligned(&arena, 32, 64, false);
+    TEST_BOOL(allocation != NULL);
+    if (!allocation) return;
+
+    memcpy(allocation, expected, sizeof(expected));
+
+    int64_t capacity = (int64_t) (arena.tail->end - arena.tail->start);
+    int64_t new_size = capacity + 128;
+
+    void* moved = jsl_infinite_arena_reallocate_aligned(&arena, allocation, new_size, 64);
+    TEST_BOOL(moved != NULL);
+    if (!moved) return;
+
+    TEST_BOOL(moved != allocation);
+    TEST_BOOL(((uintptr_t) moved % 64) == 0);
+    TEST_BOOL(memcmp(moved, expected, sizeof(expected)) == 0);
 }
 
 static void test_infinite_arena_reset_reuses_memory(void)
@@ -537,9 +641,13 @@ int main(void)
     RUN_TEST_FUNCTION("Test infinite arena allocate invalid sizes", test_infinite_arena_allocate_invalid_sizes_return_null);
     RUN_TEST_FUNCTION("Test infinite arena allocate distinct blocks", test_infinite_arena_allocate_multiple_are_distinct);
     RUN_TEST_FUNCTION("Test infinite arena realloc null behaves like alloc", test_infinite_arena_reallocate_null_behaves_like_allocate);
+    RUN_TEST_FUNCTION("Test infinite arena realloc aligned null behaves like alloc", test_infinite_arena_reallocate_aligned_null_behaves_like_allocate);
     RUN_TEST_FUNCTION("Test infinite arena realloc in place", test_infinite_arena_reallocate_in_place_when_last);
     RUN_TEST_FUNCTION("Test infinite arena realloc not last", test_infinite_arena_reallocate_not_last_allocates_new);
-    RUN_TEST_FUNCTION("Test infinite arena realloc aligned preserves alignment", test_infinite_arena_reallocate_aligned_preserves_alignment);
+    RUN_TEST_FUNCTION("Test infinite arena realloc aligned in place", test_infinite_arena_reallocate_aligned_in_place_when_last_and_fits);
+    RUN_TEST_FUNCTION("Test infinite arena realloc aligned not last", test_infinite_arena_reallocate_aligned_not_last_allocates_new);
+    RUN_TEST_FUNCTION("Test infinite arena realloc aligned mismatch", test_infinite_arena_reallocate_aligned_alignment_mismatch_allocates_new);
+    RUN_TEST_FUNCTION("Test infinite arena realloc aligned out of space", test_infinite_arena_reallocate_aligned_out_of_space_allocates_new);
     RUN_TEST_FUNCTION("Test infinite arena reset reuses memory", test_infinite_arena_reset_reuses_memory);
     RUN_TEST_FUNCTION("Test infinite arena allocator interface", test_infinite_arena_allocator_interface_basic);
 

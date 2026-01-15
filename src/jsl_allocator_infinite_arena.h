@@ -53,7 +53,9 @@ struct JSL__InfiniteArena
  * how much memory is used per lifetime and the reset points of those lifetimes. For
  * such a program, it would be a bad idea to use an infinite arena since you want to
  * have constraints as soon as possible in the development cycle to make sure that your
- * program can run performantly on the minimum tech specs you plan on supporting.
+ * program can run performantly on the minimum tech specs you plan on supporting. You
+ * should develop such a program with mechanisms to break work up so any problem size
+ * fits in the memory limits so set.
  * 
  * ## Virtual Memory Behavior
  * 
@@ -68,7 +70,8 @@ struct JSL__InfiniteArena
  * comes to on demand committing. `VirtualAlloc` with `MEM_COMMIT` commits the entire
  * range of memory right away, even though the docs imply otherwise. Meaning if you try
  * to reserve a big range you can easily hit Window's overcommit limit. There is a way
- * to do sparse virtual memory on Windows like `mmap` but it's much slower.
+ * to do sparse virtual memory on Windows like `mmap` but it's much slower. Don't confuse
+ * commit with paging. `VirtualAlloc` still does on demand paging.
  *
  * ## Functions and Macros
  *
