@@ -68,179 +68,53 @@ static JSL__FORCE_INLINE int32_t jsl__infinite_arena_effective_alignment(int32_t
             }
         }
     }
+
 #endif
 
-static struct JSL__InfiniteArenaChunk* jsl__infinite_arena_new_chunk(
-    JSLInfiniteArena* arena,
-    int64_t payload_bytes
-)
+bool jsl_infinite_arena_init(JSLInfiniteArena* arena)
 {
-    struct JSL__InfiniteArenaChunk* chunk = NULL;
-    bool size_ok = true;
-    uint64_t payload_u = 0;
-    uint64_t total_u = 0;
+    bool success = false;
 
-    if (payload_bytes < 0)
-        size_ok = false;
-    else
-        payload_u = (uint64_t) payload_bytes;
+    #if JSL_IS_WINDOWS
 
-    if (size_ok && payload_u > UINT64_MAX - (uint64_t) sizeof(struct JSL__InfiniteArenaChunk))
-        size_ok = false;
-    else if (size_ok)
-        total_u = payload_u + (uint64_t) sizeof(struct JSL__InfiniteArenaChunk);
-
-    if (size_ok)
-    {
-        if (total_u > (uint64_t) SIZE_MAX || total_u > (uint64_t) UINTPTR_MAX)
-            size_ok = false;
-    }
-
-    void* block = NULL;
-
-    if (size_ok)
-    {
-        #if JSL_IS_WINDOWS
-            block = VirtualAlloc(
-                NULL,
-                (SIZE_T) total_u,
-                MEM_COMMIT | MEM_RESERVE,
-                PAGE_READWRITE
-            );
-        #elif JSL_IS_POSIX
-            void* mapped = mmap(
-                NULL,
-                (size_t) total_u,
-                PROT_READ | PROT_WRITE,
-                MAP_PRIVATE | MAP_ANONYMOUS,
-                -1,
-                0
-            );
-            if (mapped != MAP_FAILED)
-                block = mapped;
-        #endif
-    }
-
-    if (block != NULL)
-    {
-        uint8_t* chunk_start = (uint8_t*) block + sizeof(struct JSL__InfiniteArenaChunk);
-        chunk = (struct JSL__InfiniteArenaChunk*) block;
-
-        chunk->next = NULL;
-        chunk->prev = arena->tail;
-        chunk->start = chunk_start;
-        chunk->current = chunk_start;
-        chunk->end = chunk_start + (uintptr_t) payload_bytes;
-
-        if (arena->tail != NULL)
-            arena->tail->next = chunk;
-        else
-            arena->head = chunk;
-
-        arena->tail = chunk;
-
-        ASAN_POISON_MEMORY_REGION(
-            chunk->current,
-            (size_t) (chunk->end - chunk->current)
+        arena->start = VirtualAlloc(
+            NULL,
+            (size_t) JSL_TERABYTES(8),
+            MEM_RESERVE,
+            PAGE_READWRITE
         );
-    }
 
-    return chunk;
-}
+        if (arena->start != NULL)
+        {
+            arena->current = arena->start;
+            arena->end = arena->start + JSL_TERABYTES(8);
+            arena->committed_bytes = 0;
+            arena->sentinel = JSL__INFINITE_ARENA_PRIVATE_SENTINEL;
+            success = true;
+        }
 
-static JSL__FORCE_INLINE void jsl__infinite_arena_add_chunk_to_freelist(
-    JSLInfiniteArena* arena,
-    struct JSL__InfiniteArenaChunk* chunk
-)
-{
-    chunk->current = chunk->start;
-    chunk->next = arena->free_list;
-    chunk->prev = NULL;
-    arena->free_list = chunk;
+    #elif JSL_IS_POSIX
 
-    ASAN_POISON_MEMORY_REGION(
-        chunk->current,
-        (size_t) (chunk->end - chunk->current)
-    );
-}
-
-static JSL__FORCE_INLINE struct JSL__InfiniteArenaChunk* jsl__infinite_arena_grab_chunk_from_freelist(
-    JSLInfiniteArena* arena,
-    int64_t allocation_bytes
-)
-{
-    struct JSL__InfiniteArenaChunk* chunk = arena->free_list;
-    for (; chunk != NULL; chunk = chunk->next)
-    {
-        uintptr_t available_size = (uintptr_t) chunk->end - (uintptr_t) chunk->start;
-        if (allocation_bytes <= (int64_t) available_size)
-            return chunk;
-    }
-
-    return NULL;
-}
-
-static void* jsl__infinite_arena_try_alloc_from_chunk(
-    struct JSL__InfiniteArenaChunk* chunk,
-    int64_t bytes,
-    int32_t effective_alignment,
-    uintptr_t header_size,
-    uintptr_t guard_size,
-    bool zeroed
-)
-{
-    void* allocation = NULL;
-    uintptr_t chunk_end = 0;
-    uintptr_t chunk_current = UINTPTR_MAX;
-    uintptr_t aligned_addr = UINTPTR_MAX;
-    uintptr_t next_current = UINTPTR_MAX;
-    uintptr_t allocation_end = 0;
-
-    if (chunk != NULL)
-    {
-        chunk_end = (uintptr_t) chunk->end;
-        chunk_current = (uintptr_t) chunk->current;
-
-        uintptr_t base_after_header = chunk_current + header_size;
-        aligned_addr = (uintptr_t) jsl_align_ptr_upwards(
-            (void*) base_after_header,
-            effective_alignment
+        arena->start = mmap(
+            NULL,
+            (size_t) JSL_TERABYTES(8L),
+            PROT_READ | PROT_WRITE,
+            MAP_PRIVATE | MAP_ANONYMOUS,
+            -1,
+            0
         );
-    }
 
-    if (aligned_addr <= chunk_end)
-    {
-        allocation_end = aligned_addr + (uintptr_t) bytes;
-        next_current = allocation_end + guard_size;
-    }
+        if (mapped != MAP_FAILED)
+        {
+            arena->current = arena->start;
+            arena->end = arena->start + JSL_TERABYTES(8);
+            arena->sentinel = JSL__INFINITE_ARENA_PRIVATE_SENTINEL;
+            success = true;
+        }
 
-    if (next_current <= chunk_end)
-    {
-        struct JSL__InfiniteArenaAllocationHeader* header =
-            (struct JSL__InfiniteArenaAllocationHeader*) (aligned_addr - header_size);
+    #endif
 
-        ASAN_UNPOISON_MEMORY_REGION(header, header_size + (size_t) bytes);
-
-        header->length = bytes;
-        chunk->current = (uint8_t*) next_current;
-
-        ASAN_POISON_MEMORY_REGION((void*) allocation_end, guard_size);
-
-        allocation = (void*) aligned_addr;
-    }
-
-    if (zeroed && allocation != NULL)
-        JSL_MEMSET(allocation, 0, (size_t) bytes);
-
-    return allocation;
-}
-
-void jsl_infinite_arena_init(JSLInfiniteArena* arena)
-{
-    arena->sentinel = JSL__INFINITE_ARENA_PRIVATE_SENTINEL;
-    arena->head = NULL;
-    arena->tail = NULL;
-    arena->free_list = NULL;
+    return success;
 }
 
 static void* jsl__infinite_arena_alloc_interface_alloc(void* ctx, int64_t bytes, int32_t align, bool zeroed)
@@ -316,90 +190,101 @@ void* jsl_infinite_arena_allocate_aligned(
     bool zeroed
 )
 {
-    void* result = NULL;
-    bool params_ok = true;
-
-    JSL_ASSERT(alignment > 0 && jsl_is_power_of_two(alignment));
+    JSL_ASSERT(
+        alignment > 0
+        && jsl_is_power_of_two(alignment)
+    );
 
     #ifdef NDEBUG
-        if (
-            arena->sentinel != JSL__INFINITE_ARENA_PRIVATE_SENTINEL
-            || alignment < 1
-            || !jsl_is_power_of_two(alignment)
-            || bytes < 1
-        )
-            params_ok = false;
+        if (bytes < 1 || alignment < 1 || !jsl_is_power_of_two(alignment))
+            return NULL;
     #else
-        if (
-            arena->sentinel != JSL__INFINITE_ARENA_PRIVATE_SENTINEL
-            || bytes < 1
-        )
-            params_ok = false;
+        if (bytes < 1)
+            return NULL;
     #endif
 
-    const int64_t header_size = (int64_t) sizeof(struct JSL__InfiniteArenaAllocationHeader);
-    const int32_t effective_alignment = jsl__infinite_arena_effective_alignment(alignment);
-
+    // When ASAN is enabled, we leave poisoned guard
+    // zones between allocations to catch buffer overflows
     #if JSL__HAS_ASAN
-        const int64_t guard_size = (int64_t) JSL__ASAN_GUARD_SIZE;
+        const uintptr_t guard_size = (uintptr_t) JSL__ASAN_GUARD_SIZE;
     #else
-        const int64_t guard_size = 0;
+        const uintptr_t guard_size = 0;
     #endif
 
-    struct JSL__InfiniteArenaChunk* chunk = NULL;
-    if (params_ok)
-    {
-        chunk = arena->tail;
-    }
+    const uintptr_t header_size = (uintptr_t) sizeof(struct JSL__InfiniteArenaAllocationHeader);
+    const uintptr_t arena_end = (uintptr_t) arena->end;
+    const uintptr_t arena_current_addr = (uintptr_t) arena->current;
+    const uintptr_t base_after_header = arena_current_addr + header_size;
 
-    if (params_ok && chunk != NULL)
-    {
-        result = jsl__infinite_arena_try_alloc_from_chunk(
-            chunk,
-            bytes,
-            effective_alignment,
-            header_size,
-            guard_size,
-            zeroed
-        );
-    }
+    const int32_t effective_alignment = jsl__infinite_arena_effective_alignment(
+        JSL_MAX(alignment, 8)
+    );
 
-    int64_t chunk_payload = -1;
-    struct JSL__InfiniteArenaChunk* chunk_to_use = NULL;
+    const uintptr_t aligned_allocation_addr = (uintptr_t) jsl_align_ptr_upwards(
+        (void*) base_after_header,
+        effective_alignment
+    );
+    const uintptr_t allocation_end = aligned_allocation_addr + (uintptr_t) bytes;
+    const uintptr_t next_current_addr = allocation_end + guard_size;
 
-    if (params_ok && result == NULL)
-    {
-        int64_t slop = effective_alignment - 1;
-        int64_t payload_needed = header_size + slop + bytes + guard_size;
+    #if JSL_IS_WINDOWS
 
-        chunk_payload = payload_needed <= chunk_payload ?
-            JSL__INFINITE_ARENA_CHUNK_BYTES
-            : jsl_round_up_pow2_i64(
-                payload_needed,
-                JSL__INFINITE_ARENA_CHUNK_BYTES
+        const uintptr_t current_committed_end = (uintptr_t) arena->start + (uintptr_t) arena->committed_bytes;
+
+        if (allocation_end >= current_committed_end)
+        {
+            size_t amount_to_commit = (size_t) jsl_round_up_pow2_u64(
+                allocation_end - current_committed_end,
+                (uint64_t) JSL_MEGABYTES(8)
             );
+            void* committed_memory = VirtualAlloc(
+                (void*) current_committed_end,
+                amount_to_commit,
+                MEM_COMMIT,
+                PAGE_READWRITE
+            );
+            if (committed_memory == NULL)
+                return NULL;
+            arena->committed_bytes += amount_to_commit;
 
-        chunk_to_use = jsl__infinite_arena_grab_chunk_from_freelist(arena, chunk_payload);
-    }
+            #if JSL__HAS_ASAN
+                ASAN_POISON_MEMORY_REGION(
+                    (void*) current_committed_end,
+                    amount_to_commit
+                );
+            #endif
+        }
 
-    if (params_ok && result == NULL && chunk_to_use == NULL)
+    #endif
+
+    if (aligned_allocation_addr < base_after_header || aligned_allocation_addr > arena_end)
+        return NULL;
+
+    if (next_current_addr > arena_end)
+        return NULL;
+
+    const uintptr_t header_addr = aligned_allocation_addr - header_size;
+    struct JSL__InfiniteArenaAllocationHeader* header = (struct JSL__InfiniteArenaAllocationHeader*) header_addr;
+
+    if (header_addr > arena_current_addr)
     {
-        chunk_to_use = jsl__infinite_arena_new_chunk(arena, chunk_payload);
-    }
-
-    if (chunk_to_use != NULL)
-    {
-        result = jsl__infinite_arena_try_alloc_from_chunk(
-            chunk_to_use,
-            bytes,
-            effective_alignment,
-            header_size,
-            guard_size,
-            zeroed
+        ASAN_POISON_MEMORY_REGION(
+            (void*) arena_current_addr,
+            header_addr - arena_current_addr
         );
     }
 
-    return result;
+    ASAN_UNPOISON_MEMORY_REGION(header, header_size + (size_t) bytes);
+
+    header->length = bytes;
+
+    arena->current = (uint8_t*) next_current_addr;
+    ASAN_POISON_MEMORY_REGION((void*) allocation_end, guard_size);
+
+    if (zeroed)
+        JSL_MEMSET((void*) aligned_allocation_addr, 0, (size_t) bytes);
+
+    return (void*) aligned_allocation_addr;
 }
 
 void* jsl_infinite_arena_reallocate(JSLInfiniteArena* arena, void* original_allocation, int64_t new_num_bytes)
@@ -416,205 +301,145 @@ void* jsl_infinite_arena_reallocate_aligned(
     int32_t align
 )
 {
-    void* result = NULL;
-    struct JSL__InfiniteArenaChunk* found_chunk = NULL;
-    struct JSL__InfiniteArenaAllocationHeader* valid_header = NULL;
-    uintptr_t next_current_addr = 0;
     
-    // Define constants and derived values
+    JSL_ASSERT(align > 0 && jsl_is_power_of_two(align));
+
+    #ifdef NDEBUG
+        if (new_num_bytes < 1 || align < 1 || !jsl_is_power_of_two(align))
+            return NULL;
+    #else
+        if (new_num_bytes < 1)
+            return NULL;
+    #endif
+
+    if (original_allocation == NULL)
+        return jsl_infinite_arena_allocate_aligned(arena, new_num_bytes, align, false);
+
     const uintptr_t header_size = (uintptr_t) sizeof(struct JSL__InfiniteArenaAllocationHeader);
-    const int32_t effective_alignment = jsl__infinite_arena_effective_alignment(align);
-    
+    const int32_t effective_alignment = jsl__infinite_arena_effective_alignment(
+        JSL_MAX(align, 8)
+    );
+    const uintptr_t arena_start = (uintptr_t) arena->start;
+    const uintptr_t arena_end = (uintptr_t) arena->end;
+    const uintptr_t arena_current_addr = (uintptr_t) arena->current;
+
     #if JSL__HAS_ASAN
         const uintptr_t guard_size = (uintptr_t) JSL__ASAN_GUARD_SIZE;
     #else
         const uintptr_t guard_size = 0;
     #endif
 
-    // =================================================================================================
-    // 1. INPUT VALIDATION PHASE
-    // =================================================================================================
-    // Ensure the arena and parameters are sane. If not, 'arena' is treated as NULL for subsequent logic.
-    JSL_ASSERT(align > 0 && jsl_is_power_of_two(align));
+    uintptr_t allocation_addr = (uintptr_t) original_allocation;
+    uintptr_t header_addr = allocation_addr - header_size;
 
-    #ifdef NDEBUG
-        if (arena == NULL || arena->sentinel != JSL__INFINITE_ARENA_PRIVATE_SENTINEL || align < 1 || !jsl_is_power_of_two(align) || new_num_bytes < 1)
-        {
-            arena = NULL; 
-        }
-    #else
-        if (arena == NULL || arena->sentinel != JSL__INFINITE_ARENA_PRIVATE_SENTINEL || new_num_bytes < 1)
-        {
-            arena = NULL;
-        }
-    #endif
+    bool header_in_range = header_addr >= arena_start && allocation_addr <= arena_end;
+    if (!header_in_range)
+        return NULL;
 
-    // =================================================================================================
-    // 2. NULL ALLOCATION SHORT-CIRCUIT PHASE
-    // =================================================================================================
-    // If original_allocation is NULL, this acts as a fresh allocation.
-    if (arena != NULL && original_allocation == NULL)
+    bool has_required_alignment = (allocation_addr % (uintptr_t) effective_alignment) == 0;
+
+    struct JSL__InfiniteArenaAllocationHeader* header = (struct JSL__InfiniteArenaAllocationHeader*) header_addr;
+    int64_t original_length = header->length;
+
+    if (original_length < 0)
+        return NULL;
+
+    if ((uint64_t) original_length > UINTPTR_MAX - allocation_addr)
+        return NULL;
+
+    uintptr_t original_end_addr = allocation_addr + (uintptr_t) original_length;
+    if (original_end_addr > arena_end)
+        return NULL;
+
+    if (new_num_bytes < original_length)
+        return original_allocation;
+
+    uintptr_t guarded_end = original_end_addr + guard_size;
+    bool matches_no_guard = arena_current_addr == original_end_addr;
+    bool matches_guard = arena_current_addr == guarded_end;
+    bool can_resize_in_place = (matches_no_guard || matches_guard) && has_required_alignment;
+
+    uintptr_t potential_end = allocation_addr + (uintptr_t) new_num_bytes;
+
+    bool guard_overflow_new = guard_size > UINTPTR_MAX - potential_end;
+    uintptr_t next_current_addr = potential_end;
+    if (!guard_overflow_new)
+        next_current_addr = potential_end + guard_size;
+    else
+        can_resize_in_place = false;
+
+    if (next_current_addr > arena_end)
+        can_resize_in_place = false;
+
+    if (can_resize_in_place)
     {
-        result = jsl_infinite_arena_allocate_aligned(arena, new_num_bytes, align, false);
-    }
+        header->length = new_num_bytes;
+        arena->current = (uint8_t*) next_current_addr;
 
-    // =================================================================================================
-    // 3. CHUNK LOOKUP PHASE
-    // =================================================================================================
-    // Locate the chunk containing the original allocation.
-    // Guard: We have a valid arena, an existing allocation, and no result yet.
-    if (arena != NULL && original_allocation != NULL && result == NULL)
-    {
-        uintptr_t alloc_addr = (uintptr_t) original_allocation;
-        uintptr_t header_addr = alloc_addr - header_size;
-        struct JSL__InfiniteArenaChunk* iter = arena->head;
+        #if JSL_IS_WINDOWS
 
-        for (; iter != NULL; iter = iter->next)
-        {
-            uintptr_t chunk_start = (uintptr_t) iter->start;
-            uintptr_t chunk_end = (uintptr_t) iter->end;
+            const uintptr_t current_committed_end = (uintptr_t) arena->start
+                + (uintptr_t) arena->committed_bytes;
 
-            if (header_addr >= chunk_start && alloc_addr <= chunk_end)
+            if (potential_end >= current_committed_end)
             {
-                found_chunk = iter;
-                break;
+                size_t amount_to_commit = jsl_round_up_pow2_u64(
+                    potential_end - current_committed_end,
+                    JSL_MEGABYTES(8)
+                );
+                void* committed_memory = VirtualAlloc(
+                    (void*) current_committed_end,
+                    amount_to_commit,
+                    MEM_COMMIT,
+                    PAGE_READWRITE
+                );
+                if (committed_memory == NULL)
+                    return NULL;
+                arena->committed_bytes += amount_to_commit;
+
+                #if JSL__HAS_ASAN
+                    ASAN_POISON_MEMORY_REGION(
+                        (void*) current_committed_end,
+                        amount_to_commit
+                    );
+                #endif
             }
-        }
-    }
 
-    // =================================================================================================
-    // 4. HEADER & BOUNDS VALIDATION PHASE
-    // =================================================================================================
-    // Verify the header metadata is consistent with the pointer arithmetic.
-    // Guard: A chunk was successfully found.
-    if (found_chunk != NULL)
-    {
-        uintptr_t alloc_addr = (uintptr_t) original_allocation;
-        uintptr_t header_addr = alloc_addr - header_size;
-        struct JSL__InfiniteArenaAllocationHeader* candidate = 
-            (struct JSL__InfiniteArenaAllocationHeader*) header_addr;
-        
-        int64_t original_len = candidate->length;
-        uintptr_t original_end = alloc_addr + (uintptr_t) original_len;
-        uintptr_t chunk_end = (uintptr_t) found_chunk->end;
-
-        // Check for negative length, integer overflow, and chunk bounds overflow
-        bool is_valid = (original_len >= 0) &&
-                        ((uint64_t) original_len <= UINTPTR_MAX - alloc_addr) &&
-                        (original_end <= chunk_end);
-
-        if (is_valid)
-        {
-            valid_header = candidate;
-        }
-    }
-
-    // =================================================================================================
-    // 5. SHRINK OPTIMIZATION PHASE
-    // =================================================================================================
-    // If the new size is smaller or equal, no action is needed.
-    // Guard: We have a valid header and haven't finished yet.
-    if (valid_header != NULL && result == NULL)
-    {
-        if (new_num_bytes <= valid_header->length)
-        {
-            result = original_allocation;
-        }
-    }
-
-    // =================================================================================================
-    // 6. IN-PLACE EXPANSION CALCULATION PHASE
-    // =================================================================================================
-    // Determine if we can simply move the 'current' pointer of the chunk forward.
-    // Guard: Valid header, result not found (implies expansion needed).
-    if (valid_header != NULL && result == NULL)
-    {
-        uintptr_t alloc_addr = (uintptr_t) original_allocation;
-        uintptr_t original_end = alloc_addr + (uintptr_t) valid_header->length;
-        uintptr_t chunk_current = (uintptr_t) found_chunk->current;
-        uintptr_t chunk_end = (uintptr_t) found_chunk->end;
-
-        // 1. Check Alignment
-        bool aligned = (alloc_addr % (uintptr_t) effective_alignment) == 0;
-
-        // 2. Check Adjacency (Is this the last allocation?)
-        // Calculate where the guard implies the end is
-        bool guard_overflow = guard_size > UINTPTR_MAX - original_end;
-        uintptr_t guarded_end = guard_overflow ? 0 : original_end + guard_size;
-        
-        bool is_last = (chunk_current == original_end) || 
-                       (!guard_overflow && chunk_current == guarded_end);
-
-        // 3. Check Capacity
-        bool size_overflow = (uint64_t) new_num_bytes > UINTPTR_MAX - alloc_addr;
-        uintptr_t new_end = size_overflow ? UINTPTR_MAX : alloc_addr + (uintptr_t) new_num_bytes;
-        
-        bool guard_overflow_new = guard_size > UINTPTR_MAX - new_end;
-        uintptr_t potential_next = guard_overflow_new ? UINTPTR_MAX : new_end + guard_size;
-
-        bool fits = !size_overflow && !guard_overflow_new && (potential_next <= chunk_end);
-
-        // Combine checks: Must be tail chunk, aligned, last alloc, and fit in memory
-        if (found_chunk == arena->tail && aligned && is_last && fits)
-        {
-            next_current_addr = potential_next;
-        }
-    }
-
-    // =================================================================================================
-    // 7. IN-PLACE COMMIT PHASE
-    // =================================================================================================
-    // Apply the in-place expansion if the calculation phase succeeded.
-    // Guard: next_current_addr was successfully calculated.
-    if (next_current_addr != 0)
-    {
-        #if JSL__HAS_ASAN
-            uintptr_t alloc_addr = (uintptr_t) original_allocation;
-            uintptr_t new_end = alloc_addr + (uintptr_t) new_num_bytes;
         #endif
 
-        valid_header->length = new_num_bytes;
-        found_chunk->current = (uint8_t*) next_current_addr;
+        ASAN_UNPOISON_MEMORY_REGION(header, header_size + (size_t) new_num_bytes);
+        ASAN_POISON_MEMORY_REGION((void*) potential_end, guard_size);
 
-        ASAN_UNPOISON_MEMORY_REGION(valid_header, header_size + (size_t) new_num_bytes);
-        ASAN_POISON_MEMORY_REGION((void*) new_end, guard_size);
-
-        result = original_allocation;
-    }
-
-    // =================================================================================================
-    // 8. FALLBACK ALLOCATION PHASE
-    // =================================================================================================
-    // Allocate new memory, copy data, and poison the old memory.
-    // Guard: Valid header exists (we own the ptr) but no result yet (in-place failed).
-    if (valid_header != NULL && result == NULL)
-    {
-        void* new_alloc = jsl_infinite_arena_allocate_aligned(arena, new_num_bytes, align, false);
-        
-        if (new_alloc != NULL)
+        if (new_num_bytes < original_length)
         {
-            int64_t old_len = valid_header->length;
-            size_t copy_len = (size_t) old_len; // We know new_bytes > old_len here
-            
-            JSL_MEMCPY(new_alloc, original_allocation, copy_len);
-
-            #ifdef JSL_DEBUG
-                jsl__infinite_arena_debug_memset_old_memory(original_allocation, old_len);
-            #endif
-
             ASAN_POISON_MEMORY_REGION(
-                (uint8_t*) original_allocation - header_size,
-                header_size + (size_t) old_len
+                (uint8_t*) original_allocation + new_num_bytes,
+                (size_t) (original_length - new_num_bytes)
             );
-
-            result = new_alloc;
         }
+
+        return original_allocation;
     }
 
-    // =================================================================================================
-    // 9. EXIT
-    // =================================================================================================
-    return result;
+    void* res = jsl_infinite_arena_allocate_aligned(arena, new_num_bytes, align, false);
+    if (res == NULL)
+        return NULL;
+
+    size_t bytes_to_copy = (size_t) (
+        new_num_bytes < original_length ? new_num_bytes : original_length
+    );
+    JSL_MEMCPY(res, original_allocation, bytes_to_copy);
+
+    #ifdef JSL_DEBUG
+        jsl__infinite_arena_debug_memset_old_memory(original_allocation, original_length);
+    #endif
+
+    ASAN_POISON_MEMORY_REGION(
+        (uint8_t*) original_allocation - header_size,
+        header_size + (size_t) original_length
+    );
+
+    return res;
 }
 
 
@@ -622,28 +447,7 @@ void jsl_infinite_arena_reset(JSLInfiniteArena* arena)
 {
     if (arena != NULL && arena->sentinel == JSL__INFINITE_ARENA_PRIVATE_SENTINEL)
     {
-        struct JSL__InfiniteArenaChunk* chunk = arena->head;
-        while (chunk != NULL)
-        {
-            struct JSL__InfiniteArenaChunk* next = chunk->next;
-
-
-            #ifdef JSL_DEBUG
-
-                ASAN_UNPOISON_MEMORY_REGION(
-                    chunk->start,
-                    (size_t) ((uintptr_t) chunk->end - (uintptr_t) chunk->start)
-                );
-
-                uintptr_t size = (uintptr_t) chunk->end - (uintptr_t) chunk->start;
-                jsl__infinite_arena_debug_memset_old_memory(chunk->start, (int64_t) size);
-
-            #endif
-
-            jsl__infinite_arena_add_chunk_to_freelist(arena, chunk);
-
-            chunk = next;
-        }
+        arena->current = arena->start;
     }
 }
 
@@ -651,42 +455,13 @@ JSL_DEF void jsl_infinite_arena_release(JSLInfiniteArena* arena)
 {
     if (arena != NULL && arena->sentinel == JSL__INFINITE_ARENA_PRIVATE_SENTINEL)
     {
-        struct JSL__InfiniteArenaChunk* chunk = arena->free_list;
-        struct JSL__InfiniteArenaChunk* next = NULL;
-        while (chunk != NULL)
-        {
-            next = chunk->next;
+        #if JSL_IS_WINDOWS
+            VirtualFree(arena->start, 0, MEM_RELEASE);
+        #elif JSL_IS_POSIX
+            munmap(arena->start, (size_t) (arena->end - arena->current));
+        #endif
 
-            ASAN_POISON_MEMORY_REGION(chunk, (size_t) ((uintptr_t) chunk->end - (uintptr_t) chunk));
-
-            #if JSL_IS_WINDOWS
-                VirtualFree(chunk, 0, MEM_RELEASE);
-            #elif JSL_IS_POSIX
-                munmap(chunk, total_size);
-            #endif
-
-            chunk = next;
-        }
-
-        chunk = arena->head;
-        while (chunk != NULL)
-        {
-            next = chunk->next;
-
-            ASAN_POISON_MEMORY_REGION(chunk, (size_t) ((uintptr_t) chunk->end - (uintptr_t) chunk));
-
-            #if JSL_IS_WINDOWS
-                VirtualFree(chunk, 0, MEM_RELEASE);
-            #elif JSL_IS_POSIX
-                munmap(chunk, total_size);
-            #endif
-
-            chunk = next;
-        }
-
-        arena->head = NULL;
-        arena->tail = NULL;
-        arena->free_list = NULL;
+        arena->sentinel = 0;
     }
 }
 

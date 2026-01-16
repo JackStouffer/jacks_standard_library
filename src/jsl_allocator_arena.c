@@ -160,7 +160,9 @@ void* jsl_arena_allocate_aligned(JSLArena* arena, int64_t bytes, int32_t alignme
         return NULL;
 
     const uintptr_t header_size = (uintptr_t) sizeof(struct JSL__ArenaAllocationHeader);
-    const int32_t effective_alignment = jsl__arena_effective_alignment(alignment);
+    const int32_t effective_alignment = jsl__arena_effective_alignment(
+        JSL_MAX(alignment, 8)
+    );
     uintptr_t arena_end = (uintptr_t) arena->end;
     uintptr_t arena_current_addr = (uintptr_t) arena->current;
 
@@ -240,7 +242,9 @@ void* jsl_arena_reallocate_aligned(
         return jsl_arena_allocate_aligned(arena, new_num_bytes, align, false);
 
     const uintptr_t header_size = (uintptr_t) sizeof(struct JSL__ArenaAllocationHeader);
-    const int32_t effective_alignment = jsl__arena_effective_alignment(align);
+    const int32_t effective_alignment = jsl__arena_effective_alignment(
+        JSL_MAX(align, 8)
+    );
     const uintptr_t arena_start = (uintptr_t) arena->start;
     const uintptr_t arena_end = (uintptr_t) arena->end;
     const uintptr_t arena_current_addr = (uintptr_t) arena->current;

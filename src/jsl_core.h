@@ -989,7 +989,7 @@ static JSL__FORCE_INLINE JSL__UNUSED int32_t jsl__find_first_set_u64(uint64_t x)
  * jsl_arena_init(&arena, buffer, JSL_GIGABYTES(2));
  * ```
  */
-#define JSL_GIGABYTES(x) x * 1024 * 1024 * 1024
+#define JSL_GIGABYTES(x) ((int64_t) x * 1024L * 1024L * 1024L)
 
 /**
  * Converts a numeric value to terabytes by multiplying by `1024 ^ 4`.
@@ -1008,7 +1008,7 @@ static JSL__FORCE_INLINE JSL__UNUSED int32_t jsl__find_first_set_u64(uint64_t x)
  * jsl_arena_init(&arena, buffer, JSL_GIGABYTES(2));
  * ```
  */
-#define JSL_TERABYTES(x) x * 1024 * 1024 * 1024 * 1024
+#define JSL_TERABYTES(x) ((int64_t) x * 1024L * 1024L * 1024L * 1024L)
 
 /**
  * TODO: docs

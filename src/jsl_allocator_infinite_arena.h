@@ -27,12 +27,10 @@ struct JSL__InfiniteArena
 
     uint8_t* start;
     uint8_t* current;
+    uint8_t* end;
 
     #if JSL_IS_WINDOWS
-        int64_t reserved_bytes;
         int64_t committed_bytes;
-    #elif JSL_IS_POSIX
-        uint8_t* end;
     #endif
 };
 
@@ -198,8 +196,9 @@ JSL_DEF void* jsl_infinite_arena_reallocate_aligned(
 JSL_DEF void jsl_infinite_arena_reset(JSLInfiniteArena* arena);
 
 /**
- * Release all of the virtual memory back to the OS. This does not invalidate
- * the infinite arena and it can be reused in future operations.
+ * Release all of the virtual memory back to the OS. This invalidates
+ * the infinite arena and it can not be reused in future operations
+ * until init is called on it again.
  * 
  * Note that it is not necessary to call this function before your program
  * exits. All virtual memory is automatically freed by the OS when the process
