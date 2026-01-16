@@ -8,36 +8,37 @@
 #include "jsl_core.h"
 #include "jsl_allocator.h"
 
+#if !JSL_IS_WINDOWS && !JSL_IS_POSIX
+
+    #error "jsl_allocator_infinite_arena.h: Unsupported OS detected. The infinite arena is for POSIX and Windows systems only."
+
+#endif
+
+
 // Stored immediately before every allocation so realloc can recover the length.
 struct JSL__InfiniteArenaAllocationHeader
 {
     int64_t length;
 };
 
-// A single chunk of memory in the doubly linked list of arena chunks.
-struct JSL__InfiniteArenaChunk
-{
-    struct JSL__InfiniteArenaChunk* next;
-    struct JSL__InfiniteArenaChunk* prev;
-    // the pointer generated from virtualalloc and mmap
-    uint8_t* start;
-    uint8_t* current;
-    uint8_t* end;
-};
-
 struct JSL__InfiniteArena
 {
     uint64_t sentinel;
 
-    struct JSL__InfiniteArenaChunk* head;
-    // the tail is the active chunk
-    struct JSL__InfiniteArenaChunk* tail;
-    struct JSL__InfiniteArenaChunk* free_list;
+    uint8_t* start;
+    uint8_t* current;
+
+    #if JSL_IS_WINDOWS
+        int64_t reserved_bytes;
+        int64_t committed_bytes;
+    #elif JSL_IS_POSIX
+        uint8_t* end;
+    #endif
 };
 
 /**
  * A bump allocator with a (conceptually) infinite amount of memory. Memory is pulled
- * from the OS using `VirtualAlloc`/`mmap` whenever it's needed with no limits.
+ * from the OS using `VirtualAlloc`/`mmap` with no limits.
  *
  * This allocator is useful for simple programs that can one, be a little sloppy with
  * memory and two, have a single memory lifetime for the whole program. A couple examples
@@ -57,22 +58,6 @@ struct JSL__InfiniteArena
  * should develop such a program with mechanisms to break work up so any problem size
  * fits in the memory limits so set.
  * 
- * ## Virtual Memory Behavior
- * 
- * You may be wondering, 
- * 
- * > Why not just mmap a giant chunk of memory, like 32 gb, and let the OS handle on
- * > demand paging and overcommit?
- * 
- * Because of Windows.
- * 
- * The problem is that `VirtualAlloc` and `mmap` do not have the same semantics when it
- * comes to on demand committing. `VirtualAlloc` with `MEM_COMMIT` commits the entire
- * range of memory right away, even though the docs imply otherwise. Meaning if you try
- * to reserve a big range you can easily hit Window's overcommit limit. There is a way
- * to do sparse virtual memory on Windows like `mmap` but it's much slower. Don't confuse
- * commit with paging. `VirtualAlloc` still does on demand paging.
- *
  * ## Functions and Macros
  *
  * * jsl_infinite_arena_init
@@ -95,7 +80,7 @@ typedef struct JSL__InfiniteArena JSLInfiniteArena;
  *
  * @param arena The arena to initialize.
  */
-JSL_DEF void jsl_infinite_arena_init(JSLInfiniteArena* arena);
+JSL_DEF bool jsl_infinite_arena_init(JSLInfiniteArena* arena);
 
 /**
  * Create a `JSLAllocatorInterface` that routes allocations to the arena.

@@ -78,6 +78,10 @@ extern "C" {
     #include <sys/types.h>
     #include <sys/stat.h>
 
+#else
+
+    #error "jsl_os.h: Unsupported OS detected. The JSL OS interface is for POSIX and Windows systems only."
+
 #endif
 
 typedef enum
