@@ -319,17 +319,24 @@ static void test_infinite_arena_init(void)
     arena.start = (void*) 1;
     arena.current = (void*) 2;
     arena.end = (void*) 3;
-    jsl_infinite_arena_init(&arena);
+
+    bool init = jsl_infinite_arena_init(&arena);
+    TEST_BOOL(init == true);
+    if (!init) return;
 
     TEST_BOOL(arena.start != (void*) 1);
     TEST_BOOL(arena.current != (void*) 2);
     TEST_BOOL(arena.end != (void*) 3);
+
+    jsl_infinite_arena_release(&arena);
 }
 
 static void test_infinite_arena_allocate_zeroed_and_alignment(void)
 {
     JSLInfiniteArena arena = {0};
-    jsl_infinite_arena_init(&arena);
+    bool init = jsl_infinite_arena_init(&arena);
+    TEST_BOOL(init == true);
+    if (!init) return;
 
     uint8_t* allocation = (uint8_t*) jsl_infinite_arena_allocate(&arena, 32, true);
     TEST_BOOL(allocation != NULL);
@@ -352,22 +359,30 @@ static void test_infinite_arena_allocate_zeroed_and_alignment(void)
     if (!aligned) return;
 
     TEST_BOOL(((uintptr_t) aligned % 256) == 0);
+
+    jsl_infinite_arena_release(&arena);
 }
 
 static void test_infinite_arena_allocate_invalid_sizes_return_null(void)
 {
     JSLInfiniteArena arena = {0};
-    jsl_infinite_arena_init(&arena);
+    bool init = jsl_infinite_arena_init(&arena);
+    TEST_BOOL(init == true);
+    if (!init) return;
 
     TEST_POINTERS_EQUAL(jsl_infinite_arena_allocate(&arena, 0, false), NULL);
     TEST_POINTERS_EQUAL(jsl_infinite_arena_allocate(&arena, -5, false), NULL);
     TEST_POINTERS_EQUAL(jsl_infinite_arena_allocate_aligned(&arena, 0, 8, false), NULL);
+
+    jsl_infinite_arena_release(&arena);
 }
 
 static void test_infinite_arena_allocate_multiple_are_distinct(void)
 {
     JSLInfiniteArena arena = {0};
-    jsl_infinite_arena_init(&arena);
+    bool init = jsl_infinite_arena_init(&arena);
+    TEST_BOOL(init == true);
+    if (!init) return;
 
     void* first = jsl_infinite_arena_allocate(&arena, 24, false);
     TEST_BOOL(first != NULL);
@@ -378,18 +393,24 @@ static void test_infinite_arena_allocate_multiple_are_distinct(void)
     if (!second) return;
 
     TEST_BOOL(first != second);
+
+    jsl_infinite_arena_release(&arena);
 }
 
 static void test_infinite_arena_reallocate_null_behaves_like_allocate(void)
 {
     JSLInfiniteArena arena = {0};
-    jsl_infinite_arena_init(&arena);
+    bool init = jsl_infinite_arena_init(&arena);
+    TEST_BOOL(init == true);
+    if (!init) return;
 
     void* allocation = jsl_infinite_arena_reallocate(&arena, NULL, 24);
     TEST_BOOL(allocation != NULL);
     if (!allocation) return;
 
     TEST_BOOL(((uintptr_t) allocation % JSL_DEFAULT_ALLOCATION_ALIGNMENT) == 0);
+
+    jsl_infinite_arena_release(&arena);
 }
 
 static void test_infinite_arena_reallocate_aligned_null_behaves_like_allocate(void)
@@ -402,12 +423,16 @@ static void test_infinite_arena_reallocate_aligned_null_behaves_like_allocate(vo
     if (!allocation) return;
 
     TEST_BOOL(((uintptr_t) allocation % 64) == 0);
+
+    jsl_infinite_arena_release(&arena);
 }
 
 static void test_infinite_arena_reallocate_in_place_when_last(void)
 {
     JSLInfiniteArena arena = {0};
-    jsl_infinite_arena_init(&arena);
+    bool init = jsl_infinite_arena_init(&arena);
+    TEST_BOOL(init == true);
+    if (!init) return;
 
     uint8_t* allocation = (uint8_t*) jsl_infinite_arena_allocate(&arena, 16, false);
     TEST_BOOL(allocation != NULL);
@@ -431,12 +456,16 @@ static void test_infinite_arena_reallocate_in_place_when_last(void)
     {
         TEST_BOOL(allocation[i] == (uint8_t) (i + 1));
     }
+
+    jsl_infinite_arena_release(&arena);
 }
 
 static void test_infinite_arena_reallocate_not_last_allocates_new(void)
 {
     JSLInfiniteArena arena = {0};
-    jsl_infinite_arena_init(&arena);
+    bool init = jsl_infinite_arena_init(&arena);
+    TEST_BOOL(init == true);
+    if (!init) return;
 
     uint8_t expected[16];
     for (uint8_t i = 0; i < 16; ++i)
@@ -460,12 +489,16 @@ static void test_infinite_arena_reallocate_not_last_allocates_new(void)
 
     TEST_BOOL(moved != first);
     TEST_BOOL(memcmp(moved, expected, sizeof(expected)) == 0);
+
+    jsl_infinite_arena_release(&arena);
 }
 
 static void test_infinite_arena_reallocate_aligned_in_place_when_last_and_fits(void)
 {
     JSLInfiniteArena arena = {0};
-    jsl_infinite_arena_init(&arena);
+    bool init = jsl_infinite_arena_init(&arena);
+    TEST_BOOL(init == true);
+    if (!init) return;
 
     uint8_t* allocation = (uint8_t*) jsl_infinite_arena_allocate_aligned(&arena, 16, 64, false);
     TEST_BOOL(allocation != NULL);
@@ -491,12 +524,16 @@ static void test_infinite_arena_reallocate_aligned_in_place_when_last_and_fits(v
     {
         TEST_BOOL(allocation[i] == (uint8_t) (50 + i));
     }
+
+    jsl_infinite_arena_release(&arena);
 }
 
 static void test_infinite_arena_reallocate_aligned_not_last_allocates_new(void)
 {
     JSLInfiniteArena arena = {0};
-    jsl_infinite_arena_init(&arena);
+    bool init = jsl_infinite_arena_init(&arena);
+    TEST_BOOL(init == true);
+    if (!init) return;
 
     uint8_t expected[16];
     for (uint8_t i = 0; i < 16; ++i)
@@ -521,12 +558,16 @@ static void test_infinite_arena_reallocate_aligned_not_last_allocates_new(void)
     TEST_BOOL(moved != first);
     TEST_BOOL(((uintptr_t) moved % 64) == 0);
     TEST_BOOL(memcmp(moved, expected, sizeof(expected)) == 0);
+
+    jsl_infinite_arena_release(&arena);
 }
 
 static void test_infinite_arena_reallocate_aligned_alignment_mismatch_allocates_new(void)
 {
     JSLInfiniteArena arena = {0};
-    jsl_infinite_arena_init(&arena);
+    bool init = jsl_infinite_arena_init(&arena);
+    TEST_BOOL(init == true);
+    if (!init) return;
 
     uint8_t expected[16];
     for (uint8_t i = 0; i < 16; ++i)
@@ -548,12 +589,16 @@ static void test_infinite_arena_reallocate_aligned_alignment_mismatch_allocates_
     TEST_BOOL(moved != allocation);
     TEST_BOOL(((uintptr_t) moved % 64) == 0);
     TEST_BOOL(memcmp(moved, expected, sizeof(expected)) == 0);
+
+    jsl_infinite_arena_release(&arena);
 }
 
 static void test_infinite_arena_reset_reuses_memory(void)
 {
     JSLInfiniteArena arena = {0};
-    jsl_infinite_arena_init(&arena);
+    bool init = jsl_infinite_arena_init(&arena);
+    TEST_BOOL(init == true);
+    if (!init) return;
 
     void* first = jsl_infinite_arena_allocate(&arena, 24, false);
     TEST_BOOL(first != NULL);
@@ -563,12 +608,16 @@ static void test_infinite_arena_reset_reuses_memory(void)
 
     void* second = jsl_infinite_arena_allocate(&arena, 24, false);
     TEST_POINTERS_EQUAL(first, second);
+
+    jsl_infinite_arena_release(&arena);
 }
 
 static void test_infinite_arena_allocator_interface_basic(void)
 {
     JSLInfiniteArena arena = {0};
-    jsl_infinite_arena_init(&arena);
+    bool init = jsl_infinite_arena_init(&arena);
+    TEST_BOOL(init == true);
+    if (!init) return;
 
     JSLAllocatorInterface allocator = jsl_infinite_arena_get_allocator_interface(&arena);
 
@@ -586,6 +635,8 @@ static void test_infinite_arena_allocator_interface_basic(void)
 
     void* second = jsl_allocator_interface_alloc(&allocator, 32, 8, false);
     TEST_BOOL(second != NULL);
+
+    jsl_infinite_arena_release(&arena);
 }
 
 int main(void)
@@ -610,6 +661,7 @@ int main(void)
     RUN_TEST_FUNCTION("Test arena allocator interface", test_arena_allocator_interface_basic);
     RUN_TEST_FUNCTION("Test arena typed macros", test_arena_typed_macros);
     RUN_TEST_FUNCTION("Test arena from stack macro", test_arena_from_stack_macro);
+
     RUN_TEST_FUNCTION("Test infinite arena init sets pointers", test_infinite_arena_init);
     RUN_TEST_FUNCTION("Test infinite arena allocate zeroed and alignment", test_infinite_arena_allocate_zeroed_and_alignment);
     RUN_TEST_FUNCTION("Test infinite arena allocate invalid sizes", test_infinite_arena_allocate_invalid_sizes_return_null);

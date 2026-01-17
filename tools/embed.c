@@ -201,23 +201,11 @@ static int32_t entrypoint(
         _setmode(_fileno(stdout), _O_BINARY);
         _setmode(_fileno(stderr), _O_BINARY);
 
-        SYSTEM_INFO si;
-        GetSystemInfo(&si);
-        int64_t ps = (int64_t) si.dwPageSize;
-        int64_t page_size = ps > 0 ? ps : 4096;
+        JSLInfiniteArena arena;
+        bool arena_init = jsl_infinite_arena_init(&arena);
+        assert(arena_init);
 
-        JSLArena arena;
-
-        int64_t arena_size = jsl_round_up_i64(JSL_MEGABYTES(64), page_size);
-        void* backing_data = VirtualAlloc(0, arena_size, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
-        if (backing_data == NULL)
-        {
-            jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Failed to allocate memory"));
-            return EXIT_FAILURE;
-        }
-
-        jsl_arena_init(&arena, backing_data, arena_size);
-        JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
+        JSLAllocatorInterface allocator = jsl_infinite_arena_get_allocator_interface(&arena);
 
         JSLCmdLine cmd;
         jsl_cmd_line_init(&cmd, &allocator);
@@ -226,11 +214,11 @@ static int32_t entrypoint(
         {
             if (error_message.data != NULL)
             {
-                jsl_format_to_c_file(stderr, error_message);
+                jsl_write_to_c_file(stderr, error_message);
             }
             else
             {
-                jsl_format_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Parsing failure"));
+                jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Parsing failure"));
             }
 
             jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("\n"));
@@ -263,21 +251,11 @@ static int32_t entrypoint(
 
     int32_t main(int32_t argc, char **argv)
     {
-        int64_t ps = (int64_t) sysconf(_SC_PAGESIZE);
-        int64_t page_size = ps > 0 ? ps : 4096;
+        JSLInfiniteArena arena;
+        bool arena_init = jsl_infinite_arena_init(&arena);
+        assert(arena_init);
 
-        int64_t arena_size = jsl_round_up_pow2_i64(JSL_MEGABYTES(64), page_size);
-        JSLArena arena;
-
-        void* backing_data = mmap(NULL, (size_t) arena_size, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
-        if (backing_data == NULL)
-        {
-            jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Failed to allocate memory"));
-            return EXIT_FAILURE;
-        }
-
-        jsl_arena_init(&arena, backing_data, arena_size);
-        JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
+        JSLAllocatorInterface allocator = jsl_infinite_arena_get_allocator_interface(&arena);
 
         JSLCmdLine cmd;
         if (!jsl_cmd_line_init(&cmd, &allocator))
