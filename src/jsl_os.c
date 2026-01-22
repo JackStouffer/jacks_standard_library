@@ -552,7 +552,7 @@ struct JSL__FormatOutContext
     uint8_t buffer[JSL_FORMAT_MIN_BUFFER];
 };
 
-static uint8_t* format_out_callback(uint8_t *buf, void *user, int64_t len)
+static uint8_t* format_out_callback(void* user, uint8_t* buf, int64_t len)
 {
     struct JSL__FormatOutContext* context = (struct JSL__FormatOutContext*) user;
 

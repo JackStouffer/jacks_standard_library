@@ -348,7 +348,7 @@ struct JSL__StringBuilderContext
     uint8_t buffer[JSL_FORMAT_MIN_BUFFER];
 };
 
-static uint8_t* format_string_builder_callback(uint8_t *buf, void *user, int64_t len)
+static uint8_t* format_string_builder_callback(void *user, uint8_t* buf, int64_t len)
 {
     struct JSL__StringBuilderContext* context = (struct JSL__StringBuilderContext*) user;
 

@@ -1523,7 +1523,7 @@ static JSL__ASAN_OFF uint32_t stbsp__strlen_limited(char const *string, uint32_t
 }
 
 JSL__ASAN_OFF int64_t jsl_format_callback(
-    JSL_FORMAT_CALLBACK* callback,
+    JSLFormatCallbackFP callback,
     void* user,
     uint8_t* buffer,
     JSLFatPtr fmt,
@@ -1557,7 +1557,7 @@ JSL__ASAN_OFF int64_t jsl_format_callback(
                 int32_t len = (int32_t)(buffer_cursor - buffer);                            \
                 if ((len + (bytes)) >= JSL_FORMAT_MIN_BUFFER) {                             \
                     tlen += len;                                                            \
-                    if (0 == (buffer_cursor = buffer = callback(buffer, user, len)))        \
+                    if (0 == (buffer_cursor = buffer = callback(user, buffer, len)))        \
                         goto done;                                                          \
                 }                                                                           \
             }
@@ -2707,7 +2707,7 @@ typedef struct stbsp__context {
     uint8_t tmp[JSL_FORMAT_MIN_BUFFER];
 } stbsp__context;
 
-static uint8_t* stbsp__clamp_callback(uint8_t* buf, void *user, int64_t len)
+static uint8_t* stbsp__clamp_callback(void *user, uint8_t* buf, int64_t len)
 {
     stbsp__context* context = (stbsp__context*) user;
     context->length += len;
@@ -2734,7 +2734,7 @@ static uint8_t* stbsp__clamp_callback(uint8_t* buf, void *user, int64_t len)
         : context->tmp; // go direct into buffer if you can
 }
 
-static uint8_t* stbsp__count_clamp_callback(uint8_t* buf, void* user, int64_t len)
+static uint8_t* stbsp__count_clamp_callback(void* user, uint8_t* buf, int64_t len)
 {
     stbsp__context* context = (stbsp__context*) user;
     (void) sizeof(buf);
@@ -2768,7 +2768,7 @@ JSL__ASAN_OFF int64_t jsl_format_valist(JSLFatPtr* buffer, JSLFatPtr fmt, va_lis
         jsl_format_callback(
             stbsp__clamp_callback,
             &context,
-            stbsp__clamp_callback(0, &context, 0),
+            stbsp__clamp_callback(&context, NULL, 0),
             fmt,
             va
         );
@@ -2787,7 +2787,7 @@ struct JSL__FormatAllocatorContext
     uint8_t buffer[JSL_FORMAT_MIN_BUFFER];
 };
 
-static uint8_t* format_allocator_callback(uint8_t *buf, void *user, int64_t len)
+static uint8_t* format_allocator_callback(void *user, uint8_t* buf, int64_t len)
 {
     struct JSL__FormatAllocatorContext* context = (struct JSL__FormatAllocatorContext*) user;
 

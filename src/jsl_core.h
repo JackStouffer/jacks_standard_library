@@ -1734,7 +1734,7 @@ JSL_DEF JSLFatPtr jsl_fatptr_duplicate(JSLAllocatorInterface* allocator, JSLFatP
  * @param len   Number of valid bytes in `buf`.
  * @return Pointer to the buffer that will receive the next chunk, or `NULL` to stop.
  */
-typedef uint8_t* JSL_FORMAT_CALLBACK(uint8_t* buf, void *user, int64_t len);
+typedef uint8_t* (*JSLFormatCallbackFP)(void *user, uint8_t* buf, int64_t len);
 
 /**
  * This is a full snprintf replacement that supports everything that the C
@@ -1835,7 +1835,7 @@ JSL_DEF int64_t jsl_format_valist(
  * You return the next buffer to use or 0 to stop converting
  */
 JSL_DEF int64_t jsl_format_callback(
-   JSL_FORMAT_CALLBACK* callback,
+   JSLFormatCallbackFP callback,
    void* user,
    uint8_t* buf,
    JSLFatPtr fmt,

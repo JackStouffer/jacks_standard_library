@@ -63,6 +63,8 @@ struct JSL__CmdLineArgs {
 };
 
 /**
+ * TODO: docs
+ * 
  * State container struct 
  */
 typedef struct JSL__CmdLineArgs JSLCmdLineArgs;
@@ -82,6 +84,7 @@ bool jsl_cmd_line_init(JSLCmdLineArgs* cmd_line, JSLAllocatorInterface* allocato
  * module. If `out_error` is not NULL it will be set to a
  * user-friendly message on failure.
  * 
+ * TODO: docs
  * @returns false if the arena is out of memory or the passed in strings
  * were not valid utf-8.
  */
@@ -102,6 +105,7 @@ bool jsl_cmd_line_parse(
  * module. If `out_error` is not NULL it will be set to a
  * user-friendly message on failure.
  * 
+ * TODO: docs
  * @returns false if the arena is out of memory or the passed in strings
  * were not valid utf-16.
  */
@@ -126,6 +130,7 @@ bool jsl_cmd_line_parse_wide(
  * jsl_cmd_line_has_short_flag(cmd, 'v'); // true
  * jsl_cmd_line_has_short_flag(cmd, 'g'); // false
  * ```
+ * TODO: docs
  */
 bool jsl_cmd_line_has_short_flag(JSLCmdLineArgs* cmd_line, uint8_t flag);
 
@@ -143,6 +148,7 @@ bool jsl_cmd_line_has_short_flag(JSLCmdLineArgs* cmd_line, uint8_t flag);
  * jsl_cmd_line_has_flag(cmd, JSL_FATPTR_EXPRESSION("arg")); // false
  * jsl_cmd_line_has_flag(cmd, JSL_FATPTR_EXPRESSION("arg2")); // true
  * ```
+ * TODO: docs
  */
 bool jsl_cmd_line_has_flag(JSLCmdLineArgs* cmd_line, JSLFatPtr flag);
 
@@ -160,6 +166,7 @@ bool jsl_cmd_line_has_flag(JSLCmdLineArgs* cmd_line, JSLFatPtr flag);
  * jsl_cmd_line_has_command(cmd, JSL_FATPTR_EXPRESSION("build")); // true
  * jsl_cmd_line_has_command(cmd, JSL_FATPTR_EXPRESSION("restart")); // false
  * ```
+ * TODO: docs
  */
 bool jsl_cmd_line_has_command(JSLCmdLineArgs* cmd_line, JSLFatPtr flag);
 
@@ -181,6 +188,7 @@ bool jsl_cmd_line_has_command(JSLCmdLineArgs* cmd_line, JSLFatPtr flag);
  * jsl_cmd_line_pop_arg_list(cmd, &arg); // arg == file3
  * jsl_cmd_line_pop_arg_list(cmd, &arg); // returns false
  * ```
+ * TODO: docs
  * 
  * @warning This function assumes that there are no commands that can be returned
  * with `jsl_cmd_line_has_command`. There's no syntactic distinction between a single
@@ -206,6 +214,7 @@ bool jsl_cmd_line_pop_arg_list(JSLCmdLineArgs* cmd_line, JSLFatPtr* out_value);
  * jsl_cmd_line_pop_flag_with_value(cmd, JSL_FATPTR_EXPRESSION("ignore"), &arg); // arg == bar
  * jsl_cmd_line_pop_flag_with_value(cmd, JSL_FATPTR_EXPRESSION("ignore"), &arg); // returns false
  * ```
+ * TODO: docs
  * 
  * @warning Argument ordering is not guaranteed
  */
