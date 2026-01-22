@@ -47,7 +47,7 @@
 extern "C" {
 #endif
 
-struct JSL__CmdLine {
+struct JSL__CmdLineArgs {
     JSLAllocatorInterface* allocator;
 
     uint64_t short_flag_bitset[JSL__CMD_LINE_SHORT_FLAG_BUCKETS];
@@ -65,12 +65,12 @@ struct JSL__CmdLine {
 /**
  * State container struct 
  */
-typedef struct JSL__CmdLine JSLCmdLine;
+typedef struct JSL__CmdLineArgs JSLCmdLineArgs;
 
 /**
  * Initialize an instance of the command line parser container.
  */
-bool jsl_cmd_line_init(JSLCmdLine* cmd_line, JSLAllocatorInterface* allocator);
+bool jsl_cmd_line_init(JSLCmdLineArgs* cmd_line, JSLAllocatorInterface* allocator);
 
 /**
  * Parse the given command line arguments that are in the POSIX style.
@@ -86,7 +86,7 @@ bool jsl_cmd_line_init(JSLCmdLine* cmd_line, JSLAllocatorInterface* allocator);
  * were not valid utf-8.
  */
 bool jsl_cmd_line_parse(
-    JSLCmdLine* cmd_line,
+    JSLCmdLineArgs* cmd_line,
     int32_t argc,
     char** argv,
     JSLFatPtr* out_error
@@ -106,7 +106,7 @@ bool jsl_cmd_line_parse(
  * were not valid utf-16.
  */
 bool jsl_cmd_line_parse_wide(
-    JSLCmdLine* cmd_line,
+    JSLCmdLineArgs* cmd_line,
     int32_t argc,
     wchar_t** argv,
     JSLFatPtr* out_error
@@ -127,7 +127,7 @@ bool jsl_cmd_line_parse_wide(
  * jsl_cmd_line_has_short_flag(cmd, 'g'); // false
  * ```
  */
-bool jsl_cmd_line_has_short_flag(JSLCmdLine* cmd_line, uint8_t flag);
+bool jsl_cmd_line_has_short_flag(JSLCmdLineArgs* cmd_line, uint8_t flag);
 
 /**
  * Checks if the user passed in the given flag with no value.
@@ -144,7 +144,7 @@ bool jsl_cmd_line_has_short_flag(JSLCmdLine* cmd_line, uint8_t flag);
  * jsl_cmd_line_has_flag(cmd, JSL_FATPTR_EXPRESSION("arg2")); // true
  * ```
  */
-bool jsl_cmd_line_has_flag(JSLCmdLine* cmd_line, JSLFatPtr flag);
+bool jsl_cmd_line_has_flag(JSLCmdLineArgs* cmd_line, JSLFatPtr flag);
 
 /**
  * Checks if the user passed in the given command.
@@ -161,7 +161,7 @@ bool jsl_cmd_line_has_flag(JSLCmdLine* cmd_line, JSLFatPtr flag);
  * jsl_cmd_line_has_command(cmd, JSL_FATPTR_EXPRESSION("restart")); // false
  * ```
  */
-bool jsl_cmd_line_has_command(JSLCmdLine* cmd_line, JSLFatPtr flag);
+bool jsl_cmd_line_has_command(JSLCmdLineArgs* cmd_line, JSLFatPtr flag);
 
 /**
  * If the user passed in a argument list, pop one off returning true if
@@ -186,7 +186,7 @@ bool jsl_cmd_line_has_command(JSLCmdLine* cmd_line, JSLFatPtr flag);
  * with `jsl_cmd_line_has_command`. There's no syntactic distinction between a single
  * command and a argument list.
  */
-bool jsl_cmd_line_pop_arg_list(JSLCmdLine* cmd_line, JSLFatPtr* out_value);
+bool jsl_cmd_line_pop_arg_list(JSLCmdLineArgs* cmd_line, JSLFatPtr* out_value);
 
 /**
  * If the user passed in multiple instances of flag with a value, this function
@@ -210,7 +210,7 @@ bool jsl_cmd_line_pop_arg_list(JSLCmdLine* cmd_line, JSLFatPtr* out_value);
  * @warning Argument ordering is not guaranteed
  */
 bool jsl_cmd_line_pop_flag_with_value(
-    JSLCmdLine* cmd_line,
+    JSLCmdLineArgs* cmd_line,
     JSLFatPtr flag,
     JSLFatPtr* out_value
 );

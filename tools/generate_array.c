@@ -127,7 +127,7 @@ JSLFatPtr help_message = JSL_FATPTR_INITIALIZER(
     "\t--custom-hash\t\tOverride the included hash call with the given function name\n"
 );
 
-static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLine* cmd)
+static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
 {
     bool show_help = false;
     JSLFatPtr name = {0};
@@ -355,7 +355,7 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLine* cmd)
 
         JSLAllocatorInterface allocator = jsl_infinite_arena_get_allocator_interface(&arena);
 
-        JSLCmdLine cmd;
+        JSLCmdLineArgs cmd;
         if (!jsl_cmd_line_init(&cmd, &allocator))
         {
             jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Command line input exceeds memory limit"));

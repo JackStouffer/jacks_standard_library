@@ -39,7 +39,7 @@ static void test_short_flags_grouping(void)
     JSLArena arena = JSL_ARENA_FROM_STACK(buffer);
     JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
 
-    JSLCmdLine cmd = {0};
+    JSLCmdLineArgs cmd = {0};
 
     TEST_BOOL(jsl_cmd_line_init(&cmd, &allocator));
 
@@ -79,7 +79,7 @@ static void test_short_flag_equals_is_invalid(void)
     JSLArena arena = JSL_ARENA_FROM_STACK(buffer);
     JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
 
-    JSLCmdLine cmd = {0};
+    JSLCmdLineArgs cmd = {0};
 
     TEST_BOOL(jsl_cmd_line_init(&cmd, &allocator));
 
@@ -101,7 +101,7 @@ static void test_long_flags_and_commands(void)
     JSLArena arena = JSL_ARENA_FROM_STACK(buffer);
     JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
 
-    JSLCmdLine cmd = {0};
+    JSLCmdLineArgs cmd = {0};
 
     TEST_BOOL(jsl_cmd_line_init(&cmd, &allocator));
 
@@ -153,7 +153,7 @@ static void test_long_values_equals_and_space(void)
     JSLArena arena = JSL_ARENA_FROM_STACK(buffer);
     JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
 
-    JSLCmdLine cmd = {0};
+    JSLCmdLineArgs cmd = {0};
 
     TEST_BOOL(jsl_cmd_line_init(&cmd, &allocator));
 
@@ -201,7 +201,7 @@ static void test_wide_parsing(void)
     JSLArena arena = JSL_ARENA_FROM_STACK(buffer);
     JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
 
-    JSLCmdLine cmd = {0};
+    JSLCmdLineArgs cmd = {0};
 
     TEST_BOOL(jsl_cmd_line_init(&cmd, &allocator));
 

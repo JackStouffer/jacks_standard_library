@@ -39,7 +39,7 @@ static JSLFatPtr text_flag_str = JSL_FATPTR_INITIALIZER("text");
 static JSLFatPtr var_name_flag_str = JSL_FATPTR_INITIALIZER("var-name");
 
 static int32_t entrypoint(
-    JSLCmdLine* cmd,
+    JSLCmdLineArgs* cmd,
     JSLAllocatorInterface* allocator,
     bool stdin_has_data
 )
@@ -257,7 +257,7 @@ static int32_t entrypoint(
 
         JSLAllocatorInterface allocator = jsl_infinite_arena_get_allocator_interface(&arena);
 
-        JSLCmdLine cmd;
+        JSLCmdLineArgs cmd;
         if (!jsl_cmd_line_init(&cmd, &allocator))
         {
             jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Command line input exceeds memory limit"));
