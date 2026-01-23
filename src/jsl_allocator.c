@@ -115,12 +115,25 @@ void* jsl_align_ptr_upwards(void* ptr, int32_t alignment)
         return NULL;
 
     uintptr_t addr   = (uintptr_t) ptr;
-    uintptr_t ualign = (uintptr_t) alignment;
+    const uintptr_t ualign = (uintptr_t) alignment;
 
-    uintptr_t mask = ualign - 1;
+    const uintptr_t mask = ualign - 1;
     addr = (addr + mask) & ~mask;
 
-    return (uint8_t*) addr;
+    return (void*) addr;
+}
+
+uintptr_t jsl_align_ptr_upwards_uintptr(uintptr_t ptr, int32_t alignment)
+{
+    if (ptr == 0 || alignment < 1)
+        return 0;
+
+    const uintptr_t ualign = (uintptr_t) alignment;
+    const uintptr_t mask = ualign - 1;
+
+    ptr = (ptr + mask) & ~mask;
+
+    return ptr;
 }
 
 #undef JSL__ALLOCATOR_PRIVATE_SENTINEL

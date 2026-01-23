@@ -235,8 +235,8 @@ static void test_jsl_format_file_accepts_empty_format(void)
     if (file == NULL)
         return;
 
-    bool res = jsl_format_to_c_file(file, JSL_FATPTR_EXPRESSION(""));
-    TEST_BOOL(res == true);
+    int64_t res = jsl_format_to_c_file(file, JSL_FATPTR_EXPRESSION(""));
+    TEST_BOOL(res > -1);
 
     TEST_BOOL(fflush(file) == 0);
     TEST_BOOL(fseek(file, 0, SEEK_END) == 0);
@@ -248,8 +248,8 @@ static void test_jsl_format_file_accepts_empty_format(void)
 
 static void test_jsl_format_file_null_out_parameter(void)
 {
-    bool res = jsl_format_to_c_file(NULL, JSL_FATPTR_EXPRESSION("Hello"));
-    TEST_BOOL(!res);
+    int64_t res = jsl_format_to_c_file(NULL, JSL_FATPTR_EXPRESSION("Hello"));
+    TEST_INT64_EQUAL(res, -1);
 }
 
 static void test_jsl_format_file_null_format_pointer(void)
@@ -259,8 +259,8 @@ static void test_jsl_format_file_null_format_pointer(void)
         .length = 5
     };
 
-    bool res = jsl_format_to_c_file(stdout, fmt);
-    TEST_BOOL(!res);
+    int64_t res = jsl_format_to_c_file(stdout, fmt);
+    TEST_INT64_EQUAL(res, -1);
 }
 
 static void test_jsl_format_file_negative_length(void)
@@ -270,8 +270,8 @@ static void test_jsl_format_file_negative_length(void)
         .length = -1
     };
 
-    bool res = jsl_format_to_c_file(stdout, fmt);
-    TEST_BOOL(!res);
+    int64_t res = jsl_format_to_c_file(stdout, fmt);
+    TEST_INT64_EQUAL(res, -1);
 }
 
 static void test_jsl_format_file_write_failure(void)
@@ -288,8 +288,9 @@ static void test_jsl_format_file_write_failure(void)
         {
             TEST_BOOL(setvbuf(writer, NULL, _IONBF, 0) == 0);
             void (*previous_handler)(int) = signal(SIGPIPE, SIG_IGN);
-            bool res = jsl_format_to_c_file(writer, JSL_FATPTR_EXPRESSION("Hello"));
-            TEST_BOOL(!res);
+            int64_t res = jsl_format_to_c_file(writer, JSL_FATPTR_EXPRESSION("Hello"));
+            TEST_INT64_EQUAL(res, -1);
+            
             fclose(writer);
             if (previous_handler == SIG_ERR)
             {

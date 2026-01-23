@@ -548,7 +548,7 @@ int64_t jsl_write_to_c_file(FILE* out, JSLFatPtr data)
 struct JSL__FormatOutContext
 {
     FILE* out;
-    bool failure_flag;
+    int64_t total_bytes_written;
     uint8_t buffer[JSL_FORMAT_MIN_BUFFER];
 };
 
@@ -562,29 +562,30 @@ static uint8_t* format_out_callback(void* user, uint8_t* buf, int64_t len)
         (size_t) len,
         context->out
     );
+
+    context->total_bytes_written += written;
+
     if (written == len)
     {
         return context->buffer;
     }
     else
     {
-        context->failure_flag = true;
         return NULL;
     }
 }
 
-// TODO: incomplete, refactor to return number of bytes written
-JSL__ASAN_OFF bool jsl_format_to_c_file(FILE* out, JSLFatPtr fmt, ...)
+JSL__ASAN_OFF int64_t jsl_format_to_c_file(FILE* out, JSLFatPtr fmt, ...)
 {
     if (out == NULL || fmt.data == NULL || fmt.length < 0)
-        return false;
+        return -1;
 
     va_list va;
     va_start(va, fmt);
 
     struct JSL__FormatOutContext context;
+    context.total_bytes_written = 0;
     context.out = out;
-    context.failure_flag = false;
 
     jsl_format_callback(
         format_out_callback,
@@ -596,5 +597,5 @@ JSL__ASAN_OFF bool jsl_format_to_c_file(FILE* out, JSLFatPtr fmt, ...)
 
     va_end(va);
 
-    return !context.failure_flag;
+    return context.total_bytes_written;
 }

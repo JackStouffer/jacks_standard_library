@@ -202,11 +202,10 @@ JSL_WARN_UNUSED JSL_DEF JSLWriteFileResultEnum jsl_write_file_contents(
 /**
 * Write the contents of a fat pointer to a `FILE*`.
 *
-* Attempts to emit the entire buffer to `out` using `fwrite`. Passing `NULL`
-* for the stream or data pointer, or supplying a negative length, causes the
-* function to fail immediately and return `-1`. On a short write, the returned
-* value is the number of bytes actually written, which may be less than the
-* requested length.
+* This implementation uses libc's `fwrite` to write to the file stream. If
+* this function returns less than `data.length` then the file stream is most
+* likely in an error state. In that case, `errno` will be set and you can get
+* more info with `ferror`.
 *
 * @param out Destination `FILE*` stream
 * @param data Buffer containing the bytes to write
@@ -216,18 +215,20 @@ int64_t jsl_write_to_c_file(FILE* out, JSLFatPtr data);
 
 /**
 * Format a string using the JSL formatter and write the result to a `FILE*`,
-* most often this will be `stdout`.
+* most often this will be `stdout`. Gives the number of bytes written to
+* the file.
 *
-* Streams that reject writes (for example, read-only streams or closed
-* pipes) cause the function to return `false`. Passing a `NULL` file handle,
-* a `NULL` format pointer, or a negative format length also causes failure.
+* This implementation uses libc's `fwrite` to write to the file stream. If
+* this function returns less than `fmt.length` then the file stream is most
+* likely in an error state. In that case, `errno` will be set and you can get
+* more info with `ferror`. 
 *
 * @param out Destination stream
 * @param fmt Format string
 * @param ... Format args
-* @returns `true` when formatting and writing succeeds, otherwise `false`
+* @returns the total number of bytes successfully written, or `-1` when arguments are invalid
 */
-JSL__ASAN_OFF JSL_DEF bool jsl_format_to_c_file(FILE* out, JSLFatPtr fmt, ...);
+JSL__ASAN_OFF JSL_DEF int64_t jsl_format_to_c_file(FILE* out, JSLFatPtr fmt, ...);
 
 
 #ifdef __cplusplus

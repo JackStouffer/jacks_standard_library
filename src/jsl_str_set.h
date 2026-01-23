@@ -95,10 +95,10 @@ struct JSL__StrSetEntry
 };
 
 struct JSL__StrSetKeyValueIter {
+    uint64_t sentinel;
     struct JSL__StrSet* set;
     int64_t current_lut_index;
     int64_t generational_id;
-    uint64_t sentinel;
 };
 
 struct JSL__StrSet {
