@@ -342,7 +342,7 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
 
         JSLAllocatorInterface allocator = jsl_infinite_arena_get_allocator_interface(&arena);
 
-        JSLCmdLine cmd;
+        JSLCmdLineArgs cmd;
         jsl_cmd_line_init(&cmd, &allocator);
         JSLFatPtr error_message = {0};
         if (!jsl_cmd_line_parse_wide(&cmd, argc, argv, &error_message))

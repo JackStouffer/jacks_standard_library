@@ -61,6 +61,8 @@ JSL_DEF void jsl_pool_init2(
         return;
 
     JSL_MEMSET(pool, 0, sizeof(struct JSL__PoolAllocator));
+    pool->memory_start = (uintptr_t) memory.data;
+    pool->memory_end = pool->memory_start + (uintptr_t) memory.length;
 
     
     #if JSL_IS_WEB_ASSEMBLY
@@ -99,6 +101,7 @@ JSL_DEF void jsl_pool_init2(
 
         chunk_header_ptr->sentinel = JSL__ITEM_PRIVATE_SENTINEL;
         chunk_header_ptr->allocation = (void*) chunk_pointer;
+        chunk_header_ptr->prev_next = NULL;
         chunk_header_ptr->next = pool->free_list;
         pool->free_list = (void*) chunk_header_ptr;
 
@@ -132,6 +135,10 @@ JSL_DEF void* jsl_pool_allocate(JSLPoolAllocator* pool, bool zeroed)
         struct JSL__PoolAllocatorHeader* free_list_next = current->next;
        
         current->next = pool->checked_out;
+        current->prev_next = &pool->checked_out;
+        if (current->next != NULL)
+            current->next->prev_next = &current->next;
+
         pool->checked_out = current;
         pool->free_list = free_list_next;
 
@@ -149,46 +156,39 @@ bool jsl_pool_free(JSLPoolAllocator* pool, void* allocation)
     if (pool == NULL || pool->sentinel != JSL__POOL_PRIVATE_SENTINEL || allocation == NULL)
         return false;
 
-    struct JSL__PoolAllocatorHeader* header_prev = NULL;
-    struct JSL__PoolAllocatorHeader* header_next = NULL;
-    struct JSL__PoolAllocatorHeader* header = NULL;
+    uintptr_t allocation_addr = (uintptr_t) allocation;
 
-    struct JSL__PoolAllocatorHeader* current = pool->checked_out;
-    while (current != NULL)
-    {
-        if (current->allocation == allocation)
-        {
-            header_next = current->next;
-            header = current;
-            break;
-        }
+    const bool memory_in_bounds = (
+        allocation_addr >= pool->memory_start
+        && allocation_addr < pool->memory_end
+    );
+    if (!memory_in_bounds)
+        return false;
+
+    uintptr_t header_addr = allocation_addr - sizeof(struct JSL__PoolAllocatorHeader);
+    const bool good_alignment = (header_addr % (uintptr_t) _Alignof(struct JSL__PoolAllocatorHeader)) == 0;
+    if (!good_alignment)
+        return false;
+
+    struct JSL__PoolAllocatorHeader* header = (void*) header_addr;
+
+    if (header->sentinel != JSL__ITEM_PRIVATE_SENTINEL || header->allocation != allocation || header->prev_next == NULL)
+        return false;
+
+    *(header->prev_next) = header->next;
+    if (header->next != NULL)
+        header->next->prev_next = header->prev_next;
+
+    header->prev_next = NULL;
+    header->next = pool->free_list;
+    pool->free_list = header;
     
-        header_prev = current;
-        current = current->next;
-    }
+    #ifdef JSL_DEBUG
+        jsl__pool_debug_memset_old_memory(header->allocation, pool->allocation_size);
+    #endif
 
-    if (header != NULL)
-    {
-        if (header_prev != NULL)
-        {
-            header_prev->next = header_next;
-        }
-        else
-        {
-            pool->checked_out = header_next;
-        }
+    return true;
 
-        header->next = pool->free_list;
-        pool->free_list = header;
-        
-        #ifdef JSL_DEBUG
-            jsl__pool_debug_memset_old_memory(header->allocation, pool->allocation_size);
-        #endif
-    
-        return true;
-    }
-
-    return false;
 }
 
 
@@ -202,6 +202,7 @@ JSL_DEF void jsl_pool_free_all(JSLPoolAllocator* pool)
     while (current != NULL)
     {
         struct JSL__PoolAllocatorHeader* next = current->next;
+        current->prev_next = NULL;
         current->next = pool->free_list;
         pool->free_list = current;
 
@@ -211,8 +212,8 @@ JSL_DEF void jsl_pool_free_all(JSLPoolAllocator* pool)
 
         current = next;
     }
-    
-    return;
+
+    pool->checked_out = NULL;
 }
 
 int64_t jsl_pool_free_allocation_count(

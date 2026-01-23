@@ -13,6 +13,7 @@ struct JSL__PoolAllocatorHeader
 {
     uint64_t sentinel;
     struct JSL__PoolAllocatorHeader* next;
+    struct JSL__PoolAllocatorHeader** prev_next;
     void* allocation;
 };
 
@@ -26,6 +27,8 @@ struct JSL__PoolAllocator
     // we need to keep track of the in use stuff so we can do "free all"
     struct JSL__PoolAllocatorHeader* checked_out;
     struct JSL__PoolAllocatorHeader* free_list;
+    uintptr_t memory_start;
+    uintptr_t memory_end;
     int64_t allocation_size;
     int64_t chunk_count;
 };
@@ -34,8 +37,8 @@ struct JSL__PoolAllocator
  * A pool allocator is a specialized allocator for allocating lots of things of the
  * same size (or with a well defined maximum). Since every allocation returned is
  * the same size, allocating and freeing are very fast. The entire allocator is just
- * a stack of unused chunks.
- * 
+ * one stack of used allocations and another stack of unused allocations.
+ *
  * A pool allocator should not be confused with a connection pool. These are very
  * different tools. In fact, this allocator should not even be used for the backing
  * memory for such a connection pool, as the vast majority of connection pools can
@@ -49,7 +52,7 @@ struct JSL__PoolAllocator
  * Examples of situations where this allocator shines:
  * 
  *  * Games with hundreds of short lived entities
- *  * Very large tree structures where each node carries some state
+ *  * Very large, changing tree structures where each node carries some state
  *  * Many input buffers that have a max size, like in an HTTP server
  *    when you need request body buffers for each request in flight
  *  * Event queues with thousands of events in flight
@@ -71,13 +74,14 @@ struct JSL__PoolAllocator
  * * jsl_pool_init
  * * jsl_pool_init2
  * * jsl_pool_allocate
- * * jsl_pool_allocate_aligned
- * * jsl_pool_reallocate
- * * jsl_pool_reallocate_aligned
- * * jsl_pool_reset
+ * * jsl_pool_free
+ * * jsl_pool_free_all
+ * * jsl_pool_free_allocation_count
+ * * jsl_pool_total_allocation_count
  *
  * @note The pool API is not thread safe. pool memory is assumed to live in a
- * single thread. If you want to share an pool between threads you need to lock.
+ * single thread. If you want to share an pool between threads you need to lock
+ * when calling these functions.
  */
 typedef struct JSL__PoolAllocator JSLPoolAllocator;
 

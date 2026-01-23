@@ -216,6 +216,110 @@ static void test_pool_alignment_large_alloc(void)
     #endif
 }
 
+static void test_pool_free_middle_node(void)
+{
+    uint8_t buffer[512];
+    JSLPoolAllocator pool = {0};
+
+    jsl_pool_init(&pool, buffer, (int64_t) sizeof(buffer), 32);
+
+    void* a = jsl_pool_allocate(&pool, false);
+    void* b = jsl_pool_allocate(&pool, false);
+    void* c = jsl_pool_allocate(&pool, false);
+    TEST_BOOL(a != NULL);
+    TEST_BOOL(b != NULL);
+    TEST_BOOL(c != NULL);
+    if (!a || !b || !c) return;
+
+    int64_t total = jsl_pool_total_allocation_count(&pool);
+    TEST_BOOL(jsl_pool_free(&pool, b));
+    TEST_INT64_EQUAL(jsl_pool_free_allocation_count(&pool), total - 2);
+
+    TEST_BOOL(jsl_pool_free(&pool, a));
+    TEST_BOOL(jsl_pool_free(&pool, c));
+    TEST_INT64_EQUAL(jsl_pool_free_allocation_count(&pool), total);
+}
+
+static void test_pool_free_interior_pointer(void)
+{
+    uint8_t buffer[512];
+    JSLPoolAllocator pool = {0};
+
+    jsl_pool_init(&pool, buffer, (int64_t) sizeof(buffer), 32);
+
+    uint8_t* allocation = (uint8_t*) jsl_pool_allocate(&pool, false);
+    TEST_BOOL(allocation != NULL);
+    if (!allocation) return;
+
+    int64_t free_after_alloc = jsl_pool_free_allocation_count(&pool);
+    TEST_BOOL(!jsl_pool_free(&pool, allocation + 1));
+    TEST_INT64_EQUAL(jsl_pool_free_allocation_count(&pool), free_after_alloc);
+
+    TEST_BOOL(jsl_pool_free(&pool, allocation));
+}
+
+static void test_pool_free_wrong_pool(void)
+{
+    uint8_t buffer_a[512];
+    uint8_t buffer_b[512];
+    JSLPoolAllocator pool_a = {0};
+    JSLPoolAllocator pool_b = {0};
+
+    jsl_pool_init(&pool_a, buffer_a, (int64_t) sizeof(buffer_a), 32);
+    jsl_pool_init(&pool_b, buffer_b, (int64_t) sizeof(buffer_b), 32);
+
+    void* allocation = jsl_pool_allocate(&pool_a, false);
+    TEST_BOOL(allocation != NULL);
+    if (!allocation) return;
+
+    int64_t free_before = jsl_pool_free_allocation_count(&pool_b);
+    TEST_BOOL(!jsl_pool_free(&pool_b, allocation));
+    TEST_INT64_EQUAL(jsl_pool_free_allocation_count(&pool_b), free_before);
+
+    TEST_BOOL(jsl_pool_free(&pool_a, allocation));
+}
+
+static void test_pool_free_after_free_all(void)
+{
+    uint8_t buffer[512];
+    JSLPoolAllocator pool = {0};
+
+    jsl_pool_init(&pool, buffer, (int64_t) sizeof(buffer), 32);
+
+    void* allocation = jsl_pool_allocate(&pool, false);
+    TEST_BOOL(allocation != NULL);
+    if (!allocation) return;
+
+    int64_t total = jsl_pool_total_allocation_count(&pool);
+    jsl_pool_free_all(&pool);
+    TEST_INT64_EQUAL(jsl_pool_free_allocation_count(&pool), total);
+    TEST_BOOL(!jsl_pool_free(&pool, allocation));
+}
+
+static void test_pool_free_sentinel_corruption(void)
+{
+    uint8_t buffer[512];
+    JSLPoolAllocator pool = {0};
+
+    jsl_pool_init(&pool, buffer, (int64_t) sizeof(buffer), 32);
+
+    void* allocation = jsl_pool_allocate(&pool, false);
+    TEST_BOOL(allocation != NULL);
+    if (!allocation) return;
+
+    int64_t free_after_alloc = jsl_pool_free_allocation_count(&pool);
+    struct JSL__PoolAllocatorHeader* header = (struct JSL__PoolAllocatorHeader*) (
+        (uint8_t*) allocation - sizeof(struct JSL__PoolAllocatorHeader)
+    );
+    uint64_t old_sentinel = header->sentinel;
+    header->sentinel = 0;
+    TEST_BOOL(!jsl_pool_free(&pool, allocation));
+    TEST_INT64_EQUAL(jsl_pool_free_allocation_count(&pool), free_after_alloc);
+
+    header->sentinel = old_sentinel;
+    TEST_BOOL(jsl_pool_free(&pool, allocation));
+}
+
 int main(void)
 {
     // Windows programs that crash can lose all of the terminal output.
@@ -232,6 +336,11 @@ int main(void)
     RUN_TEST_FUNCTION("Test pool free invalid/double", test_pool_free_invalid_and_double_free);
     RUN_TEST_FUNCTION("Test pool medium alignment", test_pool_alignment_medium_alloc);
     RUN_TEST_FUNCTION("Test pool large alignment", test_pool_alignment_large_alloc);
+    RUN_TEST_FUNCTION("Test pool free middle node", test_pool_free_middle_node);
+    RUN_TEST_FUNCTION("Test pool free interior pointer", test_pool_free_interior_pointer);
+    RUN_TEST_FUNCTION("Test pool free wrong pool", test_pool_free_wrong_pool);
+    RUN_TEST_FUNCTION("Test pool free after free all", test_pool_free_after_free_all);
+    RUN_TEST_FUNCTION("Test pool free sentinel corruption", test_pool_free_sentinel_corruption);
 
     TEST_RESULTS();
     return lfails != 0;
