@@ -316,15 +316,9 @@ JSL_STRING_BUILDER_DEF bool jsl_string_builder_insert_fatptr(JSLStringBuilder* b
 JSL_STRING_BUILDER_DEF bool jsl_string_builder_insert_cstr(JSLStringBuilder* builder, const char* data);
 
 /**
- * Format a string using the jsl_format logic and write the result directly into
- * the string builder.
- *
- * @param builder The string builder that receives the formatted output; must be initialized.
- * @param fmt A fat pointer describing the format string.
- * @param ... Variadic arguments consumed by the formatter.
- * @returns `true` if formatting succeeded and the formatted bytes were appended, otherwise `false`.
+ * TODO: docs
  */
-JSL_STRING_BUILDER_DEF bool jsl_string_builder_format(JSLStringBuilder* builder, JSLFatPtr fmt, ...);
+JSL_STRING_BUILDER_DEF JSLOutputSink jsl_string_builder_output_sink(JSLStringBuilder* builder);
 
 /**
  * TODO: docs

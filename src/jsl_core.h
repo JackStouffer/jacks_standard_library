@@ -1716,25 +1716,52 @@ JSL_DEF JSLFatPtr jsl_cstr_to_fatptr(JSLAllocatorInterface* allocator, char* str
  */
 JSL_DEF JSLFatPtr jsl_fatptr_duplicate(JSLAllocatorInterface* allocator, JSLFatPtr str);
 
-#ifndef JSL_FORMAT_MIN_BUFFER
-    #define JSL_FORMAT_MIN_BUFFER 512 // how many characters per callback
-#endif
+/**
+ * TODO: docs
+ * 
+ * There's no run time constraints on how large a chunk of data a user might give
+ * this function.
+ * 
+ * Handling,
+ * 
+ *      - Retries
+ *      - Partial success
+ *      - Chunking writes
+ *      - Backpressure
+ *      - Error reporting/codes
+ * 
+ * Are all your responsibility and should be in the logic of this function.
+ * 
+ * Also flushing and/or closing the sink once its lifetime is over is also your responsibilty
+ */
+typedef bool (*JSLOutputSinkWriteFP)(void* user, JSLFatPtr data);
 
 /**
- * Function signature for receiving formatted output from `jsl_format_callback`.
- *
- * The formatter hands over `len` bytes starting at `buf` each time the internal
- * buffer fills up or is flushed. The callback should consume those bytes (copy,
- * write, etc.) and then return a pointer to the buffer that should be used for
- * subsequent writes. Returning `NULL` signals an error or early termination,
- * causing `jsl_format_callback` to stop producing output.
- *
- * @param buf   Pointer to `len` bytes of freshly formatted data.
- * @param user  Opaque pointer that was supplied to `jsl_format_callback`.
- * @param len   Number of valid bytes in `buf`.
- * @return Pointer to the buffer that will receive the next chunk, or `NULL` to stop.
+ * TODO: docs
+ * 
+ * Add advice on writing data generation functions with this, like buffering the output,
+ * don't do single char
  */
-typedef uint8_t* (*JSLFormatCallbackFP)(void *user, uint8_t* buf, int64_t len);
+typedef struct JSLOutputSink {
+    JSLOutputSinkWriteFP write_fp;
+    void* user_data;
+} JSLOutputSink;
+
+/**
+ * TODO: docs
+ * 
+ * one line convenience function 
+ */
+static inline bool jsl_output_sink_write(JSLOutputSink sink, JSLFatPtr data)
+{
+    if (sink.write_fp == NULL) return false;
+    return sink.write_fp(sink.user_data, data);
+}
+
+/**
+ * TODO: docs
+ */
+JSLOutputSink jsl_fatptr_output_sink(JSLFatPtr* buffer);
 
 /**
  * This is a full snprintf replacement that supports everything that the C
@@ -1745,11 +1772,7 @@ typedef uint8_t* (*JSLFormatCallbackFP)(void *user, uint8_t* buf, int64_t len);
  *
  * There are a set of different functions for different use cases
  *
- * * jsl_format
- * * jsl_format_buffer
- * * jsl_format_valist
- * * jsl_format_callback
- * * jsl_string_builder_format
+ * * TODO: function list
  *
  * ## Fat Pointers
  *
@@ -1803,43 +1826,24 @@ JSL_DEF JSLFatPtr jsl_format(JSLAllocatorInterface* allocator, JSLFatPtr fmt, ..
 
 /**
  * See docs for jsl_format.
- *
- * Writes into a provided buffer, up to `buffer.length` bytes.
+ * 
+ * TODO: docs
  */
-JSL_DEF int64_t jsl_format_buffer(
-    JSLFatPtr* buffer,
-    JSLFatPtr fmt,
-    ...
-);
-
-/**
- * See docs for jsl_format.
- *
- * Writes into a provided buffer, up to `buffer.length` bytes using a variadic
- * argument list.
- */
-JSL_DEF int64_t jsl_format_valist(
-    JSLFatPtr* buffer,
-    JSLFatPtr fmt,
-    va_list va
-);
-
-/**
- * See docs for jsl_format.
- *
- * Convert into a buffer, calling back every JSL_FORMAT_MIN_BUFFER chars.
- * Your callback can then copy the chars out, print them or whatever.
- * This function is actually the workhorse for everything else.
- * The buffer you pass in must hold at least JSL_FORMAT_MIN_BUFFER characters.
- *
- * You return the next buffer to use or 0 to stop converting
- */
-JSL_DEF int64_t jsl_format_callback(
-   JSLFormatCallbackFP callback,
-   void* user,
-   uint8_t* buf,
+JSL_DEF int64_t jsl_format_sink_valist(
+   JSLOutputSink sink,
    JSLFatPtr fmt,
    va_list va
+);
+
+/**
+ * See docs for jsl_format.
+ * 
+ * TODO: docs
+ */
+JSL_DEF int64_t jsl_format_sink(
+   JSLOutputSink sink,
+   JSLFatPtr fmt,
+   ...
 );
 
 /**

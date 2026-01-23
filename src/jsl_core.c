@@ -1384,6 +1384,21 @@ int64_t jsl_fatptr_strip_whitespace(JSLFatPtr* str)
     return bytes_read;
 }
 
+static bool jsl__fatptr_output_sink_write(void *user, JSLFatPtr data)
+{
+    JSLFatPtr* buffer = (JSLFatPtr*)user;
+    int64_t bytes_written = jsl_fatptr_memory_copy(buffer, data);
+    return bytes_written != -1 || buffer->length > 0;
+}
+
+JSLOutputSink jsl_fatptr_output_sink(JSLFatPtr* buffer)
+{
+    JSLOutputSink sink;
+    sink.write_fp = jsl__fatptr_output_sink_write;
+    sink.user_data = buffer;
+    return sink;
+}
+
 static int32_t stbsp__real_to_str(char const **start, uint32_t *len, char *out, int32_t *decimal_pos, double value, uint32_t frac_digits);
 static int32_t stbsp__real_to_parts(int64_t *bits, int32_t *expo, double value);
 #define STBSP__SPECIAL 0x7000
@@ -1422,6 +1437,7 @@ JSL__ASAN_OFF void jsl_format_set_separators(char pcomma, char pperiod)
 #define STBSP__METRIC_NOSPACE 1024
 #define STBSP__METRIC_1024 2048
 #define STBSP__METRIC_JEDEC 4096
+#define JSL__FORMAT_BUFFER_SIZE JSL_KILOBYTES(4)
 
 static void stbsp__lead_sign(uint32_t formatting_flags, char *sign)
 {
@@ -1522,14 +1538,14 @@ static JSL__ASAN_OFF uint32_t stbsp__strlen_limited(char const *string, uint32_t
     return (uint32_t)(source_ptr - string);
 }
 
-JSL__ASAN_OFF int64_t jsl_format_callback(
-    JSLFormatCallbackFP callback,
-    void* user,
-    uint8_t* buffer,
+JSL__ASAN_OFF int64_t jsl_format_sink_valist(
+    JSLOutputSink sink,
     JSLFatPtr fmt,
     va_list va
 )
 {
+    uint8_t buffer[JSL__FORMAT_BUFFER_SIZE];
+
     static char hex[] = "0123456789abcdefxp";
     static char hexu[] = "0123456789ABCDEFXP";
     static JSLFatPtr err_string = JSL_FATPTR_INITIALIZER("(ERROR)");
@@ -1551,35 +1567,33 @@ JSL__ASAN_OFF int64_t jsl_format_callback(
         int32_t field_width, precision, trailing_zeros;
         uint32_t formatting_flags;
 
-        // macros for the callback buffer stuff
-        #define stbsp__chk_cb_bufL(bytes)                                                   \
+        // macros for the sink buffering stuff
+        #define FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(bytes)                               \
             {                                                                               \
                 int32_t len = (int32_t)(buffer_cursor - buffer);                            \
-                if ((len + (bytes)) >= JSL_FORMAT_MIN_BUFFER) {                             \
+                if ((len + (bytes)) >= JSL__FORMAT_BUFFER_SIZE)                             \
+                {                                                                           \
                     tlen += len;                                                            \
-                    if (0 == (buffer_cursor = buffer = callback(user, buffer, len)))        \
+                    JSLFatPtr data = { buffer, len };                                       \
+                    if (sink.write_fp(sink.user_data, data))                                \
+                        buffer_cursor = buffer;                                             \
+                    else                                                                    \
                         goto done;                                                          \
                 }                                                                           \
             }
 
-        #define stbsp__chk_cb_buf(bytes)                                    \
-            {                                                               \
-                if (callback) {                                             \
-                    stbsp__chk_cb_bufL(bytes);                              \
-                }                                                           \
-            }
-
-        #define stbsp__flush_cb()                                                           \
+        // flush if there is even one byte in the buffer
+        #define FLUSH_BUFFER()                                                              \
             {                                                                               \
-                stbsp__chk_cb_bufL(JSL_FORMAT_MIN_BUFFER - 1);                              \
-            } // flush if there is even one byte in the buffer
+                FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(JSL__FORMAT_BUFFER_SIZE - 1);        \
+            } 
 
-        #define stbsp__cb_buf_clamp(cl, v)                                                  \
-            cl = v;                                                                         \
-            if (callback) {                                                                 \
-                int32_t lg = JSL_FORMAT_MIN_BUFFER - (int32_t)(buffer_cursor - buffer);     \
+        #define CLAMP_VALUE_TO_BUFFER_SIZE_THEN_ASSIGN(cl, v)                               \
+            {                                                                               \
+                cl = v;                                                                     \
+                int32_t lg = JSL__FORMAT_BUFFER_SIZE - (int32_t)(buffer_cursor - buffer);   \
                 if (cl > lg)                                                                \
-                cl = lg;                                                                    \
+                    cl = lg;                                                                \
             }
 
         #if defined(__AVX2__)
@@ -1596,7 +1610,7 @@ JSL__ASAN_OFF int64_t jsl_format_callback(
                 if (f.data[0] == '%')
                     goto L_PROCESS_PERCENT;
 
-                stbsp__chk_cb_buf(1);
+                FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
                 *buffer_cursor = f.data[0];
                 ++buffer_cursor;
                 JSL_FATPTR_ADVANCE(f, 1);
@@ -1614,7 +1628,7 @@ JSL__ASAN_OFF int64_t jsl_format_callback(
                 if (mask == 0)
                 {
                     // No special characters found, store entire block
-                    stbsp__chk_cb_buf(32);
+                    FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(32);
                     _mm256_storeu_si256(wide_dest, data);
                     JSL_FATPTR_ADVANCE(f, 32);
                     buffer_cursor += 32;
@@ -1622,7 +1636,7 @@ JSL__ASAN_OFF int64_t jsl_format_callback(
                 else
                 {
                     int special_pos = JSL_PLATFORM_COUNT_TRAILING_ZEROS(mask);
-                    stbsp__chk_cb_buf(special_pos);
+                    FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(special_pos);
 
                     JSL_MEMCPY(buffer_cursor, f.data, (size_t) special_pos);
                     JSL_FATPTR_ADVANCE(f, special_pos);
@@ -1651,7 +1665,7 @@ JSL__ASAN_OFF int64_t jsl_format_callback(
                 if (f.data[0] == '%')
                     goto L_PROCESS_PERCENT;
 
-                stbsp__chk_cb_buf(1);
+                FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
                 *buffer_cursor = f.data[0];
                 ++buffer_cursor;
                 JSL_FATPTR_ADVANCE(f, 1);
@@ -1670,7 +1684,7 @@ JSL__ASAN_OFF int64_t jsl_format_callback(
                 const uint32_t combined_presence = horizontal_maximum0 | horizontal_maximum1;
                 if (combined_presence == 0)
                 {
-                    stbsp__chk_cb_buf(32);
+                    FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(32);
                     vst1q_u8(buffer_cursor, data0);
                     vst1q_u8(buffer_cursor + 16, data1);
                     JSL_FATPTR_ADVANCE(f, 32);
@@ -1683,7 +1697,7 @@ JSL__ASAN_OFF int64_t jsl_format_callback(
                     const uint32_t mask  = mask0 | (mask1 << 16);
 
                     const int32_t special_pos = (int32_t) JSL_PLATFORM_COUNT_TRAILING_ZEROS(mask);
-                    stbsp__chk_cb_buf(special_pos);
+                    FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(special_pos);
                     JSL_MEMCPY(buffer_cursor, f.data, (size_t) special_pos);
 
                     JSL_FATPTR_ADVANCE(f, special_pos);
@@ -1707,7 +1721,7 @@ JSL__ASAN_OFF int64_t jsl_format_callback(
                 if (f.data[0] == '%')
                     goto L_PROCESS_PERCENT;
 
-                stbsp__chk_cb_buf(1);
+                FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
                 *buffer_cursor = f.data[0];
                 ++buffer_cursor;
                 JSL_FATPTR_ADVANCE(f, 1);
@@ -1728,7 +1742,7 @@ JSL__ASAN_OFF int64_t jsl_format_callback(
 
                 if (callback)
                 {
-                    if ((JSL_FORMAT_MIN_BUFFER - (int32_t)(buffer_cursor - buffer)) < 4)
+                    if ((JSL__FORMAT_BUFFER_SIZE - (int32_t)(buffer_cursor - buffer)) < 4)
                         goto schk1;
                 }
 
@@ -2510,13 +2524,13 @@ JSL__ASAN_OFF int64_t jsl_format_callback(
                     {
                         while (field_width > 0)
                         {
-                            stbsp__cb_buf_clamp(i, field_width);
+                            CLAMP_VALUE_TO_BUFFER_SIZE_THEN_ASSIGN(i, field_width);
 
                             field_width -= i;
                             JSL_MEMSET(buffer_cursor, ' ', (size_t) i);
                             buffer_cursor += i;
 
-                            stbsp__chk_cb_buf(1);
+                            FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
                         }
                     }
 
@@ -2524,14 +2538,14 @@ JSL__ASAN_OFF int64_t jsl_format_callback(
                     source_ptr = lead + 1;
                     while (lead[0])
                     {
-                        stbsp__cb_buf_clamp(i, lead[0]);
+                        CLAMP_VALUE_TO_BUFFER_SIZE_THEN_ASSIGN(i, lead[0]);
 
                         lead[0] -= (char) i;
                         JSL_MEMCPY(buffer_cursor, source_ptr, (size_t) i);
                         buffer_cursor += i;
                         source_ptr += i;
 
-                        stbsp__chk_cb_buf(1);
+                        FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
                     }
 
                     // copy leading zeros
@@ -2541,7 +2555,7 @@ JSL__ASAN_OFF int64_t jsl_format_callback(
 
                     while (precision > 0)
                     {
-                    stbsp__cb_buf_clamp(i, precision);
+                    CLAMP_VALUE_TO_BUFFER_SIZE_THEN_ASSIGN(i, precision);
                     precision -= i;
 
                     if (JSL_IS_BITFLAG_NOT_SET(formatting_flags, STBSP__TRIPLET_COMMA))
@@ -2569,7 +2583,7 @@ JSL__ASAN_OFF int64_t jsl_format_callback(
                         }
                     }
 
-                    stbsp__chk_cb_buf(1);
+                    FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
                     }
 
                 }
@@ -2579,14 +2593,14 @@ JSL__ASAN_OFF int64_t jsl_format_callback(
                 while (lead[0])
                 {
                     int32_t i;
-                    stbsp__cb_buf_clamp(i, lead[0]);
+                    CLAMP_VALUE_TO_BUFFER_SIZE_THEN_ASSIGN(i, lead[0]);
 
                     lead[0] -= (char) i;
                     JSL_MEMCPY(buffer_cursor, source_ptr, (size_t) i);
                     buffer_cursor += i;
                     source_ptr += i;
 
-                    stbsp__chk_cb_buf(1);
+                    FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
                 }
 
                 // copy the string
@@ -2594,7 +2608,7 @@ JSL__ASAN_OFF int64_t jsl_format_callback(
                 while (n)
                 {
                     int32_t i;
-                    stbsp__cb_buf_clamp(i, (int32_t) n);
+                    CLAMP_VALUE_TO_BUFFER_SIZE_THEN_ASSIGN(i, (int32_t) n);
 
                     JSL_MEMCPY(buffer_cursor, string, (size_t) i);
 
@@ -2602,20 +2616,20 @@ JSL__ASAN_OFF int64_t jsl_format_callback(
                     buffer_cursor += i;
                     string += i;
 
-                    stbsp__chk_cb_buf(1);
+                    FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
                 }
 
                 // copy trailing zeros
                 while (trailing_zeros)
                 {
                     int32_t i;
-                    stbsp__cb_buf_clamp(i, trailing_zeros);
+                    CLAMP_VALUE_TO_BUFFER_SIZE_THEN_ASSIGN(i, trailing_zeros);
 
                     trailing_zeros -= i;
                     JSL_MEMSET(buffer_cursor, '0', (size_t) i);
                     buffer_cursor += i;
 
-                    stbsp__chk_cb_buf(1);
+                    FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
                 }
 
                 // copy tail if there is one
@@ -2623,14 +2637,14 @@ JSL__ASAN_OFF int64_t jsl_format_callback(
                 while (tail[0])
                 {
                     int32_t i;
-                    stbsp__cb_buf_clamp(i, tail[0]);
+                    CLAMP_VALUE_TO_BUFFER_SIZE_THEN_ASSIGN(i, tail[0]);
 
                     tail[0] -= (char)i;
                     JSL_MEMCPY(buffer_cursor, source_ptr, (size_t) i);
                     buffer_cursor += i;
                     source_ptr += i;
 
-                    stbsp__chk_cb_buf(1);
+                    FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
                 }
 
                 // handle the left justify
@@ -2641,13 +2655,13 @@ JSL__ASAN_OFF int64_t jsl_format_callback(
                     while (field_width)
                     {
                         int32_t i;
-                        stbsp__cb_buf_clamp(i, field_width);
+                        CLAMP_VALUE_TO_BUFFER_SIZE_THEN_ASSIGN(i, field_width);
 
                         field_width -= i;
                         JSL_MEMSET(buffer_cursor, ' ', (size_t) i);
                         buffer_cursor += i;
 
-                        stbsp__chk_cb_buf(1);
+                        FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
                     }
                     }
                 }
@@ -2673,10 +2687,7 @@ JSL__ASAN_OFF int64_t jsl_format_callback(
 
     L_END_FORMAT:
 
-    if (!callback)
-        *buffer_cursor = 0;
-    else
-        stbsp__flush_cb();
+    FLUSH_BUFFER();
 
     done:
     return tlen + (int32_t)(buffer_cursor - buffer);
@@ -2693,137 +2704,56 @@ JSL__ASAN_OFF int64_t jsl_format_callback(
 #undef STBSP__NEGATIVE
 #undef STBSP__METRIC_SUFFIX
 #undef STBSP__NUMSZ
-#undef stbsp__chk_cb_bufL
-#undef stbsp__chk_cb_buf
-#undef stbsp__flush_cb
-#undef stbsp__cb_buf_clamp
+#undef FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE
+#undef FLUSH_BUFFER
+#undef CLAMP_VALUE_TO_BUFFER_SIZE_THEN_ASSIGN
 
 // ============================================================================
 //   wrapper functions
 
-typedef struct stbsp__context {
-    JSLFatPtr buffer;
-    int64_t length;
-    uint8_t tmp[JSL_FORMAT_MIN_BUFFER];
-} stbsp__context;
-
-static uint8_t* stbsp__clamp_callback(void *user, uint8_t* buf, int64_t len)
+JSL__ASAN_OFF int64_t jsl_format_sink(
+    JSLOutputSink sink,
+    JSLFatPtr fmt,
+    ...
+)
 {
-    stbsp__context* context = (stbsp__context*) user;
-    context->length += len;
+    int64_t result;
+    va_list va;
+    va_start(va, fmt);
 
-    if (len > context->buffer.length)
-        len = context->buffer.length;
+    result = jsl_format_sink_valist(sink, fmt, va);
+    va_end(va);
 
-    if (len)
-    {
-        if (buf != context->buffer.data)
-        {
-            JSL_MEMCPY(context->buffer.data, buf, (size_t) len);
-        }
-
-        context->buffer.data += len;
-        context->buffer.length -= len;
-    }
-
-    if (context->buffer.length <= 0)
-        return context->tmp;
-
-    return (context->buffer.length >= JSL_FORMAT_MIN_BUFFER) ?
-        context->buffer.data
-        : context->tmp; // go direct into buffer if you can
-}
-
-static uint8_t* stbsp__count_clamp_callback(void* user, uint8_t* buf, int64_t len)
-{
-    stbsp__context* context = (stbsp__context*) user;
-    (void) sizeof(buf);
-
-    context->length += len;
-    return context->tmp; // go direct into buffer if you can
-}
-
-JSL__ASAN_OFF int64_t jsl_format_valist(JSLFatPtr* buffer, JSLFatPtr fmt, va_list va )
-{
-    stbsp__context context;
-    context.length = 0;
-
-    if ((buffer->length == 0) && buffer->data == NULL)
-    {
-        context.buffer.data = NULL;
-        context.buffer.length = 0;
-
-        jsl_format_callback(
-            stbsp__count_clamp_callback,
-            &context,
-            context.tmp,
-            fmt,
-            va
-        );
-    }
-    else
-    {
-        context.buffer = *buffer;
-
-        jsl_format_callback(
-            stbsp__clamp_callback,
-            &context,
-            stbsp__clamp_callback(&context, NULL, 0),
-            fmt,
-            va
-        );
-    }
-
-    *buffer = context.buffer;
-
-    return context.length;
+    return result;
 }
 
 struct JSL__FormatAllocatorContext
 {
     JSLAllocatorInterface* allocator;
-    JSLFatPtr current_allocation;
-    uint8_t* cursor;
-    uint8_t buffer[JSL_FORMAT_MIN_BUFFER];
+    void* current_allocation;
+    int64_t current_allocation_length;
 };
 
-static uint8_t* format_allocator_callback(void *user, uint8_t* buf, int64_t len)
+static bool format_allocator_callback(void *user, JSLFatPtr data)
 {
     struct JSL__FormatAllocatorContext* context = (struct JSL__FormatAllocatorContext*) user;
+    int64_t old_length = context->current_allocation_length;
+    int64_t new_length = context->current_allocation_length + data.length;
 
-    // First call
-    if (context->cursor == NULL)
-    {
-        context->current_allocation.data = jsl_allocator_interface_alloc(
-            context->allocator,
-            len,
-            JSL_DEFAULT_ALLOCATION_ALIGNMENT,
-            false
-        );
-        context->current_allocation.length = len;
-        if (context->current_allocation.data == NULL)
-            return 0;
+    context->current_allocation = jsl_allocator_interface_realloc(
+        context->allocator,
+        context->current_allocation,
+        new_length,
+        JSL_DEFAULT_ALLOCATION_ALIGNMENT
+    );
+    if (context->current_allocation == NULL)
+        return false;
 
-        context->cursor = context->current_allocation.data;
-    }
-    else
-    {
-        int64_t new_length = context->current_allocation.length + len;
-        context->current_allocation.data = jsl_allocator_interface_realloc(
-            context->allocator,
-            context->current_allocation.data,
-            new_length,
-            JSL_DEFAULT_ALLOCATION_ALIGNMENT
-        );
-        context->current_allocation.length = new_length;
-        if (context->current_allocation.data == NULL)
-            return 0;
-    }
+    JSL_MEMCPY(((uint8_t*) context->current_allocation) + old_length, data.data, (size_t) data.length);
 
-    JSL_MEMCPY(context->cursor, buf, (size_t) len);
-    context->cursor += len;
+    context->current_allocation_length = new_length;
 
-    return context->buffer;
+    return true;
 }
 
 JSL__ASAN_OFF JSLFatPtr jsl_format(JSLAllocatorInterface* allocator, JSLFatPtr fmt, ...)
@@ -2833,14 +2763,15 @@ JSL__ASAN_OFF JSLFatPtr jsl_format(JSLAllocatorInterface* allocator, JSLFatPtr f
 
     struct JSL__FormatAllocatorContext context;
     context.allocator = allocator;
-    context.current_allocation.data = NULL;
-    context.current_allocation.length = 0;
-    context.cursor = NULL;
+    context.current_allocation = NULL;
+    context.current_allocation_length = 0;
 
-    jsl_format_callback(
-        format_allocator_callback,
-        &context,
-        context.buffer,
+    JSLOutputSink sink;
+    sink.write_fp = format_allocator_callback;
+    sink.user_data = &context;
+
+    int64_t write_length = jsl_format_sink_valist(
+        sink,
         fmt,
         va
     );
@@ -2848,26 +2779,13 @@ JSL__ASAN_OFF JSLFatPtr jsl_format(JSLAllocatorInterface* allocator, JSLFatPtr f
     va_end(va);
 
     JSLFatPtr ret = {0};
-    int64_t write_length = context.cursor - context.current_allocation.data;
-    if (context.cursor != NULL && write_length > 0)
+    if (context.current_allocation != NULL && write_length > 0)
     {
-        ret.data = context.current_allocation.data;
+        ret.data = context.current_allocation;
         ret.length = write_length;
     }
 
     return ret;
-}
-
-JSL__ASAN_OFF int64_t jsl_format_buffer(JSLFatPtr* buffer, JSLFatPtr fmt, ...)
-{
-    int64_t result;
-    va_list va;
-    va_start(va, fmt);
-
-    result = jsl_format_valist(buffer, fmt, va);
-    va_end(va);
-
-    return result;
 }
 
 // =======================================================================

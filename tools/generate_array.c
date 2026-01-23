@@ -184,10 +184,13 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     // Check that all required parameters are provided
     //
 
+    JSLOutputSink stdout_sink = jsl_c_file_output_sink(stdout);
+    JSLOutputSink stderr_sink = jsl_c_file_output_sink(stderr);
+
     if (name.data == NULL)
     {
-        jsl_format_to_c_file(
-            stderr,
+        jsl_format_sink(
+            stderr_sink,
             JSL_FATPTR_EXPRESSION("Error: --%y is required\n"),
             name_flag_str
         );
@@ -195,8 +198,8 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     }
     if (value_type.data == NULL)
     {
-        jsl_format_to_c_file(
-            stderr,
+        jsl_format_sink(
+            stderr_sink,
             JSL_FATPTR_EXPRESSION("Error: --%y is required\n"),
             value_type_flag_str
         );
@@ -204,8 +207,8 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     }
     if (function_prefix.data == NULL)
     {
-        jsl_format_to_c_file(
-            stderr,
+        jsl_format_sink(
+            stderr_sink,
             JSL_FATPTR_EXPRESSION("Error: --%y is required\n"),
             function_prefix_flag_str
         );
@@ -213,8 +216,8 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     }
     if (fixed_flag_set && dynamic_flag_set)
     {
-        jsl_format_to_c_file(
-            stderr,
+        jsl_format_sink(
+            stderr_sink,
             JSL_FATPTR_EXPRESSION("Error: cannot set both --%y and --%y\n"),
             fixed_flag_str,
             dynamic_flag_str
@@ -223,8 +226,8 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     }
     if (!fixed_flag_set && !dynamic_flag_set)
     {
-        jsl_format_to_c_file(
-            stderr,
+        jsl_format_sink(
+            stderr_sink,
             JSL_FATPTR_EXPRESSION("Error: you must provide either --%y or --%y\n"),
             fixed_flag_str,
             dynamic_flag_str
@@ -233,8 +236,8 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     }
     if (header_flag_set && source_flag_set)
     {
-        jsl_format_to_c_file(
-            stderr,
+        jsl_format_sink(
+            stderr_sink,
             JSL_FATPTR_EXPRESSION("Error: cannot set both --%y and --%y\n"),
             header_flag_str,
             source_flag_str
@@ -243,8 +246,8 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     }
     if (!header_flag_set && !source_flag_set)
     {
-        jsl_format_to_c_file(
-            stderr,
+        jsl_format_sink(
+            stderr_sink,
             JSL_FATPTR_EXPRESSION("Error: you must provide either --%y or --%y\n"),
             header_flag_str,
             source_flag_str
@@ -291,9 +294,8 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     JSLFatPtr slice;
     while (jsl_string_builder_iterator_next(&iterator, &slice))
     {
-        jsl_write_to_c_file(stdout, slice);
+        jsl_output_sink_write(stdout_sink, slice);
     }
-
 
     return EXIT_SUCCESS;
 }

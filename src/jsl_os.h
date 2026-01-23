@@ -215,19 +215,9 @@ JSL_WARN_UNUSED JSL_DEF JSLWriteFileResultEnum jsl_write_file_contents(
 int64_t jsl_write_to_c_file(FILE* out, JSLFatPtr data);
 
 /**
-* Format a string using the JSL formatter and write the result to a `FILE*`,
-* most often this will be `stdout`.
-*
-* Streams that reject writes (for example, read-only streams or closed
-* pipes) cause the function to return `false`. Passing a `NULL` file handle,
-* a `NULL` format pointer, or a negative format length also causes failure.
-*
-* @param out Destination stream
-* @param fmt Format string
-* @param ... Format args
-* @returns `true` when formatting and writing succeeds, otherwise `false`
+* TODO: docs
 */
-JSL__ASAN_OFF JSL_DEF bool jsl_format_to_c_file(FILE* out, JSLFatPtr fmt, ...);
+JSLOutputSink jsl_c_file_output_sink(FILE* file);
 
 
 #ifdef __cplusplus

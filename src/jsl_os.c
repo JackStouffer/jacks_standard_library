@@ -544,57 +544,26 @@ int64_t jsl_write_to_c_file(FILE* out, JSLFatPtr data)
     return written;
 }
 
-
-struct JSL__FormatOutContext
+static bool jsl__c_file_sink_out(void* user, JSLFatPtr data)
 {
-    FILE* out;
-    bool failure_flag;
-    uint8_t buffer[JSL_FORMAT_MIN_BUFFER];
-};
-
-static uint8_t* format_out_callback(void* user, uint8_t* buf, int64_t len)
-{
-    struct JSL__FormatOutContext* context = (struct JSL__FormatOutContext*) user;
-
-    int64_t written = (int64_t) fwrite(
-        buf,
-        sizeof(uint8_t),
-        (size_t) len,
-        context->out
-    );
-    if (written == len)
-    {
-        return context->buffer;
-    }
-    else
-    {
-        context->failure_flag = true;
-        return NULL;
-    }
-}
-
-// TODO: incomplete, refactor to return number of bytes written
-JSL__ASAN_OFF bool jsl_format_to_c_file(FILE* out, JSLFatPtr fmt, ...)
-{
-    if (out == NULL || fmt.data == NULL || fmt.length < 0)
+    FILE* file = (FILE*) user;
+    if (file == NULL)
         return false;
 
-    va_list va;
-    va_start(va, fmt);
-
-    struct JSL__FormatOutContext context;
-    context.out = out;
-    context.failure_flag = false;
-
-    jsl_format_callback(
-        format_out_callback,
-        &context,
-        context.buffer,
-        fmt,
-        va
+    int64_t written = (int64_t) fwrite(
+        data.data,
+        sizeof(uint8_t),
+        (size_t) data.length,
+        file
     );
 
-    va_end(va);
+    return written == data.length;
+}
 
-    return !context.failure_flag;
+JSLOutputSink jsl_c_file_output_sink(FILE* out)
+{
+    JSLOutputSink sink;
+    sink.write_fp = jsl__c_file_sink_out;
+    sink.user_data = out;
+    return sink;
 }

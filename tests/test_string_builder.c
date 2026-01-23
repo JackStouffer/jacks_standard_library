@@ -437,7 +437,7 @@ static void test_jsl_string_builder_iterator_behavior(void)
     TEST_BOOL(!jsl_string_builder_iterator_next(&invalid_iterator, &invalid_slice));
 }
 
-static void test_jsl_string_builder_format_success(void)
+static void test_jsl_string_builder_with_format(void)
 {
     JSLStringBuilder builder;
     JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
@@ -445,8 +445,10 @@ static void test_jsl_string_builder_format_success(void)
     bool ok = jsl_string_builder_init2(&builder, &allocator, 32, 8);
     TEST_BOOL(ok);
 
-    TEST_BOOL(jsl_string_builder_format(&builder, JSL_FATPTR_EXPRESSION("%s-%d"), "alpha", 42));
-    TEST_BOOL(jsl_string_builder_format(&builder, JSL_FATPTR_EXPRESSION(":%02X"), 0xAB));
+    JSLOutputSink builder_sink = jsl_string_builder_output_sink(&builder);
+
+    TEST_BOOL(jsl_format_sink(builder_sink, JSL_FATPTR_EXPRESSION("%s-%d"), "alpha", 42) > -1);
+    TEST_BOOL(jsl_format_sink(builder_sink, JSL_FATPTR_EXPRESSION(":%02X"), 0xAB) > -1);
 
     uint8_t actual[64] = {0};
     JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(actual);
@@ -459,7 +461,7 @@ static void test_jsl_string_builder_format_success(void)
     TEST_BUFFERS_EQUAL(actual, "alpha-42:AB", len);
 }
 
-static void test_jsl_string_builder_format_needs_multiple_chunks(void)
+static void test_jsl_string_builder_with_format_needs_multiple_chunks(void)
 {
     uint8_t arena_buffer[256];
     JSLArena arena = JSL_ARENA_FROM_STACK(arena_buffer);
@@ -469,8 +471,10 @@ static void test_jsl_string_builder_format_needs_multiple_chunks(void)
     bool ok = jsl_string_builder_init2(&builder, &allocator, 16, 8);
     TEST_BOOL(ok);
 
+    JSLOutputSink builder_sink = jsl_string_builder_output_sink(&builder);
+
     char long_fragment[] = "0123456789ABCDEF0123456789";
-    TEST_BOOL(jsl_string_builder_format(&builder, JSL_FATPTR_EXPRESSION("%s"), long_fragment));
+    TEST_BOOL(jsl_format_sink(builder_sink, JSL_FATPTR_EXPRESSION("%s"), long_fragment) > -1);
 
     uint8_t actual[128] = {0};
     JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(actual);
@@ -484,10 +488,11 @@ static void test_jsl_string_builder_format_needs_multiple_chunks(void)
     TEST_BOOL(builder.head != builder.tail);
 }
 
-static void test_jsl_string_builder_format_invalid_builder(void)
+static void test_jsl_string_builder_with_format_invalid_builder(void)
 {
     JSLStringBuilder builder = {0};
-    TEST_BOOL(!jsl_string_builder_format(&builder, jsl_fatptr_from_cstr("abc")));
+    JSLOutputSink builder_sink = jsl_string_builder_output_sink(&builder);
+    TEST_BOOL(jsl_format_sink(builder_sink, jsl_fatptr_from_cstr("abc")) == 0);
 }
 
 static void test_jsl_string_builder_free_null_and_uninitialized(void)
@@ -631,13 +636,13 @@ int main(void)
     RUN_TEST_FUNCTION("Test iterator across chunks", test_jsl_string_builder_insert_fatptr_multi_chunk);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("Test format", test_jsl_string_builder_format_success);
+    RUN_TEST_FUNCTION("Test format", test_jsl_string_builder_with_format);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("Test format across chunks", test_jsl_string_builder_format_needs_multiple_chunks);
+    RUN_TEST_FUNCTION("Test format across chunks", test_jsl_string_builder_with_format_needs_multiple_chunks);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("Test format invalid args", test_jsl_string_builder_format_invalid_builder);
+    RUN_TEST_FUNCTION("Test format invalid args", test_jsl_string_builder_with_format_invalid_builder);
     jsl_arena_reset(&global_arena);
 
     RUN_TEST_FUNCTION("Test free null and uninitialized", test_jsl_string_builder_free_null_and_uninitialized);

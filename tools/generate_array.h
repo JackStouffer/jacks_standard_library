@@ -701,29 +701,31 @@
         (void) impl;
         srand((uint32_t) (time(NULL) % UINT32_MAX));
 
-        jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#pragma once\n\n"));
+        JSLOutputSink builder_sink = jsl_string_builder_output_sink(builder);
 
-        jsl_string_builder_insert_fatptr(
-            builder,
+        jsl_output_sink_write(builder_sink, JSL_FATPTR_EXPRESSION("#pragma once\n\n"));
+
+        jsl_output_sink_write(
+            builder_sink,
             JSL_FATPTR_EXPRESSION("// DEFAULT INCLUDED HEADERS\n")
         );
-        jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include <stdint.h>\n"));
-        jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("#include \"jsl_hash_map_common.h\"\n\n"));
+        jsl_output_sink_write(builder_sink, JSL_FATPTR_EXPRESSION("#include <stdint.h>\n"));
+        jsl_output_sink_write(builder_sink, JSL_FATPTR_EXPRESSION("#include \"jsl_hash_map_common.h\"\n\n"));
 
-        jsl_string_builder_insert_fatptr(
-            builder,
+        jsl_output_sink_write(
+            builder_sink,
             JSL_FATPTR_EXPRESSION("// USER INCLUDED HEADERS\n")
         );
 
         for (int32_t i = 0; i < include_header_count; ++i)
         {
-            jsl_string_builder_format(builder, JSL_FATPTR_EXPRESSION("#include \"%y\"\n"), include_header_array[i]);
+            jsl_format_sink(builder_sink, JSL_FATPTR_EXPRESSION("#include \"%y\"\n"), include_header_array[i]);
         }
 
-        jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("\n"));
+        jsl_output_sink_write(builder_sink, JSL_FATPTR_EXPRESSION("\n"));
         
-        jsl_string_builder_format(
-            builder,
+        jsl_format_sink(
+            builder_sink,
             JSL_FATPTR_EXPRESSION("#define PRIVATE_SENTINEL_%y %" PRIu64 "U \n"),
             array_type_name,
             rand_u64()
@@ -776,35 +778,38 @@
     )
     {
         (void) impl;
-        jsl_string_builder_insert_fatptr(
-            builder,
+
+        JSLOutputSink builder_sink = jsl_string_builder_output_sink(builder);
+
+        jsl_output_sink_write(
+            builder_sink,
             JSL_FATPTR_EXPRESSION("// DEFAULT INCLUDED HEADERS\n")
         );
 
-        jsl_string_builder_insert_fatptr(
-            builder,
+        jsl_output_sink_write(
+            builder_sink,
             JSL_FATPTR_EXPRESSION("#include <stddef.h>\n")
         );
-        jsl_string_builder_insert_fatptr(
-            builder,
+        jsl_output_sink_write(
+            builder_sink,
             JSL_FATPTR_EXPRESSION("#include <stdint.h>\n")
         );
-        jsl_string_builder_insert_fatptr(
-            builder,
+        jsl_output_sink_write(
+            builder_sink,
             JSL_FATPTR_EXPRESSION("#include \"jsl_core.h\"\n")
         );
 
-        jsl_string_builder_insert_fatptr(
-            builder,
+        jsl_output_sink_write(
+            builder_sink,
             JSL_FATPTR_EXPRESSION("// USER INCLUDED HEADERS\n")
         );
 
         for (int32_t i = 0; i < include_header_count; ++i)
         {
-            jsl_string_builder_format(builder, JSL_FATPTR_EXPRESSION("#include \"%y\"\n"), include_header_array[i]);
+            jsl_format_sink(builder_sink, JSL_FATPTR_EXPRESSION("#include \"%y\"\n"), include_header_array[i]);
         }
 
-        jsl_string_builder_insert_fatptr(builder, JSL_FATPTR_EXPRESSION("\n"));
+        jsl_format_sink(builder_sink, JSL_FATPTR_EXPRESSION("\n"));
 
         JSLStrToStrMap map;
         jsl_str_to_str_map_init(&map, allocator, 0x123456789);

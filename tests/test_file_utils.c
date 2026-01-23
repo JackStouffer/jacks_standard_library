@@ -208,8 +208,10 @@ static void test_jsl_format_file_formats_and_writes_output(void)
     if (file == NULL)
         return;
 
-    bool res = jsl_format_to_c_file(
-        file,
+    JSLOutputSink sink = jsl_c_file_output_sink(file);
+
+    bool res = jsl_format_sink(
+        sink,
         JSL_FATPTR_EXPRESSION("Hello %s %d"),
         "World",
         42
@@ -235,7 +237,9 @@ static void test_jsl_format_file_accepts_empty_format(void)
     if (file == NULL)
         return;
 
-    bool res = jsl_format_to_c_file(file, JSL_FATPTR_EXPRESSION(""));
+    JSLOutputSink sink = jsl_c_file_output_sink(file);
+
+    bool res = jsl_format_sink(sink, JSL_FATPTR_EXPRESSION(""));
     TEST_BOOL(res == true);
 
     TEST_BOOL(fflush(file) == 0);
@@ -248,7 +252,9 @@ static void test_jsl_format_file_accepts_empty_format(void)
 
 static void test_jsl_format_file_null_out_parameter(void)
 {
-    bool res = jsl_format_to_c_file(NULL, JSL_FATPTR_EXPRESSION("Hello"));
+    JSLOutputSink sink = jsl_c_file_output_sink(NULL);
+
+    bool res = jsl_format_sink(sink, JSL_FATPTR_EXPRESSION("Hello"));
     TEST_BOOL(!res);
 }
 
@@ -259,7 +265,9 @@ static void test_jsl_format_file_null_format_pointer(void)
         .length = 5
     };
 
-    bool res = jsl_format_to_c_file(stdout, fmt);
+    JSLOutputSink sink = jsl_c_file_output_sink(stdout);
+
+    bool res = jsl_format_sink(sink, fmt);
     TEST_BOOL(!res);
 }
 
@@ -269,8 +277,9 @@ static void test_jsl_format_file_negative_length(void)
         .data = (uint8_t*)"Hello",
         .length = -1
     };
+    JSLOutputSink sink = jsl_c_file_output_sink(stdout);
 
-    bool res = jsl_format_to_c_file(stdout, fmt);
+    bool res = jsl_format_sink(sink, fmt);
     TEST_BOOL(!res);
 }
 
@@ -288,7 +297,10 @@ static void test_jsl_format_file_write_failure(void)
         {
             TEST_BOOL(setvbuf(writer, NULL, _IONBF, 0) == 0);
             void (*previous_handler)(int) = signal(SIGPIPE, SIG_IGN);
-            bool res = jsl_format_to_c_file(writer, JSL_FATPTR_EXPRESSION("Hello"));
+
+            JSLOutputSink sink = jsl_c_file_output_sink(writer);
+
+            bool res = jsl_format_sink(sink, JSL_FATPTR_EXPRESSION("Hello"));
             TEST_BOOL(!res);
             fclose(writer);
             if (previous_handler == SIG_ERR)
@@ -310,7 +322,8 @@ static void test_jsl_format_file_write_failure(void)
 
     if (file != NULL)
     {
-        bool res = jsl_format_to_c_file(file, JSL_FATPTR_EXPRESSION("Hello"));
+        JSLOutputSink sink = jsl_c_file_output_sink(file);
+        bool res = jsl_format_sink(sink, JSL_FATPTR_EXPRESSION("Hello"));
         TEST_BOOL(!res);
         fclose(file);
         return;
@@ -329,7 +342,8 @@ static void test_jsl_format_file_write_failure(void)
         return;
     }
 
-    bool res = jsl_format_to_c_file(read_only, JSL_FATPTR_EXPRESSION("Hello"));
+    JSLOutputSink ro_sink = jsl_c_file_output_sink(read_only);
+    bool res = jsl_format_sink(ro_sink, JSL_FATPTR_EXPRESSION("Hello"));
     TEST_BOOL(!res);
 
     fclose(read_only);

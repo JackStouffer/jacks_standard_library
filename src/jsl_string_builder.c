@@ -281,9 +281,6 @@ bool jsl_string_builder_insert_cstr(JSLStringBuilder* builder, const char* data)
     if (
         builder == NULL
         || builder->sentinel != JSL__BUILDER_PRIVATE_SENTINEL
-        || builder->head == NULL
-        || builder->tail == NULL
-        || data == NULL
     )
         return false;
 
@@ -341,62 +338,21 @@ bool jsl_string_builder_iterator_next(JSLStringBuilderIterator* iterator, JSLFat
     return true;
 }
 
-struct JSL__StringBuilderContext
+static bool format_string_builder_callback(void *user, JSLFatPtr data)
 {
-    JSLStringBuilder* builder;
-    bool failure_flag;
-    uint8_t buffer[JSL_FORMAT_MIN_BUFFER];
-};
-
-static uint8_t* format_string_builder_callback(void *user, uint8_t* buf, int64_t len)
-{
-    struct JSL__StringBuilderContext* context = (struct JSL__StringBuilderContext*) user;
-
-    if (
-        context->builder == NULL
-        || context->builder->sentinel != JSL__BUILDER_PRIVATE_SENTINEL
-        || context->builder->head == NULL
-        || context->builder->tail == NULL
-        || len > JSL_FORMAT_MIN_BUFFER
-    )
-        return NULL;
-
-    bool res = jsl_string_builder_insert_fatptr(context->builder, jsl_fatptr_init(buf, len));
-
-    if (res)
-    {
-        return context->buffer;
-    }
-    else
-    {
-        context->failure_flag = true;
-        return NULL;
-    }
-}
-
-JSL__ASAN_OFF bool jsl_string_builder_format(JSLStringBuilder* builder, JSLFatPtr fmt, ...)
-{
-    if (builder == NULL || builder->head == NULL || builder->tail == NULL)
+    if (user == NULL)
         return false;
 
-    va_list va;
-    va_start(va, fmt);
+    JSLStringBuilder* builder = (JSLStringBuilder*) user;
+    return jsl_string_builder_insert_fatptr(builder, data);
+}
 
-    struct JSL__StringBuilderContext context;
-    context.builder = builder;
-    context.failure_flag = false;
-
-    jsl_format_callback(
-        format_string_builder_callback,
-        &context,
-        context.buffer,
-        fmt,
-        va
-    );
-
-    va_end(va);
-
-    return !context.failure_flag;
+JSLOutputSink jsl_string_builder_output_sink(JSLStringBuilder* builder)
+{
+    JSLOutputSink sink;
+    sink.write_fp = format_string_builder_callback;
+    sink.user_data = builder;
+    return sink;
 }
 
 void jsl_string_builder_free(
