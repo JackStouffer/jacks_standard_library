@@ -332,6 +332,17 @@ static UnitTestDecl unit_test_declarations[] = {
         }
     },
     {
+        "test_allocator_pool",
+        (char*[])
+        {
+            "tests/test_allocator_pool.c",
+            "src/jsl_core.c",
+            "src/jsl_allocator.c",
+            "src/jsl_allocator_pool.c",
+            NULL
+        }
+    },
+    {
         "test_format",
         (char*[])
         {

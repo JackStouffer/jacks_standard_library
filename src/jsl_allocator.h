@@ -50,6 +50,11 @@ void* jsl_align_ptr_upwards(void* ptr, int32_t align);
 /**
  * TODO: docs
  */
+uintptr_t jsl_align_ptr_upwards_uintptr(uintptr_t ptr, int32_t align);
+
+/**
+ * TODO: docs
+ */
 void jsl_allocator_interface_init(
     JSLAllocatorInterface* allocator,
     JSLAllocateFP allocate_fp,

@@ -202,11 +202,10 @@ JSL_WARN_UNUSED JSL_DEF JSLWriteFileResultEnum jsl_write_file_contents(
 /**
 * Write the contents of a fat pointer to a `FILE*`.
 *
-* Attempts to emit the entire buffer to `out` using `fwrite`. Passing `NULL`
-* for the stream or data pointer, or supplying a negative length, causes the
-* function to fail immediately and return `-1`. On a short write, the returned
-* value is the number of bytes actually written, which may be less than the
-* requested length.
+* This implementation uses libc's `fwrite` to write to the file stream. If
+* this function returns less than `data.length` then the file stream is most
+* likely in an error state. In that case, `errno` will be set and you can get
+* more info with `ferror`.
 *
 * @param out Destination `FILE*` stream
 * @param data Buffer containing the bytes to write
