@@ -56,13 +56,7 @@ void* jsl_allocator_interface_alloc(
     bool zeroed
 )
 {
-    if (
-        allocator == NULL
-        || allocator->sentinel != JSL__ALLOCATOR_PRIVATE_SENTINEL
-        || bytes < 1
-        || alignment < 1
-        || !jsl_is_power_of_two(alignment)
-    )
+    if (allocator == NULL|| allocator->sentinel != JSL__ALLOCATOR_PRIVATE_SENTINEL)
         return NULL;
 
     return allocator->allocate(allocator->context, bytes, alignment, zeroed);
@@ -75,14 +69,7 @@ void* jsl_allocator_interface_realloc(
     int32_t alignment
 )
 {
-    if (
-        allocator == NULL
-        || allocator->sentinel != JSL__ALLOCATOR_PRIVATE_SENTINEL
-        || allocation == NULL
-        || new_bytes < 1
-        || alignment < 1
-        || !jsl_is_power_of_two(alignment)
-    )
+    if (allocator == NULL|| allocator->sentinel != JSL__ALLOCATOR_PRIVATE_SENTINEL)
         return NULL;
 
     return allocator->reallocate(allocator->context, allocation, new_bytes, alignment);
@@ -93,7 +80,7 @@ bool jsl_allocator_interface_free(
     void* allocation
 )
 {
-    if (allocator == NULL || allocator->sentinel != JSL__ALLOCATOR_PRIVATE_SENTINEL || allocation == NULL)
+    if (allocator == NULL || allocator->sentinel != JSL__ALLOCATOR_PRIVATE_SENTINEL)
         return false;
 
     return allocator->free(allocator->context, allocation);

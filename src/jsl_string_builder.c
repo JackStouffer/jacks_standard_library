@@ -340,11 +340,7 @@ bool jsl_string_builder_iterator_next(JSLStringBuilderIterator* iterator, JSLFat
 
 static bool format_string_builder_callback(void *user, JSLFatPtr data)
 {
-    if (user == NULL)
-        return false;
-
-    JSLStringBuilder* builder = (JSLStringBuilder*) user;
-    return jsl_string_builder_insert_fatptr(builder, data);
+    return jsl_string_builder_insert_fatptr((JSLStringBuilder*) user, data);
 }
 
 JSLOutputSink jsl_string_builder_output_sink(JSLStringBuilder* builder)
