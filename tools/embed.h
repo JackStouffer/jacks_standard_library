@@ -42,8 +42,11 @@
         OUTPUT_TYPE_TEXT = 2
     } EmbedOuputTypeEnum;
 
+    /**
+     * TODO: docs
+     */
     EMBED_DEF bool generate_embed_header(
-        JSLStringBuilder* builder,
+        JSLOutputSink sink,
         JSLFatPtr variable_name,
         JSLFatPtr file_data,
         EmbedOuputTypeEnum output_type
@@ -58,7 +61,7 @@
 #ifdef EMBED_IMPLEMENTATION
 
     bool generate_embed_header(
-        JSLStringBuilder* builder,
+        JSLOutputSink sink,
         JSLFatPtr variable_name,
         JSLFatPtr file_data,
         EmbedOuputTypeEnum output_type
@@ -66,16 +69,14 @@
     {
         JSL_ASSERT(output_type != OUTPUT_TYPE_INVALID);
 
-        JSLOutputSink builder_sink = jsl_string_builder_output_sink(builder);
-
-        jsl_output_sink_write_cstr(builder_sink, "#pragma once\n\n");
-        jsl_output_sink_write_cstr(builder_sink, "#include <stdint.h>\n\n");
-        jsl_output_sink_write_cstr(builder_sink, "#include \"jsl_core.h\"\n\n");
+        jsl_output_sink_write_cstr(sink, "#pragma once\n\n");
+        jsl_output_sink_write_cstr(sink, "#include <stdint.h>\n\n");
+        jsl_output_sink_write_cstr(sink, "#include \"jsl_core.h\"\n\n");
 
         if (output_type == OUTPUT_TYPE_BINARY)
         {
-            jsl_string_builder_format(
-                builder,
+            jsl_format_sink(
+                sink,
                 JSL_FATPTR_EXPRESSION("static uint8_t __%y_data[] = {\n"),
                 variable_name
             );
@@ -84,10 +85,10 @@
             for (int64_t i = 0; i < file_data.length; ++i)
             {
                 if (i % bytes_per_line == 0)
-                    jsl_output_sink_write_cstr(builder_sink, "    ");
+                    jsl_output_sink_write_cstr(sink, "    ");
 
-                jsl_string_builder_format(
-                    builder,
+                jsl_format_sink(
+                    sink,
                     JSL_FATPTR_EXPRESSION("0x%02x"),
                     file_data.data[i]
                 );
@@ -96,18 +97,18 @@
                 bool end_of_line = ((i + 1) % bytes_per_line) == 0;
 
                 if (!is_last)
-                    jsl_output_sink_write_u8(builder_sink, ',');
+                    jsl_output_sink_write_u8(sink, ',');
 
                 if (end_of_line || is_last)
-                    jsl_output_sink_write_u8(builder_sink, '\n');
+                    jsl_output_sink_write_u8(sink, '\n');
                 else
-                    jsl_output_sink_write_u8(builder_sink, ' ');
+                    jsl_output_sink_write_u8(sink, ' ');
             }
 
-            jsl_output_sink_write_cstr(builder_sink, "};\n\n");
+            jsl_output_sink_write_cstr(sink, "};\n\n");
 
-            jsl_string_builder_format(
-                builder,
+            jsl_format_sink(
+                sink,
                 JSL_FATPTR_EXPRESSION("static JSLFatPtr %y = { __%y_data, %lld };\n\n"),
                 variable_name,
                 variable_name,
@@ -116,8 +117,8 @@
         }
         else if (output_type == OUTPUT_TYPE_TEXT)
         {
-            jsl_string_builder_format(
-                builder,
+            jsl_format_sink(
+                sink,
                 JSL_FATPTR_EXPRESSION("static JSLFatPtr %y = JSL_FATPTR_INITIALIZER(\n"),
                 variable_name
             );
@@ -125,7 +126,7 @@
             bool string_open = false;
             if (file_data.length > 0)
             {
-                jsl_output_sink_write_u8(builder_sink, '"');
+                jsl_output_sink_write_u8(sink, '"');
                 string_open = true;
 
                 for (int64_t i = 0; i < file_data.length; ++i)
@@ -134,13 +135,13 @@
 
                     if (c == '\n')
                     {
-                        jsl_output_sink_write_cstr(builder_sink, "\\n\"");
+                        jsl_output_sink_write_cstr(sink, "\\n\"");
                         string_open = false;
-                        jsl_output_sink_write_u8(builder_sink, '\n');
+                        jsl_output_sink_write_u8(sink, '\n');
 
                         if ((i + 1) < file_data.length)
                         {
-                            jsl_output_sink_write_u8(builder_sink, '"');
+                            jsl_output_sink_write_u8(sink, '"');
                             string_open = true;
                         }
 
@@ -150,31 +151,31 @@
                     switch (c)
                     {
                         case '\\':
-                            jsl_output_sink_write_cstr(builder_sink, "\\\\");
+                            jsl_output_sink_write_cstr(sink, "\\\\");
                             break;
                         case '\"':
-                            jsl_output_sink_write_cstr(builder_sink, "\\\"");
+                            jsl_output_sink_write_cstr(sink, "\\\"");
                             break;
                         case '\r':
-                            jsl_output_sink_write_cstr(builder_sink, "\\r");
+                            jsl_output_sink_write_cstr(sink, "\\r");
                             break;
                         case '\t':
-                            jsl_output_sink_write_cstr(builder_sink, "\\t");
+                            jsl_output_sink_write_cstr(sink, "\\t");
                             break;
                         default:
-                            jsl_output_sink_write_u8(builder_sink, c);
+                            jsl_output_sink_write_u8(sink, c);
                             break;
                     }
                 }
 
                 if (string_open)
                 {
-                    jsl_output_sink_write_u8(builder_sink, '"');
-                    jsl_output_sink_write_u8(builder_sink, '\n');
+                    jsl_output_sink_write_u8(sink, '"');
+                    jsl_output_sink_write_u8(sink, '\n');
                 }
             }
 
-            jsl_output_sink_write_cstr(builder_sink, ");\n\n");
+            jsl_output_sink_write_cstr(sink, ");\n\n");
 
         }
 

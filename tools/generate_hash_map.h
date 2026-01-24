@@ -121,10 +121,10 @@
     } HashMapImplementation;
 
     /**
-     * Generate the text of the C header and insert it into the string builder.
+     * Generate the text of the C header and insert it into the string sink.
      * 
      * @param arena Used for all memory allocations
-     * @param builder Used to insert the generated text
+     * @param sink Used to insert the generated text
      * @param impl Which hash map implementation to use
      * @param hash_map_name The name of the container type
      * @param function_prefix The prefix plus "_" for each function
@@ -136,7 +136,7 @@
      */
     GENERATE_HASH_MAP_DEF void write_hash_map_header(
         JSLAllocatorInterface* allocator,
-        JSLStringBuilder* builder,
+        JSLOutputSink sink,
         HashMapImplementation impl,
         JSLFatPtr hash_map_name,
         JSLFatPtr function_prefix,
@@ -148,10 +148,10 @@
     );
 
     /**
-     * Generate the text of the C source and insert it into the string builder.
+     * Generate the text of the C source and insert it into the string sink.
      * 
      * @param arena Used for all memory allocations
-     * @param builder Used to insert the generated text
+     * @param sink Used to insert the generated text
      * @param impl Which hash map implementation to use
      * @param hash_map_name The name of the container type
      * @param function_prefix The prefix plus "_" for each function
@@ -163,7 +163,7 @@
      */
     GENERATE_HASH_MAP_DEF void write_hash_map_source(
         JSLAllocatorInterface* allocator,
-        JSLStringBuilder* builder,
+        JSLOutputSink sink,
         HashMapImplementation impl,
         JSLFatPtr hash_map_name,
         JSLFatPtr function_prefix,
@@ -774,7 +774,7 @@
     }
 
     static void render_template(
-        JSLStringBuilder* str_builder,
+        JSLOutputSink sink,
         JSLFatPtr template,
         JSLStrToStrMap* variables
     )
@@ -782,8 +782,6 @@
         static JSLFatPtr open_param = JSL_FATPTR_INITIALIZER("{{");
         static JSLFatPtr close_param = JSL_FATPTR_INITIALIZER("}}");
         JSLFatPtr template_reader = template;
-
-        JSLOutputSink builder_sink = jsl_string_builder_output_sink(str_builder);
         
         while (template_reader.length > 0)
         {
@@ -792,14 +790,14 @@
             // No more variables, write everything
             if (index_of_open == -1)
             {
-                jsl_output_sink_write_fatptr(builder_sink, template_reader);
+                jsl_output_sink_write_fatptr(sink, template_reader);
                 break;
             }
 
             if (index_of_open > 0)
             {
                 JSLFatPtr slice = jsl_fatptr_slice(template_reader, 0, index_of_open);
-                jsl_output_sink_write_fatptr(builder_sink, slice);
+                jsl_output_sink_write_fatptr(sink, slice);
             }
 
             JSL_FATPTR_ADVANCE(template_reader, index_of_open + open_param.length);
@@ -809,8 +807,8 @@
             // Improperly closed template param, write everything including the open marker
             if (index_of_close == -1)
             {
-                jsl_output_sink_write_fatptr(builder_sink, open_param);
-                jsl_output_sink_write_fatptr(builder_sink, template_reader);
+                jsl_output_sink_write_fatptr(sink, open_param);
+                jsl_output_sink_write_fatptr(sink, template_reader);
                 break;
             }
 
@@ -820,7 +818,7 @@
             JSLFatPtr var_value;
             if (jsl_str_to_str_map_get(variables, var_name, &var_value))
             {
-                jsl_output_sink_write_fatptr(builder_sink, var_value);
+                jsl_output_sink_write_fatptr(sink, var_value);
             }
 
             JSL_FATPTR_ADVANCE(template_reader, index_of_close + close_param.length);
@@ -857,7 +855,7 @@
     */
     GENERATE_HASH_MAP_DEF void write_hash_map_header(
         JSLAllocatorInterface* allocator,
-        JSLStringBuilder* builder,
+        JSLOutputSink sink,
         HashMapImplementation impl,
         JSLFatPtr hash_map_name,
         JSLFatPtr function_prefix,
@@ -872,42 +870,40 @@
 
         srand((uint32_t) (time(NULL) % UINT32_MAX));
 
-        JSLOutputSink builder_sink = jsl_string_builder_output_sink(builder);
-
         jsl_output_sink_write_fatptr(
-            builder_sink,
+            sink,
             JSL_FATPTR_EXPRESSION("// DEFAULT INCLUDED HEADERS\n")
         );
 
-        jsl_output_sink_write_fatptr(builder_sink, JSL_FATPTR_EXPRESSION("#pragma once\n\n"));
-        jsl_output_sink_write_fatptr(builder_sink, JSL_FATPTR_EXPRESSION("#include <stdint.h>\n"));
-        jsl_output_sink_write_fatptr(builder_sink, JSL_FATPTR_EXPRESSION("#include \"jsl_allocator.h\"\n"));
-        jsl_output_sink_write_fatptr(builder_sink, JSL_FATPTR_EXPRESSION("#include \"jsl_hash_map_common.h\"\n"));
+        jsl_output_sink_write_fatptr(sink, JSL_FATPTR_EXPRESSION("#pragma once\n\n"));
+        jsl_output_sink_write_fatptr(sink, JSL_FATPTR_EXPRESSION("#include <stdint.h>\n"));
+        jsl_output_sink_write_fatptr(sink, JSL_FATPTR_EXPRESSION("#include \"jsl_allocator.h\"\n"));
+        jsl_output_sink_write_fatptr(sink, JSL_FATPTR_EXPRESSION("#include \"jsl_hash_map_common.h\"\n"));
         jsl_output_sink_write_u8(
-            builder_sink,
+            sink,
             '\n'
         );
 
         jsl_output_sink_write_fatptr(
-            builder_sink,
+            sink,
             JSL_FATPTR_EXPRESSION("// USER INCLUDED HEADERS\n")
         );
 
         for (int32_t i = 0; i < include_header_count; ++i)
         {
-            jsl_format_sink(builder_sink, JSL_FATPTR_EXPRESSION("#include \"%y\"\n"), include_header_array[i]);
+            jsl_format_sink(sink, JSL_FATPTR_EXPRESSION("#include \"%y\"\n"), include_header_array[i]);
         }
 
-        jsl_output_sink_write_fatptr(builder_sink, JSL_FATPTR_EXPRESSION("\n"));
+        jsl_output_sink_write_fatptr(sink, JSL_FATPTR_EXPRESSION("\n"));
         
         jsl_format_sink(
-            builder_sink,
+            sink,
             JSL_FATPTR_EXPRESSION("#define PRIVATE_SENTINEL_%y %" PRIu32 "U \n"),
             hash_map_name,
             rand_u32()
         );
 
-        jsl_output_sink_write_fatptr(builder_sink, JSL_FATPTR_EXPRESSION("\n"));
+        jsl_output_sink_write_fatptr(sink, JSL_FATPTR_EXPRESSION("\n"));
 
         JSLStrToStrMap map;
         jsl_str_to_str_map_init(&map, allocator, 0x123456789);
@@ -942,16 +938,16 @@
         );
 
         if (impl == IMPL_FIXED)
-            render_template(builder, fixed_header_template, &map);
+            render_template(sink, fixed_header_template, &map);
         else if (impl == IMPL_DYNAMIC)
-            render_template(builder, dynamic_header_template, &map);
+            render_template(sink, dynamic_header_template, &map);
         else
             assert(0);
     }
 
     GENERATE_HASH_MAP_DEF void write_hash_map_source(
         JSLAllocatorInterface* allocator,
-        JSLStringBuilder* builder,
+        JSLOutputSink sink,
         HashMapImplementation impl,
         JSLFatPtr hash_map_name,
         JSLFatPtr function_prefix,
@@ -964,42 +960,40 @@
     {
         (void) impl;
 
-        JSLOutputSink builder_sink = jsl_string_builder_output_sink(builder);
-
         jsl_output_sink_write_fatptr(
-            builder_sink,
+            sink,
             JSL_FATPTR_EXPRESSION("// DEFAULT INCLUDED HEADERS\n")
         );
 
         jsl_output_sink_write_fatptr(
-            builder_sink,
+            sink,
             JSL_FATPTR_EXPRESSION("#include <stddef.h>\n")
         );
         jsl_output_sink_write_fatptr(
-            builder_sink,
+            sink,
             JSL_FATPTR_EXPRESSION("#include <stdint.h>\n")
         );
         jsl_output_sink_write_fatptr(
-            builder_sink,
+            sink,
             JSL_FATPTR_EXPRESSION("#include \"jsl_core.h\"\n")
         );
-        jsl_output_sink_write_fatptr(builder_sink, JSL_FATPTR_EXPRESSION("#include \"jsl_allocator.h\"\n"));
+        jsl_output_sink_write_fatptr(sink, JSL_FATPTR_EXPRESSION("#include \"jsl_allocator.h\"\n"));
         jsl_output_sink_write_fatptr(
-            builder_sink,
+            sink,
             JSL_FATPTR_EXPRESSION("#include \"jsl_hash_map_common.h\"\n\n")
         );
 
         jsl_output_sink_write_fatptr(
-            builder_sink,
+            sink,
             JSL_FATPTR_EXPRESSION("// USER INCLUDED HEADERS\n")
         );
 
         for (int32_t i = 0; i < include_header_count; ++i)
         {
-            jsl_format_sink(builder_sink, JSL_FATPTR_EXPRESSION("#include \"%y\"\n"), include_header_array[i]);
+            jsl_format_sink(sink, JSL_FATPTR_EXPRESSION("#include \"%y\"\n"), include_header_array[i]);
         }
 
-        jsl_output_sink_write_fatptr(builder_sink, JSL_FATPTR_EXPRESSION("\n"));
+        jsl_output_sink_write_fatptr(sink, JSL_FATPTR_EXPRESSION("\n"));
 
 
         JSLStrToStrMap map;
@@ -1142,7 +1136,7 @@
             );
         }
 
-        render_template(builder, fixed_source_template, &map);
+        render_template(sink, fixed_source_template, &map);
     }
 
 #endif /* GENERATE_HASH_MAP_IMPLEMENTATION */

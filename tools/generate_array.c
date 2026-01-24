@@ -137,6 +137,9 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     JSLFatPtr* header_includes = NULL;
     int32_t header_includes_count = 0;
 
+    JSLOutputSink stdout_sink = jsl_c_file_output_sink(stdout);
+    JSLOutputSink stderr_sink = jsl_c_file_output_sink(stderr);
+
     static JSLFatPtr help_flag_str = JSL_FATPTR_INITIALIZER("help");
     static JSLFatPtr name_flag_str = JSL_FATPTR_INITIALIZER("name");
     static JSLFatPtr function_prefix_flag_str = JSL_FATPTR_INITIALIZER("function-prefix");
@@ -183,9 +186,6 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     //
     // Check that all required parameters are provided
     //
-
-    JSLOutputSink stdout_sink = jsl_c_file_output_sink(stdout);
-    JSLOutputSink stderr_sink = jsl_c_file_output_sink(stderr);
 
     if (name.data == NULL)
     {
@@ -258,14 +258,11 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     if (fixed_flag_set) impl = IMPL_FIXED;
     if (dynamic_flag_set) impl = IMPL_DYNAMIC;
 
-    JSLStringBuilder builder;
-    jsl_string_builder_init(&builder, allocator);
-
     if (header_flag_set)
     {
         write_array_header(
             allocator,
-            &builder,
+            stdout_sink,
             impl,
             name,
             function_prefix,
@@ -278,7 +275,7 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     {
         write_array_source(
             allocator,
-            &builder,
+            stdout_sink,
             impl,
             name,
             function_prefix,
@@ -286,15 +283,6 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
             header_includes,
             header_includes_count
         );
-    }
-
-    JSLStringBuilderIterator iterator;
-    jsl_string_builder_iterator_init(&builder, &iterator);
-
-    JSLFatPtr slice;
-    while (jsl_string_builder_iterator_next(&iterator, &slice))
-    {
-        jsl_output_sink_write_fatptr(stdout_sink, slice);
     }
 
     return EXIT_SUCCESS;

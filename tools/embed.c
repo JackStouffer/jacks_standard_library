@@ -44,6 +44,9 @@ static int32_t entrypoint(
     bool stdin_has_data
 )
 {
+    JSLOutputSink stdout_sink = jsl_c_file_output_sink(stdout);
+    JSLOutputSink stderr_sink = jsl_c_file_output_sink(stderr);
+
     JSLFatPtr file_path = {0};
     JSLFatPtr file_contents = {0};
     JSLFatPtr var_name = default_var_name;
@@ -65,8 +68,8 @@ static int32_t entrypoint(
     //
     if (output_text && output_binary)
     {
-        jsl_format_to_c_file(
-            stderr,
+        jsl_format_sink(
+            stderr_sink,
             JSL_FATPTR_EXPRESSION("Error: cannot specify both --%y and --%y"),
             binary_flag_str,
             text_flag_str
@@ -95,8 +98,8 @@ static int32_t entrypoint(
     {
         if (jsl_cmd_line_pop_arg_list(cmd, &file_path))
         {
-            jsl_format_to_c_file(
-                stderr,
+            jsl_format_sink(
+                stderr_sink,
                 JSL_FATPTR_EXPRESSION("Only provide zero or one file path\n")
             );
             return EXIT_FAILURE;
@@ -111,8 +114,8 @@ static int32_t entrypoint(
 
         if (load_result != JSL_FILE_LOAD_SUCCESS)
         {
-            jsl_format_to_c_file(
-                stderr,
+            jsl_format_sink(
+                stderr_sink,
                 JSL_FATPTR_EXPRESSION("Failed to load template file %y (errno %d)\n"),
                 file_contents,
                 load_errno
@@ -150,30 +153,18 @@ static int32_t entrypoint(
     }
     else
     {
-        jsl_format_to_c_file(stdout, help_message);
+        jsl_format_sink(stdout_sink, help_message);
         return EXIT_FAILURE;
     }
 
     if (file_contents.length > 0)
     {
-        JSLStringBuilder builder;
-        jsl_string_builder_init(&builder, allocator);
-
         generate_embed_header(
-            &builder,
+            stdout_sink,
             var_name,
             file_contents,
             output_type
         );
-        
-        JSLStringBuilderIterator iterator;
-        jsl_string_builder_iterator_init(&builder, &iterator);
-
-        JSLFatPtr slice;
-        while (jsl_string_builder_iterator_next(&iterator, &slice))
-        {
-            jsl_write_to_c_file(stdout, slice);
-        }
 
         return EXIT_SUCCESS;
     }
@@ -207,7 +198,7 @@ static int32_t entrypoint(
 
         JSLAllocatorInterface allocator = jsl_infinite_arena_get_allocator_interface(&arena);
 
-        JSLCmdLine cmd;
+        JSLCmdLineArgs cmd;
         jsl_cmd_line_init(&cmd, &allocator);
         JSLFatPtr error_message = {0};
         if (!jsl_cmd_line_parse_wide(&cmd, argc, argv, &error_message))

@@ -651,130 +651,185 @@ int32_t main(int32_t argc, char **argv)
     /**
      *
      *
+     *                       EMBED TOOL
+     *
+     *
+     */
+
+    {
+        nob_log(NOB_INFO, "Compiling embed program");
+
+        #if JSL_IS_WINDOWS
+            char generate_array_exe_name[256] = "tests\\bin\\embed.exe";
+            char generate_array_run_exe_command[256] = ".\\tests\\bin\\embed.exe";
+        #elif JSL_IS_POSIX
+            char generate_array_exe_name[256] = "tests/bin/embed";
+            char generate_array_run_exe_command[256] = "./tests/bin/embed";
+        #else
+            #error "Unrecognized platform. Only windows and POSIX platforms are supported."
+        #endif
+
+        Nob_Cmd embed_compile_command = {0};
+        nob_cmd_append(
+            &embed_compile_command,
+            "clang",
+            "-DJSL_DEBUG",
+            "-fno-omit-frame-pointer",
+            "-fno-optimize-sibling-calls",
+            "-O0",
+            "-glldb",
+            "-std=c11"
+        );
+
+        // add clang warnings
+        for (int32_t flag_idx = 0;; ++flag_idx)
+        {
+            char* flag = clang_warning_flags[flag_idx];
+            if (flag == NULL)
+                break;
+
+            nob_cmd_append(&embed_compile_command, flag);
+        }
+
+        nob_cmd_append(
+            &embed_compile_command,
+            "-o", generate_array_exe_name,
+            "-Isrc/",
+            "tools/embed.c"
+        );
+
+        if (!nob_cmd_run(&embed_compile_command)) return 1;
+    }
+
+    /**
+     *
+     *
      *                         ARRAYS
      *
      *
      */
 
-    nob_log(NOB_INFO, "Compiling generate array program");
-
-    #if JSL_IS_WINDOWS
-        char generate_array_exe_name[256] = "tests\\bin\\generate_array.exe";
-        char generate_array_run_exe_command[256] = ".\\tests\\bin\\generate_array.exe";
-    #elif JSL_IS_POSIX
-        char generate_array_exe_name[256] = "tests/bin/generate_array";
-        char generate_array_run_exe_command[256] = "./tests/bin/generate_array";
-    #else
-        #error "Unrecognized platform. Only windows and POSIX platforms are supported."
-    #endif
-
-    Nob_Cmd generate_array_compile_command = {0};
-    nob_cmd_append(
-        &generate_array_compile_command,
-        "clang",
-        "-DJSL_DEBUG",
-        "-fno-omit-frame-pointer",
-        "-fno-optimize-sibling-calls",
-        "-O0",
-        "-glldb",
-        "-std=c11"
-    );
-
-    // add clang warnings
-    for (int32_t flag_idx = 0;; ++flag_idx)
     {
-        char* flag = clang_warning_flags[flag_idx];
-        if (flag == NULL)
-            break;
+        nob_log(NOB_INFO, "Compiling generate array program");
 
-        nob_cmd_append(&generate_array_compile_command, flag);
+        #if JSL_IS_WINDOWS
+            char generate_array_exe_name[256] = "tests\\bin\\generate_array.exe";
+            char generate_array_run_exe_command[256] = ".\\tests\\bin\\generate_array.exe";
+        #elif JSL_IS_POSIX
+            char generate_array_exe_name[256] = "tests/bin/generate_array";
+            char generate_array_run_exe_command[256] = "./tests/bin/generate_array";
+        #else
+            #error "Unrecognized platform. Only windows and POSIX platforms are supported."
+        #endif
+
+        Nob_Cmd generate_array_compile_command = {0};
+        nob_cmd_append(
+            &generate_array_compile_command,
+            "clang",
+            "-DJSL_DEBUG",
+            "-fno-omit-frame-pointer",
+            "-fno-optimize-sibling-calls",
+            "-O0",
+            "-glldb",
+            "-std=c11"
+        );
+
+        // add clang warnings
+        for (int32_t flag_idx = 0;; ++flag_idx)
+        {
+            char* flag = clang_warning_flags[flag_idx];
+            if (flag == NULL)
+                break;
+
+            nob_cmd_append(&generate_array_compile_command, flag);
+        }
+
+        nob_cmd_append(
+            &generate_array_compile_command,
+            "-o", generate_array_exe_name,
+            "-Isrc/",
+            "tools/generate_array.c"
+        );
+
+        if (!nob_cmd_run(&generate_array_compile_command)) return 1;
+
+        int32_t array_test_count = sizeof(array_declarations) / sizeof(ArrayDecl);
+
+        nob_log(NOB_INFO, "Generating Array Files");
+
+        Nob_Procs array_procs = {0};
+
+        for (int32_t i = 0; i < array_test_count; ++i)
+        {
+            ArrayDecl* decl = &array_declarations[i];
+
+            Nob_Cmd write_array_header = {0};
+            nob_cmd_append(
+                &write_array_header,
+                generate_array_run_exe_command,
+                "--name", decl->name,
+                "--function-prefix", decl->prefix,
+                "--value-type", decl->value_type,
+                decl->impl_type,
+                "--header"
+            );
+
+            nob_cmd_append(
+                &write_array_header,
+                "--add-header",
+                "../test_hash_map_types.h"
+            );
+
+            char out_path_header[256] = "tests/arrays/";
+            strcat(out_path_header, decl->prefix);
+            strcat(out_path_header, ".h");
+
+            if (!nob_cmd_run(
+                &write_array_header,
+                .stdout_path = out_path_header,
+                .async = &array_procs
+            )) return 1;
+
+            Nob_Cmd write_array_source = {0};
+            nob_cmd_append(
+                &write_array_source,
+                generate_array_run_exe_command,
+                "--name", decl->name,
+                "--function-prefix", decl->prefix,
+                "--value-type", decl->value_type,
+                decl->impl_type,
+                "--source"
+            );
+
+            char header_name[256] = {0};
+            strcat(header_name, decl->prefix);
+            strcat(header_name, ".h");
+
+            nob_cmd_append(
+                &write_array_source,
+                "--add-header",
+                "../test_hash_map_types.h"
+            );
+            nob_cmd_append(
+                &write_array_source,
+                "--add-header",
+                header_name
+            );
+
+            char out_path_source[256] = "tests/arrays/";
+            strcat(out_path_source, decl->prefix);
+            strcat(out_path_source, ".c");
+
+            if (!nob_cmd_run(
+                &write_array_source,
+                .stdout_path = out_path_source,
+                .async = &array_procs
+            )) return 1;
+        }
+
+        if (!nob_procs_wait(array_procs)) return 1;
+        nob_da_free(array_procs);
     }
-
-    nob_cmd_append(
-        &generate_array_compile_command,
-        "-o", generate_array_exe_name,
-        "-Isrc/",
-        "tools/generate_array.c"
-    );
-
-    if (!nob_cmd_run(&generate_array_compile_command)) return 1;
-
-    int32_t array_test_count = sizeof(array_declarations) / sizeof(ArrayDecl);
-
-    nob_log(NOB_INFO, "Generating Array Files");
-
-    Nob_Procs array_procs = {0};
-
-    for (int32_t i = 0; i < array_test_count; ++i)
-    {
-        ArrayDecl* decl = &array_declarations[i];
-
-        Nob_Cmd write_array_header = {0};
-        nob_cmd_append(
-            &write_array_header,
-            generate_array_run_exe_command,
-            "--name", decl->name,
-            "--function-prefix", decl->prefix,
-            "--value-type", decl->value_type,
-            decl->impl_type,
-            "--header"
-        );
-
-        nob_cmd_append(
-            &write_array_header,
-            "--add-header",
-            "../test_hash_map_types.h"
-        );
-
-        char out_path_header[256] = "tests/arrays/";
-        strcat(out_path_header, decl->prefix);
-        strcat(out_path_header, ".h");
-
-        if (!nob_cmd_run(
-            &write_array_header,
-            .stdout_path = out_path_header,
-            .async = &array_procs
-        )) return 1;
-
-        Nob_Cmd write_array_source = {0};
-        nob_cmd_append(
-            &write_array_source,
-            generate_array_run_exe_command,
-            "--name", decl->name,
-            "--function-prefix", decl->prefix,
-            "--value-type", decl->value_type,
-            decl->impl_type,
-            "--source"
-        );
-
-        char header_name[256] = {0};
-        strcat(header_name, decl->prefix);
-        strcat(header_name, ".h");
-
-        nob_cmd_append(
-            &write_array_source,
-            "--add-header",
-            "../test_hash_map_types.h"
-        );
-        nob_cmd_append(
-            &write_array_source,
-            "--add-header",
-            header_name
-        );
-
-        char out_path_source[256] = "tests/arrays/";
-        strcat(out_path_source, decl->prefix);
-        strcat(out_path_source, ".c");
-
-        if (!nob_cmd_run(
-            &write_array_source,
-            .stdout_path = out_path_source,
-            .async = &array_procs
-        )) return 1;
-    }
-
-    if (!nob_procs_wait(array_procs)) return 1;
-    nob_da_free(array_procs);
 
     /**
      *
@@ -784,134 +839,136 @@ int32_t main(int32_t argc, char **argv)
      *
      */
 
-    nob_log(NOB_INFO, "Compiling generate hash map program");
-
-    #if JSL_IS_WINDOWS
-        char generate_hash_map_exe_name[256] = "tests\\bin\\generate_hash_map.exe";
-        char generate_hash_map_run_exe_command[256] = ".\\tests\\bin\\generate_hash_map.exe";
-    #elif JSL_IS_POSIX
-        char generate_hash_map_exe_name[256] = "tests/bin/generate_hash_map";
-        char generate_hash_map_run_exe_command[256] = "./tests/bin/generate_hash_map";
-    #else
-        #error "Unrecognized platform. Only windows and POSIX platforms are supported."
-    #endif
-
-    Nob_Cmd generate_hash_map_compile_command = {0};
-    nob_cmd_append(
-        &generate_hash_map_compile_command,
-        "clang",
-        "-DJSL_DEBUG",
-        "-fno-omit-frame-pointer",
-        "-fno-optimize-sibling-calls",
-        "-O0",
-        "-glldb",
-        "-std=c11"
-    );
-
-    // add clang warnings
-    for (int32_t flag_idx = 0;; ++flag_idx)
     {
-        char* flag = clang_warning_flags[flag_idx];
-        if (flag == NULL)
-            break;
+        nob_log(NOB_INFO, "Compiling generate hash map program");
 
-        nob_cmd_append(&generate_hash_map_compile_command, flag);
-    }
+        #if JSL_IS_WINDOWS
+            char generate_hash_map_exe_name[256] = "tests\\bin\\generate_hash_map.exe";
+            char generate_hash_map_run_exe_command[256] = ".\\tests\\bin\\generate_hash_map.exe";
+        #elif JSL_IS_POSIX
+            char generate_hash_map_exe_name[256] = "tests/bin/generate_hash_map";
+            char generate_hash_map_run_exe_command[256] = "./tests/bin/generate_hash_map";
+        #else
+            #error "Unrecognized platform. Only windows and POSIX platforms are supported."
+        #endif
 
-    nob_cmd_append(
-        &generate_hash_map_compile_command,
-        "-o", generate_hash_map_exe_name,
-        "-Isrc/",
-        "tools/generate_hash_map.c"
-    );
-
-    if (!nob_cmd_run(&generate_hash_map_compile_command)) return 1;
-
-    int32_t hash_map_test_count = sizeof(hash_map_declarations) / sizeof(HashMapDecl);
-
-    nob_log(NOB_INFO, "Generating Hash Map Files");
-
-    Nob_Procs hash_map_procs = {0};
-
-    for (int32_t i = 0; i < hash_map_test_count; ++i)
-    {
-        HashMapDecl* decl = &hash_map_declarations[i];
-
-        Nob_Cmd write_hash_map_header = {0};
+        Nob_Cmd generate_hash_map_compile_command = {0};
         nob_cmd_append(
-            &write_hash_map_header,
-            generate_hash_map_run_exe_command,
-            "--name", decl->name,
-            "--function-prefix", decl->prefix,
-            "--key-type", decl->key_type,
-            "--value-type", decl->value_type,
-            decl->impl_type,
-            "--header"
+            &generate_hash_map_compile_command,
+            "clang",
+            "-DJSL_DEBUG",
+            "-fno-omit-frame-pointer",
+            "-fno-optimize-sibling-calls",
+            "-O0",
+            "-glldb",
+            "-std=c11"
         );
 
-        for (int32_t header_idx = 0;;++header_idx)
+        // add clang warnings
+        for (int32_t flag_idx = 0;; ++flag_idx)
         {
-            if (decl->headers == NULL)
-                break;
-            if (decl->headers[header_idx] == NULL)
+            char* flag = clang_warning_flags[flag_idx];
+            if (flag == NULL)
                 break;
 
+            nob_cmd_append(&generate_hash_map_compile_command, flag);
+        }
+
+        nob_cmd_append(
+            &generate_hash_map_compile_command,
+            "-o", generate_hash_map_exe_name,
+            "-Isrc/",
+            "tools/generate_hash_map.c"
+        );
+
+        if (!nob_cmd_run(&generate_hash_map_compile_command)) return 1;
+
+        int32_t hash_map_test_count = sizeof(hash_map_declarations) / sizeof(HashMapDecl);
+
+        nob_log(NOB_INFO, "Generating Hash Map Files");
+
+        Nob_Procs hash_map_procs = {0};
+
+        for (int32_t i = 0; i < hash_map_test_count; ++i)
+        {
+            HashMapDecl* decl = &hash_map_declarations[i];
+
+            Nob_Cmd write_hash_map_header = {0};
             nob_cmd_append(
                 &write_hash_map_header,
-                "--add-header",
-                decl->headers[header_idx]
+                generate_hash_map_run_exe_command,
+                "--name", decl->name,
+                "--function-prefix", decl->prefix,
+                "--key-type", decl->key_type,
+                "--value-type", decl->value_type,
+                decl->impl_type,
+                "--header"
             );
-        }
 
-        char out_path_header[256] = "tests/hash_maps/";
-        strcat(out_path_header, decl->prefix);
-        strcat(out_path_header, ".h");
+            for (int32_t header_idx = 0;;++header_idx)
+            {
+                if (decl->headers == NULL)
+                    break;
+                if (decl->headers[header_idx] == NULL)
+                    break;
 
-        if (!nob_cmd_run(
-            &write_hash_map_header,
-            .stdout_path = out_path_header,
-            .async = &hash_map_procs
-        )) return 1;
+                nob_cmd_append(
+                    &write_hash_map_header,
+                    "--add-header",
+                    decl->headers[header_idx]
+                );
+            }
 
-        Nob_Cmd write_hash_map_source = {0};
-        nob_cmd_append(
-            &write_hash_map_source,
-            generate_hash_map_run_exe_command,
-            "--name", decl->name,
-            "--function-prefix", decl->prefix,
-            "--key-type", decl->key_type,
-            "--value-type", decl->value_type,
-            decl->impl_type,
-            "--source"
-        );
+            char out_path_header[256] = "tests/hash_maps/";
+            strcat(out_path_header, decl->prefix);
+            strcat(out_path_header, ".h");
 
-        for (int32_t header_idx = 0;;++header_idx)
-        {
-            if (decl->headers == NULL)
-                break;
-            if (decl->headers[header_idx] == NULL)
-                break;
+            if (!nob_cmd_run(
+                &write_hash_map_header,
+                .stdout_path = out_path_header,
+                .async = &hash_map_procs
+            )) return 1;
 
+            Nob_Cmd write_hash_map_source = {0};
             nob_cmd_append(
                 &write_hash_map_source,
-                "--add-header",
-                decl->headers[header_idx]
+                generate_hash_map_run_exe_command,
+                "--name", decl->name,
+                "--function-prefix", decl->prefix,
+                "--key-type", decl->key_type,
+                "--value-type", decl->value_type,
+                decl->impl_type,
+                "--source"
             );
+
+            for (int32_t header_idx = 0;;++header_idx)
+            {
+                if (decl->headers == NULL)
+                    break;
+                if (decl->headers[header_idx] == NULL)
+                    break;
+
+                nob_cmd_append(
+                    &write_hash_map_source,
+                    "--add-header",
+                    decl->headers[header_idx]
+                );
+            }
+
+            char out_path_source[256] = "tests/hash_maps/";
+            strcat(out_path_source, decl->prefix);
+            strcat(out_path_source, ".c");
+
+            if (!nob_cmd_run(
+                &write_hash_map_source,
+                .stdout_path = out_path_source,
+                .async = &hash_map_procs
+            )) return 1;
         }
 
-        char out_path_source[256] = "tests/hash_maps/";
-        strcat(out_path_source, decl->prefix);
-        strcat(out_path_source, ".c");
-
-        if (!nob_cmd_run(
-            &write_hash_map_source,
-            .stdout_path = out_path_source,
-            .async = &hash_map_procs
-        )) return 1;
+        if (!nob_procs_wait(hash_map_procs)) return 1;
+        nob_da_free(hash_map_procs);
     }
-
-    if (!nob_procs_wait(hash_map_procs)) return 1;
-    nob_da_free(hash_map_procs);
     
 
     /**
