@@ -239,8 +239,8 @@ static void test_jsl_format_file_accepts_empty_format(void)
 
     JSLOutputSink sink = jsl_c_file_output_sink(file);
 
-    bool res = jsl_format_sink(sink, JSL_FATPTR_EXPRESSION(""));
-    TEST_BOOL(res == true);
+    int64_t res = jsl_format_sink(sink, JSL_FATPTR_EXPRESSION(""));
+    TEST_INT64_EQUAL(res, 0);
 
     TEST_BOOL(fflush(file) == 0);
     TEST_BOOL(fseek(file, 0, SEEK_END) == 0);
@@ -267,8 +267,8 @@ static void test_jsl_format_file_null_format_pointer(void)
 
     JSLOutputSink sink = jsl_c_file_output_sink(stdout);
 
-    bool res = jsl_format_sink(sink, fmt);
-    TEST_BOOL(!res);
+    int64_t res = jsl_format_sink(sink, fmt);
+    TEST_INT64_EQUAL(res, -1);
 }
 
 static void test_jsl_format_file_negative_length(void)
@@ -279,8 +279,8 @@ static void test_jsl_format_file_negative_length(void)
     };
     JSLOutputSink sink = jsl_c_file_output_sink(stdout);
 
-    bool res = jsl_format_sink(sink, fmt);
-    TEST_BOOL(!res);
+    int64_t res = jsl_format_sink(sink, fmt);
+    TEST_INT64_EQUAL(res, -1);
 }
 
 static void test_jsl_format_file_write_failure(void)
@@ -300,8 +300,9 @@ static void test_jsl_format_file_write_failure(void)
 
             JSLOutputSink sink = jsl_c_file_output_sink(writer);
 
-            bool res = jsl_format_sink(sink, JSL_FATPTR_EXPRESSION("Hello"));
-            TEST_BOOL(!res);
+            int64_t res = jsl_format_sink(sink, JSL_FATPTR_EXPRESSION("Hello"));
+            TEST_INT64_EQUAL(res, -1);
+
             fclose(writer);
             if (previous_handler == SIG_ERR)
             {
@@ -323,8 +324,9 @@ static void test_jsl_format_file_write_failure(void)
     if (file != NULL)
     {
         JSLOutputSink sink = jsl_c_file_output_sink(file);
-        bool res = jsl_format_sink(sink, JSL_FATPTR_EXPRESSION("Hello"));
-        TEST_BOOL(!res);
+        int64_t res1 = jsl_format_sink(sink, JSL_FATPTR_EXPRESSION("Hello"));
+        TEST_INT64_EQUAL(res1, -1);
+
         fclose(file);
         return;
     }
@@ -343,8 +345,8 @@ static void test_jsl_format_file_write_failure(void)
     }
 
     JSLOutputSink ro_sink = jsl_c_file_output_sink(read_only);
-    bool res = jsl_format_sink(ro_sink, JSL_FATPTR_EXPRESSION("Hello"));
-    TEST_BOOL(!res);
+    int64_t res2 = jsl_format_sink(ro_sink, JSL_FATPTR_EXPRESSION("Hello"));
+    TEST_INT64_EQUAL(res2, 0);
 
     fclose(read_only);
     remove(path);

@@ -703,16 +703,16 @@
 
         JSLOutputSink builder_sink = jsl_string_builder_output_sink(builder);
 
-        jsl_output_sink_write(builder_sink, JSL_FATPTR_EXPRESSION("#pragma once\n\n"));
+        jsl_output_sink_write_fatptr(builder_sink, JSL_FATPTR_EXPRESSION("#pragma once\n\n"));
 
-        jsl_output_sink_write(
+        jsl_output_sink_write_fatptr(
             builder_sink,
             JSL_FATPTR_EXPRESSION("// DEFAULT INCLUDED HEADERS\n")
         );
-        jsl_output_sink_write(builder_sink, JSL_FATPTR_EXPRESSION("#include <stdint.h>\n"));
-        jsl_output_sink_write(builder_sink, JSL_FATPTR_EXPRESSION("#include \"jsl_hash_map_common.h\"\n\n"));
+        jsl_output_sink_write_fatptr(builder_sink, JSL_FATPTR_EXPRESSION("#include <stdint.h>\n"));
+        jsl_output_sink_write_fatptr(builder_sink, JSL_FATPTR_EXPRESSION("#include \"jsl_hash_map_common.h\"\n\n"));
 
-        jsl_output_sink_write(
+        jsl_output_sink_write_fatptr(
             builder_sink,
             JSL_FATPTR_EXPRESSION("// USER INCLUDED HEADERS\n")
         );
@@ -722,7 +722,7 @@
             jsl_format_sink(builder_sink, JSL_FATPTR_EXPRESSION("#include \"%y\"\n"), include_header_array[i]);
         }
 
-        jsl_output_sink_write(builder_sink, JSL_FATPTR_EXPRESSION("\n"));
+        jsl_output_sink_write_fatptr(builder_sink, JSL_FATPTR_EXPRESSION("\n"));
         
         jsl_format_sink(
             builder_sink,
@@ -781,25 +781,25 @@
 
         JSLOutputSink builder_sink = jsl_string_builder_output_sink(builder);
 
-        jsl_output_sink_write(
+        jsl_output_sink_write_fatptr(
             builder_sink,
             JSL_FATPTR_EXPRESSION("// DEFAULT INCLUDED HEADERS\n")
         );
 
-        jsl_output_sink_write(
+        jsl_output_sink_write_fatptr(
             builder_sink,
             JSL_FATPTR_EXPRESSION("#include <stddef.h>\n")
         );
-        jsl_output_sink_write(
+        jsl_output_sink_write_fatptr(
             builder_sink,
             JSL_FATPTR_EXPRESSION("#include <stdint.h>\n")
         );
-        jsl_output_sink_write(
+        jsl_output_sink_write_fatptr(
             builder_sink,
             JSL_FATPTR_EXPRESSION("#include \"jsl_core.h\"\n")
         );
 
-        jsl_output_sink_write(
+        jsl_output_sink_write_fatptr(
             builder_sink,
             JSL_FATPTR_EXPRESSION("// USER INCLUDED HEADERS\n")
         );

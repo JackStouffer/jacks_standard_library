@@ -174,146 +174,14 @@ JSL_STRING_BUILDER_DEF bool jsl_string_builder_init2(
 );
 
 /**
- * Add boolean to the string builder as an unsigned 8 bit int. Each append may result in an
- * allocation if there's no more space. If that allocation fails then this function returns false.
- *
- * @param builder The string builder to append to; must be initialized.
- * @param data The bool to append.
- * @returns `true` inserted was successful, otherwise `false`.
- */
-JSL_STRING_BUILDER_DEF bool jsl_string_builder_insert_bool(JSLStringBuilder* builder, bool data);
-
-/**
- * Append a single raw byte to the string builder.
- * The value is written as-is, so it can be used for arbitrary binary data, including
- * zero bytes. Each append may result in an allocation if there's no more space. If
- * that allocation fails then this function returns false.
- *
- * @param builder The string builder to append to; must be initialized.
- * @param data The byte to append.
- * @returns `true` inserted was successful, otherwise `false`.
- */
-JSL_STRING_BUILDER_DEF bool jsl_string_builder_insert_i8(JSLStringBuilder* builder, int8_t data);
-
-/**
- * Append a single raw byte to the end of the string builder.
- * The value is written as-is, so it can be used for arbitrary binary data, including
- * zero bytes. Each append may result in an allocation if there's no more space. If
- * that allocation fails then this function returns false.
- *
- * @param builder The string builder to append to; must be initialized.
- * @param data The byte to append.
- * @returns `true` inserted was successful, otherwise `false`.
- */
-JSL_STRING_BUILDER_DEF bool jsl_string_builder_insert_u8(JSLStringBuilder* builder, uint8_t data);
-
-/**
- * Append the binary, host ordered, representation of the signed 16 bit int to the 
- * string builder. Each append may result in an allocation if there's no more space. If
- * that allocation fails then this function returns false.
- *
- * @param builder The string builder to append to; must be initialized.
- * @param data The number to write.
- * @returns `true` inserted was successful, otherwise `false`.
- */
-JSL_STRING_BUILDER_DEF bool jsl_string_builder_insert_i16(JSLStringBuilder* builder, int16_t data);
-
-/**
- * Append the binary, host ordered, representation of the unsigned 16 bit int to the 
- * string builder. Each append may result in an allocation if there's no more space. If
- * that allocation fails then this function returns false.
- *
- * @param builder The string builder to append to; must be initialized.
- * @param data The number to write.
- * @returns `true` inserted was successful, otherwise `false`.
- */
-JSL_STRING_BUILDER_DEF bool jsl_string_builder_insert_u16(JSLStringBuilder* builder, uint16_t data);
-
-/**
- * Append the binary, host ordered, representation of the signed 32 bit int to the 
- * string builder. Each append may result in an allocation if there's no more space. If
- * that allocation fails then this function returns false.
- *
- * @param builder The string builder to append to; must be initialized.
- * @param data The number to write.
- * @returns `true` inserted was successful, otherwise `false`.
- */
-JSL_STRING_BUILDER_DEF bool jsl_string_builder_insert_i32(JSLStringBuilder* builder, int32_t data);
-
-/**
- * Append the binary, host ordered, representation of the unsigned 32 bit int to the 
- * string builder. Each append may result in an allocation if there's no more space. If
- * that allocation fails then this function returns false.
- *
- * @param builder The string builder to append to; must be initialized.
- * @param data The number to write.
- * @returns `true` inserted was successful, otherwise `false`.
- */
-JSL_STRING_BUILDER_DEF bool jsl_string_builder_insert_u32(JSLStringBuilder* builder, uint32_t data);
-
-/**
- * Append the binary, host ordered, representation of the signed 64 bit int to the 
- * string builder. Each append may result in an allocation if there's no more space. If
- * that allocation fails then this function returns false.
- *
- * @param builder The string builder to append to; must be initialized.
- * @param data The number to write.
- * @returns `true` inserted was successful, otherwise `false`.
- */
-JSL_STRING_BUILDER_DEF bool jsl_string_builder_insert_i64(JSLStringBuilder* builder, int64_t data);
-
-/**
- * Append the binary, host ordered, representation of the unsigned 64 bit int to the 
- * string builder. Each append may result in an allocation if there's no more space. If
- * that allocation fails then this function returns false.
- *
- * @param builder The string builder to append to; must be initialized.
- * @param data The number to write.
- * @returns `true` inserted was successful, otherwise `false`.
- */
-JSL_STRING_BUILDER_DEF bool jsl_string_builder_insert_u64(JSLStringBuilder* builder, uint64_t data);
-
-/**
- * Append the binary, host ordered, representation of the 32 bit floating point number to the 
- * string builder. Each append may result in an allocation if there's no more space. If
- * that allocation fails then this function returns false.
- *
- * @param builder The string builder to append to; must be initialized.
- * @param data The number to write.
- * @returns `true` inserted was successful, otherwise `false`.
- */
-JSL_STRING_BUILDER_DEF bool jsl_string_builder_insert_f32(JSLStringBuilder* builder, float data);
-
-/**
- * Append the binary, host ordered, representation of the 64 bit floating point number to the 
- * string builder. Each append may result in an allocation if there's no more space. If
- * that allocation fails then this function returns false.
- *
- * @param builder The string builder to append to; must be initialized.
- * @param data The number to write.
- * @returns `true` inserted was successful, otherwise `false`.
- */
-JSL_STRING_BUILDER_DEF bool jsl_string_builder_insert_f64(JSLStringBuilder* builder, double data);
-
-/**
  * Append the contents of a fat pointer. Additional chunks are allocated as needed
  * while copying so if any of the allocations fail this returns false.
  *
  * @param builder The string builder to append to; must be initialized.
  * @param data A fat pointer describing the bytes to copy; its length may be zero.
- * @returns `true` if the data was appended successfully, otherwise `false`.
+ * @returns number of bytes written, `-1` if error
  */
-JSL_STRING_BUILDER_DEF bool jsl_string_builder_insert_fatptr(JSLStringBuilder* builder, JSLFatPtr data);
-
-/**
- * Append the contents of a null terminated C string. Additional chunks are allocated as needed
- * while copying so if any of the allocations fail this returns false.
- *
- * @param builder The string builder to append to; must be initialized.
- * @param data A null terminated C string
- * @returns `true` if the data was appended successfully, otherwise `false`.
- */
-JSL_STRING_BUILDER_DEF bool jsl_string_builder_insert_cstr(JSLStringBuilder* builder, const char* data);
+JSL_STRING_BUILDER_DEF int64_t jsl_string_builder_insert_fatptr(JSLStringBuilder* builder, JSLFatPtr data);
 
 /**
  * TODO: docs

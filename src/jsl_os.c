@@ -541,10 +541,14 @@ int64_t jsl_write_to_c_file(FILE* out, JSLFatPtr data)
         (size_t) data.length,
         out
     );
-    return written;
+
+    if (ferror(out) == 0)
+        return written;
+    else
+        return -errno;
 }
 
-static bool jsl__c_file_sink_out(void* user, JSLFatPtr data)
+static int64_t jsl__c_file_sink_out(void* user, JSLFatPtr data)
 {
     FILE* file = (FILE*) user;
     if (file == NULL)
@@ -557,7 +561,10 @@ static bool jsl__c_file_sink_out(void* user, JSLFatPtr data)
         file
     );
 
-    return written == data.length;
+    if (ferror(file) == 0)
+        return written;
+    else
+        return -errno;
 }
 
 JSLOutputSink jsl_c_file_output_sink(FILE* out)

@@ -185,7 +185,7 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
 
     if (show_help)
     {
-        jsl_output_sink_write(stdout_sink, help_message);
+        jsl_output_sink_write_fatptr(stdout_sink, help_message);
         return EXIT_SUCCESS;
     }
     
@@ -313,7 +313,7 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     JSLFatPtr slice;
     while (jsl_string_builder_iterator_next(&iterator, &slice))
     {
-        jsl_output_sink_write(stdout_sink, slice);
+        jsl_output_sink_write_fatptr(stdout_sink, slice);
     }
 
     return EXIT_SUCCESS;

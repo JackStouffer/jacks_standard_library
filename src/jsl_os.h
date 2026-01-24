@@ -204,12 +204,12 @@ JSL_WARN_UNUSED JSL_DEF JSLWriteFileResultEnum jsl_write_file_contents(
 *
 * This implementation uses libc's `fwrite` to write to the file stream. If
 * this function returns less than `data.length` then the file stream is most
-* likely in an error state. In that case, `errno` will be set and you can get
-* more info with `ferror`.
+* likely in an error state. In that case, `-errno` will be returned and you
+* can get more info with `ferror`.
 *
 * @param out Destination `FILE*` stream
 * @param data Buffer containing the bytes to write
-* @returns Bytes written, or `-1` when arguments are invalid
+* @returns Bytes written, or `-1` when arguments are invalid, or `-errno` on error
 */
 int64_t jsl_write_to_c_file(FILE* out, JSLFatPtr data);
 

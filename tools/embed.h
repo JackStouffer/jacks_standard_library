@@ -66,9 +66,11 @@
     {
         JSL_ASSERT(output_type != OUTPUT_TYPE_INVALID);
 
-        jsl_string_builder_insert_cstr(builder, "#pragma once\n\n");
-        jsl_string_builder_insert_cstr(builder, "#include <stdint.h>\n\n");
-        jsl_string_builder_insert_cstr(builder, "#include \"jsl_core.h\"\n\n");
+        JSLOutputSink builder_sink = jsl_string_builder_output_sink(builder);
+
+        jsl_output_sink_write_cstr(builder_sink, "#pragma once\n\n");
+        jsl_output_sink_write_cstr(builder_sink, "#include <stdint.h>\n\n");
+        jsl_output_sink_write_cstr(builder_sink, "#include \"jsl_core.h\"\n\n");
 
         if (output_type == OUTPUT_TYPE_BINARY)
         {
@@ -82,7 +84,7 @@
             for (int64_t i = 0; i < file_data.length; ++i)
             {
                 if (i % bytes_per_line == 0)
-                    jsl_string_builder_insert_cstr(builder, "    ");
+                    jsl_output_sink_write_cstr(builder_sink, "    ");
 
                 jsl_string_builder_format(
                     builder,
@@ -94,15 +96,15 @@
                 bool end_of_line = ((i + 1) % bytes_per_line) == 0;
 
                 if (!is_last)
-                    jsl_string_builder_insert_u8(builder, ',');
+                    jsl_output_sink_write_u8(builder_sink, ',');
 
                 if (end_of_line || is_last)
-                    jsl_string_builder_insert_u8(builder, '\n');
+                    jsl_output_sink_write_u8(builder_sink, '\n');
                 else
-                    jsl_string_builder_insert_u8(builder, ' ');
+                    jsl_output_sink_write_u8(builder_sink, ' ');
             }
 
-            jsl_string_builder_insert_cstr(builder, "};\n\n");
+            jsl_output_sink_write_cstr(builder_sink, "};\n\n");
 
             jsl_string_builder_format(
                 builder,
@@ -123,7 +125,7 @@
             bool string_open = false;
             if (file_data.length > 0)
             {
-                jsl_string_builder_insert_u8(builder, '"');
+                jsl_output_sink_write_u8(builder_sink, '"');
                 string_open = true;
 
                 for (int64_t i = 0; i < file_data.length; ++i)
@@ -132,13 +134,13 @@
 
                     if (c == '\n')
                     {
-                        jsl_string_builder_insert_cstr(builder, "\\n\"");
+                        jsl_output_sink_write_cstr(builder_sink, "\\n\"");
                         string_open = false;
-                        jsl_string_builder_insert_u8(builder, '\n');
+                        jsl_output_sink_write_u8(builder_sink, '\n');
 
                         if ((i + 1) < file_data.length)
                         {
-                            jsl_string_builder_insert_u8(builder, '"');
+                            jsl_output_sink_write_u8(builder_sink, '"');
                             string_open = true;
                         }
 
@@ -148,31 +150,31 @@
                     switch (c)
                     {
                         case '\\':
-                            jsl_string_builder_insert_cstr(builder, "\\\\");
+                            jsl_output_sink_write_cstr(builder_sink, "\\\\");
                             break;
                         case '\"':
-                            jsl_string_builder_insert_cstr(builder, "\\\"");
+                            jsl_output_sink_write_cstr(builder_sink, "\\\"");
                             break;
                         case '\r':
-                            jsl_string_builder_insert_cstr(builder, "\\r");
+                            jsl_output_sink_write_cstr(builder_sink, "\\r");
                             break;
                         case '\t':
-                            jsl_string_builder_insert_cstr(builder, "\\t");
+                            jsl_output_sink_write_cstr(builder_sink, "\\t");
                             break;
                         default:
-                            jsl_string_builder_insert_u8(builder, c);
+                            jsl_output_sink_write_u8(builder_sink, c);
                             break;
                     }
                 }
 
                 if (string_open)
                 {
-                    jsl_string_builder_insert_u8(builder, '"');
-                    jsl_string_builder_insert_u8(builder, '\n');
+                    jsl_output_sink_write_u8(builder_sink, '"');
+                    jsl_output_sink_write_u8(builder_sink, '\n');
                 }
             }
 
-            jsl_string_builder_insert_cstr(builder, ");\n\n");
+            jsl_output_sink_write_cstr(builder_sink, ");\n\n");
 
         }
 

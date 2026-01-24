@@ -1384,11 +1384,11 @@ int64_t jsl_fatptr_strip_whitespace(JSLFatPtr* str)
     return bytes_read;
 }
 
-static bool jsl__fatptr_output_sink_write(void *user, JSLFatPtr data)
+static int64_t jsl__fatptr_output_sink_write(void *user, JSLFatPtr data)
 {
     JSLFatPtr* buffer = (JSLFatPtr*)user;
-    int64_t bytes_written = jsl_fatptr_memory_copy(buffer, data);
-    return bytes_written != -1 || buffer->length > 0;
+    int64_t bytes_written_to_sink = jsl_fatptr_memory_copy(buffer, data);
+    return bytes_written_to_sink < 1 ? -1 : bytes_written_to_sink;
 }
 
 JSLOutputSink jsl_fatptr_output_sink(JSLFatPtr* buffer)
@@ -1544,17 +1544,17 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
     va_list va
 )
 {
-    uint8_t buffer[JSL__FORMAT_BUFFER_SIZE];
+    if (sink.write_fp == NULL || fmt.data == NULL || fmt.length < 0)
+        return -1;
 
     static char hex[] = "0123456789abcdefxp";
     static char hexu[] = "0123456789ABCDEFXP";
     static JSLFatPtr err_string = JSL_FATPTR_INITIALIZER("(ERROR)");
-    uint8_t* buffer_cursor;
-    JSLFatPtr f;
-    int32_t tlen = 0;
 
-    buffer_cursor = buffer;
-    f = fmt;
+    uint8_t buffer[JSL__FORMAT_BUFFER_SIZE];
+    uint8_t* buffer_cursor = buffer;
+    JSLFatPtr f = fmt;
+    int64_t bytes_written_to_sink = 0;
 
     #if defined(__AVX2__)
         const __m256i percent_wide = _mm256_set1_epi8('%');
@@ -1570,15 +1570,18 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
         // macros for the sink buffering stuff
         #define FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(bytes)                               \
             {                                                                               \
-                int32_t len = (int32_t)(buffer_cursor - buffer);                            \
+                int64_t len = (int64_t)(buffer_cursor - buffer);                            \
                 if ((len + (bytes)) >= JSL__FORMAT_BUFFER_SIZE)                             \
                 {                                                                           \
-                    tlen += len;                                                            \
-                    JSLFatPtr data = { buffer, len };                                       \
-                    if (sink.write_fp(sink.user_data, data))                                \
+                    JSLFatPtr data_to_write = { buffer, len };                              \
+                    int64_t sink_res = sink.write_fp(sink.user_data, data_to_write);        \
+                    if (sink_res > -1)                                                      \
+                    {                                                                       \
+                        bytes_written_to_sink += sink_res;                                  \
                         buffer_cursor = buffer;                                             \
+                    }                                                                       \
                     else                                                                    \
-                        goto done;                                                          \
+                        goto L_DONE;                                                          \
                 }                                                                           \
             }
 
@@ -1740,11 +1743,8 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 if (((v ^ 0x25252525) - 0x01010101) & c)
                     goto schk1;
 
-                if (callback)
-                {
-                    if ((JSL__FORMAT_BUFFER_SIZE - (int32_t)(buffer_cursor - buffer)) < 4)
-                        goto schk1;
-                }
+                if ((JSL__FORMAT_BUFFER_SIZE - (int32_t)(buffer_cursor - buffer)) < 4)
+                    goto schk1;
 
                 if(((uintptr_t) buffer_cursor) & 3)
                 {
@@ -1992,8 +1992,10 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
 
             case 'n': // weird write-bytes specifier
             {
-                int32_t *d = va_arg(va, int32_t *);
-                *d = tlen + (int32_t)(buffer_cursor - buffer);
+                FLUSH_BUFFER();
+
+                int32_t* d = va_arg(va, int32_t *);
+                *d = (int32_t) bytes_written_to_sink;
             } break;
 
             case 'A': // hex float
@@ -2686,11 +2688,10 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
 
 
     L_END_FORMAT:
-
     FLUSH_BUFFER();
 
-    done:
-    return tlen + (int32_t)(buffer_cursor - buffer);
+    L_DONE:
+    return bytes_written_to_sink;
 }
 
 // cleanup
@@ -2717,11 +2718,11 @@ JSL__ASAN_OFF int64_t jsl_format_sink(
     ...
 )
 {
-    int64_t result;
     va_list va;
     va_start(va, fmt);
 
-    result = jsl_format_sink_valist(sink, fmt, va);
+    int64_t result = jsl_format_sink_valist(sink, fmt, va);
+
     va_end(va);
 
     return result;
@@ -2734,7 +2735,7 @@ struct JSL__FormatAllocatorContext
     int64_t current_allocation_length;
 };
 
-static bool format_allocator_callback(void *user, JSLFatPtr data)
+static int64_t format_allocator_callback(void *user, JSLFatPtr data)
 {
     struct JSL__FormatAllocatorContext* context = (struct JSL__FormatAllocatorContext*) user;
     int64_t old_length = context->current_allocation_length;
@@ -2747,17 +2748,26 @@ static bool format_allocator_callback(void *user, JSLFatPtr data)
         JSL_DEFAULT_ALLOCATION_ALIGNMENT
     );
     if (context->current_allocation == NULL)
-        return false;
+        return -1;
 
-    JSL_MEMCPY(((uint8_t*) context->current_allocation) + old_length, data.data, (size_t) data.length);
+    JSL_MEMCPY(
+        ((uint8_t*) context->current_allocation) + old_length,
+        data.data,
+        (size_t) data.length
+    );
 
     context->current_allocation_length = new_length;
 
-    return true;
+    return data.length;
 }
 
 JSL__ASAN_OFF JSLFatPtr jsl_format(JSLAllocatorInterface* allocator, JSLFatPtr fmt, ...)
 {
+    JSLFatPtr ret = {0};
+
+    if (allocator == NULL)
+        return ret;
+
     va_list va;
     va_start(va, fmt);
 
@@ -2778,7 +2788,6 @@ JSL__ASAN_OFF JSLFatPtr jsl_format(JSLAllocatorInterface* allocator, JSLFatPtr f
 
     va_end(va);
 
-    JSLFatPtr ret = {0};
     if (context.current_allocation != NULL && write_length > 0)
     {
         ret.data = context.current_allocation;

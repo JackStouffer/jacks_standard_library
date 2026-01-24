@@ -465,7 +465,7 @@ static JSL__FORCE_INLINE JSL__UNUSED int32_t jsl__find_first_set_u64(uint64_t x)
 
     #elif JSL__IS_MSVC_VAL
 
-        __declspec(noinline) static inline void jsl__msvc_debug_sink(const void *p)
+        __declspec(noinline) static inline void jsl__msvc_debug_dont_optimize(const void *p)
         {
             /* Pretend to use p in a way the optimizer can’t see through easily */
             _ReadWriteBarrier();
@@ -475,7 +475,7 @@ static JSL__FORCE_INLINE JSL__UNUSED int32_t jsl__find_first_set_u64(uint64_t x)
         #define JSL__DONT_OPTIMIZE_AWAY_IMPL(x)         \
             do                                          \
             {                                           \
-                jsl_msvc_debug_sink(&(x));              \
+                jsl__msvc_debug_dont_optimize(&(x));    \
             }                                           \
             while (0)
 
@@ -1724,6 +1724,7 @@ JSL_DEF JSLFatPtr jsl_fatptr_duplicate(JSLAllocatorInterface* allocator, JSLFatP
  * 
  * Handling,
  * 
+ *      - blocking or non-blocking behavior
  *      - Retries
  *      - Partial success
  *      - Chunking writes
@@ -1734,13 +1735,18 @@ JSL_DEF JSLFatPtr jsl_fatptr_duplicate(JSLAllocatorInterface* allocator, JSLFatP
  * 
  * Also flushing and/or closing the sink once its lifetime is over is also your responsibilty
  */
-typedef bool (*JSLOutputSinkWriteFP)(void* user, JSLFatPtr data);
+typedef int64_t (*JSLOutputSinkWriteFP)(void* user, JSLFatPtr data);
 
 /**
  * TODO: docs
  * 
  * Add advice on writing data generation functions with this, like buffering the output,
  * don't do single char
+ * 
+ * The benefits are ...
+ * 
+ * No abstraction is without it's downsides. Not all output situations will fit cleanly into
+ * this format.
  */
 typedef struct JSLOutputSink {
     JSLOutputSinkWriteFP write_fp;
@@ -1752,10 +1758,141 @@ typedef struct JSLOutputSink {
  * 
  * one line convenience function 
  */
-static inline bool jsl_output_sink_write(JSLOutputSink sink, JSLFatPtr data)
+static inline int64_t jsl_output_sink_write_fatptr(JSLOutputSink sink, JSLFatPtr data)
 {
     if (sink.write_fp == NULL) return false;
     return sink.write_fp(sink.user_data, data);
+}
+
+/**
+ * TODO: docs
+ * 
+ * one line convenience function 
+ */
+static inline int64_t jsl_output_sink_write_i8(JSLOutputSink builder, int8_t data)
+{
+    JSLFatPtr fp = {(uint8_t*) &data, sizeof(int8_t)};
+    return jsl_output_sink_write_fatptr(builder, fp);
+}
+
+/**
+ * TODO: docs
+ * 
+ * one line convenience function 
+ */
+static inline int64_t jsl_output_sink_write_u8(JSLOutputSink builder, uint8_t data)
+{
+    JSLFatPtr fp = {(uint8_t*) &data, sizeof(uint8_t)};
+    return jsl_output_sink_write_fatptr(builder, fp);
+}
+
+/**
+ * TODO: docs
+ * 
+ * one line convenience function 
+ */
+static inline int64_t jsl_output_sink_write_bool(JSLOutputSink builder, bool data)
+{
+    return jsl_output_sink_write_u8(builder, data);
+}
+
+/**
+ * TODO: docs
+ * 
+ * one line convenience function 
+ */
+static inline int64_t jsl_output_sink_write_i16(JSLOutputSink builder, int16_t data)
+{
+    JSLFatPtr fp = {(uint8_t*) &data, sizeof(int16_t)};
+    return jsl_output_sink_write_fatptr(builder, fp);
+}
+
+/**
+ * TODO: docs
+ * 
+ * one line convenience function 
+ */
+static inline int64_t jsl_output_sink_write_u16(JSLOutputSink builder, uint16_t data)
+{
+    JSLFatPtr fp = {(uint8_t*) &data, sizeof(uint16_t)};
+    return jsl_output_sink_write_fatptr(builder, fp);
+}
+
+/**
+ * TODO: docs
+ * 
+ * one line convenience function 
+ */
+static inline int64_t jsl_output_sink_write_i32(JSLOutputSink builder, int32_t data)
+{
+    JSLFatPtr fp = {(uint8_t*) &data, sizeof(int32_t)};
+    return jsl_output_sink_write_fatptr(builder, fp);
+}
+
+/**
+ * TODO: docs
+ * 
+ * one line convenience function 
+ */
+static inline int64_t jsl_output_sink_write_u32(JSLOutputSink builder, uint32_t data)
+{
+    JSLFatPtr fp = {(uint8_t*) &data, sizeof(uint32_t)};
+    return jsl_output_sink_write_fatptr(builder, fp);
+}
+
+/**
+ * TODO: docs
+ * 
+ * one line convenience function 
+ */
+static inline int64_t jsl_output_sink_write_i64(JSLOutputSink builder, int64_t data)
+{
+    JSLFatPtr fp = {(uint8_t*) &data, sizeof(int64_t)};
+    return jsl_output_sink_write_fatptr(builder, fp);
+}
+
+/**
+ * TODO: docs
+ * 
+ * one line convenience function 
+ */
+static inline int64_t jsl_output_sink_write_u64(JSLOutputSink builder, uint64_t data)
+{
+    JSLFatPtr fp = {(uint8_t*) &data, sizeof(uint64_t)};
+    return jsl_output_sink_write_fatptr(builder, fp);
+}
+
+/**
+ * TODO: docs
+ * 
+ * one line convenience function 
+ */
+static inline int64_t jsl_output_sink_write_f32(JSLOutputSink builder, float data)
+{
+    JSLFatPtr fp = {(uint8_t*) &data, sizeof(float)};
+    return jsl_output_sink_write_fatptr(builder, fp);
+}
+
+/**
+ * TODO: docs
+ * 
+ * one line convenience function 
+ */
+static inline int64_t jsl_output_sink_write_f64(JSLOutputSink builder, double data)
+{
+    JSLFatPtr fp = {(uint8_t*) &data, sizeof(double)};
+    return jsl_output_sink_write_fatptr(builder, fp);
+}
+
+/**
+ * TODO: docs
+ * 
+ * one line convenience function 
+ */
+static inline int64_t jsl_output_sink_write_cstr(JSLOutputSink builder, const char* data)
+{
+    JSLFatPtr fp = jsl_fatptr_from_cstr(data);
+    return jsl_output_sink_write_fatptr(builder, fp);
 }
 
 /**
