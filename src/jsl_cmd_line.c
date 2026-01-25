@@ -1166,7 +1166,7 @@ static bool jsl__cmd_line_parse_common(
     return res;
 }
 
-bool jsl_cmd_line_init(JSLCmdLineArgs* cmd_line, JSLAllocatorInterface* allocator)
+bool jsl_cmd_line_args_init(JSLCmdLineArgs* cmd_line, JSLAllocatorInterface* allocator)
 {
     bool res = false;
 
@@ -1190,7 +1190,7 @@ bool jsl_cmd_line_init(JSLCmdLineArgs* cmd_line, JSLAllocatorInterface* allocato
     return res;
 }
 
-bool jsl_cmd_line_parse(JSLCmdLineArgs* cmd_line, int32_t argc, char** argv, JSLFatPtr* out_error)
+bool jsl_cmd_line_args_parse(JSLCmdLineArgs* cmd_line, int32_t argc, char** argv, JSLFatPtr* out_error)
 {
     return jsl__cmd_line_parse_common(
         cmd_line,
@@ -1202,7 +1202,7 @@ bool jsl_cmd_line_parse(JSLCmdLineArgs* cmd_line, int32_t argc, char** argv, JSL
     );
 }
 
-bool jsl_cmd_line_parse_wide(JSLCmdLineArgs* cmd_line, int32_t argc, wchar_t** argv, JSLFatPtr* out_error)
+bool jsl_cmd_line_args_parse_wide(JSLCmdLineArgs* cmd_line, int32_t argc, wchar_t** argv, JSLFatPtr* out_error)
 {
     return jsl__cmd_line_parse_common(
         cmd_line,
@@ -1214,7 +1214,7 @@ bool jsl_cmd_line_parse_wide(JSLCmdLineArgs* cmd_line, int32_t argc, wchar_t** a
     );
 }
 
-bool jsl_cmd_line_has_short_flag(JSLCmdLineArgs* cmd_line, uint8_t flag)
+bool jsl_cmd_line_args_has_short_flag(JSLCmdLineArgs* cmd_line, uint8_t flag)
 {
     bool res = false;
 
@@ -1227,7 +1227,7 @@ bool jsl_cmd_line_has_short_flag(JSLCmdLineArgs* cmd_line, uint8_t flag)
     return res;
 }
 
-bool jsl_cmd_line_has_flag(JSLCmdLineArgs* cmd_line, JSLFatPtr flag)
+bool jsl_cmd_line_args_has_flag(JSLCmdLineArgs* cmd_line, JSLFatPtr flag)
 {
     bool res = false;
 
@@ -1245,7 +1245,7 @@ bool jsl_cmd_line_has_flag(JSLCmdLineArgs* cmd_line, JSLFatPtr flag)
     return res;
 }
 
-bool jsl_cmd_line_has_command(JSLCmdLineArgs* cmd_line, JSLFatPtr flag)
+bool jsl_cmd_line_args_has_command(JSLCmdLineArgs* cmd_line, JSLFatPtr flag)
 {
     bool res = false;
 
@@ -1263,7 +1263,7 @@ bool jsl_cmd_line_has_command(JSLCmdLineArgs* cmd_line, JSLFatPtr flag)
     return res;
 }
 
-bool jsl_cmd_line_pop_arg_list(JSLCmdLineArgs* cmd_line, JSLFatPtr* out_value)
+bool jsl_cmd_line_args_pop_arg_list(JSLCmdLineArgs* cmd_line, JSLFatPtr* out_value)
 {
     bool res = false;
 
@@ -1284,7 +1284,7 @@ bool jsl_cmd_line_pop_arg_list(JSLCmdLineArgs* cmd_line, JSLFatPtr* out_value)
     return res;
 }
 
-bool jsl_cmd_line_pop_flag_with_value(
+bool jsl_cmd_line_args_pop_flag_with_value(
     JSLCmdLineArgs* cmd_line,
     JSLFatPtr flag,
     JSLFatPtr* out_value

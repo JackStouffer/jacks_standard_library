@@ -41,7 +41,7 @@ static void test_short_flags_grouping(void)
 
     JSLCmdLineArgs cmd = {0};
 
-    TEST_BOOL(jsl_cmd_line_init(&cmd, &allocator));
+    TEST_BOOL(jsl_cmd_line_args_init(&cmd, &allocator));
 
     char* argv[] = {
         "prog",
@@ -51,22 +51,22 @@ static void test_short_flags_grouping(void)
         "--output=result.txt",
     };
 
-    TEST_BOOL(jsl_cmd_line_parse(&cmd, 5, argv, NULL));
+    TEST_BOOL(jsl_cmd_line_args_parse(&cmd, 5, argv, NULL));
 
-    TEST_BOOL(jsl_cmd_line_has_short_flag(&cmd, 'a'));
-    TEST_BOOL(jsl_cmd_line_has_short_flag(&cmd, 'b'));
-    TEST_BOOL(jsl_cmd_line_has_short_flag(&cmd, 'c'));
-    TEST_BOOL(jsl_cmd_line_has_short_flag(&cmd, 'd'));
-    TEST_BOOL(!jsl_cmd_line_has_short_flag(&cmd, 'e'));
+    TEST_BOOL(jsl_cmd_line_args_has_short_flag(&cmd, 'a'));
+    TEST_BOOL(jsl_cmd_line_args_has_short_flag(&cmd, 'b'));
+    TEST_BOOL(jsl_cmd_line_args_has_short_flag(&cmd, 'c'));
+    TEST_BOOL(jsl_cmd_line_args_has_short_flag(&cmd, 'd'));
+    TEST_BOOL(!jsl_cmd_line_args_has_short_flag(&cmd, 'e'));
 
     JSLFatPtr value = {0};
-    TEST_BOOL(jsl_cmd_line_pop_flag_with_value(
+    TEST_BOOL(jsl_cmd_line_args_pop_flag_with_value(
         &cmd,
         JSL_FATPTR_EXPRESSION("output"),
         &value
     ));
     TEST_BOOL(jsl_fatptr_cstr_compare(value, "result.txt"));
-    TEST_BOOL(!jsl_cmd_line_pop_flag_with_value(
+    TEST_BOOL(!jsl_cmd_line_args_pop_flag_with_value(
         &cmd,
         JSL_FATPTR_EXPRESSION("output"),
         &value
@@ -81,7 +81,7 @@ static void test_short_flag_equals_is_invalid(void)
 
     JSLCmdLineArgs cmd = {0};
 
-    TEST_BOOL(jsl_cmd_line_init(&cmd, &allocator));
+    TEST_BOOL(jsl_cmd_line_args_init(&cmd, &allocator));
 
     char* argv[] = {
         "prog",
@@ -90,7 +90,7 @@ static void test_short_flag_equals_is_invalid(void)
     };
 
     JSLFatPtr error = {0};
-    TEST_BOOL(!jsl_cmd_line_parse(&cmd, 3, argv, &error));
+    TEST_BOOL(!jsl_cmd_line_args_parse(&cmd, 3, argv, &error));
     TEST_BOOL(error.data != NULL && error.length > 0);
     TEST_BOOL(jsl_fatptr_index_of(error, '=') >= 0);
 }
@@ -103,7 +103,7 @@ static void test_long_flags_and_commands(void)
 
     JSLCmdLineArgs cmd = {0};
 
-    TEST_BOOL(jsl_cmd_line_init(&cmd, &allocator));
+    TEST_BOOL(jsl_cmd_line_args_init(&cmd, &allocator));
 
     char* argv[] = {
         "prog",
@@ -114,15 +114,15 @@ static void test_long_flags_and_commands(void)
         "--not-a-flag",
     };
 
-    TEST_BOOL(jsl_cmd_line_parse(&cmd, 6, argv, NULL));
+    TEST_BOOL(jsl_cmd_line_args_parse(&cmd, 6, argv, NULL));
 
-    TEST_BOOL(jsl_cmd_line_has_flag(&cmd, JSL_FATPTR_EXPRESSION("verbose")));
-    TEST_BOOL(!jsl_cmd_line_has_flag(&cmd, JSL_FATPTR_EXPRESSION("output")));
-    TEST_BOOL(jsl_cmd_line_has_command(&cmd, JSL_FATPTR_EXPRESSION("build")));
-    TEST_BOOL(jsl_cmd_line_has_command(&cmd, JSL_FATPTR_EXPRESSION("--not-a-flag")));
+    TEST_BOOL(jsl_cmd_line_args_has_flag(&cmd, JSL_FATPTR_EXPRESSION("verbose")));
+    TEST_BOOL(!jsl_cmd_line_args_has_flag(&cmd, JSL_FATPTR_EXPRESSION("output")));
+    TEST_BOOL(jsl_cmd_line_args_has_command(&cmd, JSL_FATPTR_EXPRESSION("build")));
+    TEST_BOOL(jsl_cmd_line_args_has_command(&cmd, JSL_FATPTR_EXPRESSION("--not-a-flag")));
 
     JSLFatPtr value = {0};
-    TEST_BOOL(jsl_cmd_line_pop_flag_with_value(
+    TEST_BOOL(jsl_cmd_line_args_pop_flag_with_value(
         &cmd,
         JSL_FATPTR_EXPRESSION("output"),
         &value
@@ -130,11 +130,11 @@ static void test_long_flags_and_commands(void)
     TEST_BOOL(jsl_fatptr_cstr_compare(value, "result.txt"));
 
     JSLFatPtr arg = {0};
-    TEST_BOOL(jsl_cmd_line_pop_arg_list(&cmd, &arg));
+    TEST_BOOL(jsl_cmd_line_args_pop_arg_list(&cmd, &arg));
     TEST_BOOL(jsl_fatptr_cstr_compare(arg, "build"));
-    TEST_BOOL(jsl_cmd_line_pop_arg_list(&cmd, &arg));
+    TEST_BOOL(jsl_cmd_line_args_pop_arg_list(&cmd, &arg));
     TEST_BOOL(jsl_fatptr_cstr_compare(arg, "--not-a-flag"));
-    TEST_BOOL(!jsl_cmd_line_pop_arg_list(&cmd, &arg));
+    TEST_BOOL(!jsl_cmd_line_args_pop_arg_list(&cmd, &arg));
 }
 
 static bool contains_value(JSLFatPtr* values, int32_t length, const char* needle)
@@ -155,7 +155,7 @@ static void test_long_values_equals_and_space(void)
 
     JSLCmdLineArgs cmd = {0};
 
-    TEST_BOOL(jsl_cmd_line_init(&cmd, &allocator));
+    TEST_BOOL(jsl_cmd_line_args_init(&cmd, &allocator));
 
     char* argv[] = {
         "prog",
@@ -166,12 +166,12 @@ static void test_long_values_equals_and_space(void)
         "clean",
     };
 
-    TEST_BOOL(jsl_cmd_line_parse(&cmd, 7, argv, NULL));
+    TEST_BOOL(jsl_cmd_line_args_parse(&cmd, 7, argv, NULL));
 
     JSLFatPtr collected[3] = {0};
     int32_t collected_count = 0;
     JSLFatPtr value = {0};
-    while (jsl_cmd_line_pop_flag_with_value(
+    while (jsl_cmd_line_args_pop_flag_with_value(
         &cmd,
         JSL_FATPTR_EXPRESSION("ignore"),
         &value
@@ -185,14 +185,14 @@ static void test_long_values_equals_and_space(void)
     TEST_BOOL(contains_value(collected, collected_count, "bar"));
     TEST_BOOL(contains_value(collected, collected_count, "baz"));
 
-    TEST_BOOL(!jsl_cmd_line_has_command(&cmd, JSL_FATPTR_EXPRESSION("bar")));
+    TEST_BOOL(!jsl_cmd_line_args_has_command(&cmd, JSL_FATPTR_EXPRESSION("bar")));
 
     JSLFatPtr arg = {0};
-    TEST_BOOL(jsl_cmd_line_pop_arg_list(&cmd, &arg));
+    TEST_BOOL(jsl_cmd_line_args_pop_arg_list(&cmd, &arg));
     TEST_BOOL(jsl_fatptr_cstr_compare(arg, "run"));
-    TEST_BOOL(jsl_cmd_line_pop_arg_list(&cmd, &arg));
+    TEST_BOOL(jsl_cmd_line_args_pop_arg_list(&cmd, &arg));
     TEST_BOOL(jsl_fatptr_cstr_compare(arg, "clean"));
-    TEST_BOOL(!jsl_cmd_line_pop_arg_list(&cmd, &arg));
+    TEST_BOOL(!jsl_cmd_line_args_pop_arg_list(&cmd, &arg));
 }
 
 static void test_wide_parsing(void)
@@ -203,7 +203,7 @@ static void test_wide_parsing(void)
 
     JSLCmdLineArgs cmd = {0};
 
-    TEST_BOOL(jsl_cmd_line_init(&cmd, &allocator));
+    TEST_BOOL(jsl_cmd_line_args_init(&cmd, &allocator));
 
     wchar_t arg0[] = L"prog";
     wchar_t arg1[] = L"--name";
@@ -217,18 +217,18 @@ static void test_wide_parsing(void)
         arg3
     };
 
-    TEST_BOOL(jsl_cmd_line_parse_wide(&cmd, 4, argv, NULL));
+    TEST_BOOL(jsl_cmd_line_args_parse_wide(&cmd, 4, argv, NULL));
 
     JSLFatPtr value = {0};
-    TEST_BOOL(jsl_cmd_line_pop_flag_with_value(
+    TEST_BOOL(jsl_cmd_line_args_pop_flag_with_value(
         &cmd,
         JSL_FATPTR_EXPRESSION("name"),
         &value
     ));
     TEST_BOOL(jsl_fatptr_cstr_compare(value, "alice"));
 
-    TEST_BOOL(jsl_cmd_line_has_command(&cmd, JSL_FATPTR_EXPRESSION("deploy")));
-    TEST_BOOL(!jsl_cmd_line_has_command(&cmd, JSL_FATPTR_EXPRESSION("alice")));
+    TEST_BOOL(jsl_cmd_line_args_has_command(&cmd, JSL_FATPTR_EXPRESSION("deploy")));
+    TEST_BOOL(!jsl_cmd_line_args_has_command(&cmd, JSL_FATPTR_EXPRESSION("alice")));
 }
 
 int main(void)

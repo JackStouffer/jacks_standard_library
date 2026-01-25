@@ -154,15 +154,15 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     // Parsing command line
     //
 
-    show_help = jsl_cmd_line_has_short_flag(cmd, 'h')
-        || jsl_cmd_line_has_flag(cmd, help_flag_str);
+    show_help = jsl_cmd_line_args_has_short_flag(cmd, 'h')
+        || jsl_cmd_line_args_has_flag(cmd, help_flag_str);
 
-    jsl_cmd_line_pop_flag_with_value(cmd, name_flag_str, &name);
-    jsl_cmd_line_pop_flag_with_value(cmd, function_prefix_flag_str, &function_prefix);
-    jsl_cmd_line_pop_flag_with_value(cmd, value_type_flag_str, &value_type);
+    jsl_cmd_line_args_pop_flag_with_value(cmd, name_flag_str, &name);
+    jsl_cmd_line_args_pop_flag_with_value(cmd, function_prefix_flag_str, &function_prefix);
+    jsl_cmd_line_args_pop_flag_with_value(cmd, value_type_flag_str, &value_type);
 
     JSLFatPtr custom_header = {0};
-    while (jsl_cmd_line_pop_flag_with_value(cmd, add_header_flag_str, &custom_header))
+    while (jsl_cmd_line_args_pop_flag_with_value(cmd, add_header_flag_str, &custom_header))
     {
         ++header_includes_count;
         header_includes = realloc(
@@ -172,10 +172,10 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
         header_includes[header_includes_count - 1] = custom_header;
     }
 
-    bool fixed_flag_set = jsl_cmd_line_has_flag(cmd, fixed_flag_str);
-    bool dynamic_flag_set = jsl_cmd_line_has_flag(cmd, dynamic_flag_str);
-    bool header_flag_set = jsl_cmd_line_has_flag(cmd, header_flag_str);
-    bool source_flag_set = jsl_cmd_line_has_flag(cmd, source_flag_str);
+    bool fixed_flag_set = jsl_cmd_line_args_has_flag(cmd, fixed_flag_str);
+    bool dynamic_flag_set = jsl_cmd_line_args_has_flag(cmd, dynamic_flag_str);
+    bool header_flag_set = jsl_cmd_line_args_has_flag(cmd, header_flag_str);
+    bool source_flag_set = jsl_cmd_line_args_has_flag(cmd, source_flag_str);
 
     if (show_help)
     {
@@ -314,9 +314,9 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
         JSLAllocatorInterface allocator = jsl_infinite_arena_get_allocator_interface(&arena);
 
         JSLCmdLineArgs cmd;
-        jsl_cmd_line_init(&cmd, &allocator);
+        jsl_cmd_line_args_init(&cmd, &allocator);
         JSLFatPtr error_message = {0};
-        if (!jsl_cmd_line_parse_wide(&cmd, argc, argv, &error_message))
+        if (!jsl_cmd_line_args_parse_wide(&cmd, argc, argv, &error_message))
         {
             if (error_message.data != NULL)
             {
@@ -346,14 +346,14 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
         JSLAllocatorInterface allocator = jsl_infinite_arena_get_allocator_interface(&arena);
 
         JSLCmdLineArgs cmd;
-        if (!jsl_cmd_line_init(&cmd, &allocator))
+        if (!jsl_cmd_line_args_init(&cmd, &allocator))
         {
             jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Command line input exceeds memory limit"));
             return EXIT_FAILURE;
         }
 
         JSLFatPtr error_message = {0};
-        if (!jsl_cmd_line_parse(&cmd, argc, argv, &error_message))
+        if (!jsl_cmd_line_args_parse(&cmd, argc, argv, &error_message))
         {
             if (error_message.data != NULL)
             {

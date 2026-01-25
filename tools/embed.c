@@ -53,15 +53,15 @@ static int32_t entrypoint(
     int32_t load_errno = 0;
     EmbedOuputTypeEnum output_type = OUTPUT_TYPE_INVALID;
 
-    bool show_help = jsl_cmd_line_has_short_flag(cmd, 'h')
-        || jsl_cmd_line_has_flag(cmd, help_flag_str);
+    bool show_help = jsl_cmd_line_args_has_short_flag(cmd, 'h')
+        || jsl_cmd_line_args_has_flag(cmd, help_flag_str);
 
-    bool output_binary = jsl_cmd_line_has_flag(cmd, binary_flag_str);
-    bool output_text = jsl_cmd_line_has_flag(cmd, text_flag_str);
+    bool output_binary = jsl_cmd_line_args_has_flag(cmd, binary_flag_str);
+    bool output_text = jsl_cmd_line_args_has_flag(cmd, text_flag_str);
 
-    jsl_cmd_line_pop_flag_with_value(cmd, var_name_flag_str, &var_name);
+    jsl_cmd_line_args_pop_flag_with_value(cmd, var_name_flag_str, &var_name);
 
-    jsl_cmd_line_pop_arg_list(cmd, &file_path);
+    jsl_cmd_line_args_pop_arg_list(cmd, &file_path);
 
     //
     // check params
@@ -96,7 +96,7 @@ static int32_t entrypoint(
     }
     else if (file_path.data != NULL)
     {
-        if (jsl_cmd_line_pop_arg_list(cmd, &file_path))
+        if (jsl_cmd_line_args_pop_arg_list(cmd, &file_path))
         {
             jsl_format_sink(
                 stderr_sink,
@@ -199,9 +199,9 @@ static int32_t entrypoint(
         JSLAllocatorInterface allocator = jsl_infinite_arena_get_allocator_interface(&arena);
 
         JSLCmdLineArgs cmd;
-        jsl_cmd_line_init(&cmd, &allocator);
+        jsl_cmd_line_args_init(&cmd, &allocator);
         JSLFatPtr error_message = {0};
-        if (!jsl_cmd_line_parse_wide(&cmd, argc, argv, &error_message))
+        if (!jsl_cmd_line_args_parse_wide(&cmd, argc, argv, &error_message))
         {
             if (error_message.data != NULL)
             {
@@ -249,14 +249,14 @@ static int32_t entrypoint(
         JSLAllocatorInterface allocator = jsl_infinite_arena_get_allocator_interface(&arena);
 
         JSLCmdLineArgs cmd;
-        if (!jsl_cmd_line_init(&cmd, &allocator))
+        if (!jsl_cmd_line_args_init(&cmd, &allocator))
         {
             jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Command line input exceeds memory limit"));
             return EXIT_FAILURE;
         }
 
         JSLFatPtr error_message = {0};
-        if (!jsl_cmd_line_parse(&cmd, argc, argv, &error_message))
+        if (!jsl_cmd_line_args_parse(&cmd, argc, argv, &error_message))
         {
             if (error_message.data != NULL)
             {

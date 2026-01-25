@@ -72,7 +72,7 @@ typedef struct JSL__CmdLineArgs JSLCmdLineArgs;
 /**
  * Initialize an instance of the command line parser container.
  */
-bool jsl_cmd_line_init(JSLCmdLineArgs* cmd_line, JSLAllocatorInterface* allocator);
+bool jsl_cmd_line_args_init(JSLCmdLineArgs* cmd_line, JSLAllocatorInterface* allocator);
 
 /**
  * Parse the given command line arguments that are in the POSIX style.
@@ -88,7 +88,7 @@ bool jsl_cmd_line_init(JSLCmdLineArgs* cmd_line, JSLAllocatorInterface* allocato
  * @returns false if the arena is out of memory or the passed in strings
  * were not valid utf-8.
  */
-bool jsl_cmd_line_parse(
+bool jsl_cmd_line_args_parse(
     JSLCmdLineArgs* cmd_line,
     int32_t argc,
     char** argv,
@@ -109,7 +109,7 @@ bool jsl_cmd_line_parse(
  * @returns false if the arena is out of memory or the passed in strings
  * were not valid utf-16.
  */
-bool jsl_cmd_line_parse_wide(
+bool jsl_cmd_line_args_parse_wide(
     JSLCmdLineArgs* cmd_line,
     int32_t argc,
     wchar_t** argv,
@@ -126,13 +126,13 @@ bool jsl_cmd_line_parse_wide(
  * ```
  * 
  * ```
- * jsl_cmd_line_has_short_flag(cmd, 'f'); // true
- * jsl_cmd_line_has_short_flag(cmd, 'v'); // true
- * jsl_cmd_line_has_short_flag(cmd, 'g'); // false
+ * jsl_cmd_line_args_has_short_flag(cmd, 'f'); // true
+ * jsl_cmd_line_args_has_short_flag(cmd, 'v'); // true
+ * jsl_cmd_line_args_has_short_flag(cmd, 'g'); // false
  * ```
  * TODO: docs
  */
-bool jsl_cmd_line_has_short_flag(JSLCmdLineArgs* cmd_line, uint8_t flag);
+bool jsl_cmd_line_args_has_short_flag(JSLCmdLineArgs* cmd_line, uint8_t flag);
 
 /**
  * Checks if the user passed in the given flag with no value.
@@ -144,13 +144,13 @@ bool jsl_cmd_line_has_short_flag(JSLCmdLineArgs* cmd_line, uint8_t flag);
  * ```
  * 
  * ```
- * jsl_cmd_line_has_flag(cmd, JSL_FATPTR_EXPRESSION("long-flag")); // true
- * jsl_cmd_line_has_flag(cmd, JSL_FATPTR_EXPRESSION("arg")); // false
- * jsl_cmd_line_has_flag(cmd, JSL_FATPTR_EXPRESSION("arg2")); // true
+ * jsl_cmd_line_args_has_flag(cmd, JSL_FATPTR_EXPRESSION("long-flag")); // true
+ * jsl_cmd_line_args_has_flag(cmd, JSL_FATPTR_EXPRESSION("arg")); // false
+ * jsl_cmd_line_args_has_flag(cmd, JSL_FATPTR_EXPRESSION("arg2")); // true
  * ```
  * TODO: docs
  */
-bool jsl_cmd_line_has_flag(JSLCmdLineArgs* cmd_line, JSLFatPtr flag);
+bool jsl_cmd_line_args_has_flag(JSLCmdLineArgs* cmd_line, JSLFatPtr flag);
 
 /**
  * Checks if the user passed in the given command.
@@ -162,13 +162,13 @@ bool jsl_cmd_line_has_flag(JSLCmdLineArgs* cmd_line, JSLFatPtr flag);
  * ```
  * 
  * ```
- * jsl_cmd_line_has_command(cmd, JSL_FATPTR_EXPRESSION("clean")); // true
- * jsl_cmd_line_has_command(cmd, JSL_FATPTR_EXPRESSION("build")); // true
- * jsl_cmd_line_has_command(cmd, JSL_FATPTR_EXPRESSION("restart")); // false
+ * jsl_cmd_line_args_has_command(cmd, JSL_FATPTR_EXPRESSION("clean")); // true
+ * jsl_cmd_line_args_has_command(cmd, JSL_FATPTR_EXPRESSION("build")); // true
+ * jsl_cmd_line_args_has_command(cmd, JSL_FATPTR_EXPRESSION("restart")); // false
  * ```
  * TODO: docs
  */
-bool jsl_cmd_line_has_command(JSLCmdLineArgs* cmd_line, JSLFatPtr flag);
+bool jsl_cmd_line_args_has_command(JSLCmdLineArgs* cmd_line, JSLFatPtr flag);
 
 /**
  * If the user passed in a argument list, pop one off returning true if
@@ -183,18 +183,18 @@ bool jsl_cmd_line_has_command(JSLCmdLineArgs* cmd_line, JSLFatPtr flag);
  * ```
  * JSLFatPtr arg;
  * 
- * jsl_cmd_line_pop_arg_list(cmd, &arg); // arg == file1
- * jsl_cmd_line_pop_arg_list(cmd, &arg); // arg == file2
- * jsl_cmd_line_pop_arg_list(cmd, &arg); // arg == file3
- * jsl_cmd_line_pop_arg_list(cmd, &arg); // returns false
+ * jsl_cmd_line_args_pop_arg_list(cmd, &arg); // arg == file1
+ * jsl_cmd_line_args_pop_arg_list(cmd, &arg); // arg == file2
+ * jsl_cmd_line_args_pop_arg_list(cmd, &arg); // arg == file3
+ * jsl_cmd_line_args_pop_arg_list(cmd, &arg); // returns false
  * ```
  * TODO: docs
  * 
  * @warning This function assumes that there are no commands that can be returned
- * with `jsl_cmd_line_has_command`. There's no syntactic distinction between a single
+ * with `jsl_cmd_line_args_has_command`. There's no syntactic distinction between a single
  * command and a argument list.
  */
-bool jsl_cmd_line_pop_arg_list(JSLCmdLineArgs* cmd_line, JSLFatPtr* out_value);
+bool jsl_cmd_line_args_pop_arg_list(JSLCmdLineArgs* cmd_line, JSLFatPtr* out_value);
 
 /**
  * If the user passed in multiple instances of flag with a value, this function
@@ -210,15 +210,15 @@ bool jsl_cmd_line_pop_arg_list(JSLCmdLineArgs* cmd_line, JSLFatPtr* out_value);
  * ```
  * JSLFatPtr arg;
  * 
- * jsl_cmd_line_pop_flag_with_value(cmd, JSL_FATPTR_EXPRESSION("ignore"), &arg); // arg == foo
- * jsl_cmd_line_pop_flag_with_value(cmd, JSL_FATPTR_EXPRESSION("ignore"), &arg); // arg == bar
- * jsl_cmd_line_pop_flag_with_value(cmd, JSL_FATPTR_EXPRESSION("ignore"), &arg); // returns false
+ * jsl_cmd_line_args_pop_flag_with_value(cmd, JSL_FATPTR_EXPRESSION("ignore"), &arg); // arg == foo
+ * jsl_cmd_line_args_pop_flag_with_value(cmd, JSL_FATPTR_EXPRESSION("ignore"), &arg); // arg == bar
+ * jsl_cmd_line_args_pop_flag_with_value(cmd, JSL_FATPTR_EXPRESSION("ignore"), &arg); // returns false
  * ```
  * TODO: docs
  * 
  * @warning Argument ordering is not guaranteed
  */
-bool jsl_cmd_line_pop_flag_with_value(
+bool jsl_cmd_line_args_pop_flag_with_value(
     JSLCmdLineArgs* cmd_line,
     JSLFatPtr flag,
     JSLFatPtr* out_value
