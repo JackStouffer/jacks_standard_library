@@ -54,7 +54,6 @@
 - [`JSLAllocatorInterface`](#type-jslallocatorinterface)
 - [`JSLStringLifeTime`](#type-jslstringlifetime)
 - [`JSLFatPtr`](#type-jslfatptr)
-- [`int64_t`](#type-typedef-int64_t)
 - [`JSLOutputSink`](#type-jsloutputsink)
 
 ## Functions
@@ -2313,36 +2312,6 @@ JSLFatPtr jsl_fatptr_duplicate(JSLAllocatorInterface *allocator, JSLFatPtr str);
 
 
 *Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_core.h:1717`
-
----
-
-<a id="type-typedef-int64_t"></a>
-### Typedef: `int64_t`
-
-TODO: docs
-
-There's no run time constraints on how large a chunk of data a user might give
-this function.
-
-Handling,
-
-- blocking or non-blocking behavior
-- Retries
-- Partial success
-- Chunking writes
-- Backpressure
-- Error reporting/codes
-
-Are all your responsibility and should be in the logic of this function.
-
-Also flushing and/or closing the sink once its lifetime is over is also your responsibilty
-
-```c
-typedef int (int *) int64_t;
-```
-
-
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_core.h:1738`
 
 ---
 

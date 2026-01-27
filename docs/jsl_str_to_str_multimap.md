@@ -2,12 +2,16 @@
 
 ## Macros
 
-- [`JSL_STR_TO_STR_MULTIMAP_H_INCLUDED`](#macro-jsl_str_to_str_multimap_h_included)
 - [`JSL_STR_TO_STR_MULTIMAP_VERSION`](#macro-jsl_str_to_str_multimap_version)
 - [`JSL_STR_TO_STR_MULTIMAP_DEF`](#macro-jsl_str_to_str_multimap_def)
 
 ## Types
 
+- [`JSLStrToStrMultimapKeyState`](#type-jslstrtostrmultimapkeystate)
+- [`union (unnamed at /Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:86:5)`](#type-union-unnamed-at-users-jackstouffer-documents-code-jacks_standard_library-src-jsl_str_to_str_multimap-h-86-5)
+- [`struct (unnamed at /Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:88:9)`](#type-struct-unnamed-at-users-jackstouffer-documents-code-jacks_standard_library-src-jsl_str_to_str_multimap-h-88-9)
+- [`union (unnamed at /Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:101:5)`](#type-union-unnamed-at-users-jackstouffer-documents-code-jacks_standard_library-src-jsl_str_to_str_multimap-h-101-5)
+- [`struct (unnamed at /Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:103:9)`](#type-struct-unnamed-at-users-jackstouffer-documents-code-jacks_standard_library-src-jsl_str_to_str_multimap-h-103-9)
 - [`JSLStrToStrMultimap`](#type-typedef-jslstrtostrmultimap)
 - [`JSLStrToStrMultimapKeyValueIter`](#type-typedef-jslstrtostrmultimapkeyvalueiter)
 - [`JSLStrToStrMultimapValueIter`](#type-typedef-jslstrtostrmultimapvalueiter)
@@ -29,7 +33,7 @@
 - [`jsl_str_to_str_multimap_delete_value`](#function-jsl_str_to_str_multimap_delete_value)
 - [`jsl_str_to_str_multimap_clear`](#function-jsl_str_to_str_multimap_clear)
 
-## File: src/jsl_str_to_str_multimap.h
+## File: /Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h
 
 ## JSL String to String Multimap
 
@@ -41,29 +45,6 @@ This file is part of the Jack's Standard Library project.
 ### Documentation
 
 See `docs/jsl_str_to_str_multimap.md` for a formatted documentation page.
-
-### Usage
-
-1. Copy the `jsl_str_to_str_multimap.h` file into your repo
-2. Include the header like normally in each source file where you use it:
-
-```c
-#include "jsl_str_to_str_multimap.h"
-```
-
-3. Then, in ONE AND ONLY ONE file, do this:
-
-```c
-#define JSL_STR_TO_STR_MULTIMAP_IMPLEMENTATION
-#include "jsl_str_to_str_multimap.h"
-```
-
-**IMPORTANT**: The multimap also requires that the implementation of
-`jsl_core.h` be in the same executable.
-
-This should probably be in the same file as your entrypoint function,
-but it doesn't have to be. It's also common to put this into an otherwise
-empty file for easier integration to standard C/C++ build systems.
 
 ### Caveats
 
@@ -79,7 +60,7 @@ Remember to
 
 ### License
 
-Copyright (c) 2025 Jack Stouffer
+Copyright (c) 2026 Jack Stouffer
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the “Software”),
@@ -98,18 +79,6 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
 WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
-<a id="macro-jsl_str_to_str_multimap_h_included"></a>
-### Macro: `JSL_STR_TO_STR_MULTIMAP_H_INCLUDED`
-
-```c
-#define JSL_STR_TO_STR_MULTIMAP_H_INCLUDED JSL_STR_TO_STR_MULTIMAP_H_INCLUDED
-```
-
-
-*Defined at*: `src/jsl_str_to_str_multimap.h:72`
-
----
-
 <a id="macro-jsl_str_to_str_multimap_version"></a>
 ### Macro: `JSL_STR_TO_STR_MULTIMAP_VERSION`
 
@@ -118,7 +87,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:85`
+*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:61`
 
 ---
 
@@ -130,7 +99,61 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:93`
+*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:69`
+
+---
+
+<a id="type-jslstrtostrmultimapkeystate"></a>
+### : `JSLStrToStrMultimapKeyState`
+
+- `JSL__MULTIMAP_EMPTY = 1`
+- `JSL__MULTIMAP_TOMBSTONE = 2`
+
+
+*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:76`
+
+---
+
+<a id="type-union-unnamed-at-users-jackstouffer-documents-code-jacks_standard_library-src-jsl_str_to_str_multimap-h-86-5"></a>
+### : `union (unnamed at /Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:86:5)`
+
+- `JSLFatPtr value;`
+
+
+*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:86`
+
+---
+
+<a id="type-struct-unnamed-at-users-jackstouffer-documents-code-jacks_standard_library-src-jsl_str_to_str_multimap-h-88-9"></a>
+### : `struct (unnamed at /Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:88:9)`
+
+- `int64_t sso_len;`
+- `int[32] small_string_buffer;`
+
+
+*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:88`
+
+---
+
+<a id="type-union-unnamed-at-users-jackstouffer-documents-code-jacks_standard_library-src-jsl_str_to_str_multimap-h-101-5"></a>
+### : `union (unnamed at /Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:101:5)`
+
+- `JSLFatPtr key;`
+- `struct JSL__StrToStrMultimapEntry * next;`
+
+
+*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:101`
+
+---
+
+<a id="type-struct-unnamed-at-users-jackstouffer-documents-code-jacks_standard_library-src-jsl_str_to_str_multimap-h-103-9"></a>
+### : `struct (unnamed at /Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:103:9)`
+
+- `int[24] small_string_buffer;`
+- `int64_t sso_len;`
+
+
+*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:103`
 
 ---
 
@@ -192,7 +215,7 @@ typedef struct JSL__StrToStrMultimap JSLStrToStrMultimap;
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:151`
+*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:216`
 
 ---
 
@@ -218,7 +241,7 @@ typedef struct JSL__StrToStrMultimapKeyValueIter JSLStrToStrMultimapKeyValueIter
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:166`
+*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:231`
 
 ---
 
@@ -244,7 +267,7 @@ typedef struct JSL__StrToStrMultimapValueIter JSLStrToStrMultimapValueIter;
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:181`
+*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:246`
 
 ---
 
@@ -273,11 +296,11 @@ map cannot be attacked, then zero is valid seed value.
 `true` on success, `false` if any parameter is invalid or out of memory.
 
 ```c
-int jsl_str_to_str_multimap_init(JSLStrToStrMultimap *map, JSLArena *arena, int seed);
+int jsl_str_to_str_multimap_init(JSLStrToStrMultimap *map, JSLAllocatorInterface *allocator, int seed);
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:196`
+*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:261`
 
 ---
 
@@ -313,11 +336,11 @@ this map cannot be attacked, then zero is valid seed value
 `true` on success, `false` if any parameter is invalid or out of memory.
 
 ```c
-int jsl_str_to_str_multimap_init2(JSLStrToStrMultimap *map, JSLArena *arena, int seed, int item_count_guess, float load_factor);
+int jsl_str_to_str_multimap_init2(JSLStrToStrMultimap *map, JSLAllocatorInterface *allocator, int seed, int64_t item_count_guess, float load_factor);
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:220`
+*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:285`
 
 ---
 
@@ -341,7 +364,7 @@ int jsl_str_to_str_multimap_get_key_count(JSLStrToStrMultimap *map);
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:234`
+*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:299`
 
 ---
 
@@ -365,7 +388,7 @@ int jsl_str_to_str_multimap_get_value_count(JSLStrToStrMultimap *map);
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:244`
+*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:309`
 
 ---
 
@@ -389,7 +412,7 @@ int jsl_str_to_str_multimap_has_key(JSLStrToStrMultimap *map, JSLFatPtr key);
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:254`
+*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:319`
 
 ---
 
@@ -428,7 +451,7 @@ int jsl_str_to_str_multimap_insert(JSLStrToStrMultimap *map, JSLFatPtr key, JSLS
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:276`
+*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:341`
 
 ---
 
@@ -454,7 +477,7 @@ int jsl_str_to_str_multimap_get_value_count_for_key(JSLStrToStrMultimap *map, JS
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:291`
+*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:356`
 
 ---
 
@@ -500,7 +523,7 @@ int jsl_str_to_str_multimap_key_value_iterator_init(JSLStrToStrMultimap *map, JS
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:323`
+*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:388`
 
 ---
 
@@ -548,7 +571,7 @@ int jsl_str_to_str_multimap_key_value_iterator_next(JSLStrToStrMultimapKeyValueI
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:356`
+*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:421`
 
 ---
 
@@ -596,7 +619,7 @@ int jsl_str_to_str_multimap_get_values_for_key_iterator_init(JSLStrToStrMultimap
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:390`
+*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:455`
 
 ---
 
@@ -643,7 +666,7 @@ int jsl_str_to_str_multimap_get_values_for_key_iterator_next(JSLStrToStrMultimap
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:424`
+*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:489`
 
 ---
 
@@ -672,7 +695,7 @@ int jsl_str_to_str_multimap_delete_key(JSLStrToStrMultimap *map, JSLFatPtr key);
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:439`
+*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:504`
 
 ---
 
@@ -705,7 +728,7 @@ int jsl_str_to_str_multimap_delete_value(JSLStrToStrMultimap *map, JSLFatPtr key
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:457`
+*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:522`
 
 ---
 
@@ -723,7 +746,7 @@ void jsl_str_to_str_multimap_clear(JSLStrToStrMultimap *map);
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:468`
+*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_str_to_str_multimap.h:533`
 
 ---
 
