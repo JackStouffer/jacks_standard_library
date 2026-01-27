@@ -21,7 +21,7 @@
 - [`jsl_allocator_interface_free`](#function-jsl_allocator_interface_free)
 - [`jsl_allocator_interface_free_all`](#function-jsl_allocator_interface_free_all)
 
-## File: /Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator.h
+## File: src/jsl_allocator.h
 
 This file defines a standardized allocator abstraction to allow library
 code to interact cleanly with arbitrary user code.
@@ -108,7 +108,7 @@ struct MyStruct* thing = JSL_TYPED_ALLOCATE(struct MyStruct, arena);
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator.h:195`
+*Defined at*: `src/jsl_allocator.h:195`
 
 ---
 
@@ -130,7 +130,7 @@ typedef void *(*)(void *, int64_t *, int, int) JSLAllocateFP;
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator.h:82`
+*Defined at*: `src/jsl_allocator.h:82`
 
 ---
 
@@ -151,7 +151,7 @@ typedef void *(*)(void *, void *, int64_t *, int) JSLReallocateFP;
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator.h:93`
+*Defined at*: `src/jsl_allocator.h:93`
 
 ---
 
@@ -165,7 +165,7 @@ typedef int (*)(void *) JSLFreeAllFP;
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator.h:101`
+*Defined at*: `src/jsl_allocator.h:101`
 
 ---
 
@@ -184,7 +184,7 @@ typedef struct JSL__AllocatorInterface JSLAllocatorInterface;
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator.h:122`
+*Defined at*: `src/jsl_allocator.h:122`
 
 ---
 
@@ -198,7 +198,7 @@ void * jsl_align_ptr_upwards(void *ptr, int align);
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator.h:127`
+*Defined at*: `src/jsl_allocator.h:127`
 
 ---
 
@@ -212,7 +212,7 @@ int jsl_align_ptr_upwards_uintptr(int ptr, int align);
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator.h:132`
+*Defined at*: `src/jsl_allocator.h:132`
 
 ---
 
@@ -228,7 +228,7 @@ void jsl_allocator_interface_init(JSLAllocatorInterface *allocator, JSLAllocateF
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator.h:139`
+*Defined at*: `src/jsl_allocator.h:139`
 
 ---
 
@@ -242,7 +242,7 @@ void * jsl_allocator_interface_alloc(JSLAllocatorInterface *allocator, int64_t b
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator.h:151`
+*Defined at*: `src/jsl_allocator.h:151`
 
 ---
 
@@ -256,7 +256,7 @@ void * jsl_allocator_interface_realloc(JSLAllocatorInterface *allocator, void *a
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator.h:161`
+*Defined at*: `src/jsl_allocator.h:161`
 
 ---
 
@@ -270,7 +270,7 @@ int jsl_allocator_interface_free(JSLAllocatorInterface *allocator, void *allocat
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator.h:171`
+*Defined at*: `src/jsl_allocator.h:171`
 
 ---
 
@@ -284,7 +284,7 @@ int jsl_allocator_interface_free_all(JSLAllocatorInterface *allocator);
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator.h:179`
+*Defined at*: `src/jsl_allocator.h:179`
 
 ---
 

@@ -19,7 +19,7 @@
 - [`jsl_cmd_line_args_pop_arg_list`](#function-jsl_cmd_line_args_pop_arg_list)
 - [`jsl_cmd_line_args_pop_flag_with_value`](#function-jsl_cmd_line_args_pop_flag_with_value)
 
-## File: /Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_cmd_line.h
+## File: src/jsl_cmd_line.h
 
 TODO: docs
 
@@ -56,7 +56,7 @@ typedef struct JSL__CmdLineArgs JSLCmdLineArgs;
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_cmd_line.h:70`
+*Defined at*: `src/jsl_cmd_line.h:70`
 
 ---
 
@@ -70,7 +70,7 @@ int jsl_cmd_line_args_init(JSLCmdLineArgs *args, JSLAllocatorInterface *allocato
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_cmd_line.h:75`
+*Defined at*: `src/jsl_cmd_line.h:75`
 
 ---
 
@@ -98,7 +98,7 @@ int jsl_cmd_line_args_parse(JSLCmdLineArgs *args, int argc, char **argv, JSLFatP
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_cmd_line.h:91`
+*Defined at*: `src/jsl_cmd_line.h:91`
 
 ---
 
@@ -126,7 +126,7 @@ int jsl_cmd_line_args_parse_wide(JSLCmdLineArgs *args, int argc, int **argv, JSL
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_cmd_line.h:112`
+*Defined at*: `src/jsl_cmd_line.h:112`
 
 ---
 
@@ -153,7 +153,7 @@ int jsl_cmd_line_args_has_short_flag(JSLCmdLineArgs *args, int flag);
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_cmd_line.h:135`
+*Defined at*: `src/jsl_cmd_line.h:135`
 
 ---
 
@@ -180,7 +180,7 @@ int jsl_cmd_line_args_has_flag(JSLCmdLineArgs *args, JSLFatPtr flag);
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_cmd_line.h:153`
+*Defined at*: `src/jsl_cmd_line.h:153`
 
 ---
 
@@ -207,7 +207,7 @@ int jsl_cmd_line_args_has_command(JSLCmdLineArgs *args, JSLFatPtr flag);
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_cmd_line.h:171`
+*Defined at*: `src/jsl_cmd_line.h:171`
 
 ---
 
@@ -244,7 +244,7 @@ int jsl_cmd_line_args_pop_arg_list(JSLCmdLineArgs *args, JSLFatPtr *out_value);
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_cmd_line.h:197`
+*Defined at*: `src/jsl_cmd_line.h:197`
 
 ---
 
@@ -279,7 +279,7 @@ int jsl_cmd_line_args_pop_flag_with_value(JSLCmdLineArgs *args, JSLFatPtr flag, 
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_cmd_line.h:221`
+*Defined at*: `src/jsl_cmd_line.h:221`
 
 ---
 

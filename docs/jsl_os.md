@@ -20,7 +20,7 @@
 - [`jsl_write_to_c_file`](#function-jsl_write_to_c_file)
 - [`jsl_c_file_output_sink`](#function-jsl_c_file_output_sink)
 
-## File: /Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_os.h
+## File: src/jsl_os.h
 
 ## Jack's Standard Library File Utilities
 
@@ -73,7 +73,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - `JSL_GET_FILE_SIZE_ENUM_COUNT = 4`
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_os.h:87`
+*Defined at*: `src/jsl_os.h:87`
 
 ---
 
@@ -91,7 +91,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - `JSL_FILE_LOAD_ENUM_COUNT = 8`
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_os.h:97`
+*Defined at*: `src/jsl_os.h:97`
 
 ---
 
@@ -106,7 +106,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - `JSL_FILE_WRITE_ENUM_COUNT = 5`
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_os.h:111`
+*Defined at*: `src/jsl_os.h:111`
 
 ---
 
@@ -124,7 +124,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - `JSL_FILE_TYPE_COUNT = 8`
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_os.h:122`
+*Defined at*: `src/jsl_os.h:122`
 
 ---
 
@@ -152,7 +152,7 @@ JSLGetFileSizeResultEnum jsl_get_file_size(JSLFatPtr path, int64_t *out_size, in
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_os.h:143`
+*Defined at*: `src/jsl_os.h:143`
 
 ---
 
@@ -169,7 +169,7 @@ JSLLoadFileResultEnum jsl_load_file_contents(JSLAllocatorInterface *allocator, J
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_os.h:155`
+*Defined at*: `src/jsl_os.h:155`
 
 ---
 
@@ -202,7 +202,7 @@ JSLLoadFileResultEnum jsl_load_file_contents_buffer(JSLFatPtr *buffer, JSLFatPtr
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_os.h:175`
+*Defined at*: `src/jsl_os.h:175`
 
 ---
 
@@ -237,7 +237,7 @@ JSLWriteFileResultEnum jsl_write_file_contents(JSLFatPtr contents, JSLFatPtr pat
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_os.h:195`
+*Defined at*: `src/jsl_os.h:195`
 
 ---
 
@@ -268,7 +268,7 @@ int jsl_write_to_c_file(int *out, JSLFatPtr data);
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_os.h:214`
+*Defined at*: `src/jsl_os.h:214`
 
 ---
 
@@ -282,7 +282,7 @@ JSLOutputSink jsl_c_file_output_sink(int *file);
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_os.h:219`
+*Defined at*: `src/jsl_os.h:219`
 
 ---
 

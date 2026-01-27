@@ -23,7 +23,7 @@
 - [`jsl_arena_save_restore_point`](#function-jsl_arena_save_restore_point)
 - [`jsl_arena_load_restore_point`](#function-jsl_arena_load_restore_point)
 
-## File: /Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator_arena.h
+## File: src/jsl_allocator_arena.h
 
 <a id="macro-jsl_arena_from_stack"></a>
 ### Macro: `JSL_ARENA_FROM_STACK`
@@ -66,7 +66,7 @@ Fast, cheap, easy automatic memory management!
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator_arena.h:96`
+*Defined at*: `src/jsl_allocator_arena.h:96`
 
 ---
 
@@ -97,7 +97,7 @@ struct MyStruct* thing = JSL_ARENA_TYPED_ALLOCATE(struct MyStruct, arena);
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator_arena.h:162`
+*Defined at*: `src/jsl_allocator_arena.h:162`
 
 ---
 
@@ -128,7 +128,7 @@ struct MyStruct* thing_array = JSL_ARENA_TYPED_ALLOCATE(struct MyStruct, arena, 
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator_arena.h:176`
+*Defined at*: `src/jsl_allocator_arena.h:176`
 
 ---
 
@@ -166,7 +166,7 @@ single thread. If you want to share an arena between threads you need to lock.
 - `int * end;`
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator_arena.h:42`
+*Defined at*: `src/jsl_allocator_arena.h:42`
 
 ---
 
@@ -188,7 +188,7 @@ void jsl_arena_init(JSLArena *arena, void *memory, int64_t length);
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator_arena.h:105`
+*Defined at*: `src/jsl_allocator_arena.h:105`
 
 ---
 
@@ -211,7 +211,7 @@ void jsl_arena_init2(JSLArena *arena, JSLFatPtr memory);
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator_arena.h:116`
+*Defined at*: `src/jsl_allocator_arena.h:116`
 
 ---
 
@@ -225,7 +225,7 @@ JSLAllocatorInterface jsl_arena_get_allocator_interface(JSLArena *arena);
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator_arena.h:121`
+*Defined at*: `src/jsl_allocator_arena.h:121`
 
 ---
 
@@ -256,7 +256,7 @@ void * jsl_arena_allocate(JSLArena *arena, int64_t bytes, bool zeroed);
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator_arena.h:134`
+*Defined at*: `src/jsl_allocator_arena.h:134`
 
 ---
 
@@ -289,7 +289,7 @@ void * jsl_arena_allocate_aligned(JSLArena *arena, int64_t bytes, int alignment,
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator_arena.h:148`
+*Defined at*: `src/jsl_allocator_arena.h:148`
 
 ---
 
@@ -304,7 +304,7 @@ void * jsl_arena_reallocate(JSLArena *arena, void *original_allocation, int64_t 
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator_arena.h:182`
+*Defined at*: `src/jsl_allocator_arena.h:182`
 
 ---
 
@@ -319,7 +319,7 @@ void * jsl_arena_reallocate_aligned(JSLArena *arena, void *original_allocation, 
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator_arena.h:192`
+*Defined at*: `src/jsl_allocator_arena.h:192`
 
 ---
 
@@ -336,7 +336,7 @@ void jsl_arena_reset(JSLArena *arena);
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator_arena.h:205`
+*Defined at*: `src/jsl_allocator_arena.h:205`
 
 ---
 
@@ -367,7 +367,7 @@ int * jsl_arena_save_restore_point(JSLArena *arena);
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator_arena.h:227`
+*Defined at*: `src/jsl_allocator_arena.h:227`
 
 ---
 
@@ -401,7 +401,7 @@ void jsl_arena_load_restore_point(JSLArena *arena, int *restore_point);
 ```
 
 
-*Defined at*: `/Users/jackstouffer/Documents/code/jacks_standard_library/src/jsl_allocator_arena.h:252`
+*Defined at*: `src/jsl_allocator_arena.h:252`
 
 ---
 
