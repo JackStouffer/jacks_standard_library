@@ -1,0 +1,2 @@
+./../c_doc_gen/doc_gen --ignore "ASAN*"  --ignore "bool" --ignore "JSL__*" --ignore "jsl__*" ~/Documents/code/jacks_standard_library/src/jsl_core.h > docs/jsl_core.md
+./../c_doc_gen/doc_gen --ignore "bool" --ignore "JSL__*" --ignore "jsl__*" ~/Documents/code/jacks_standard_library/src/jsl_allocator.h > docs/jsl_allocator.md
