@@ -47,6 +47,208 @@
 extern "C" {
 #endif
 
+/**
+ * TODO: docs
+ */
+typedef enum JSLCmdLineOutputMode
+{
+    /// @brief Force no escape codes
+    JSL_CMD_LINE_OUTPUT_MODE_NONE = 0,
+    /// @brief detect (TTY + env hints) or fall back
+    JSL_CMD_LINE_OUTPUT_MODE_DETECT,
+    /// @brief 16 color output
+    JSL_CMD_LINE_OUTPUT_MODE_ANSI16,
+    /// @brief 255 color output
+    JSL_CMD_LINE_OUTPUT_MODE_ANSI256,
+    /// @brief True 3 channel, 24 bit color output
+    JSL_CMD_LINE_OUTPUT_MODE_TRUECOLOR
+} JSLCmdLineOutputMode;
+
+
+typedef struct JSLTerminalInfo {
+    // IMPLEMENT ME
+    int _placeholder;
+} JSLTerminalInfo;
+
+/**
+ * TODO: docs
+ */
+typedef enum JSLCmdLineColorType
+{
+    /// @brief TODO: docs
+    JSL_CMD_LINE_COLOR_DEFAULT = 0,
+    /// @brief TODO: docs
+    JSL_CMD_LINE_COLOR_ANSI16,      // 0..15
+    /// @brief TODO: docs
+    JSL_CMD_LINE_COLOR_ANSI256,     // 0..255
+    /// @brief TODO: docs
+    JSL_CMD_LINE_COLOR_RGB          // 24-bit
+} JSLCmdLineColorType;
+
+/**
+ * TODO: docs
+ */
+typedef struct JSLCmdLineColor
+{
+    JSLCmdLineColorType color_type;
+    union
+    {
+        uint8_t ansi16;   // 0..15
+        uint8_t ansi256;  // 0..255
+        struct { uint8_t r, g, b; } rgb;
+    };
+} JSLCmdLineColor;
+
+/**
+ * TODO: docs
+ */
+typedef enum JSLCmdLineStyleAttribute {
+    /// @brief TODO: docs
+    JSL_CMD_LINE_STYLE_BOLD = JSL_MAKE_BITFLAG(0),
+    /// @brief TODO: docs
+    JSL_CMD_LINE_STYLE_DIM = JSL_MAKE_BITFLAG(1),
+    /// @brief TODO: docs
+    JSL_CMD_LINE_STYLE_ITALIC = JSL_MAKE_BITFLAG(2),
+    /// @brief TODO: docs
+    JSL_CMD_LINE_STYLE_UNDERLINE = JSL_MAKE_BITFLAG(3),
+    /// @brief double underline (if supported)
+    JSL_CMD_LINE_STYLE_DUNDERLINE = JSL_MAKE_BITFLAG(4),
+    /// @brief TODO: docs
+    JSL_CMD_LINE_STYLE_BLINK = JSL_MAKE_BITFLAG(5),
+    /// @brief rapid blink (rare)
+    JSL_CMD_LINE_STYLE_RBLINK = JSL_MAKE_BITFLAG(6),
+    /// @brief TODO: docs
+    JSL_CMD_LINE_STYLE_INVERSE = JSL_MAKE_BITFLAG(7),
+    /// @brief TODO: docs
+    JSL_CMD_LINE_STYLE_HIDDEN = JSL_MAKE_BITFLAG(8),
+    /// @brief TODO: docs
+    JSL_CMD_LINE_STYLE_STRIKE = JSL_MAKE_BITFLAG(9)
+} JSLCmdLineStyleAttribute;
+
+typedef struct JSLCmdLineStyle {
+    JSLCmdLineColor foreground;
+    JSLCmdLineColor background;
+    uint32_t style_attributes;
+} JSLCmdLineStyle;
+
+/// TODO: docs
+extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_WHITE;
+/// TODO: docs
+extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_WHITE_ITALIC;
+/// TODO: docs
+extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_WHITE_UNDERLINE;
+/// TODO: docs
+extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_WHITE_BOLD;
+/// TODO: docs
+extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_RED;
+/// TODO: docs
+extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_RED_ITALIC;
+/// TODO: docs
+extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_RED_UNDERLINE;
+/// TODO: docs
+extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_RED_BOLD;
+/// TODO: docs
+extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_GREEN;
+/// TODO: docs
+extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_GREEN_ITALIC;
+/// TODO: docs
+extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_GREEN_UNDERLINE;
+/// TODO: docs
+extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_GREEN_BOLD;
+/// TODO: docs
+extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_BLUE;
+/// TODO: docs
+extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_BLUE_ITALIC;
+/// TODO: docs
+extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_BLUE_UNDERLINE;
+/// TODO: docs
+extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_BLUE_BOLD;
+
+JSLTerminalInfo jsl_cmd_line_auto_detect_terminal_info();
+
+JSLTerminalInfo jsl_cmd_line_force_no_color();
+
+/**
+ * Converts the RGB color to its closest (mathmatical) color in the ANSI
+ * 16 color space 
+ * 
+ * This function is used in the background when attempting to write a 
+ * JSLCmdLineStyle with a RGB color to a terminal that only supports 16
+ * color mode. 
+ * 
+ * TODO: better docs, doxygen
+ */
+uint8_t jsl_cmd_line_rgb_to_ansi16(uint8_t r, uint8_t g, uint8_t b);
+
+/**
+ * Converts the RGB color to its closest (mathmatical) color in the ANSI
+ * 255 color space.
+ *
+ * This function is used in the background when attempting to write a 
+ * JSLCmdLineStyle with a RGB color to a terminal that only supports 255
+ * color mode. 
+ * 
+ * TODO: better docs, doxygen
+ */
+uint8_t jsl_cmd_line_rgb_to_ansi256(uint8_t r, uint8_t g, uint8_t b);
+
+/**
+ * Converts the ANSI 255 color to its closest (mathmatical) color in the ANSI
+ * 16 color space.
+ *
+ * This function is used in the background when attempting to write a 
+ * JSLCmdLineStyle with a ANSI 255 color to a terminal that only supports 16
+ * color mode. 
+ * 
+ * TODO: better docs, doxygen
+ */
+uint8_t jsl_cmd_line_ansi256_to_ansi16(uint8_t color255);
+
+/** 
+ * Send the ANSI escape codes to generate the given style to the output sink.
+ * This does NOT automatically send a reset code. All ANSI codes sent by this
+ * function are additive.
+ * 
+ * Example:
+ * 
+ * ```
+ * JSLOutputSink sink = jsl_c_file_output_sink(stdout);
+ *
+ * jsl_cmd_line_reset_style(sink);
+ * jsl_cmd_line_set_style(sink, JSL_CMD_LINE_STYLE_BOLD_RED);
+ * // this will be bold red
+ * jsl_output_sink_write_cstr(sink, "ERROR: ");
+ * jsl_cmd_line_reset_style(sink);
+ * // this will be default
+ * jsl_output_sink_write_cstr(sink, "There's an error in the program!");
+ * ```
+ * 
+ * TODO: better docs, doxygen
+ */
+int64_t jsl_cmd_line_set_style(JSLOutputSink sink, JSLTerminalInfo* terminal_info, JSLCmdLineStyle* style);
+
+/**
+ * Reset all styling by sending the reset ANSI escape code to the given output sink
+ *
+ * Example:
+ * 
+ * ```
+ * JSLOutputSink sink = jsl_c_file_output_sink(stdout);
+ *
+ * jsl_cmd_line_reset_style(sink);
+ * jsl_cmd_line_set_style(sink, JSL_CMD_LINE_STYLE_BOLD_RED);
+ * // this will be bold red
+ * jsl_output_sink_write_cstr(sink, "ERROR: ");
+ * jsl_cmd_line_reset_style(sink);
+ * // this will be default
+ * jsl_output_sink_write_cstr(sink, "There's an error in the program!");
+ * ```
+ * 
+ * TODO: better docs, doxygen
+ */
+int64_t jsl_cmd_line_reset_style(JSLOutputSink sink, JSLTerminalInfo* terminal_info);
+
+
 struct JSL__CmdLineArgs {
     JSLAllocatorInterface* allocator;
 
