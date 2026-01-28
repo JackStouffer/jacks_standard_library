@@ -24,6 +24,10 @@
 #include <stdint.h>
 #include <wchar.h>
 #include <limits.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include <stdio.h>
 
 #if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L
     #include <stdbool.h>
@@ -36,6 +40,13 @@
 #include "jsl_str_to_str_map.h"
 #include "jsl_str_to_str_multimap.h"
 
+#if JSL_IS_WINDOWS
+    #include <windows.h>
+    #include <io.h>
+#elif JSL_IS_POSIX
+    #include <unistd.h>
+#endif
+
 #if WCHAR_MAX <= 0xFFFFu
     #define JSL__CMD_LINE_WCHAR_IS_16_BIT 1
 #elif WCHAR_MAX <= 0xFFFFFFFFu
@@ -44,9 +55,15 @@
     #error "Unsupported wchar_t size"
 #endif
 
+#define JSL__CMD_LINE_OUTPUT_MODE_INVALID_STATE 0
+#define JSL__CMD_LINE_OUTPUT_MODE_NONE 1
+#define JSL__CMD_LINE_OUTPUT_MODE_ANSI16 2
+#define JSL__CMD_LINE_OUTPUT_MODE_ANSI256 3
+#define JSL__CMD_LINE_OUTPUT_MODE_TRUECOLOR 4
+
 static const JSLFatPtr JSL__CMD_LINE_EMPTY_VALUE = JSL_FATPTR_INITIALIZER("");
 
-static JSL__FORCE_INLINE void jsl__cmd_line_set_error(JSLCmdLineArgs* args, JSLFatPtr* out_error, JSLFatPtr message)
+static JSL__FORCE_INLINE void jsl__cmd_line_args_set_error(JSLCmdLineArgs* args, JSLFatPtr* out_error, JSLFatPtr message)
 {
     bool params_valid = (
         args != NULL
@@ -60,14 +77,14 @@ static JSL__FORCE_INLINE void jsl__cmd_line_set_error(JSLCmdLineArgs* args, JSLF
     }
 }
 
-static JSL__FORCE_INLINE void jsl__cmd_line_set_short_flag(JSLCmdLineArgs* args, uint8_t flag)
+static JSL__FORCE_INLINE void jsl__cmd_line_args_set_short_flag(JSLCmdLineArgs* args, uint8_t flag)
 {
     uint32_t bucket_index = (uint32_t) flag >> 6;
     uint32_t bit_index = (uint32_t) flag & 63u;
     args->short_flag_bitset[bucket_index] |= (uint64_t) 1u << bit_index;
 }
 
-static JSL__FORCE_INLINE bool jsl__cmd_line_short_flag_present(JSLCmdLineArgs* args, uint8_t flag)
+static JSL__FORCE_INLINE bool jsl__cmd_line_args_short_flag_present(JSLCmdLineArgs* args, uint8_t flag)
 {
     uint32_t bucket_index = (uint32_t) flag >> 6;
     uint32_t bit_index = (uint32_t) flag & 63u;
@@ -75,7 +92,7 @@ static JSL__FORCE_INLINE bool jsl__cmd_line_short_flag_present(JSLCmdLineArgs* a
     return (args->short_flag_bitset[bucket_index] & mask) != 0;
 }
 
-static bool jsl__cmd_line_validate_utf8(JSLFatPtr str)
+static bool jsl__cmd_line_args_validate_utf8(JSLFatPtr str)
 {
     bool res = false;
 
@@ -171,7 +188,7 @@ static bool jsl__cmd_line_validate_utf8(JSLFatPtr str)
     return res;
 }
 
-static bool jsl__cmd_line_utf16_to_utf8(JSLAllocatorInterface* allocator, wchar_t* wide, JSLFatPtr* out_utf8)
+static bool jsl__cmd_line_args_utf16_to_utf8(JSLAllocatorInterface* allocator, wchar_t* wide, JSLFatPtr* out_utf8)
 {
     bool res = false;
 
@@ -336,7 +353,7 @@ static bool jsl__cmd_line_utf16_to_utf8(JSLAllocatorInterface* allocator, wchar_
     return res;
 }
 
-static void jsl__cmd_line_reset(JSLCmdLineArgs* args)
+static void jsl__cmd_line_args_reset(JSLCmdLineArgs* args)
 {
     bool params_valid = args != NULL;
 
@@ -357,7 +374,7 @@ static void jsl__cmd_line_reset(JSLCmdLineArgs* args)
     }
 }
 
-static bool jsl__cmd_line_ensure_arg_capacity(JSLCmdLineArgs* args, int64_t capacity_needed)
+static bool jsl__cmd_line_args_ensure_arg_capacity(JSLCmdLineArgs* args, int64_t capacity_needed)
 {
     bool res = false;
 
@@ -399,7 +416,7 @@ static bool jsl__cmd_line_ensure_arg_capacity(JSLCmdLineArgs* args, int64_t capa
     return res;
 }
 
-static bool jsl__cmd_line_copy_arg(JSLCmdLineArgs* args, JSLFatPtr raw, JSLFatPtr* out_copy)
+static bool jsl__cmd_line_args_copy_arg(JSLCmdLineArgs* args, JSLFatPtr raw, JSLFatPtr* out_copy)
 {
     bool res = false;
 
@@ -439,7 +456,7 @@ static bool jsl__cmd_line_copy_arg(JSLCmdLineArgs* args, JSLFatPtr raw, JSLFatPt
     return res;
 }
 
-static bool jsl__cmd_line_add_command(
+static bool jsl__cmd_line_args_add_command(
     JSLCmdLineArgs* args,
     JSLFatPtr command,
     int32_t arg_index,
@@ -471,7 +488,7 @@ static bool jsl__cmd_line_add_command(
 
     if (params_valid && !inserted && out_error != NULL)
     {
-        jsl__cmd_line_set_error(
+        jsl__cmd_line_args_set_error(
             args,
             out_error,
             jsl_format(
@@ -491,7 +508,7 @@ static bool jsl__cmd_line_add_command(
     return res;
 }
 
-static bool jsl__cmd_line_handle_long_option(
+static bool jsl__cmd_line_args_handle_long_option(
     JSLCmdLineArgs* args,
     JSLFatPtr arg,
     JSLFatPtr separate_value,
@@ -516,7 +533,7 @@ static bool jsl__cmd_line_handle_long_option(
         params_valid = flag_body.data != NULL && flag_body.length > 0;
         if (!params_valid && out_error != NULL)
         {
-            jsl__cmd_line_set_error(
+            jsl__cmd_line_args_set_error(
                 args,
                 out_error,
                 jsl_format(
@@ -536,7 +553,7 @@ static bool jsl__cmd_line_handle_long_option(
         {
             if (out_error != NULL)
             {
-                jsl__cmd_line_set_error(
+                jsl__cmd_line_args_set_error(
                     args,
                     out_error,
                     jsl_format(
@@ -572,7 +589,7 @@ static bool jsl__cmd_line_handle_long_option(
 
             if (out_error != NULL && !inserted)
             {
-                jsl__cmd_line_set_error(
+                jsl__cmd_line_args_set_error(
                     args,
                     out_error,
                     jsl_format(
@@ -615,7 +632,7 @@ static bool jsl__cmd_line_handle_long_option(
         bool key_valid = key.data != NULL && key.length > -1;
         if (!key_valid && out_error != NULL)
         {
-            jsl__cmd_line_set_error(
+            jsl__cmd_line_args_set_error(
                 args,
                 out_error,
                 jsl_format(
@@ -636,7 +653,7 @@ static bool jsl__cmd_line_handle_long_option(
 
         if (out_error != NULL && key_valid && !inserted)
         {
-            jsl__cmd_line_set_error(
+            jsl__cmd_line_args_set_error(
                 args,
                 out_error,
                 jsl_format(
@@ -661,7 +678,7 @@ static bool jsl__cmd_line_handle_long_option(
     return res;
 }
 
-static bool jsl__cmd_line_handle_short_option(
+static bool jsl__cmd_line_args_handle_short_option(
     JSLCmdLineArgs* args,
     JSLFatPtr arg,
     int32_t arg_index,
@@ -691,7 +708,7 @@ static bool jsl__cmd_line_handle_short_option(
         {
             if (out_error != NULL)
             {
-                jsl__cmd_line_set_error(
+                jsl__cmd_line_args_set_error(
                     args,
                     out_error,
                     jsl_format(
@@ -716,13 +733,13 @@ static bool jsl__cmd_line_handle_short_option(
             ascii_valid = flag_char < 0x80u;
             if (ascii_valid)
             {
-                jsl__cmd_line_set_short_flag(args, flag_char);
+                jsl__cmd_line_args_set_short_flag(args, flag_char);
             }
         }
 
         if (!ascii_valid && out_error != NULL)
         {
-            jsl__cmd_line_set_error(
+            jsl__cmd_line_args_set_error(
                 args,
                 out_error,
                 jsl_format(
@@ -743,7 +760,7 @@ static bool jsl__cmd_line_handle_short_option(
     return res;
 }
 
-static bool jsl__cmd_line_process_arg(
+static bool jsl__cmd_line_args_process_arg(
     JSLCmdLineArgs* args,
     JSLFatPtr stored_arg,
     JSLFatPtr next_arg,
@@ -765,7 +782,7 @@ static bool jsl__cmd_line_process_arg(
 
     if (!params_valid && out_error != NULL && args != NULL && args->allocator != NULL)
     {
-        jsl__cmd_line_set_error(
+        jsl__cmd_line_args_set_error(
             args,
             out_error,
             jsl_format(
@@ -791,7 +808,7 @@ static bool jsl__cmd_line_process_arg(
     bool handled = params_valid && parsing_done;
     if (handled && !needs_stop)
     {
-        handled = jsl__cmd_line_add_command(args, stored_arg, arg_index, out_error);
+        handled = jsl__cmd_line_args_add_command(args, stored_arg, arg_index, out_error);
     }
 
     bool is_long_flag = params_valid
@@ -803,7 +820,7 @@ static bool jsl__cmd_line_process_arg(
     bool consumed_next_arg = false;
     if (is_long_flag)
     {
-        handled = jsl__cmd_line_handle_long_option(
+        handled = jsl__cmd_line_args_handle_long_option(
             args,
             stored_arg,
             next_arg,
@@ -822,7 +839,7 @@ static bool jsl__cmd_line_process_arg(
 
     if (is_short_flag)
     {
-        handled = jsl__cmd_line_handle_short_option(args, stored_arg, arg_index, out_error);
+        handled = jsl__cmd_line_args_handle_short_option(args, stored_arg, arg_index, out_error);
     }
 
     bool is_command = params_valid
@@ -832,7 +849,7 @@ static bool jsl__cmd_line_process_arg(
 
     if (is_command)
     {
-        handled = jsl__cmd_line_add_command(args, stored_arg, arg_index, out_error);
+        handled = jsl__cmd_line_args_add_command(args, stored_arg, arg_index, out_error);
     }
 
     if (params_valid)
@@ -850,7 +867,7 @@ static bool jsl__cmd_line_process_arg(
     }
     else if (params_valid && !handled && out_error != NULL && out_error->data == NULL)
     {
-        jsl__cmd_line_set_error(
+        jsl__cmd_line_args_set_error(
             args,
             out_error,
             jsl_format(
@@ -875,7 +892,7 @@ typedef bool (*JSL__CmdLinePrepareArg)(
 
 typedef bool (*JSL__CmdLineIsFlag)(void* argv, int32_t index);
 
-static bool jsl__cmd_line_is_narrow_flag(void* argv, int32_t index)
+static bool jsl__cmd_line_args_is_narrow_flag(void* argv, int32_t index)
 {
     bool res = false;
 
@@ -889,7 +906,7 @@ static bool jsl__cmd_line_is_narrow_flag(void* argv, int32_t index)
     return res;
 }
 
-static bool jsl__cmd_line_is_wide_flag(void* argv, int32_t index)
+static bool jsl__cmd_line_args_is_wide_flag(void* argv, int32_t index)
 {
     bool res = false;
 
@@ -903,7 +920,7 @@ static bool jsl__cmd_line_is_wide_flag(void* argv, int32_t index)
     return res;
 }
 
-static bool jsl__cmd_line_prepare_utf8_arg(
+static bool jsl__cmd_line_args_prepare_utf8_arg(
     JSLCmdLineArgs* args,
     void* argv,
     int32_t index,
@@ -927,7 +944,7 @@ static bool jsl__cmd_line_prepare_utf8_arg(
         params_valid = raw.data != NULL;
         if (!params_valid && out_error != NULL)
         {
-            jsl__cmd_line_set_error(
+            jsl__cmd_line_args_set_error(
                 args,
                 out_error,
                 jsl_format(
@@ -939,10 +956,10 @@ static bool jsl__cmd_line_prepare_utf8_arg(
         }
     }
 
-    bool utf8_ok = params_valid && jsl__cmd_line_validate_utf8(raw);
+    bool utf8_ok = params_valid && jsl__cmd_line_args_validate_utf8(raw);
     if (params_valid && !utf8_ok && out_error != NULL)
     {
-        jsl__cmd_line_set_error(
+        jsl__cmd_line_args_set_error(
             args,
             out_error,
             jsl_format(
@@ -954,10 +971,10 @@ static bool jsl__cmd_line_prepare_utf8_arg(
     }
 
     JSLFatPtr stored = {0};
-    bool copied = utf8_ok && jsl__cmd_line_copy_arg(args, raw, &stored);
+    bool copied = utf8_ok && jsl__cmd_line_args_copy_arg(args, raw, &stored);
     if (utf8_ok && !copied && out_error != NULL)
     {
-        jsl__cmd_line_set_error(
+        jsl__cmd_line_args_set_error(
             args,
             out_error,
             jsl_format(
@@ -977,7 +994,7 @@ static bool jsl__cmd_line_prepare_utf8_arg(
     return res;
 }
 
-static bool jsl__cmd_line_prepare_wide_arg(
+static bool jsl__cmd_line_args_prepare_wide_arg(
     JSLCmdLineArgs* args,
     void* argv,
     int32_t index,
@@ -1002,7 +1019,7 @@ static bool jsl__cmd_line_prepare_wide_arg(
         params_valid = wide_arg != NULL;
         if (!params_valid && out_error != NULL)
         {
-            jsl__cmd_line_set_error(
+            jsl__cmd_line_args_set_error(
                 args,
                 out_error,
                 jsl_format(
@@ -1016,12 +1033,12 @@ static bool jsl__cmd_line_prepare_wide_arg(
 
     if (params_valid)
     {
-        bool converted = jsl__cmd_line_utf16_to_utf8(args->allocator, wide_arg, &utf8_arg)
-            && jsl__cmd_line_validate_utf8(utf8_arg);
+        bool converted = jsl__cmd_line_args_utf16_to_utf8(args->allocator, wide_arg, &utf8_arg)
+            && jsl__cmd_line_args_validate_utf8(utf8_arg);
 
         if (!converted && out_error != NULL)
         {
-            jsl__cmd_line_set_error(
+            jsl__cmd_line_args_set_error(
                 args,
                 out_error,
                 jsl_format(
@@ -1043,7 +1060,7 @@ static bool jsl__cmd_line_prepare_wide_arg(
     return res;
 }
 
-static bool jsl__cmd_line_parse_common(
+static bool jsl__cmd_line_args_parse_common(
     JSLCmdLineArgs* args,
     int32_t argc,
     void* argv,
@@ -1073,16 +1090,16 @@ static bool jsl__cmd_line_parse_common(
         return false;
     }
 
-    jsl__cmd_line_reset(args);
+    jsl__cmd_line_args_reset(args);
 
     int64_t capacity_needed = (int64_t) argc;
-    bool capacity_ok = jsl__cmd_line_ensure_arg_capacity(args, capacity_needed);
+    bool capacity_ok = jsl__cmd_line_args_ensure_arg_capacity(args, capacity_needed);
 
     if (!capacity_ok)
     {
         if (out_error != NULL)
         {
-            jsl__cmd_line_set_error(
+            jsl__cmd_line_args_set_error(
                 args,
                 out_error,
                 jsl_format(
@@ -1124,7 +1141,7 @@ static bool jsl__cmd_line_parse_common(
 
         bool consumed_next = false;
         bool processed = parse_ok
-            && jsl__cmd_line_process_arg(
+            && jsl__cmd_line_args_process_arg(
                 args,
                 stored,
                 next_stored,
@@ -1149,10 +1166,10 @@ static bool jsl__cmd_line_parse_common(
     }
     else
     {
-        jsl__cmd_line_reset(args);
+        jsl__cmd_line_args_reset(args);
         if (out_error != NULL && out_error->data == NULL)
         {
-            jsl__cmd_line_set_error(
+            jsl__cmd_line_args_set_error(
                 args,
                 out_error,
                 jsl_format(
@@ -1164,6 +1181,294 @@ static bool jsl__cmd_line_parse_common(
     }
 
     return res;
+}
+
+static inline uint8_t jsl__cmd_line_to_lower(uint8_t ch)
+{
+    if (ch >= 'A' && ch <= 'Z')
+    {
+        return ch + 32;
+    }
+    return ch;
+}
+
+static bool jsl__cmd_line_str_contains_ci(JSLFatPtr haystack, JSLFatPtr needle)
+{
+    if (
+        haystack.data == NULL
+        || haystack.length < 1
+        || needle.data == NULL
+        || needle.length < 1
+        || needle.length > haystack.length
+    )
+    {
+        return false;
+    }
+
+    uint8_t n0_lower = jsl__cmd_line_to_lower(needle.data[0]);
+    uint8_t nlast = needle.data[needle.length - 1];
+    uint8_t nlast_lower = tolower(nlast);
+    int64_t last_index = needle.length - 1;
+    int64_t max_i = haystack.length - needle.length;
+
+    for (int64_t i = 0; i <= max_i; ++i)
+    {
+        uint8_t h0 = jsl__cmd_line_to_lower(haystack.data[i]);
+        if (h0 != n0_lower)
+        {
+            continue;
+        }
+
+        uint8_t hlast = jsl__cmd_line_to_lower(haystack.data[i + last_index]);
+        if (hlast != nlast_lower)
+        {
+            continue;
+        }
+
+        int64_t j = 1;
+        while (j < last_index)
+        {
+            uint8_t hc = jsl__cmd_line_to_lower(haystack.data[i + j]);
+            uint8_t nc = jsl__cmd_line_to_lower(needle.data[j]);
+            if (hc != nc)
+            {
+                break;
+            }
+            ++j;
+        }
+
+        if (j == last_index)
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+static bool jsl__cmd_line_env_truthy(JSLFatPtr value)
+{
+    if (value.data == NULL || value.length < 1)
+    {
+        return false;
+    }
+
+    static JSLFatPtr zero_str = JSL_FATPTR_INITIALIZER("0");
+    static JSLFatPtr false_str = JSL_FATPTR_INITIALIZER("false");
+    static JSLFatPtr no_str = JSL_FATPTR_INITIALIZER("no");
+    static JSLFatPtr off_str = JSL_FATPTR_INITIALIZER("off");
+
+    if (jsl_fatptr_memory_compare(value, zero_str)
+        || jsl_fatptr_memory_compare(value, false_str)
+        || jsl_fatptr_memory_compare(value, no_str)
+        || jsl_fatptr_memory_compare(value, off_str))
+    {
+        return false;
+    }
+
+    return true;
+}
+
+bool jsl_cmd_line_get_terminal_info(JSLTerminalInfo* info, uint32_t flags)
+{
+    JSL_MEMSET(info, 0, sizeof(JSLTerminalInfo));
+
+    bool force_no_color = JSL_IS_BITFLAG_SET(flags, JSL_GET_TERMINAL_INFO_FORCE_NO_COLOR);
+    bool force_16 = JSL_IS_BITFLAG_SET(flags, JSL_GET_TERMINAL_INFO_FORCE_16_COLOR_MODE);
+    bool force_255 = JSL_IS_BITFLAG_SET(flags, JSL_GET_TERMINAL_INFO_FORCE_255_COLOR_MODE);
+    bool force_24 = JSL_IS_BITFLAG_SET(flags, JSL_GET_TERMINAL_INFO_FORCE_24_BIT_COLOR_MODE);
+
+    int32_t param_check = (force_no_color + force_16 + force_255 + force_24);
+    if (param_check > 1)
+    {
+        info->output_mode = JSL__CMD_LINE_OUTPUT_MODE_INVALID_STATE;
+        return false;
+    }
+
+    if (force_no_color)
+    {
+        info->output_mode = JSL__CMD_LINE_OUTPUT_MODE_NONE;
+        return true;
+    }
+
+    if (force_16)
+    {
+        info->output_mode = JSL__CMD_LINE_OUTPUT_MODE_ANSI16;
+        return true;
+    }
+
+    if (force_255)
+    {
+        info->output_mode = JSL__CMD_LINE_OUTPUT_MODE_ANSI256;
+        return true;
+    }
+
+    if (force_24)
+    {
+        info->output_mode = JSL__CMD_LINE_OUTPUT_MODE_TRUECOLOR;
+        return true;
+    }
+
+    //
+    //      Auto-detect Code
+    //
+
+    // default to none
+    info->output_mode = JSL__CMD_LINE_OUTPUT_MODE_NONE;
+
+    JSLFatPtr env_no_color = jsl_fatptr_from_cstr(getenv("NO_COLOR"));
+    JSLFatPtr env_term = jsl_fatptr_from_cstr(getenv("TERM"));
+    JSLFatPtr env_colorterm = jsl_fatptr_from_cstr(getenv("COLORTERM"));
+    JSLFatPtr env_term_program = jsl_fatptr_from_cstr(getenv("TERM_PROGRAM"));
+    JSLFatPtr env_clicolor = jsl_fatptr_from_cstr(getenv("CLICOLOR"));
+    JSLFatPtr env_clicolor_force = jsl_fatptr_from_cstr(getenv("CLICOLOR_FORCE"));
+    JSLFatPtr env_force_color = jsl_fatptr_from_cstr(getenv("FORCE_COLOR"));
+    JSLFatPtr env_vte_version = jsl_fatptr_from_cstr(getenv("VTE_VERSION"));
+    JSLFatPtr env_ansicon = jsl_fatptr_from_cstr(getenv("ANSICON"));
+    JSLFatPtr env_conemu_ansi = jsl_fatptr_from_cstr(getenv("ConEmuANSI"));
+    JSLFatPtr env_wt_session = jsl_fatptr_from_cstr(getenv("WT_SESSION"));
+
+    static JSLFatPtr dumb_str = JSL_FATPTR_INITIALIZER("dumb");
+    bool term_dumb = jsl_fatptr_compare_ascii_insensitive(env_term, dumb_str);
+
+    bool clicolor_disabled = env_clicolor.length > 0
+        && !jsl__cmd_line_env_truthy(env_clicolor);
+
+    bool color_disabled = env_no_color.length > 0
+        || term_dumb
+        || clicolor_disabled;
+
+    bool color_forced = jsl__cmd_line_env_truthy(env_clicolor_force)
+        || jsl__cmd_line_env_truthy(env_force_color);
+
+    bool is_tty = false;
+    bool windows_console = false;
+    bool windows_vt_enabled = false;
+
+    #if JSL_IS_WINDOWS
+
+        // Explicitly set VT code processing for Windows 10 or greater
+
+        HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
+        DWORD mode = 0;
+        if (handle != NULL && handle != INVALID_HANDLE_VALUE && GetConsoleMode(handle, &mode))
+        {
+            windows_console = true;
+            is_tty = true;
+
+            if ((mode & ENABLE_VIRTUAL_TERMINAL_PROCESSING) != 0)
+            {
+                windows_vt_enabled = true;
+            }
+            else
+            {
+                DWORD new_mode = mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING;
+                if (SetConsoleMode(handle, new_mode))
+                {
+                    windows_vt_enabled = true;
+                }
+            }
+        }
+
+        if (!is_tty)
+        {
+            int fd = _fileno(stdout);
+            if (fd >= 0 && _isatty(fd))
+            {
+                is_tty = true;
+            }
+        }
+
+    #elif JSL_IS_POSIX
+
+        is_tty = isatty(fileno(stdout)) != 0;
+
+    #else
+
+        JSL_ASSERT(0 && "Terminal auto detection is only available on Windows or POSIX systems");
+
+    #endif
+
+    bool ansi_available = !color_disabled && (is_tty || color_forced);
+
+    #if JSL_IS_WINDOWS
+        bool ansi_shim = (env_ansicon.data != NULL && env_ansicon.length > 0)
+            || jsl__cmd_line_env_truthy(env_conemu_ansi);
+
+        if (windows_console && !windows_vt_enabled && !ansi_shim)
+        {
+            ansi_available = false;
+        }
+    #endif
+
+    static JSLFatPtr color_str = JSL_FATPTR_INITIALIZER("color");
+    static JSLFatPtr truecolor_str = JSL_FATPTR_INITIALIZER("truecolor");
+    static JSLFatPtr bit24_str = JSL_FATPTR_INITIALIZER("24bit");
+    static JSLFatPtr color256_str = JSL_FATPTR_INITIALIZER("256color");
+
+    bool colorterm_truecolor = jsl__cmd_line_str_contains_ci(env_colorterm, truecolor_str)
+        || jsl__cmd_line_str_contains_ci(env_colorterm, bit24_str);
+
+    bool term_has_256 = jsl__cmd_line_str_contains_ci(env_term, color256_str);
+    bool term_has_color = jsl__cmd_line_str_contains_ci(env_term, color_str);
+
+    bool truecolor_hint = colorterm_truecolor
+        || env_wt_session.length > 0;
+
+    bool ansi256_hint = term_has_256
+        || env_vte_version.length > 0;
+
+    bool ansi16_hint = term_has_color
+        || jsl__cmd_line_env_is_set(env_colorterm)
+        || jsl__cmd_line_env_is_set(env_ansicon)
+        || jsl__cmd_line_env_truthy(env_conemu_ansi);
+
+    if (ansi_available)
+    {
+        if (truecolor_hint)
+        {
+            info->output_mode = JSL__CMD_LINE_OUTPUT_MODE_TRUECOLOR;
+        }
+        else if (ansi256_hint)
+        {
+            info->output_mode = JSL__CMD_LINE_OUTPUT_MODE_ANSI256;
+        }
+        else if (ansi16_hint)
+        {
+            info->output_mode = JSL__CMD_LINE_OUTPUT_MODE_ANSI16;
+        }
+        else
+        {
+            info->output_mode = JSL__CMD_LINE_OUTPUT_MODE_ANSI16;
+        }
+    }
+
+    return true;
+}
+
+uint8_t jsl_cmd_line_rgb_to_ansi16(uint8_t r, uint8_t g, uint8_t b)
+{
+// NOT IMPLEMENTED YET!
+}
+
+uint8_t jsl_cmd_line_rgb_to_ansi256(uint8_t r, uint8_t g, uint8_t b)
+{
+// NOT IMPLEMENTED YET!
+}
+
+uint8_t jsl_cmd_line_ansi256_to_ansi16(uint8_t color255)
+{
+// NOT IMPLEMENTED YET!
+}
+
+int64_t jsl_cmd_line_set_style(JSLOutputSink sink, JSLTerminalInfo* terminal_info, JSLCmdLineStyle* style)
+{
+// NOT IMPLEMENTED YET!
+}
+
+int64_t jsl_cmd_line_reset_style(JSLOutputSink sink, JSLTerminalInfo* terminal_info)
+{
+// NOT IMPLEMENTED YET!
 }
 
 bool jsl_cmd_line_args_init(JSLCmdLineArgs* args, JSLAllocatorInterface* allocator)
@@ -1192,24 +1497,24 @@ bool jsl_cmd_line_args_init(JSLCmdLineArgs* args, JSLAllocatorInterface* allocat
 
 bool jsl_cmd_line_args_parse(JSLCmdLineArgs* args, int32_t argc, char** argv, JSLFatPtr* out_error)
 {
-    return jsl__cmd_line_parse_common(
+    return jsl__cmd_line_args_parse_common(
         args,
         argc,
         (void*) argv,
-        jsl__cmd_line_prepare_utf8_arg,
-        jsl__cmd_line_is_narrow_flag,
+        jsl__cmd_line_args_prepare_utf8_arg,
+        jsl__cmd_line_args_is_narrow_flag,
         out_error
     );
 }
 
 bool jsl_cmd_line_args_parse_wide(JSLCmdLineArgs* args, int32_t argc, wchar_t** argv, JSLFatPtr* out_error)
 {
-    return jsl__cmd_line_parse_common(
+    return jsl__cmd_line_args_parse_common(
         args,
         argc,
         (void*) argv,
-        jsl__cmd_line_prepare_wide_arg,
-        jsl__cmd_line_is_wide_flag,
+        jsl__cmd_line_args_prepare_wide_arg,
+        jsl__cmd_line_args_is_wide_flag,
         out_error
     );
 }
@@ -1221,7 +1526,7 @@ bool jsl_cmd_line_args_has_short_flag(JSLCmdLineArgs* args, uint8_t flag)
     bool params_valid = args != NULL;
     if (params_valid)
     {
-        res = jsl__cmd_line_short_flag_present(args, flag);
+        res = jsl__cmd_line_args_short_flag_present(args, flag);
     }
 
     return res;
@@ -1317,7 +1622,7 @@ bool jsl_cmd_line_args_pop_flag_with_value(
     bool copied = false;
     if (has_value)
     {
-        copied = jsl__cmd_line_copy_arg(args, value, out_value);
+        copied = jsl__cmd_line_args_copy_arg(args, value, out_value);
     }
 
     if (copied)
@@ -1332,3 +1637,10 @@ bool jsl_cmd_line_args_pop_flag_with_value(
 
     return res;
 }
+
+#undef JSL__CMD_LINE_WCHAR_IS_16_BIT
+#undef JSL__CMD_LINE_OUTPUT_MODE_INVALID_STATE
+#undef JSL__CMD_LINE_OUTPUT_MODE_NONE
+#undef JSL__CMD_LINE_OUTPUT_MODE_ANSI16
+#undef JSL__CMD_LINE_OUTPUT_MODE_ANSI256
+#undef JSL__CMD_LINE_OUTPUT_MODE_TRUECOLOR

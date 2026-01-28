@@ -47,28 +47,15 @@
 extern "C" {
 #endif
 
+// Private implementation, not garunteed to be stable!
+struct JSL__TerminalInfo {
+    int32_t output_mode;
+};
+
 /**
  * TODO: docs
  */
-typedef enum JSLCmdLineOutputMode
-{
-    /// @brief Force no escape codes
-    JSL_CMD_LINE_OUTPUT_MODE_NONE = 0,
-    /// @brief detect (TTY + env hints) or fall back
-    JSL_CMD_LINE_OUTPUT_MODE_DETECT,
-    /// @brief 16 color output
-    JSL_CMD_LINE_OUTPUT_MODE_ANSI16,
-    /// @brief 255 color output
-    JSL_CMD_LINE_OUTPUT_MODE_ANSI256,
-    /// @brief True 3 channel, 24 bit color output
-    JSL_CMD_LINE_OUTPUT_MODE_TRUECOLOR
-} JSLCmdLineOutputMode;
-
-
-typedef struct JSLTerminalInfo {
-    // IMPLEMENT ME
-    int _placeholder;
-} JSLTerminalInfo;
+typedef struct JSL__TerminalInfo JSLTerminalInfo;
 
 /**
  * TODO: docs
@@ -101,6 +88,8 @@ typedef struct JSLCmdLineColor
 
 /**
  * TODO: docs
+ * 
+ * flags to be set on JSLCmdLineStyle
  */
 typedef enum JSLCmdLineStyleAttribute {
     /// @brief TODO: docs
@@ -131,42 +120,22 @@ typedef struct JSLCmdLineStyle {
     uint32_t style_attributes;
 } JSLCmdLineStyle;
 
-/// TODO: docs
-extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_WHITE;
-/// TODO: docs
-extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_WHITE_ITALIC;
-/// TODO: docs
-extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_WHITE_UNDERLINE;
-/// TODO: docs
-extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_WHITE_BOLD;
-/// TODO: docs
-extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_RED;
-/// TODO: docs
-extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_RED_ITALIC;
-/// TODO: docs
-extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_RED_UNDERLINE;
-/// TODO: docs
-extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_RED_BOLD;
-/// TODO: docs
-extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_GREEN;
-/// TODO: docs
-extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_GREEN_ITALIC;
-/// TODO: docs
-extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_GREEN_UNDERLINE;
-/// TODO: docs
-extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_GREEN_BOLD;
-/// TODO: docs
-extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_BLUE;
-/// TODO: docs
-extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_BLUE_ITALIC;
-/// TODO: docs
-extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_BLUE_UNDERLINE;
-/// TODO: docs
-extern const JSLCmdLineStyle JSL_CMD_LINE_STYLE_BLUE_BOLD;
+/**
+ * TODO: docs
+ * 
+ * flags to be used with jsl_cmd_line_get_terminal_info
+ */
+enum JSLGetTerminalInfoFlags {
+    JSL_GET_TERMINAL_INFO_FORCE_NO_COLOR = JSL_MAKE_BITFLAG(0),
+    JSL_GET_TERMINAL_INFO_FORCE_16_COLOR_MODE = JSL_MAKE_BITFLAG(1),
+    JSL_GET_TERMINAL_INFO_FORCE_255_COLOR_MODE = JSL_MAKE_BITFLAG(2),
+    JSL_GET_TERMINAL_INFO_FORCE_24_BIT_COLOR_MODE = JSL_MAKE_BITFLAG(3)
+};
 
-JSLTerminalInfo jsl_cmd_line_auto_detect_terminal_info();
-
-JSLTerminalInfo jsl_cmd_line_force_no_color();
+/**
+ * TODO: docs
+ */
+bool jsl_cmd_line_get_terminal_info(JSLTerminalInfo* info, uint32_t flags);
 
 /**
  * Converts the RGB color to its closest (mathmatical) color in the ANSI

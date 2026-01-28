@@ -1198,7 +1198,7 @@ void jsl_fatptr_to_lowercase_ascii(JSLFatPtr str)
     }
 }
 
-static inline uint8_t ascii_to_lower(uint8_t ch)
+static inline uint8_t jsl__ascii_to_lower(uint8_t ch)
 {
     if (ch >= 'A' && ch <= 'Z')
     {
@@ -1275,7 +1275,7 @@ bool jsl_fatptr_compare_ascii_insensitive(JSLFatPtr a, JSLFatPtr b)
 
     for (; i < a.length; i++)
     {
-        if (ascii_to_lower(a.data[i]) != ascii_to_lower(b.data[i]))
+        if (jsl__ascii_to_lower(a.data[i]) != jsl__ascii_to_lower(b.data[i]))
             return false;
     }
 
