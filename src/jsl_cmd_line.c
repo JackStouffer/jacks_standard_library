@@ -1446,29 +1446,214 @@ bool jsl_cmd_line_get_terminal_info(JSLTerminalInfo* info, uint32_t flags)
     return true;
 }
 
+static const uint8_t jsl__ansi16[16][3] = {
+    {  0,   0,   0}, {205,   0,   0}, {  0, 205,   0}, {205, 205,   0},
+    {  0,   0, 238}, {205,   0, 205}, {  0, 205, 205}, {229, 229, 229},
+    {127, 127, 127}, {255,   0,   0}, {  0, 255,   0}, {255, 255,   0},
+    { 92,  92, 255}, {255,   0, 255}, {  0, 255, 255}, {255, 255, 255}
+};
+
 uint8_t jsl_cmd_line_rgb_to_ansi16(uint8_t r, uint8_t g, uint8_t b)
 {
-// NOT IMPLEMENTED YET!
+    uint8_t best = 0;
+    uint32_t best_dist = UINT32_MAX;
+
+    for (uint8_t i = 0; i < 16; ++i)
+    {
+        int32_t dr = (int32_t) r - (int32_t) jsl__ansi16[i][0];
+        int32_t dg = (int32_t) g - (int32_t) jsl__ansi16[i][1];
+        int32_t db = (int32_t) b - (int32_t) jsl__ansi16[i][2];
+
+        // perceptual-ish weighting; still cheap integer math
+        uint32_t dist = 30u*dr*dr + 59u*dg*dg + 11u*db*db;
+
+        if (dist < best_dist)
+        {
+            best_dist = dist;
+            best = i;
+        }
+    }
+
+    return best;
 }
 
 uint8_t jsl_cmd_line_rgb_to_ansi256(uint8_t r, uint8_t g, uint8_t b)
 {
-// NOT IMPLEMENTED YET!
+    static const uint8_t cube_levels[6] = { 0, 95, 135, 175, 215, 255 };
+
+    uint8_t best = 0;
+    uint32_t best_dist = UINT32_MAX;
+
+    for (uint8_t i = 0; i < 16; ++i)
+    {
+        int32_t dr = (int32_t) r - (int32_t) jsl__ansi16[i][0];
+        int32_t dg = (int32_t) g - (int32_t) jsl__ansi16[i][1];
+        int32_t db = (int32_t) b - (int32_t) jsl__ansi16[i][2];
+
+        uint32_t dist = 30u*dr*dr + 59u*dg*dg + 11u*db*db;
+        if (dist < best_dist)
+        {
+            best_dist = dist;
+            best = i;
+        }
+    }
+
+    for (uint8_t ri = 0; ri < 6; ++ri)
+    {
+        uint8_t rv = cube_levels[ri];
+        int dr = (int)r - (int)rv;
+        uint32_t drw = 30u*dr*dr;
+        for (uint8_t gi = 0; gi < 6; ++gi)
+        {
+            uint8_t gv = cube_levels[gi];
+            int dg = (int)g - (int)gv;
+            uint32_t drdg = drw + 59u*dg*dg;
+            for (uint8_t bi = 0; bi < 6; ++bi)
+            {
+                uint8_t bv = cube_levels[bi];
+                int db = (int)b - (int)bv;
+                uint32_t dist = drdg + 11u*db*db;
+                if (dist < best_dist)
+                {
+                    best_dist = dist;
+                    best = (uint8_t)(16 + 36u*ri + 6u*gi + bi);
+                }
+            }
+        }
+    }
+
+    for (uint8_t i = 0; i < 24; ++i)
+    {
+        uint8_t level = (uint8_t)(8u + 10u*i);
+        int32_t dr = (int32_t) r - (int32_t) level;
+        int32_t dg = (int32_t) g - (int32_t) level;
+        int32_t db = (int32_t) b - (int32_t) level;
+
+        uint32_t dist = 30u*dr*dr + 59u*dg*dg + 11u*db*db;
+        if (dist < best_dist)
+        {
+            best_dist = dist;
+            best = (uint8_t)(232 + i);
+        }
+    }
+
+    return best;
 }
 
 uint8_t jsl_cmd_line_ansi256_to_ansi16(uint8_t color255)
 {
-// NOT IMPLEMENTED YET!
+    /* Python used to generate LUT:
+
+    ```
+    ansi16 = [
+        (0,0,0),(205,0,0),(0,205,0),(205,205,0),
+        (0,0,238),(205,0,205),(0,205,205),(229,229,229),
+        (127,127,127),(255,0,0),(0,255,0),(255,255,0),
+        (92,92,255),(255,0,255),(0,255,255),(255,255,255)
+    ]
+
+    cube_levels = [0, 95, 135, 175, 215, 255]
+
+    def rgb_to_ansi16(r, g, b):
+        best = 0
+        best_dist = 2**32-1
+        for i,(ar,ag,ab) in enumerate(ansi16):
+            dr = r - ar
+            dg = g - ag
+            db = b - ab
+            dist = 30*dr*dr + 59*dg*dg + 11*db*db
+            if dist < best_dist:
+                best_dist = dist
+                best = i
+        return best
+
+    def ansi256_to_ansi16(c):
+        if c < 16:
+            return c
+        if c >= 232:
+            level = 8 + 10*(c - 232)
+            return rgb_to_ansi16(level, level, level)
+        idx = c - 16
+        ri = idx // 36
+        gi = (idx // 6) % 6
+        bi = idx % 6
+        return rgb_to_ansi16(cube_levels[ri], cube_levels[gi], cube_levels[bi])
+
+    lut = [ansi256_to_ansi16(c) for c in range(256)]
+    ```
+    */
+
+    static const uint8_t jsl__ansi256_to_ansi16_lut[256] = {
+         0,  1,  2,  3,  4,  5,  6,  7,  8,  9, 10, 11, 12, 13, 14, 15,
+         0,  0,  4,  4,  4,  4,  0, 12, 12, 12, 12, 12,  2,  2,  6,  6,
+         6,  6,  2,  2,  6,  6,  6,  6,  2,  2,  6,  6,  6,  6, 10, 10,
+        14, 14, 14, 14,  0,  0,  4,  4,  4,  4,  8,  8,  8, 12, 12, 12,
+         8,  8,  8,  8,  8, 12,  2,  8,  8,  8,  8,  8,  2,  2,  6,  6,
+         6,  6, 10, 10, 14, 14, 14, 14,  1,  1,  5,  5,  5,  5,  8,  8,
+         8,  8, 12, 12,  8,  8,  8,  8,  8, 12,  3,  8,  8,  8,  8,  8,
+         3,  3,  3,  7,  7,  7,  3,  3,  7,  7,  7,  7,  1,  1,  5,  5,
+         5,  5,  8,  8,  8,  8,  8, 12,  8,  8,  8,  8,  8,  8,  3,  3,
+         8,  8,  7,  7,  3,  3,  7,  7,  7,  7,  3,  3,  7,  7,  7,  7,
+         1,  1,  5,  5,  5,  5,  8,  8,  8,  8,  8, 12,  3,  8,  8,  8,
+         8,  8,  3,  3,  3,  7,  7,  7,  3,  3,  7,  7,  7,  7, 11, 11,
+         7,  7,  7, 15,  9,  9,  5, 13, 13, 13,  9,  8,  8,  8, 13, 13,
+         3,  3,  8,  8,  7,  7,  3,  3,  7,  7,  7,  7,  3,  3,  7,  7,
+         7,  7, 11, 11,  7, 15, 15, 15,  0,  0,  0,  0,  0,  0,  8,  8,
+         8,  8,  8,  8,  8,  8,  8,  8,  8,  7,  7,  7,  7,  7,  7,  7,
+    };
+
+    return jsl__ansi256_to_ansi16_lut[color255];
 }
 
-int64_t jsl_cmd_line_set_style(JSLOutputSink sink, JSLTerminalInfo* terminal_info, JSLCmdLineStyle* style)
+JSLCmdLineColor jsl_cmd_line_color_from_ansi16(uint8_t color16)
+{
+    // NOT IMPLEMENTED YET
+}
+
+JSLCmdLineColor jsl_cmd_line_color_from_ansi256(uint8_t color255)
+{
+    // NOT IMPLEMENTED YET
+}
+
+JSLCmdLineColor jsl_cmd_line_color_from_rgb(uint8_t r, uint8_t g, uint8_t b)
+{
+    // NOT IMPLEMENTED YET
+}
+
+void jsl_cmd_line_style_set_foreground(JSLCmdLineColor color)
+{
+    // NOT IMPLEMENTED YET
+}
+
+void jsl_cmd_line_style_set_background(JSLCmdLineColor color)
+{
+    // NOT IMPLEMENTED YET
+}
+
+void jsl_cmd_line_style_set_attributes(uint32_t flags)
+{
+    // NOT IMPLEMENTED YET
+}
+
+int64_t jsl_cmd_line_write_style(JSLOutputSink sink, JSLTerminalInfo* terminal_info, JSLCmdLineStyle* style)
 {
 // NOT IMPLEMENTED YET!
 }
 
-int64_t jsl_cmd_line_reset_style(JSLOutputSink sink, JSLTerminalInfo* terminal_info)
+int64_t jsl_cmd_line_write_reset(JSLOutputSink sink, JSLTerminalInfo* terminal_info)
 {
-// NOT IMPLEMENTED YET!
+    if (terminal_info == NULL)
+        return -1;
+
+    if (terminal_info->output_mode == JSL__CMD_LINE_OUTPUT_MODE_ANSI16
+        || terminal_info->output_mode == JSL__CMD_LINE_OUTPUT_MODE_ANSI256
+        || terminal_info->output_mode == JSL__CMD_LINE_OUTPUT_MODE_TRUECOLOR)
+    {
+        static JSLFatPtr reset_code = JSL_FATPTR_INITIALIZER("\x1b[0m");
+        return jsl_output_sink_write_fatptr(sink, reset_code);
+    }
+
+    return 0;
 }
 
 bool jsl_cmd_line_args_init(JSLCmdLineArgs* args, JSLAllocatorInterface* allocator)

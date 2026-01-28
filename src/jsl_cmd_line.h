@@ -47,7 +47,7 @@
 extern "C" {
 #endif
 
-// Private implementation, not garunteed to be stable!
+// Private implementation, not guaranteed to be stable!
 struct JSL__TerminalInfo {
     int32_t output_mode;
 };
@@ -57,10 +57,8 @@ struct JSL__TerminalInfo {
  */
 typedef struct JSL__TerminalInfo JSLTerminalInfo;
 
-/**
- * TODO: docs
- */
-typedef enum JSLCmdLineColorType
+// TODO: docs
+enum JSL__CmdLineColorType
 {
     /// @brief TODO: docs
     JSL_CMD_LINE_COLOR_DEFAULT = 0,
@@ -70,14 +68,14 @@ typedef enum JSLCmdLineColorType
     JSL_CMD_LINE_COLOR_ANSI256,     // 0..255
     /// @brief TODO: docs
     JSL_CMD_LINE_COLOR_RGB          // 24-bit
-} JSLCmdLineColorType;
+};
 
 /**
  * TODO: docs
  */
 typedef struct JSLCmdLineColor
 {
-    JSLCmdLineColorType color_type;
+    enum JSL__CmdLineColorType color_type;
     union
     {
         uint8_t ansi16;   // 0..15
@@ -173,6 +171,36 @@ uint8_t jsl_cmd_line_rgb_to_ansi256(uint8_t r, uint8_t g, uint8_t b);
  */
 uint8_t jsl_cmd_line_ansi256_to_ansi16(uint8_t color255);
 
+/**
+ * TODO: docs
+ */
+JSLCmdLineColor jsl_cmd_line_color_from_ansi16(uint8_t color16);
+
+/**
+ * TODO: docs
+ */
+JSLCmdLineColor jsl_cmd_line_color_from_ansi256(uint8_t color255);
+
+/**
+ * TODO: docs
+ */
+JSLCmdLineColor jsl_cmd_line_color_from_rgb(uint8_t r, uint8_t g, uint8_t b);
+
+/**
+ * TODO: docs
+ */
+void jsl_cmd_line_style_set_foreground(JSLCmdLineColor color);
+
+/**
+ * TODO: docs
+ */
+void jsl_cmd_line_style_set_background(JSLCmdLineColor color);
+
+/**
+ * TODO: docs
+ */
+void jsl_cmd_line_style_set_attributes(uint32_t flags);
+
 /** 
  * Send the ANSI escape codes to generate the given style to the output sink.
  * This does NOT automatically send a reset code. All ANSI codes sent by this
@@ -194,7 +222,7 @@ uint8_t jsl_cmd_line_ansi256_to_ansi16(uint8_t color255);
  * 
  * TODO: better docs, doxygen
  */
-int64_t jsl_cmd_line_set_style(JSLOutputSink sink, JSLTerminalInfo* terminal_info, JSLCmdLineStyle* style);
+int64_t jsl_cmd_line_write_style(JSLOutputSink sink, JSLTerminalInfo* terminal_info, JSLCmdLineStyle* style);
 
 /**
  * Reset all styling by sending the reset ANSI escape code to the given output sink
@@ -215,7 +243,7 @@ int64_t jsl_cmd_line_set_style(JSLOutputSink sink, JSLTerminalInfo* terminal_inf
  * 
  * TODO: better docs, doxygen
  */
-int64_t jsl_cmd_line_reset_style(JSLOutputSink sink, JSLTerminalInfo* terminal_info);
+int64_t jsl_cmd_line_write_reset(JSLOutputSink sink, JSLTerminalInfo* terminal_info);
 
 
 struct JSL__CmdLineArgs {
