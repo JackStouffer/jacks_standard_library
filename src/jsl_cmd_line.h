@@ -136,70 +136,113 @@ enum JSLGetTerminalInfoFlags {
 bool jsl_cmd_line_get_terminal_info(JSLTerminalInfo* info, uint32_t flags);
 
 /**
- * Converts the RGB color to its closest (mathmatical) color in the ANSI
- * 16 color space 
+ * Converts the RGB color to its closest color in the ANSI 16 color space.
  * 
  * This function is used in the background when attempting to write a 
  * JSLCmdLineStyle with a RGB color to a terminal that only supports 16
  * color mode. 
+ *
+ * This function assumes an XTERM like color pallet for ANSI colors, as
+ * such colors are user configurable.
+ *
+ * This function does not use a lookup table, as such a table would add many
+ * kilobytes to the executable for a very rare case (ANSI 16 only terminals).
+ * As such it's constant time, but it's not cheap.
  * 
- * TODO: better docs, doxygen
+ * @param r The red color channel
+ * @param g The green color channel
+ * @param b The blue color channel
+ * @returns The ANSI 16 color code
  */
 uint8_t jsl_cmd_line_rgb_to_ansi16(uint8_t r, uint8_t g, uint8_t b);
 
 /**
- * Converts the RGB color to its closest (mathmatical) color in the ANSI
- * 255 color space.
- *
+ * Converts the RGB color to its closest color in the ANSI 256 color space.
+ * 
  * This function is used in the background when attempting to write a 
- * JSLCmdLineStyle with a RGB color to a terminal that only supports 255
+ * JSLCmdLineStyle with a RGB color to a terminal that only supports 256
  * color mode. 
  * 
- * TODO: better docs, doxygen
+ * This function assumes an XTERM like color pallet for ANSI colors, as
+ * such colors are user configurable.
+ * 
+ * This function does not use a lookup table, as such a table would add many
+ * kilobytes to the executable for a very rare case (ANSI 256 only terminals).
+ * As such it's constant time, but it's not cheap.
+ *
+ * @param r The red color channel
+ * @param g The green color channel
+ * @param b The blue color channel
+ * @returns The ANSI 256 color code
  */
 uint8_t jsl_cmd_line_rgb_to_ansi256(uint8_t r, uint8_t g, uint8_t b);
 
 /**
- * Converts the ANSI 255 color to its closest (mathmatical) color in the ANSI
+ * Converts the ANSI 256 color to its closest color in the ANSI
  * 16 color space.
  *
  * This function is used in the background when attempting to write a 
- * JSLCmdLineStyle with a ANSI 255 color to a terminal that only supports 16
- * color mode. 
+ * JSLCmdLineStyle with a ANSI 256 color to a terminal that only supports 16
+ * color mode.
  * 
- * TODO: better docs, doxygen
+ * This function assumes an XTERM like color pallet for ANSI colors, as
+ * such colors are user configurable.
+ * 
+ * This function does use a constant look up table and is very fast.
+ *
+ * @param color256 The ANSI 256 color code
+ * @returns The ANSI 16 color code
  */
-uint8_t jsl_cmd_line_ansi256_to_ansi16(uint8_t color255);
+uint8_t jsl_cmd_line_ansi256_to_ansi16(uint8_t color256);
 
 /**
  * TODO: docs
  */
-JSLCmdLineColor jsl_cmd_line_color_from_ansi16(uint8_t color16);
+void jsl_cmd_line_color_from_ansi16(JSLCmdLineColor* color, uint8_t color16);
 
 /**
  * TODO: docs
  */
-JSLCmdLineColor jsl_cmd_line_color_from_ansi256(uint8_t color255);
+void jsl_cmd_line_color_from_ansi256(JSLCmdLineColor* color, uint8_t color256);
 
 /**
  * TODO: docs
  */
-JSLCmdLineColor jsl_cmd_line_color_from_rgb(uint8_t r, uint8_t g, uint8_t b);
+void jsl_cmd_line_color_from_rgb(JSLCmdLineColor* color, uint8_t r, uint8_t g, uint8_t b);
 
 /**
  * TODO: docs
+ * 
+ * The value of `flags` is set from OR-ing any of the flags in `JSLCmdLineStyleAttribute`
  */
-void jsl_cmd_line_style_set_foreground(JSLCmdLineColor color);
+void jsl_cmd_line_style_with_foreground(
+    JSLCmdLineStyle* style,
+    JSLCmdLineColor foreground,
+    uint32_t style_flags
+);
 
 /**
  * TODO: docs
+ * 
+ * The value of `flags` is set from OR-ing any of the flags in `JSLCmdLineStyleAttribute`
  */
-void jsl_cmd_line_style_set_background(JSLCmdLineColor color);
+void jsl_cmd_line_style_with_background(
+    JSLCmdLineStyle* style,
+    JSLCmdLineColor background,
+    uint32_t style_flags
+);
 
 /**
  * TODO: docs
+ * 
+ * The value of `flags` is set from OR-ing any of the flags in `JSLCmdLineStyleAttribute`
  */
-void jsl_cmd_line_style_set_attributes(uint32_t flags);
+void jsl_cmd_line_style_with_foreground_and_background(
+    JSLCmdLineStyle* style,
+    JSLCmdLineColor foreground,
+    JSLCmdLineColor background,
+    uint32_t style_flags
+);
 
 /** 
  * Send the ANSI escape codes to generate the given style to the output sink.
@@ -209,39 +252,76 @@ void jsl_cmd_line_style_set_attributes(uint32_t flags);
  * Example:
  * 
  * ```
+ * // This is a full example of writing colored text to stdout
+ * 
  * JSLOutputSink sink = jsl_c_file_output_sink(stdout);
+ * 
+ * JSLTerminalInfo terminal_info;
+ * jsl_cmd_line_get_terminal_info(&terminal_info, 0);
+ * 
+ * JSLCmdLineColor red_color;
+ * jsl_cmd_line_color_from_rgb(&red_color, 255, 0, 0);
+ * 
+ * JSLCmdLineStyle bold_red;
+ * jsl_cmd_line_style_with_foreground(&bold_red, &red_color, JSL_CMD_LINE_STYLE_BOLD);
  *
+ * // You write the style first, then you write your text 
  * jsl_cmd_line_reset_style(sink);
- * jsl_cmd_line_set_style(sink, JSL_CMD_LINE_STYLE_BOLD_RED);
+ * jsl_cmd_line_write_style(sink, &terminal_info, &bold_red);
+ *
  * // this will be bold red
  * jsl_output_sink_write_cstr(sink, "ERROR: ");
+ * 
+ * // You have to reset, or else each style write is additive
  * jsl_cmd_line_reset_style(sink);
+ *
  * // this will be default
  * jsl_output_sink_write_cstr(sink, "There's an error in the program!");
  * ```
  * 
- * TODO: better docs, doxygen
+ * @param sink Where to send the ANSI escape codes
+ * @param terminal_info Information about the current terminal environment so this knows what codes to send
+ * @param style The style to write
+ * @returns The number of bytes written to the sink, or -1 if there was an error in the sink
  */
 int64_t jsl_cmd_line_write_style(JSLOutputSink sink, JSLTerminalInfo* terminal_info, JSLCmdLineStyle* style);
 
 /**
  * Reset all styling by sending the reset ANSI escape code to the given output sink
- *
+ * 
  * Example:
  * 
  * ```
+ * // This is a full example of writing colored text to stdout
+ * 
  * JSLOutputSink sink = jsl_c_file_output_sink(stdout);
+ * 
+ * JSLTerminalInfo terminal_info;
+ * jsl_cmd_line_get_terminal_info(&terminal_info, 0);
+ * 
+ * JSLCmdLineColor red_color;
+ * jsl_cmd_line_color_from_rgb(&red_color, 255, 0, 0);
+ * 
+ * JSLCmdLineStyle bold_red;
+ * jsl_cmd_line_style_with_foreground(&bold_red, &red_color, JSL_CMD_LINE_STYLE_BOLD);
  *
+ * // You write the style first, then you write your text 
  * jsl_cmd_line_reset_style(sink);
- * jsl_cmd_line_set_style(sink, JSL_CMD_LINE_STYLE_BOLD_RED);
+ * jsl_cmd_line_write_style(sink, &terminal_info, &bold_red);
+ *
  * // this will be bold red
  * jsl_output_sink_write_cstr(sink, "ERROR: ");
+ * 
+ * // You have to reset, or else each style write is additive
  * jsl_cmd_line_reset_style(sink);
+ *
  * // this will be default
  * jsl_output_sink_write_cstr(sink, "There's an error in the program!");
  * ```
  * 
- * TODO: better docs, doxygen
+ * @param sink Where to send the ANSI reset escape code
+ * @param terminal_info Information about the current terminal environment so this knows what codes to send
+ * @returns The number of bytes written to the sink, or -1 if there was an error in the sink
  */
 int64_t jsl_cmd_line_write_reset(JSLOutputSink sink, JSLTerminalInfo* terminal_info);
 
