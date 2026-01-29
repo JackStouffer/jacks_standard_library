@@ -91,7 +91,8 @@ static bool comp3_equal(const CompositeType3* lhs, const CompositeType3* rhs)
 
 static void test_dynamic_array_init_success(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
     jsl_allocator_interface_free_all(&allocator);
 
@@ -166,7 +167,8 @@ static void test_dynamic_array_init_success(void)
 
 static void test_dynamic_array_init_invalid_args(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(&allocator);
 
     {
@@ -200,7 +202,8 @@ static void test_dynamic_array_init_invalid_args(void)
 
 static void test_dynamic_array_insert_appends_and_grows(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(&allocator);
 
     {
@@ -296,7 +299,8 @@ static void test_dynamic_array_insert_appends_and_grows(void)
 
 static void test_dynamic_array_insert_at_inserts_and_shifts(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(&allocator);
 
     {
@@ -439,7 +443,8 @@ static void test_dynamic_array_insert_at_inserts_and_shifts(void)
 
 static void test_dynamic_array_delete_at_removes_and_shifts(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(&allocator);
 
     {
@@ -599,7 +604,8 @@ static void test_dynamic_array_delete_at_removes_and_shifts(void)
 
 static void test_dynamic_array_clear_resets_length(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(&allocator);
 
     {
@@ -689,7 +695,8 @@ static void test_dynamic_array_clear_resets_length(void)
 
 static void test_dynamic_array_checks_sentinel(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(&allocator);
 
     DynamicInt32Array array = {0};

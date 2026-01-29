@@ -120,18 +120,16 @@ static bool alloc_interface_free_all(void* ctx)
     return true;
 }
 
-JSLAllocatorInterface jsl_arena_get_allocator_interface(JSLArena* arena)
+void jsl_arena_get_allocator_interface(JSLAllocatorInterface* allocator, JSLArena* arena)
 {
-    JSLAllocatorInterface i;
     jsl_allocator_interface_init(
-        &i,
+        allocator,
         alloc_interface_alloc,
         alloc_interface_realloc,
         alloc_interface_free,
         alloc_interface_free_all,
         arena
     );
-    return i;
 }
 
 void* jsl_arena_allocate(JSLArena* arena, int64_t bytes, bool zeroed)

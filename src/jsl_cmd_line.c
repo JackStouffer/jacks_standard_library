@@ -939,8 +939,8 @@ static bool jsl__cmd_line_args_prepare_utf8_arg(
     JSLFatPtr raw = {0};
     if (params_valid)
     {
-        char** args = (char**) argv;
-        raw = jsl_fatptr_from_cstr(args[index]);
+        char** arg_array = (char**) argv;
+        raw = jsl_fatptr_from_cstr(arg_array[index]);
         params_valid = raw.data != NULL;
         if (!params_valid && out_error != NULL)
         {
@@ -1014,8 +1014,8 @@ static bool jsl__cmd_line_args_prepare_wide_arg(
     wchar_t* wide_arg = NULL;
     if (params_valid)
     {
-        wchar_t** args = (wchar_t**) argv;
-        wide_arg = args[index];
+        wchar_t** arg_array = (wchar_t**) argv;
+        wide_arg = arg_array[index];
         params_valid = wide_arg != NULL;
         if (!params_valid && out_error != NULL)
         {
@@ -1207,7 +1207,7 @@ static bool jsl__cmd_line_str_contains_ci(JSLFatPtr haystack, JSLFatPtr needle)
 
     uint8_t n0_lower = jsl__cmd_line_to_lower(needle.data[0]);
     uint8_t nlast = needle.data[needle.length - 1];
-    uint8_t nlast_lower = tolower(nlast);
+    uint8_t nlast_lower = jsl__cmd_line_to_lower(nlast);
     int64_t last_index = needle.length - 1;
     int64_t max_i = haystack.length - needle.length;
 
@@ -1319,7 +1319,6 @@ bool jsl_cmd_line_get_terminal_info(JSLTerminalInfo* info, uint32_t flags)
     JSLFatPtr env_no_color = jsl_fatptr_from_cstr(getenv("NO_COLOR"));
     JSLFatPtr env_term = jsl_fatptr_from_cstr(getenv("TERM"));
     JSLFatPtr env_colorterm = jsl_fatptr_from_cstr(getenv("COLORTERM"));
-    JSLFatPtr env_term_program = jsl_fatptr_from_cstr(getenv("TERM_PROGRAM"));
     JSLFatPtr env_clicolor = jsl_fatptr_from_cstr(getenv("CLICOLOR"));
     JSLFatPtr env_clicolor_force = jsl_fatptr_from_cstr(getenv("CLICOLOR_FORCE"));
     JSLFatPtr env_force_color = jsl_fatptr_from_cstr(getenv("FORCE_COLOR"));
@@ -1342,10 +1341,11 @@ bool jsl_cmd_line_get_terminal_info(JSLTerminalInfo* info, uint32_t flags)
         || jsl__cmd_line_env_truthy(env_force_color);
 
     bool is_tty = false;
-    bool windows_console = false;
-    bool windows_vt_enabled = false;
 
     #if JSL_IS_WINDOWS
+
+        bool windows_console = false;
+        bool windows_vt_enabled = false;
 
         // Explicitly set VT code processing for Windows 10 or greater
 
@@ -1419,9 +1419,9 @@ bool jsl_cmd_line_get_terminal_info(JSLTerminalInfo* info, uint32_t flags)
         || env_vte_version.length > 0;
 
     bool ansi16_hint = term_has_color
-        || jsl__cmd_line_env_is_set(env_colorterm)
-        || jsl__cmd_line_env_is_set(env_ansicon)
-        || jsl__cmd_line_env_truthy(env_conemu_ansi);
+        || env_colorterm.data != NULL
+        || env_ansicon.data != NULL
+        || env_conemu_ansi.data != NULL;
 
     if (ansi_available)
     {
@@ -1460,9 +1460,9 @@ uint8_t jsl_cmd_line_rgb_to_ansi16(uint8_t r, uint8_t g, uint8_t b)
 
     for (uint8_t i = 0; i < 16; ++i)
     {
-        int32_t dr = (int32_t) r - (int32_t) jsl__ansi16[i][0];
-        int32_t dg = (int32_t) g - (int32_t) jsl__ansi16[i][1];
-        int32_t db = (int32_t) b - (int32_t) jsl__ansi16[i][2];
+        uint32_t dr = (uint32_t) r - (uint32_t) jsl__ansi16[i][0];
+        uint32_t dg = (uint32_t) g - (uint32_t) jsl__ansi16[i][1];
+        uint32_t db = (uint32_t) b - (uint32_t) jsl__ansi16[i][2];
 
         // perceptual-ish weighting; still cheap integer math
         uint32_t dist = 30u*dr*dr + 59u*dg*dg + 11u*db*db;
@@ -1486,9 +1486,9 @@ uint8_t jsl_cmd_line_rgb_to_ansi256(uint8_t r, uint8_t g, uint8_t b)
 
     for (uint8_t i = 0; i < 16; ++i)
     {
-        int32_t dr = (int32_t) r - (int32_t) jsl__ansi16[i][0];
-        int32_t dg = (int32_t) g - (int32_t) jsl__ansi16[i][1];
-        int32_t db = (int32_t) b - (int32_t) jsl__ansi16[i][2];
+        uint32_t dr = (uint32_t) r - (uint32_t) jsl__ansi16[i][0];
+        uint32_t dg = (uint32_t) g - (uint32_t) jsl__ansi16[i][1];
+        uint32_t db = (uint32_t) b - (uint32_t) jsl__ansi16[i][2];
 
         uint32_t dist = 30u*dr*dr + 59u*dg*dg + 11u*db*db;
         if (dist < best_dist)
@@ -1501,18 +1501,21 @@ uint8_t jsl_cmd_line_rgb_to_ansi256(uint8_t r, uint8_t g, uint8_t b)
     for (uint8_t ri = 0; ri < 6; ++ri)
     {
         uint8_t rv = cube_levels[ri];
-        int dr = (int)r - (int)rv;
+        uint32_t dr = (uint32_t) r - (uint32_t) rv;
         uint32_t drw = 30u*dr*dr;
+
         for (uint8_t gi = 0; gi < 6; ++gi)
         {
             uint8_t gv = cube_levels[gi];
-            int dg = (int)g - (int)gv;
+            uint32_t dg = (uint32_t) g - (uint32_t) gv;
             uint32_t drdg = drw + 59u*dg*dg;
+
             for (uint8_t bi = 0; bi < 6; ++bi)
             {
                 uint8_t bv = cube_levels[bi];
-                int db = (int)b - (int)bv;
+                uint32_t db = (uint32_t) b - (uint32_t) bv;
                 uint32_t dist = drdg + 11u*db*db;
+
                 if (dist < best_dist)
                 {
                     best_dist = dist;
@@ -1525,9 +1528,9 @@ uint8_t jsl_cmd_line_rgb_to_ansi256(uint8_t r, uint8_t g, uint8_t b)
     for (uint8_t i = 0; i < 24; ++i)
     {
         uint8_t level = (uint8_t)(8u + 10u*i);
-        int32_t dr = (int32_t) r - (int32_t) level;
-        int32_t dg = (int32_t) g - (int32_t) level;
-        int32_t db = (int32_t) b - (int32_t) level;
+        uint32_t dr = (uint32_t) r - (uint32_t) level;
+        uint32_t dg = (uint32_t) g - (uint32_t) level;
+        uint32_t db = (uint32_t) b - (uint32_t) level;
 
         uint32_t dist = 30u*dr*dr + 59u*dg*dg + 11u*db*db;
         if (dist < best_dist)
@@ -1755,6 +1758,8 @@ static int64_t jsl__cmd_line_write_color(
                 (int32_t) output_color.rgb.b
             );
         }
+
+        case JSL_CMD_LINE_COLOR_DEFAULT:
         default:
             break;
     }

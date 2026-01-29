@@ -46,7 +46,8 @@ JSLArena global_arena;
 
 static void test_fixed_insert(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(&allocator);
 
     {
@@ -165,7 +166,8 @@ static void test_fixed_insert(void)
 
 static void test_fixed_get(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(&allocator);
 
     {
@@ -263,7 +265,8 @@ static void test_fixed_get(void)
 
 static void test_fixed_delete(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(&allocator);
 
     {
@@ -492,7 +495,8 @@ static void test_fixed_delete(void)
 
 static void test_fixed_iterator(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(&allocator);
 
     {
@@ -686,7 +690,8 @@ typedef struct ExpectedPair {
 
 static void test_jsl_str_to_str_map_init_success(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(&allocator);
 
     JSLStrToStrMap map = {0};
@@ -704,7 +709,8 @@ static void test_jsl_str_to_str_map_init_success(void)
 
 static void test_jsl_str_to_str_map_init_invalid_arguments(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(&allocator);
 
     JSLStrToStrMap map = {0};
@@ -720,7 +726,8 @@ static void test_jsl_str_to_str_map_init_invalid_arguments(void)
 
 static void test_jsl_str_to_str_map_item_count_and_has_key(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(&allocator);
 
     JSLStrToStrMap map = {0};
@@ -749,7 +756,8 @@ static void test_jsl_str_to_str_map_item_count_and_has_key(void)
 
 static void test_jsl_str_to_str_map_get(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(&allocator);
 
     JSLStrToStrMap map = {0};
@@ -783,7 +791,8 @@ static void test_jsl_str_to_str_map_get(void)
 
 static void test_jsl_str_to_str_map_insert_overwrites_value(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(&allocator);
 
     JSLStrToStrMap map = {0};
@@ -820,7 +829,8 @@ static void test_jsl_str_to_str_map_insert_overwrites_value(void)
 
 static void test_jsl_str_to_str_map_transient_lifetime_copies_data(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(&allocator);
 
     JSLStrToStrMap map = {0};
@@ -882,7 +892,8 @@ static void test_jsl_str_to_str_map_transient_lifetime_copies_data(void)
 
 static void test_jsl_str_to_str_map_fixed_lifetime_uses_original_pointers(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(&allocator);
 
     JSLStrToStrMap map = {0};
@@ -915,7 +926,8 @@ static void test_jsl_str_to_str_map_fixed_lifetime_uses_original_pointers(void)
 
 static void test_jsl_str_to_str_map_handles_empty_and_binary_strings(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(&allocator);
 
     JSLStrToStrMap map = {0};
@@ -984,7 +996,8 @@ static void test_jsl_str_to_str_map_handles_empty_and_binary_strings(void)
 
 static void test_jsl_str_to_str_map_iterator_covers_all_pairs(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(&allocator);
 
     JSLStrToStrMap map = {0};
@@ -1043,7 +1056,8 @@ static void test_jsl_str_to_str_map_iterator_covers_all_pairs(void)
 
 static void test_jsl_str_to_str_map_iterator_invalidated_on_mutation(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(&allocator);
 
     JSLStrToStrMap map = {0};
@@ -1066,7 +1080,8 @@ static void test_jsl_str_to_str_map_iterator_invalidated_on_mutation(void)
 
 static void test_jsl_str_to_str_map_delete(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(&allocator);
 
     JSLStrToStrMap map = {0};
@@ -1096,7 +1111,8 @@ static void test_jsl_str_to_str_map_delete(void)
 
 static void test_jsl_str_to_str_map_clear(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(&allocator);
 
     JSLStrToStrMap map = {0};
@@ -1126,7 +1142,8 @@ static void test_jsl_str_to_str_map_clear(void)
 
 static void test_jsl_str_to_str_map_rehash(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(&allocator);
 
     JSLStrToStrMap map = {0};
@@ -1189,7 +1206,8 @@ static void test_jsl_str_to_str_map_rehash(void)
 
 static void test_jsl_str_to_str_map_invalid_inserts(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(&allocator);
 
     JSLStrToStrMap map = {0};

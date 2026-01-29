@@ -1032,7 +1032,8 @@
         {
             uint8_t hash_function_call_buffer[JSL_KILOBYTES(4)];
             JSLArena hash_function_scratch_arena = JSL_ARENA_FROM_STACK(hash_function_call_buffer);
-            JSLAllocatorInterface scratch_interface = jsl_arena_get_allocator_interface(&hash_function_scratch_arena);
+            JSLAllocatorInterface scratch_interface;
+            jsl_arena_get_allocator_interface(&scratch_interface, &hash_function_scratch_arena);
 
             JSLFatPtr resolved_hash_function_call;
             if (hash_function_name.data != NULL && hash_function_name.length > 0)
@@ -1090,7 +1091,8 @@
         {
             uint8_t resolved_key_buffer[JSL_KILOBYTES(4)];
             JSLArena scratch_arena = JSL_ARENA_FROM_STACK(resolved_key_buffer);
-            JSLAllocatorInterface scratch_interface = jsl_arena_get_allocator_interface(&scratch_arena);
+            JSLAllocatorInterface scratch_interface;
+            jsl_arena_get_allocator_interface(&scratch_interface, &scratch_arena);
 
             JSLFatPtr resolved_key_compare;
 

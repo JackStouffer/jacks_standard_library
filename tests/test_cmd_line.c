@@ -37,7 +37,8 @@ static void test_short_flags_grouping(void)
 {
     uint8_t buffer[4096];
     JSLArena arena = JSL_ARENA_FROM_STACK(buffer);
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &arena);
 
     JSLCmdLineArgs cmd = {0};
 
@@ -77,7 +78,8 @@ static void test_short_flag_equals_is_invalid(void)
 {
     uint8_t buffer[4096];
     JSLArena arena = JSL_ARENA_FROM_STACK(buffer);
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &arena);
 
     JSLCmdLineArgs cmd = {0};
 
@@ -99,7 +101,8 @@ static void test_long_flags_and_commands(void)
 {
     uint8_t buffer[4096];
     JSLArena arena = JSL_ARENA_FROM_STACK(buffer);
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &arena);
 
     JSLCmdLineArgs cmd = {0};
 
@@ -151,7 +154,8 @@ static void test_long_values_equals_and_space(void)
 {
     uint8_t buffer[4096];
     JSLArena arena = JSL_ARENA_FROM_STACK(buffer);
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &arena);
 
     JSLCmdLineArgs cmd = {0};
 
@@ -199,7 +203,8 @@ static void test_wide_parsing(void)
 {
     uint8_t buffer[4096];
     JSLArena arena = JSL_ARENA_FROM_STACK(buffer);
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &arena);
 
     JSLCmdLineArgs cmd = {0};
 

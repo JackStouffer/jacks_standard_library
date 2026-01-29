@@ -247,7 +247,9 @@ static void test_arena_allocator_interface_basic(void)
     JSLArena arena = {0};
     jsl_arena_init(&arena, buffer, (int64_t) sizeof(buffer));
 
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
+    JSLAllocatorInterface allocator;
+
+    jsl_arena_get_allocator_interface(&allocator, &arena);
 
     uint8_t* allocation = (uint8_t*) jsl_allocator_interface_alloc(&allocator, 32, 8, true);
     TEST_BOOL(allocation != NULL);
@@ -619,7 +621,8 @@ static void test_infinite_arena_allocator_interface_basic(void)
     TEST_BOOL(init == true);
     if (!init) return;
 
-    JSLAllocatorInterface allocator = jsl_infinite_arena_get_allocator_interface(&arena);
+    JSLAllocatorInterface allocator;
+    jsl_infinite_arena_get_allocator_interface(&allocator, &arena);
 
     uint8_t* allocation = (uint8_t*) jsl_allocator_interface_alloc(&allocator, 32, 8, true);
     TEST_BOOL(allocation != NULL);

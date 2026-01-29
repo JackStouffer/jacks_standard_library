@@ -61,7 +61,8 @@ static void test_jsl_load_file_contents(void)
 
     JSLArena arena;
     jsl_arena_init(&arena, malloc(JSL_KILOBYTES(4)), JSL_KILOBYTES(4));
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &arena);
 
     JSLFatPtr contents;
     JSLLoadFileResultEnum res = jsl_load_file_contents(

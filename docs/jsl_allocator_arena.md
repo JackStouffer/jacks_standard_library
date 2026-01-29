@@ -221,7 +221,7 @@ void jsl_arena_init2(JSLArena *arena, JSLFatPtr memory);
 TODO: docs
 
 ```c
-JSLAllocatorInterface jsl_arena_get_allocator_interface(JSLArena *arena);
+void jsl_arena_get_allocator_interface(JSLAllocatorInterface *allocator, JSLArena *arena);
 ```
 
 
@@ -404,4 +404,3 @@ void jsl_arena_load_restore_point(JSLArena *arena, int *restore_point);
 *Defined at*: `src/jsl_allocator_arena.h:252`
 
 ---
-

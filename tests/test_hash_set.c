@@ -61,7 +61,8 @@ static bool insert_values(JSLStrSet* set, const char** values, size_t count)
 static void test_jsl_str_set_init_success(void)
 {
     JSLStrSet set = {0};
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
     bool ok = jsl_str_set_init2(&set, &allocator, 0xABCDULL, 10, 0.5f);
     TEST_BOOL(ok);
@@ -79,7 +80,8 @@ static void test_jsl_str_set_init_success(void)
 static void test_jsl_str_set_init_invalid_arguments(void)
 {
     JSLStrSet set = {0};
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
     TEST_BOOL(!jsl_str_set_init2(NULL, &allocator, 0, 4, 0.5f));
     TEST_BOOL(!jsl_str_set_init2(&set, NULL, 0, 4, 0.5f));
@@ -93,7 +95,8 @@ static void test_jsl_str_set_init_invalid_arguments(void)
 static void test_jsl_str_set_insert_and_has(void)
 {
     JSLStrSet set = {0};
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
     bool ok = jsl_str_set_init2(&set, &allocator, 42, 8, 0.75f);
     TEST_BOOL(ok);
@@ -127,7 +130,8 @@ static void test_jsl_str_set_insert_and_has(void)
 static void test_jsl_str_set_respects_lifetime_rules(void)
 {
     JSLStrSet set = {0};
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
     bool ok = jsl_str_set_init2(&set, &allocator, 7, 4, 0.5f);
     TEST_BOOL(ok);
@@ -180,7 +184,8 @@ static void test_jsl_str_set_respects_lifetime_rules(void)
 static void test_jsl_str_set_iterator_covers_all_values(void)
 {
     JSLStrSet set = {0};
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
     bool ok = jsl_str_set_init2(&set, &allocator, 99, 6, 0.6f);
     TEST_BOOL(ok);
@@ -231,7 +236,8 @@ static void test_jsl_str_set_iterator_covers_all_values(void)
 static void test_jsl_str_set_iterator_invalidated_on_mutation(void)
 {
     JSLStrSet set = {0};
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
     bool ok = jsl_str_set_init(&set, &allocator, 1111);
     TEST_BOOL(ok);
@@ -251,7 +257,8 @@ static void test_jsl_str_set_iterator_invalidated_on_mutation(void)
 static void test_jsl_str_set_delete(void)
 {
     JSLStrSet set = {0};
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
     bool ok = jsl_str_set_init2(&set, &allocator, 2020, 12, 0.7f);
     TEST_BOOL(ok);
@@ -278,7 +285,8 @@ static void test_jsl_str_set_delete(void)
 static void test_jsl_str_set_clear(void)
 {
     JSLStrSet set = {0};
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
     bool ok = jsl_str_set_init2(&set, &allocator, 3030, 10, 0.6f);
     TEST_BOOL(ok);
@@ -308,7 +316,8 @@ static void test_jsl_str_set_clear(void)
 
 static void test_jsl_str_set_handles_empty_and_binary_values(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
     JSLStrSet set = {0};
     bool ok = jsl_str_set_init2(&set, &allocator, 5050, 8, 0.5f);
@@ -357,7 +366,8 @@ static void test_jsl_str_set_handles_empty_and_binary_values(void)
 
 static void test_jsl_str_set_intersection_basic(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
     JSLStrSet a = {0};
     JSLStrSet b = {0};
@@ -387,7 +397,8 @@ static void test_jsl_str_set_intersection_basic(void)
 
 static void test_jsl_str_set_intersection_with_empty_sets(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
     JSLStrSet filled = {0};
     JSLStrSet empty = {0};
@@ -414,7 +425,8 @@ static void test_jsl_str_set_intersection_with_empty_sets(void)
 
 static void test_jsl_str_set_union_collects_all_unique_values(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
     JSLStrSet a = {0};
     JSLStrSet b = {0};
@@ -446,7 +458,8 @@ static void test_jsl_str_set_union_collects_all_unique_values(void)
 
 static void test_jsl_str_set_union_with_empty_sets(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
     JSLStrSet filled = {0};
     JSLStrSet empty = {0};
@@ -483,7 +496,8 @@ static void test_jsl_str_set_union_with_empty_sets(void)
 
 static void test_jsl_str_set_difference_basic(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
     JSLStrSet a = {0};
     JSLStrSet b = {0};
@@ -513,7 +527,8 @@ static void test_jsl_str_set_difference_basic(void)
 
 static void test_jsl_str_set_difference_with_empty_sets(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
     JSLStrSet filled = {0};
     JSLStrSet empty = {0};
@@ -552,7 +567,8 @@ static void test_jsl_str_set_difference_with_empty_sets(void)
 
 static void test_jsl_str_set_set_operations_invalid_parameters(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
     JSLStrSet a = {0};
     JSLStrSet b = {0};
@@ -593,7 +609,8 @@ static void test_jsl_str_set_set_operations_invalid_parameters(void)
 
 static void test_jsl_str_set_rehash_preserves_entries(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
     JSLStrSet set = {0};
     bool ok = jsl_str_set_init2(&set, &allocator, 6060, 4, 0.5f);
@@ -634,7 +651,8 @@ static void test_jsl_str_set_rehash_preserves_entries(void)
 
 static void test_jsl_str_set_rejects_invalid_parameters(void)
 {
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&global_arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
     JSLFatPtr value = JSL_FATPTR_INITIALIZER("value");
     TEST_BOOL(!jsl_str_set_insert(NULL, value, JSL_STRING_LIFETIME_STATIC));

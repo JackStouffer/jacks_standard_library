@@ -175,18 +175,16 @@ static bool jsl__infinite_arena_alloc_interface_free_all(void* ctx)
     return true;
 }
 
-JSLAllocatorInterface jsl_infinite_arena_get_allocator_interface(JSLInfiniteArena* arena)
+void jsl_infinite_arena_get_allocator_interface(JSLAllocatorInterface* allocator, JSLInfiniteArena* arena)
 {
-    JSLAllocatorInterface i;
     jsl_allocator_interface_init(
-        &i,
+        allocator,
         jsl__infinite_arena_alloc_interface_alloc,
         jsl__infinite_arena_alloc_interface_realloc,
         jsl__infinite_arena_alloc_interface_free,
         jsl__infinite_arena_alloc_interface_free_all,
         arena
     );
-    return i;
 }
 
 void* jsl_infinite_arena_allocate(JSLInfiniteArena* arena, int64_t bytes, bool zeroed)

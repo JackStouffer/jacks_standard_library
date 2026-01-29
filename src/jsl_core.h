@@ -69,7 +69,7 @@ extern "C" {
 
 
 // forward decl
-typedef struct JSLAllocatorInterface JSLAllocatorInterface;
+typedef struct JSL__AllocatorInterface JSLAllocatorInterface;
 
 
 #if (defined(__BYTE_ORDER__) && __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__)

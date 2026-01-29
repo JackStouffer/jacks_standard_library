@@ -649,7 +649,8 @@ static void test_jsl_fatptr_to_lowercase_ascii(void)
 {
     JSLArena arena;
     jsl_arena_init(&arena, malloc(1024), 1024);
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &arena);
 
     JSLFatPtr buffer1 = jsl_cstr_to_fatptr(&allocator, "10023");
     jsl_fatptr_to_lowercase_ascii(buffer1);
@@ -946,7 +947,8 @@ static void test_jsl_fatptr_to_cstr(void)
 {
     JSLArena arena;
     jsl_arena_init(&arena, malloc(1024), 1024);
-    JSLAllocatorInterface allocator = jsl_arena_get_allocator_interface(&arena);
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &arena);
 
     {
         JSLFatPtr fatptr = {0};

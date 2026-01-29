@@ -1,3 +1,32 @@
+/**
+ * This file contains an arena allocator (a.k.a bump, region, or monotonic
+ * allocator).
+ *
+ * See the DESIGN.md file for detailed notes on arena implementation, their uses,
+ * and when they shouldn't be used.
+ *
+ * ## License
+ *
+ * Copyright (c) 2026 Jack Stouffer
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the “Software”),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the Software
+ * is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+ */
+
 #pragma once
 
 #include <stdint.h>
@@ -116,9 +145,15 @@ JSL_DEF void jsl_arena_init(JSLArena* arena, void* memory, int64_t length);
 JSL_DEF void jsl_arena_init2(JSLArena* arena, JSLFatPtr memory);
 
 /**
- * TODO: docs
+ * Get an allocator interface for the given arena.
+ * 
+ * The allocator interface stores a pointer to the arena and is only valid for
+ * as long as the arena is.
+ * 
+ * @param arena pointer to the arena
+ * @return A new allocator interface.
  */
-JSL_DEF JSLAllocatorInterface jsl_arena_get_allocator_interface(JSLArena* arena);
+JSL_DEF void jsl_arena_get_allocator_interface(JSLAllocatorInterface* allocator, JSLArena* arena);
 
 /**
  * Allocate a block of memory from the arena using the default alignment.

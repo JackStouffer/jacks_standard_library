@@ -88,9 +88,7 @@ JSL_DEF bool jsl_infinite_arena_init(JSLInfiniteArena* arena);
  * @param arena The arena used for all allocator callbacks.
  * @return Allocator interface that uses the infinite arena for allocate/reallocate/free.
  */
-JSL_DEF JSLAllocatorInterface jsl_infinite_arena_get_allocator_interface(
-    JSLInfiniteArena* arena
-);
+JSL_DEF void jsl_infinite_arena_get_allocator_interface(JSLAllocatorInterface* allocator, JSLInfiniteArena* arena);
 
 /**
  * Allocate a block of memory from the arena using the default alignment.
