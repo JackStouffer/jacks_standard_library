@@ -302,7 +302,7 @@ static void test_jsl_format_file_write_failure(void)
             JSLOutputSink sink = jsl_c_file_output_sink(writer);
 
             int64_t res = jsl_format_sink(sink, JSL_FATPTR_EXPRESSION("Hello"));
-            TEST_INT64_EQUAL(res, -1);
+            TEST_BOOL(res < 0);
 
             fclose(writer);
             if (previous_handler == SIG_ERR)

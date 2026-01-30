@@ -1555,6 +1555,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
     uint8_t* buffer_cursor = buffer;
     JSLFatPtr f = fmt;
     int64_t bytes_written_to_sink = 0;
+    int64_t sink_err_res = 0;
 
     #if defined(__AVX2__)
         const __m256i percent_wide = _mm256_set1_epi8('%');
@@ -1581,7 +1582,10 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                         buffer_cursor = buffer;                                             \
                     }                                                                       \
                     else                                                                    \
-                        goto L_DONE;                                                          \
+                    {                                                                       \
+                        sink_err_res = sink_res;                                            \
+                        goto L_DONE;                                                        \
+                    }                                                                       \
                 }                                                                           \
             }
 
@@ -2691,7 +2695,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
     FLUSH_BUFFER();
 
     L_DONE:
-    return bytes_written_to_sink;
+    return sink_err_res < 0 ? sink_err_res : bytes_written_to_sink;
 }
 
 // cleanup

@@ -561,7 +561,11 @@ static int64_t jsl__c_file_sink_out(void* user, JSLFatPtr data)
         file
     );
 
-    if (ferror(file) == 0)
+    int32_t err_res = ferror(file);
+
+    JSL_DEBUG_DONT_OPTIMIZE_AWAY(err_res);
+
+    if (err_res == 0)
         return written;
     else
         return -errno;

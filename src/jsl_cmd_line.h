@@ -146,9 +146,9 @@ bool jsl_cmd_line_get_terminal_info(JSLTerminalInfo* info, uint32_t flags);
  * such colors are user configurable.
  *
  * This function does not use a lookup table, as such a table would add many
- * kilobytes to the executable for a very rare case (ANSI 16 only terminals).
- * As such it's constant time, but it's not cheap.
- * 
+ * tens of kilobytes to the executable for a very rare case (ANSI 16 only terminals).
+ * As such, this function is constant time, but it's not cheap.
+ *
  * @param r The red color channel
  * @param g The green color channel
  * @param b The blue color channel
@@ -167,8 +167,8 @@ uint8_t jsl_cmd_line_rgb_to_ansi16(uint8_t r, uint8_t g, uint8_t b);
  * such colors are user configurable.
  * 
  * This function does not use a lookup table, as such a table would add many
- * kilobytes to the executable for a very rare case (ANSI 256 only terminals).
- * As such it's constant time, but it's not cheap.
+ * tens of kilobytes to the executable for a very rare case (ANSI 256 only terminals).
+ * As such, this function is constant time, but it's not cheap.
  *
  * @param r The red color channel
  * @param g The green color channel

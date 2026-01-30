@@ -80,6 +80,7 @@
  *
  */
 typedef void* (*JSLAllocateFP)(void* ctx, int64_t bytes, int32_t alignment, bool zeroed);
+
 /**
  * TODO: docs
  * 
@@ -91,10 +92,12 @@ typedef void* (*JSLAllocateFP)(void* ctx, int64_t bytes, int32_t alignment, bool
  *      - If `zeroed` is true, this allocator returns the requested memory already set to zero for all `bytes` number of bytes
  */
 typedef void* (*JSLReallocateFP)(void* ctx, void* allocation, int64_t new_bytes, int32_t alignment);
+
 /**
  * TODO: docs
  */
 typedef bool (*JSLFreeFP)(void* ctx, void* allocation);
+
 /**
  * TODO: docs
  */

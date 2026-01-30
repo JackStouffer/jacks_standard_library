@@ -335,7 +335,7 @@ static void test_jsl_string_builder_with_format_invalid_builder(void)
 {
     JSLStringBuilder builder = {0};
     JSLOutputSink builder_sink = jsl_string_builder_output_sink(&builder);
-    TEST_INT64_EQUAL(jsl_format_sink(builder_sink, jsl_fatptr_from_cstr("abc")), 0);
+    TEST_INT64_EQUAL(jsl_format_sink(builder_sink, jsl_fatptr_from_cstr("abc")), -1);
 }
 
 static void test_jsl_string_builder_free_null_and_uninitialized(void)

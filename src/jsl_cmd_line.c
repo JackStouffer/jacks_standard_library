@@ -1446,7 +1446,7 @@ bool jsl_cmd_line_get_terminal_info(JSLTerminalInfo* info, uint32_t flags)
     return true;
 }
 
-static const uint8_t jsl__ansi16[16][3] = {
+static const uint32_t jsl__ansi16[16][3] = {
     {  0,   0,   0}, {205,   0,   0}, {  0, 205,   0}, {205, 205,   0},
     {  0,   0, 238}, {205,   0, 205}, {  0, 205, 205}, {229, 229, 229},
     {127, 127, 127}, {255,   0,   0}, {  0, 255,   0}, {255, 255,   0},
@@ -1460,12 +1460,16 @@ uint8_t jsl_cmd_line_rgb_to_ansi16(uint8_t r, uint8_t g, uint8_t b)
 
     for (uint8_t i = 0; i < 16; ++i)
     {
-        uint32_t dr = (uint32_t) r - (uint32_t) jsl__ansi16[i][0];
-        uint32_t dg = (uint32_t) g - (uint32_t) jsl__ansi16[i][1];
-        uint32_t db = (uint32_t) b - (uint32_t) jsl__ansi16[i][2];
+        uint32_t dr = (uint32_t) r - jsl__ansi16[i][0];
+        uint32_t dg = (uint32_t) g - jsl__ansi16[i][1];
+        uint32_t db = (uint32_t) b - jsl__ansi16[i][2];
 
         // perceptual-ish weighting; still cheap integer math
-        uint32_t dist = 30u*dr*dr + 59u*dg*dg + 11u*db*db;
+        uint32_t red_dist = 30u * dr * dr;
+        uint32_t green_dist = 59u * dg * dg;
+        uint32_t blue_dist = 11u * db * db;
+        
+        uint32_t dist = red_dist + green_dist + blue_dist;
 
         if (dist < best_dist)
         {
@@ -1486,11 +1490,16 @@ uint8_t jsl_cmd_line_rgb_to_ansi256(uint8_t r, uint8_t g, uint8_t b)
 
     for (uint8_t i = 0; i < 16; ++i)
     {
-        uint32_t dr = (uint32_t) r - (uint32_t) jsl__ansi16[i][0];
-        uint32_t dg = (uint32_t) g - (uint32_t) jsl__ansi16[i][1];
-        uint32_t db = (uint32_t) b - (uint32_t) jsl__ansi16[i][2];
+        uint32_t dr = (uint32_t) r - jsl__ansi16[i][0];
+        uint32_t dg = (uint32_t) g - jsl__ansi16[i][1];
+        uint32_t db = (uint32_t) b - jsl__ansi16[i][2];
 
-        uint32_t dist = 30u*dr*dr + 59u*dg*dg + 11u*db*db;
+        uint32_t red_dist = 30u * dr * dr;
+        uint32_t green_dist = 59u * dg * dg;
+        uint32_t blue_dist = 11u * db * db;
+        
+        uint32_t dist = red_dist + green_dist + blue_dist;
+
         if (dist < best_dist)
         {
             best_dist = dist;

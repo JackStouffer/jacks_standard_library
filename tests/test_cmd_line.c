@@ -33,6 +33,15 @@
 
 #include "minctest.h"
 
+#define EXPECT_SINK_OUTPUT(expected_literal, bytes_written, buffer, writer) \
+    do { \
+        int64_t expected_len = (int64_t)(sizeof(expected_literal) - 1); \
+        int64_t actual_len = jsl_fatptr_total_write_length((buffer), (writer)); \
+        TEST_INT64_EQUAL((bytes_written), expected_len); \
+        TEST_INT64_EQUAL(actual_len, expected_len); \
+        TEST_BUFFERS_EQUAL((buffer).data, (expected_literal), expected_len); \
+    } while (0)
+
 static void test_short_flags_grouping(void)
 {
     uint8_t buffer[4096];
@@ -236,13 +245,201 @@ static void test_wide_parsing(void)
     TEST_BOOL(!jsl_cmd_line_args_has_command(&cmd, JSL_FATPTR_EXPRESSION("alice")));
 }
 
+static void test_cmd_line_color_conversions(void)
+{
+    TEST_UINT32_EQUAL(jsl_cmd_line_rgb_to_ansi16(0, 0, 0), 0);
+    TEST_UINT32_EQUAL(jsl_cmd_line_rgb_to_ansi16(255, 0, 0), 9);
+    TEST_UINT32_EQUAL(jsl_cmd_line_rgb_to_ansi16(0, 255, 0), 10);
+    TEST_UINT32_EQUAL(jsl_cmd_line_rgb_to_ansi16(255, 255, 255), 15);
+    TEST_UINT32_EQUAL(jsl_cmd_line_rgb_to_ansi16(0, 0, 255), 4);
+
+    TEST_UINT32_EQUAL(jsl_cmd_line_rgb_to_ansi256(255, 0, 0), 9);
+    TEST_UINT32_EQUAL(jsl_cmd_line_rgb_to_ansi256(95, 135, 175), 67);
+    TEST_UINT32_EQUAL(jsl_cmd_line_rgb_to_ansi256(58, 58, 58), 237);
+
+    TEST_UINT32_EQUAL(jsl_cmd_line_ansi256_to_ansi16(0), 0);
+    TEST_UINT32_EQUAL(jsl_cmd_line_ansi256_to_ansi16(15), 15);
+    TEST_UINT32_EQUAL(jsl_cmd_line_ansi256_to_ansi16(16), 0);
+    TEST_UINT32_EQUAL(jsl_cmd_line_ansi256_to_ansi16(196), 9);
+}
+
+static void test_cmd_line_write_style_no_color(void)
+{
+    JSLTerminalInfo info = {0};
+    TEST_BOOL(jsl_cmd_line_get_terminal_info(&info, JSL_GET_TERMINAL_INFO_FORCE_NO_COLOR));
+
+    JSLCmdLineColor fg = {0};
+    jsl_cmd_line_color_from_ansi16(&fg, 1);
+
+    JSLCmdLineStyle style = {0};
+    jsl_cmd_line_style_with_foreground(&style, fg, JSL_CMD_LINE_STYLE_BOLD);
+
+    uint8_t raw[64] = {0};
+    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(raw);
+    JSLFatPtr writer = buffer;
+    JSLOutputSink sink = jsl_fatptr_output_sink(&writer);
+
+    int64_t result = jsl_cmd_line_write_style(sink, &info, &style);
+    EXPECT_SINK_OUTPUT("", result, buffer, writer);
+
+    JSLFatPtr reset_writer = buffer;
+    JSLOutputSink reset_sink = jsl_fatptr_output_sink(&reset_writer);
+    result = jsl_cmd_line_write_reset(reset_sink, &info);
+    EXPECT_SINK_OUTPUT("", result, buffer, reset_writer);
+}
+
+static void test_cmd_line_write_style_ansi16(void)
+{
+    JSLTerminalInfo info = {0};
+    TEST_BOOL(jsl_cmd_line_get_terminal_info(&info, JSL_GET_TERMINAL_INFO_FORCE_16_COLOR_MODE));
+
+    JSLCmdLineColor fg = {0};
+    JSLCmdLineColor bg = {0};
+    jsl_cmd_line_color_from_ansi16(&fg, 1);
+    jsl_cmd_line_color_from_ansi16(&bg, 12);
+
+    JSLCmdLineStyle style = {0};
+    jsl_cmd_line_style_with_foreground_and_background(
+        &style,
+        fg,
+        bg,
+        JSL_CMD_LINE_STYLE_BOLD | JSL_CMD_LINE_STYLE_UNDERLINE | JSL_CMD_LINE_STYLE_STRIKE
+    );
+
+    uint8_t raw[128] = {0};
+    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(raw);
+    JSLFatPtr writer = buffer;
+    JSLOutputSink sink = jsl_fatptr_output_sink(&writer);
+
+    int64_t result = jsl_cmd_line_write_style(sink, &info, &style);
+    EXPECT_SINK_OUTPUT("\x1b[1m\x1b[4m\x1b[9m\x1b[31m\x1b[104m", result, buffer, writer);
+}
+
+static void test_cmd_line_write_style_ansi16_converts_color_types(void)
+{
+    JSLTerminalInfo info = {0};
+    TEST_BOOL(jsl_cmd_line_get_terminal_info(&info, JSL_GET_TERMINAL_INFO_FORCE_16_COLOR_MODE));
+
+    JSLCmdLineColor fg = {0};
+    JSLCmdLineColor bg = {0};
+    jsl_cmd_line_color_from_rgb(&fg, 0, 255, 0);
+    jsl_cmd_line_color_from_ansi256(&bg, 196);
+
+    JSLCmdLineStyle style = {0};
+    jsl_cmd_line_style_with_foreground_and_background(&style, fg, bg, 0);
+
+    uint8_t raw[128] = {0};
+    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(raw);
+    JSLFatPtr writer = buffer;
+    JSLOutputSink sink = jsl_fatptr_output_sink(&writer);
+
+    int64_t result = jsl_cmd_line_write_style(sink, &info, &style);
+    EXPECT_SINK_OUTPUT("\x1b[92m\x1b[101m", result, buffer, writer);
+}
+
+static void test_cmd_line_write_style_ansi256(void)
+{
+    JSLTerminalInfo info = {0};
+    TEST_BOOL(jsl_cmd_line_get_terminal_info(&info, JSL_GET_TERMINAL_INFO_FORCE_255_COLOR_MODE));
+
+    JSLCmdLineColor fg = {0};
+    JSLCmdLineColor bg = {0};
+    jsl_cmd_line_color_from_rgb(&fg, 95, 135, 175);
+    jsl_cmd_line_color_from_ansi16(&bg, 3);
+
+    JSLCmdLineStyle style = {0};
+    jsl_cmd_line_style_with_foreground_and_background(&style, fg, bg, JSL_CMD_LINE_STYLE_DIM);
+
+    uint8_t raw[128] = {0};
+    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(raw);
+    JSLFatPtr writer = buffer;
+    JSLOutputSink sink = jsl_fatptr_output_sink(&writer);
+
+    int64_t result = jsl_cmd_line_write_style(sink, &info, &style);
+    EXPECT_SINK_OUTPUT("\x1b[2m\x1b[38;5;67m\x1b[43m", result, buffer, writer);
+}
+
+static void test_cmd_line_write_style_truecolor(void)
+{
+    JSLTerminalInfo info = {0};
+    TEST_BOOL(jsl_cmd_line_get_terminal_info(&info, JSL_GET_TERMINAL_INFO_FORCE_24_BIT_COLOR_MODE));
+
+    JSLCmdLineColor fg = {0};
+    JSLCmdLineColor bg = {0};
+    jsl_cmd_line_color_from_rgb(&fg, 12, 34, 56);
+    jsl_cmd_line_color_from_ansi256(&bg, 200);
+
+    JSLCmdLineStyle style = {0};
+    jsl_cmd_line_style_with_foreground_and_background(
+        &style,
+        fg,
+        bg,
+        JSL_CMD_LINE_STYLE_ITALIC | JSL_CMD_LINE_STYLE_INVERSE
+    );
+
+    uint8_t raw[128] = {0};
+    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(raw);
+    JSLFatPtr writer = buffer;
+    JSLOutputSink sink = jsl_fatptr_output_sink(&writer);
+
+    int64_t result = jsl_cmd_line_write_style(sink, &info, &style);
+    EXPECT_SINK_OUTPUT("\x1b[3m\x1b[7m\x1b[38;2;12;34;56m\x1b[48;5;200m", result, buffer, writer);
+}
+
+static void test_cmd_line_write_style_and_reset_invalid(void)
+{
+    JSLTerminalInfo info = {0};
+    bool ok = jsl_cmd_line_get_terminal_info(
+        &info,
+        JSL_GET_TERMINAL_INFO_FORCE_16_COLOR_MODE | JSL_GET_TERMINAL_INFO_FORCE_255_COLOR_MODE
+    );
+    TEST_BOOL(!ok);
+
+    JSLCmdLineStyle style = {0};
+
+    uint8_t raw[32] = {0};
+    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(raw);
+    JSLFatPtr writer = buffer;
+    JSLOutputSink sink = jsl_fatptr_output_sink(&writer);
+
+    TEST_INT64_EQUAL(jsl_cmd_line_write_style(sink, &info, &style), -1);
+    EXPECT_SINK_OUTPUT("", 0, buffer, writer);
+
+    JSLFatPtr reset_writer = buffer;
+    JSLOutputSink reset_sink = jsl_fatptr_output_sink(&reset_writer);
+    TEST_INT64_EQUAL(jsl_cmd_line_write_reset(reset_sink, &info), -1);
+    EXPECT_SINK_OUTPUT("", 0, buffer, reset_writer);
+}
+
+static void test_cmd_line_write_reset_ansi_modes(void)
+{
+    JSLTerminalInfo info = {0};
+    TEST_BOOL(jsl_cmd_line_get_terminal_info(&info, JSL_GET_TERMINAL_INFO_FORCE_16_COLOR_MODE));
+
+    uint8_t raw[16] = {0};
+    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(raw);
+    JSLFatPtr writer = buffer;
+    JSLOutputSink sink = jsl_fatptr_output_sink(&writer);
+
+    int64_t result = jsl_cmd_line_write_reset(sink, &info);
+    EXPECT_SINK_OUTPUT("\x1b[0m", result, buffer, writer);
+}
+
 int main(void)
 {
-    RUN_TEST_FUNCTION("Short flags grouping", test_short_flags_grouping);
-    RUN_TEST_FUNCTION("Short flag with equals fails", test_short_flag_equals_is_invalid);
-    RUN_TEST_FUNCTION("Long flags, commands, and terminator", test_long_flags_and_commands);
-    RUN_TEST_FUNCTION("Long flag values via equals and space", test_long_values_equals_and_space);
-    RUN_TEST_FUNCTION("Wide argument parsing", test_wide_parsing);
+    RUN_TEST_FUNCTION("Test command line arg short flags grouping", test_short_flags_grouping);
+    RUN_TEST_FUNCTION("Test command line arg short flag with equals fails", test_short_flag_equals_is_invalid);
+    RUN_TEST_FUNCTION("Test command line arg long flags, commands, and terminator", test_long_flags_and_commands);
+    RUN_TEST_FUNCTION("Test command line arg long flag values via equals and space", test_long_values_equals_and_space);
+    RUN_TEST_FUNCTION("Test command line arg wide argument parsing", test_wide_parsing);
+    RUN_TEST_FUNCTION("Test command line color conversions", test_cmd_line_color_conversions);
+    RUN_TEST_FUNCTION("Test command line style writes no color", test_cmd_line_write_style_no_color);
+    RUN_TEST_FUNCTION("Test command line style write ANSI16", test_cmd_line_write_style_ansi16);
+    RUN_TEST_FUNCTION("Test command line style converts to ANSI16", test_cmd_line_write_style_ansi16_converts_color_types);
+    RUN_TEST_FUNCTION("Test command line style write ANSI256", test_cmd_line_write_style_ansi256);
+    RUN_TEST_FUNCTION("Test command line style write truecolor", test_cmd_line_write_style_truecolor);
+    RUN_TEST_FUNCTION("Test command line style/reset invalid", test_cmd_line_write_style_and_reset_invalid);
+    RUN_TEST_FUNCTION("Test command line reset ANSI modes", test_cmd_line_write_reset_ansi_modes);
 
     TEST_RESULTS();
     return lfails != 0;

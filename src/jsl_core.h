@@ -1719,9 +1719,16 @@ JSL_DEF JSLFatPtr jsl_fatptr_duplicate(JSLAllocatorInterface* allocator, JSLFatP
 /**
  * TODO: docs
  * 
- * There's no run time constraints on how large a chunk of data a user might give
- * this function.
+ * IMPORTANT: the lifetime of `data` is only guaranteed to be as long as this
+ * function call. I.E. after this function it is perfectly legitimate for the
+ * caller to completely throw away the given data.
  * 
+ * There's no run time constraints on how large a chunk of data a user might give
+ * this function. Your function needs to handle writes as small as one byte and as
+ * large as a gigabyte. For the majority of people, this means your function will
+ * have to use blocking writes, or chunk very large writes, or stage this data for
+ * writing at a later time.
+ *
  * Handling,
  * 
  *      - blocking or non-blocking behavior
