@@ -427,6 +427,8 @@ static JSL__FORCE_INLINE JSL__UNUSED int32_t jsl__find_first_set_u64(uint64_t x)
         #define JSL__FIND_FIRST_SET_IMPL64(x) __builtin_ffsl(x)
     #endif
 
+    #define JSL__MAX_ALIGN_T_IMPL max_align_t
+
 #elif JSL__IS_MSVC_VAL
 
     #define JSL__COUNT_TRAILING_ZEROS_IMPL(x) jsl__count_trailing_zeros_u32(x)
@@ -438,6 +440,15 @@ static JSL__FORCE_INLINE JSL__UNUSED int32_t jsl__find_first_set_u64(uint64_t x)
     #define JSL__FIND_FIRST_SET_IMPL(x) jsl__find_first_set_u32(x)
     #define JSL__FIND_FIRST_SET_IMPL64(x) jsl__find_first_set_u64(x)
 
+    #ifndef max_align_t
+        typedef struct jsl__max_align_t {
+            long long ll;
+            long double ld;
+        } max_align_t;
+    #endif
+
+    #define JSL__MAX_ALIGN_T_IMPL max_align_t
+
 #else
 
     #define JSL__COUNT_TRAILING_ZEROS_IMPL(x) jsl__count_trailing_zeros_u32(x)
@@ -448,6 +459,15 @@ static JSL__FORCE_INLINE JSL__UNUSED int32_t jsl__find_first_set_u64(uint64_t x)
     #define JSL__POPULATION_COUNT_IMPL64(x) jsl__population_count_u64(x)
     #define JSL__FIND_FIRST_SET_IMPL(x) jsl__find_first_set_u32(x)
     #define JSL__FIND_FIRST_SET_IMPL64(x) jsl__find_first_set_u64(x)
+
+    #ifndef max_align_t
+        typedef struct jsl__max_align_t {
+            long long ll;
+            long double ld;
+        } max_align_t;
+    #endif
+
+    #define JSL__MAX_ALIGN_T_IMPL max_align_t
 
 #endif
 
@@ -802,6 +822,23 @@ static JSL__FORCE_INLINE JSL__UNUSED int32_t jsl__find_first_set_u64(uint64_t x)
  * with zero is undefined for GCC and clang while MSVC will give 32.
  */
 #define JSL_PLATFORM_FIND_FIRST_SET64(x) JSL__FIND_FIRST_SET_IMPL64((x))
+
+/**
+ * Cross platform implementation of C11's `max_align_t`. MSVC does not
+ * support this feature. On clang and gcc this aliases to `max_align_t`.
+ * On all other platforms this will define a struct 
+ * 
+ * ```
+ * struct jsl__max_align_t {
+ *     long long ll;
+ *     long double ld;
+ * }
+ * ```
+ * 
+ * which should provide the max alignment of any built in type when
+ * used in conjunction with `alignof`.
+ */
+#define JSL_MAX_ALIGN_T JSL__MAX_ALIGN_T_IMPL
 
 /**
  * Evaluates the maximum of two values.
@@ -1721,7 +1758,7 @@ JSL_DEF JSLFatPtr jsl_fatptr_duplicate(JSLAllocatorInterface* allocator, JSLFatP
  * 
  * IMPORTANT: the lifetime of `data` is only guaranteed to be as long as this
  * function call. I.E. after this function it is perfectly legitimate for the
- * caller to completely throw away the given data.
+ * caller to completely throw away or overwrite the memory pointed to by data.
  * 
  * There's no run time constraints on how large a chunk of data a user might give
  * this function. Your function needs to handle writes as small as one byte and as
@@ -1753,7 +1790,7 @@ typedef int64_t (*JSLOutputSinkWriteFP)(void* user, JSLFatPtr data);
  * The benefits are ...
  * 
  * No abstraction is without it's downsides. Not all output situations will fit cleanly into
- * this format.
+ * this forma ...
  */
 typedef struct JSLOutputSink {
     JSLOutputSinkWriteFP write_fp;

@@ -28,6 +28,7 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdalign.h>
 
 #if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L
     #include <stdbool.h>
@@ -113,9 +114,7 @@ typedef enum JSLCmdLineStyleAttribute {
 } JSLCmdLineStyleAttribute;
 
 typedef struct JSLCmdLineStyle {
-    JSLCmdLineColor foreground;
-    JSLCmdLineColor background;
-    uint32_t style_attributes;
+    alignas(alignof(JSL_MAX_ALIGN_T)) uint8_t _buf[20];
 } JSLCmdLineStyle;
 
 /**

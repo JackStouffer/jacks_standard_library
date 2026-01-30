@@ -347,7 +347,7 @@ static void test_jsl_format_file_write_failure(void)
 
     JSLOutputSink ro_sink = jsl_c_file_output_sink(read_only);
     int64_t res2 = jsl_format_sink(ro_sink, JSL_FATPTR_EXPRESSION("Hello"));
-    TEST_INT64_EQUAL(res2, 0);
+    TEST_BOOL(res2 < 0);
 
     fclose(read_only);
     remove(path);

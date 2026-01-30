@@ -196,7 +196,8 @@ static int32_t entrypoint(
         bool arena_init = jsl_infinite_arena_init(&arena);
         assert(arena_init);
 
-        JSLAllocatorInterface allocator = jsl_infinite_arena_get_allocator_interface(&arena);
+        JSLAllocatorInterface allocator;
+        jsl_infinite_arena_get_allocator_interface(&allocator, &arena);
 
         JSLCmdLineArgs cmd;
         jsl_cmd_line_args_init(&cmd, &allocator);

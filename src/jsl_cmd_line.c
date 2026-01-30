@@ -63,6 +63,17 @@
 
 static const JSLFatPtr JSL__CMD_LINE_EMPTY_VALUE = JSL_FATPTR_INITIALIZER("");
 
+
+struct JSL__CmdLineStyle {
+    JSLCmdLineColor foreground;
+    JSLCmdLineColor background;
+    uint32_t style_attributes;
+};
+_Static_assert(
+    sizeof(struct JSL__CmdLineStyle) <= sizeof(JSLCmdLineStyle),
+    "INTERNAL ERROR: JSL__CmdLineStyle size error"
+);
+
 static JSL__FORCE_INLINE void jsl__cmd_line_args_set_error(JSLCmdLineArgs* args, JSLFatPtr* out_error, JSLFatPtr message)
 {
     bool params_valid = (
@@ -1316,16 +1327,52 @@ bool jsl_cmd_line_get_terminal_info(JSLTerminalInfo* info, uint32_t flags)
     // default to none
     info->output_mode = JSL__CMD_LINE_OUTPUT_MODE_NONE;
 
-    JSLFatPtr env_no_color = jsl_fatptr_from_cstr(getenv("NO_COLOR"));
-    JSLFatPtr env_term = jsl_fatptr_from_cstr(getenv("TERM"));
-    JSLFatPtr env_colorterm = jsl_fatptr_from_cstr(getenv("COLORTERM"));
-    JSLFatPtr env_clicolor = jsl_fatptr_from_cstr(getenv("CLICOLOR"));
-    JSLFatPtr env_clicolor_force = jsl_fatptr_from_cstr(getenv("CLICOLOR_FORCE"));
-    JSLFatPtr env_force_color = jsl_fatptr_from_cstr(getenv("FORCE_COLOR"));
-    JSLFatPtr env_vte_version = jsl_fatptr_from_cstr(getenv("VTE_VERSION"));
-    JSLFatPtr env_ansicon = jsl_fatptr_from_cstr(getenv("ANSICON"));
-    JSLFatPtr env_conemu_ansi = jsl_fatptr_from_cstr(getenv("ConEmuANSI"));
-    JSLFatPtr env_wt_session = jsl_fatptr_from_cstr(getenv("WT_SESSION"));
+    #if JSL_IS_WINDOWS
+        
+        // Look at all this fucking code, man. getenv_s is such a terrible API
+        #define GET_WIN_ENV_SAFE(VAR_NAME, ENV_NAME)                    \
+            char _buffer_##VAR_NAME[128];                               \
+            size_t _res_##VAR_NAME = 0;                                 \
+            int32_t _err_##VAR_NAME = getenv_s(                         \
+                &_res_##VAR_NAME,                                       \
+                _buffer_##VAR_NAME,                                     \
+                128,                                                    \
+                ENV_NAME                                                \
+            );                                                          \
+            JSLFatPtr VAR_NAME = {0};                                   \
+            if (_err_##VAR_NAME == 0 && _res_##VAR_NAME > 0)            \
+            {                                                           \
+                VAR_NAME.data = (uint8_t*) _buffer_##VAR_NAME;          \
+                VAR_NAME.length = (int64_t) _res_##VAR_NAME;            \
+            }
+
+        GET_WIN_ENV_SAFE(env_no_color, "NO_COLOR")
+        GET_WIN_ENV_SAFE(env_term, "TERM")
+        GET_WIN_ENV_SAFE(env_colorterm, "COLORTERM")
+        GET_WIN_ENV_SAFE(env_clicolor, "CLICOLOR")
+        GET_WIN_ENV_SAFE(env_clicolor_force, "CLICOLOR_FORCE")
+        GET_WIN_ENV_SAFE(env_force_color, "FORCE_COLOR")
+        GET_WIN_ENV_SAFE(env_vte_version, "VTE_VERSION")
+        GET_WIN_ENV_SAFE(env_ansicon, "ANSICON")
+        GET_WIN_ENV_SAFE(env_conemu_ansi, "ConEmuANSI")
+        GET_WIN_ENV_SAFE(env_wt_session, "WT_SESSION")
+        
+        #undef GET_WIN_ENV_SAFE
+
+    #else
+
+        JSLFatPtr env_no_color = jsl_fatptr_from_cstr(getenv("NO_COLOR"));
+        JSLFatPtr env_term = jsl_fatptr_from_cstr(getenv("TERM"));
+        JSLFatPtr env_colorterm = jsl_fatptr_from_cstr(getenv("COLORTERM"));
+        JSLFatPtr env_clicolor = jsl_fatptr_from_cstr(getenv("CLICOLOR"));
+        JSLFatPtr env_clicolor_force = jsl_fatptr_from_cstr(getenv("CLICOLOR_FORCE"));
+        JSLFatPtr env_force_color = jsl_fatptr_from_cstr(getenv("FORCE_COLOR"));
+        JSLFatPtr env_vte_version = jsl_fatptr_from_cstr(getenv("VTE_VERSION"));
+        JSLFatPtr env_ansicon = jsl_fatptr_from_cstr(getenv("ANSICON"));
+        JSLFatPtr env_conemu_ansi = jsl_fatptr_from_cstr(getenv("ConEmuANSI"));
+        JSLFatPtr env_wt_session = jsl_fatptr_from_cstr(getenv("WT_SESSION"));
+
+    #endif
 
     static JSLFatPtr dumb_str = JSL_FATPTR_INITIALIZER("dumb");
     bool term_dumb = jsl_fatptr_compare_ascii_insensitive(env_term, dumb_str);
@@ -1643,9 +1690,10 @@ void jsl_cmd_line_style_with_foreground(
     uint32_t style_flags
 )
 {
-    style->foreground = foreground;
-    style->background.color_type = JSL_CMD_LINE_COLOR_DEFAULT;
-    style->style_attributes = style_flags;
+    struct JSL__CmdLineStyle* s = (struct JSL__CmdLineStyle*) style;
+    s->foreground = foreground;
+    s->background.color_type = JSL_CMD_LINE_COLOR_DEFAULT;
+    s->style_attributes = style_flags;
 }
 
 void jsl_cmd_line_style_with_background(
@@ -1654,9 +1702,10 @@ void jsl_cmd_line_style_with_background(
     uint32_t style_flags
 )
 {
-    style->foreground.color_type = JSL_CMD_LINE_COLOR_DEFAULT;
-    style->background = background;
-    style->style_attributes = style_flags;
+    struct JSL__CmdLineStyle* s = (struct JSL__CmdLineStyle*) style;
+    s->foreground.color_type = JSL_CMD_LINE_COLOR_DEFAULT;
+    s->background = background;
+    s->style_attributes = style_flags;
 }
 
 void jsl_cmd_line_style_with_foreground_and_background(
@@ -1666,9 +1715,10 @@ void jsl_cmd_line_style_with_foreground_and_background(
     uint32_t style_flags
 )
 {
-    style->foreground = foreground;
-    style->background = background;
-    style->style_attributes = style_flags;
+    struct JSL__CmdLineStyle* s = (struct JSL__CmdLineStyle*) style;
+    s->foreground = foreground;
+    s->background = background;
+    s->style_attributes = style_flags;
 }
 
 static int64_t jsl__cmd_line_write_color(
@@ -1802,7 +1852,8 @@ int64_t jsl_cmd_line_write_style(JSLOutputSink sink, JSLTerminalInfo* terminal_i
     static const JSLFatPtr hidden_code = JSL_FATPTR_INITIALIZER("\x1b[8m");
     static const JSLFatPtr strike_code = JSL_FATPTR_INITIALIZER("\x1b[9m");
 
-    uint32_t attributes = style->style_attributes;
+    struct JSL__CmdLineStyle* s = (struct JSL__CmdLineStyle*) style;
+    uint32_t attributes = s->style_attributes;
 
     if (JSL_IS_BITFLAG_SET(attributes, JSL_CMD_LINE_STYLE_BOLD))
     {
@@ -1874,11 +1925,11 @@ int64_t jsl_cmd_line_write_style(JSLOutputSink sink, JSLTerminalInfo* terminal_i
         bytes_written += result;
     }
 
-    result = jsl__cmd_line_write_color(sink, terminal_info->output_mode, style->foreground, true);
+    result = jsl__cmd_line_write_color(sink, terminal_info->output_mode, s->foreground, true);
     if (result < 0) return -1;
     bytes_written += result;
 
-    result = jsl__cmd_line_write_color(sink, terminal_info->output_mode, style->background, false);
+    result = jsl__cmd_line_write_color(sink, terminal_info->output_mode, s->background, false);
     if (result < 0) return -1;
     bytes_written += result;
 

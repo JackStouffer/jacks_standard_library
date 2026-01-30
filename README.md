@@ -11,7 +11,7 @@ See the DESIGN.md file for more info.
 
 ## What's Included
 
-### Jack's Standard Library Core
+### Core
 
 `jsl_core.h`
 
@@ -28,17 +28,20 @@ See the DESIGN.md file for more info.
    * vastly simplifies functions like file reading
 * Common string and buffer utilities for fat pointers
    * things like fat pointer memcmp, memcpy, substring search, etc.
-* An arena allocator
-   * a.k.a a monotonic, region, or bump allocator
-   * They are easy to create, use, reset-able, allocators
-   * Great for things with known lifetimes (which is 99% of the things you allocate)
-   * See the DESIGN.md file more information
 * A snprintf replacement
    * works directly with fat pointers
    * Removes all compiler specific weirdness
 * A string builder container type
 
-### Jack's Standard Library File Utilities
+### Allocators
+
+* An arena allocator
+   * a.k.a a monotonic, region, or bump allocator
+   * They are easy to create, use, reset-able, allocators
+   * Great for things with known lifetimes (which is 99% of the things you allocate)
+   * See the DESIGN.md file more information
+
+### File Utilities
 
 `jsl_files.h`
 
@@ -53,7 +56,7 @@ See the DESIGN.md file for more info.
     * mkdir
     * a `fprintf` replacement
 
-### Jack's Standard Library Templates
+### Templates
 
 `cli/`
 
@@ -111,10 +114,17 @@ build system the way that you desire. As such, JSL does not ship with a
 build script that produces a static library. If you desire such a thing,
 you can just `cc -O3 -c` and `ar rcs` all of the C files in the `src/` directory.
 
+Additionally, **JSL makes no guarantees of binary compatibility between versions**,
+not even minor versions. You are expected to recompile on upgrades.
+
 Using this as a source library comes with several advantages: TK
+
+### Unity Builds
 
 For easy inclusion in a unity build, `jsl_everything.c` includes all of the source
 files at once.
+
+### Standard Library
 
 One note is that most of this library does not depend on the C standard library to
 be available at link time if you don't want to use it. However, it does require the
@@ -125,6 +135,7 @@ also have to define the replacement functions for the C standard library functio
 Files that depend on libc:
 
 * `jsl_os.c`
+* `jsl_cmd_line.c`
 * `jsl_allocator_infinite_arena.c`
 
 ### Note On Compile Flags
