@@ -76,13 +76,7 @@ enum JSL__CmdLineColorType
  */
 typedef struct JSLCmdLineColor
 {
-    enum JSL__CmdLineColorType color_type;
-    union
-    {
-        uint8_t ansi16;   // 0..15
-        uint8_t ansi256;  // 0..255
-        struct { uint8_t r, g, b; } rgb;
-    };
+    alignas(alignof(JSL_MAX_ALIGN_T)) uint8_t _buf[8];
 } JSLCmdLineColor;
 
 /**
@@ -130,7 +124,17 @@ enum JSLGetTerminalInfoFlags {
 };
 
 /**
- * TODO: docs
+ * Gather information about this terminal for the styling functions. 
+ * 
+ * The flags value is a bitwise OR of the values of `enum JSLGetTerminalInfoFlags`.
+ * Some of these flags are mutually exclusive.
+ * 
+ * With a flags value of zero, this function will autodetect the terminals
+ * color display capabilities.
+ * 
+ * @param info The info struct to fill out
+ * @param flags Bitflags to control the function's behavior
+ * @returns A bool indicating the success or failure of `info`'s initialization
  */
 bool jsl_cmd_line_get_terminal_info(JSLTerminalInfo* info, uint32_t flags);
 
@@ -324,28 +328,14 @@ int64_t jsl_cmd_line_write_style(JSLOutputSink sink, JSLTerminalInfo* terminal_i
  */
 int64_t jsl_cmd_line_write_reset(JSLOutputSink sink, JSLTerminalInfo* terminal_info);
 
-
-struct JSL__CmdLineArgs {
-    JSLAllocatorInterface* allocator;
-
-    uint64_t short_flag_bitset[JSL__CMD_LINE_SHORT_FLAG_BUCKETS];
-
-    JSLStrToStrMap long_flags;
-    JSLStrToStrMultimap flags_with_values;
-    JSLStrSet commands;
-
-    JSLFatPtr* arg_list;
-    int64_t arg_list_length;
-    int64_t arg_list_index;
-    int64_t arg_list_capacity;
-};
-
 /**
  * TODO: docs
- * 
+ *
  * State container struct 
  */
-typedef struct JSL__CmdLineArgs JSLCmdLineArgs;
+typedef struct JSLCmdLineArgs {
+    alignas(alignof(JSL_MAX_ALIGN_T)) uint8_t _buf[312];
+} JSLCmdLineArgs;
 
 /**
  * Initialize an instance of the command line parser container.
