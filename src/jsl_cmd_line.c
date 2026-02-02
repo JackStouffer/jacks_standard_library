@@ -65,53 +65,7 @@
 
 static const JSLFatPtr JSL__CMD_LINE_EMPTY_VALUE = JSL_FATPTR_INITIALIZER("");
 
-struct JSL__CmdLineColor
-{
-    enum JSL__CmdLineColorType color_type;
-    union
-    {
-        uint8_t ansi16;   // 0..15
-        uint8_t ansi256;  // 0..255
-        struct { uint8_t r, g, b; } rgb;
-    };
-};
-_Static_assert(
-    sizeof(struct JSL__CmdLineColor) <= sizeof(JSLCmdLineColor),
-    "INTERNAL ERROR: JSL__CmdLineColor size error"
-);
-
-struct JSL__CmdLineStyle {
-    struct JSL__CmdLineColor foreground;
-    struct JSL__CmdLineColor background;
-    uint32_t style_attributes;
-};
-_Static_assert(
-    sizeof(struct JSL__CmdLineStyle) <= sizeof(JSLCmdLineStyle),
-    "INTERNAL ERROR: JSL__CmdLineStyle size error"
-);
-
-struct JSL__CmdLineArgs {
-    uint64_t sentinel;
-
-    JSLAllocatorInterface* allocator;
-
-    uint64_t short_flag_bitset[JSL__CMD_LINE_SHORT_FLAG_BUCKETS];
-
-    JSLStrToStrMap long_flags;
-    JSLStrToStrMultimap flags_with_values;
-    JSLStrSet commands;
-
-    JSLFatPtr* arg_list;
-    int64_t arg_list_length;
-    int64_t arg_list_index;
-    int64_t arg_list_capacity;
-};
-_Static_assert(
-    sizeof(struct JSL__CmdLineArgs) <= sizeof(JSLCmdLineArgs),
-    "INTERNAL ERROR: JSLCmdLineArgs size error"
-);
-
-static JSL__FORCE_INLINE void jsl__cmd_line_args_set_error(struct JSL__CmdLineArgs* args, JSLFatPtr* out_error, JSLFatPtr message)
+static JSL__FORCE_INLINE void jsl__cmd_line_args_set_error(struct JSLCmdLineArgs* args, JSLFatPtr* out_error, JSLFatPtr message)
 {
     bool params_valid = (
         args != NULL
@@ -125,7 +79,7 @@ static JSL__FORCE_INLINE void jsl__cmd_line_args_set_error(struct JSL__CmdLineAr
     }
 }
 
-static JSL__FORCE_INLINE void jsl__cmd_line_args_set_short_flag(struct JSL__CmdLineArgs* args, uint8_t flag)
+static JSL__FORCE_INLINE void jsl__cmd_line_args_set_short_flag(struct JSLCmdLineArgs* args, uint8_t flag)
 {
     uint32_t bucket_index = (uint32_t) flag >> 6;
     uint32_t bit_index = (uint32_t) flag & 63u;
@@ -393,7 +347,7 @@ static bool jsl__cmd_line_args_utf16_to_utf8(JSLAllocatorInterface* allocator, w
     return res;
 }
 
-static void jsl__cmd_line_args_reset(struct JSL__CmdLineArgs* args)
+static void jsl__cmd_line_args_reset(struct JSLCmdLineArgs* args)
 {
     bool params_valid = args != NULL;
 
@@ -414,7 +368,7 @@ static void jsl__cmd_line_args_reset(struct JSL__CmdLineArgs* args)
     }
 }
 
-static bool jsl__cmd_line_args_ensure_arg_capacity(struct JSL__CmdLineArgs* args, int64_t capacity_needed)
+static bool jsl__cmd_line_args_ensure_arg_capacity(struct JSLCmdLineArgs* args, int64_t capacity_needed)
 {
     bool res = false;
 
@@ -456,7 +410,7 @@ static bool jsl__cmd_line_args_ensure_arg_capacity(struct JSL__CmdLineArgs* args
     return res;
 }
 
-static bool jsl__cmd_line_args_copy_arg(struct JSL__CmdLineArgs* args, JSLFatPtr raw, JSLFatPtr* out_copy)
+static bool jsl__cmd_line_args_copy_arg(struct JSLCmdLineArgs* args, JSLFatPtr raw, JSLFatPtr* out_copy)
 {
     bool res = false;
 
@@ -497,7 +451,7 @@ static bool jsl__cmd_line_args_copy_arg(struct JSL__CmdLineArgs* args, JSLFatPtr
 }
 
 static bool jsl__cmd_line_args_add_command(
-    struct JSL__CmdLineArgs* args,
+    struct JSLCmdLineArgs* args,
     JSLFatPtr command,
     int32_t arg_index,
     JSLFatPtr* out_error
@@ -549,7 +503,7 @@ static bool jsl__cmd_line_args_add_command(
 }
 
 static bool jsl__cmd_line_args_handle_long_option(
-    struct JSL__CmdLineArgs* args,
+    struct JSLCmdLineArgs* args,
     JSLFatPtr arg,
     JSLFatPtr separate_value,
     bool has_separate_value,
@@ -719,7 +673,7 @@ static bool jsl__cmd_line_args_handle_long_option(
 }
 
 static bool jsl__cmd_line_args_handle_short_option(
-    struct JSL__CmdLineArgs* args,
+    struct JSLCmdLineArgs* args,
     JSLFatPtr arg,
     int32_t arg_index,
     JSLFatPtr* out_error
@@ -801,7 +755,7 @@ static bool jsl__cmd_line_args_handle_short_option(
 }
 
 static bool jsl__cmd_line_args_process_arg(
-    struct JSL__CmdLineArgs* args,
+    struct JSLCmdLineArgs* args,
     JSLFatPtr stored_arg,
     JSLFatPtr next_arg,
     bool has_next_arg,
@@ -923,7 +877,7 @@ static bool jsl__cmd_line_args_process_arg(
 }
 
 typedef bool (*JSL__CmdLinePrepareArg)(
-    struct JSL__CmdLineArgs* args,
+    struct JSLCmdLineArgs* args,
     void* argv,
     int32_t index,
     JSLFatPtr* out_arg,
@@ -961,7 +915,7 @@ static bool jsl__cmd_line_args_is_wide_flag(void* argv, int32_t index)
 }
 
 static bool jsl__cmd_line_args_prepare_utf8_arg(
-    struct JSL__CmdLineArgs* args,
+    struct JSLCmdLineArgs* args,
     void* argv,
     int32_t index,
     JSLFatPtr* out_arg,
@@ -1035,7 +989,7 @@ static bool jsl__cmd_line_args_prepare_utf8_arg(
 }
 
 static bool jsl__cmd_line_args_prepare_wide_arg(
-    struct JSL__CmdLineArgs* args,
+    struct JSLCmdLineArgs* args,
     void* argv,
     int32_t index,
     JSLFatPtr* out_arg,
@@ -1101,7 +1055,7 @@ static bool jsl__cmd_line_args_prepare_wide_arg(
 }
 
 static bool jsl__cmd_line_args_parse_common(
-    struct JSL__CmdLineArgs* cmd_args,
+    struct JSLCmdLineArgs* cmd_args,
     int32_t argc,
     void* argv,
     JSL__CmdLinePrepareArg prepare_arg,
@@ -1109,7 +1063,7 @@ static bool jsl__cmd_line_args_parse_common(
     JSLFatPtr* out_error
 )
 {
-    struct JSL__CmdLineArgs* args = (struct JSL__CmdLineArgs*) cmd_args;
+    struct JSLCmdLineArgs* args = (struct JSLCmdLineArgs*) cmd_args;
 
     bool res = false;
 
@@ -1698,25 +1652,22 @@ uint8_t jsl_cmd_line_ansi256_to_ansi16(uint8_t color256)
 
 void jsl_cmd_line_color_from_ansi16(JSLCmdLineColor* color, uint8_t color16)
 {
-    struct JSL__CmdLineColor* c = (struct JSL__CmdLineColor*) color;
-    c->color_type = JSL_CMD_LINE_COLOR_ANSI16;
-    c->ansi16 = color16;
+    color->color_type = JSL_CMD_LINE_COLOR_ANSI16;
+    color->ansi16 = color16;
 }
 
 void jsl_cmd_line_color_from_ansi256(JSLCmdLineColor* color, uint8_t color256)
 {
-    struct JSL__CmdLineColor* c = (struct JSL__CmdLineColor*) color;
-    c->color_type = JSL_CMD_LINE_COLOR_ANSI256;
-    c->ansi16 = color256;
+    color->color_type = JSL_CMD_LINE_COLOR_ANSI256;
+    color->ansi16 = color256;
 }
 
 void jsl_cmd_line_color_from_rgb(JSLCmdLineColor* color, uint8_t r, uint8_t g, uint8_t b)
 {
-    struct JSL__CmdLineColor* c = (struct JSL__CmdLineColor*) color;
-    c->color_type = JSL_CMD_LINE_COLOR_RGB;
-    c->rgb.r = r;
-    c->rgb.g = g;
-    c->rgb.b = b;
+    color->color_type = JSL_CMD_LINE_COLOR_RGB;
+    color->rgb.r = r;
+    color->rgb.g = g;
+    color->rgb.b = b;
 }
 
 void jsl_cmd_line_style_with_foreground(
@@ -1725,10 +1676,9 @@ void jsl_cmd_line_style_with_foreground(
     uint32_t style_flags
 )
 {
-    struct JSL__CmdLineStyle* s = (struct JSL__CmdLineStyle*) style;
-    JSL_MEMCPY(&s->foreground, &foreground, sizeof(struct JSL__CmdLineColor));
-    s->background.color_type = JSL_CMD_LINE_COLOR_DEFAULT;
-    s->style_attributes = style_flags;
+    JSL_MEMCPY(&style->foreground, &foreground, sizeof(JSLCmdLineColor));
+    style->background.color_type = JSL_CMD_LINE_COLOR_DEFAULT;
+    style->style_attributes = style_flags;
 }
 
 void jsl_cmd_line_style_with_background(
@@ -1737,10 +1687,9 @@ void jsl_cmd_line_style_with_background(
     uint32_t style_flags
 )
 {
-    struct JSL__CmdLineStyle* s = (struct JSL__CmdLineStyle*) style;
-    s->foreground.color_type = JSL_CMD_LINE_COLOR_DEFAULT;
-    JSL_MEMCPY(&s->background, &background, sizeof(struct JSL__CmdLineColor));
-    s->style_attributes = style_flags;
+    style->foreground.color_type = JSL_CMD_LINE_COLOR_DEFAULT;
+    JSL_MEMCPY(&style->background, &background, sizeof(JSLCmdLineColor));
+    style->style_attributes = style_flags;
 }
 
 void jsl_cmd_line_style_with_foreground_and_background(
@@ -1750,16 +1699,15 @@ void jsl_cmd_line_style_with_foreground_and_background(
     uint32_t style_flags
 )
 {
-    struct JSL__CmdLineStyle* s = (struct JSL__CmdLineStyle*) style;
-    JSL_MEMCPY(&s->foreground, &foreground, sizeof(struct JSL__CmdLineColor));
-    JSL_MEMCPY(&s->background, &background, sizeof(struct JSL__CmdLineColor));
-    s->style_attributes = style_flags;
+    JSL_MEMCPY(&style->foreground, &foreground, sizeof(JSLCmdLineColor));
+    JSL_MEMCPY(&style->background, &background, sizeof(JSLCmdLineColor));
+    style->style_attributes = style_flags;
 }
 
 static int64_t jsl__cmd_line_write_color(
     JSLOutputSink sink,
     int32_t output_mode,
-    struct JSL__CmdLineColor* color,
+    JSLCmdLineColor* color,
     bool is_foreground
 )
 {
@@ -1788,8 +1736,8 @@ static int64_t jsl__cmd_line_write_color(
             return 0;
     }
 
-    struct JSL__CmdLineColor output_color;
-    JSL_MEMCPY(&output_color, color, sizeof(struct JSL__CmdLineColor));
+    JSLCmdLineColor output_color;
+    JSL_MEMCPY(&output_color, color, sizeof(JSLCmdLineColor));
 
     if (terminal_color_type == JSL_CMD_LINE_COLOR_ANSI16)
     {
@@ -1888,8 +1836,7 @@ int64_t jsl_cmd_line_write_style(JSLOutputSink sink, JSLTerminalInfo* terminal_i
     static const JSLFatPtr hidden_code = JSL_FATPTR_INITIALIZER("\x1b[8m");
     static const JSLFatPtr strike_code = JSL_FATPTR_INITIALIZER("\x1b[9m");
 
-    struct JSL__CmdLineStyle* s = (struct JSL__CmdLineStyle*) style;
-    uint32_t attributes = s->style_attributes;
+    uint32_t attributes = style->style_attributes;
 
     if (JSL_IS_BITFLAG_SET(attributes, JSL_CMD_LINE_STYLE_BOLD))
     {
@@ -1964,7 +1911,7 @@ int64_t jsl_cmd_line_write_style(JSLOutputSink sink, JSLTerminalInfo* terminal_i
     result = jsl__cmd_line_write_color(
         sink,
         terminal_info->output_mode,
-        (struct JSL__CmdLineColor*) &s->foreground,
+        &style->foreground,
         true
     );
     if (result < 0) return -1;
@@ -1973,7 +1920,7 @@ int64_t jsl_cmd_line_write_style(JSLOutputSink sink, JSLTerminalInfo* terminal_i
     result = jsl__cmd_line_write_color(
         sink,
         terminal_info->output_mode,
-        (struct JSL__CmdLineColor*) &s->background,
+        &style->background,
         false
     );
     if (result < 0) return -1;
@@ -2000,7 +1947,7 @@ int64_t jsl_cmd_line_write_reset(JSLOutputSink sink, JSLTerminalInfo* terminal_i
 
 bool jsl_cmd_line_args_init(JSLCmdLineArgs* cmd_args, JSLAllocatorInterface* allocator)
 {
-    struct JSL__CmdLineArgs* args = (struct JSL__CmdLineArgs*) cmd_args;
+    struct JSLCmdLineArgs* args = (struct JSLCmdLineArgs*) cmd_args;
 
     bool res = false;
 
@@ -2010,7 +1957,7 @@ bool jsl_cmd_line_args_init(JSLCmdLineArgs* cmd_args, JSLAllocatorInterface* all
 
     if (args != NULL && allocator != NULL)
     {
-        JSL_MEMSET(args, 0, sizeof(struct JSL__CmdLineArgs));
+        JSL_MEMSET(args, 0, sizeof(JSLCmdLineArgs));
         args->allocator = allocator;
 
         long_init = jsl_str_to_str_map_init(&args->long_flags, allocator, 0);
@@ -2029,10 +1976,8 @@ bool jsl_cmd_line_args_init(JSLCmdLineArgs* cmd_args, JSLAllocatorInterface* all
 
 bool jsl_cmd_line_args_parse(JSLCmdLineArgs* cmd_args, int32_t argc, char** argv, JSLFatPtr* out_error)
 {
-    struct JSL__CmdLineArgs* args = (struct JSL__CmdLineArgs*) cmd_args;
-
     return jsl__cmd_line_args_parse_common(
-        args,
+        cmd_args,
         argc,
         (void*) argv,
         jsl__cmd_line_args_prepare_utf8_arg,
@@ -2043,10 +1988,8 @@ bool jsl_cmd_line_args_parse(JSLCmdLineArgs* cmd_args, int32_t argc, char** argv
 
 bool jsl_cmd_line_args_parse_wide(JSLCmdLineArgs* cmd_args, int32_t argc, wchar_t** argv, JSLFatPtr* out_error)
 {
-    struct JSL__CmdLineArgs* args = (struct JSL__CmdLineArgs*) cmd_args;
-
     return jsl__cmd_line_args_parse_common(
-        args,
+        cmd_args,
         argc,
         (void*) argv,
         jsl__cmd_line_args_prepare_wide_arg,
@@ -2057,17 +2000,15 @@ bool jsl_cmd_line_args_parse_wide(JSLCmdLineArgs* cmd_args, int32_t argc, wchar_
 
 bool jsl_cmd_line_args_has_short_flag(JSLCmdLineArgs* cmd_args, uint8_t flag)
 {
-    struct JSL__CmdLineArgs* args = (struct JSL__CmdLineArgs*) cmd_args;
-
     if (
-        args != NULL
-        && args->sentinel == JSL__CMD_LINE_ARGS_PRIVATE_SENTINEL
+        cmd_args != NULL
+        && cmd_args->sentinel == JSL__CMD_LINE_ARGS_PRIVATE_SENTINEL
     )
     {
         uint32_t bucket_index = (uint32_t) flag >> 6;
         uint32_t bit_index = (uint32_t) flag & 63u;
         uint64_t mask = (uint64_t) 1u << bit_index;
-        return (args->short_flag_bitset[bucket_index] & mask) != 0;
+        return (cmd_args->short_flag_bitset[bucket_index] & mask) != 0;
     }
 
     return false;
@@ -2075,19 +2016,17 @@ bool jsl_cmd_line_args_has_short_flag(JSLCmdLineArgs* cmd_args, uint8_t flag)
 
 bool jsl_cmd_line_args_has_flag(JSLCmdLineArgs* cmd_args, JSLFatPtr flag)
 {
-    struct JSL__CmdLineArgs* args = (struct JSL__CmdLineArgs*) cmd_args;
-
     bool res = false;
 
     bool params_valid = (
-        args != NULL
+        cmd_args != NULL
         && flag.data != NULL
         && flag.length > -1
     );
 
     if (params_valid)
     {
-        res = jsl_str_to_str_map_has_key(&args->long_flags, flag);
+        res = jsl_str_to_str_map_has_key(&cmd_args->long_flags, flag);
     }
 
     return res;
@@ -2095,19 +2034,17 @@ bool jsl_cmd_line_args_has_flag(JSLCmdLineArgs* cmd_args, JSLFatPtr flag)
 
 bool jsl_cmd_line_args_has_command(JSLCmdLineArgs* cmd_args, JSLFatPtr flag)
 {
-    struct JSL__CmdLineArgs* args = (struct JSL__CmdLineArgs*) cmd_args;
-
     bool res = false;
 
     bool params_valid = (
-        args != NULL
+        cmd_args != NULL
         && flag.data != NULL
         && flag.length > -1
     );
 
     if (params_valid)
     {
-        res = jsl_str_set_has(&args->commands, flag);
+        res = jsl_str_set_has(&cmd_args->commands, flag);
     }
 
     return res;
@@ -2115,21 +2052,19 @@ bool jsl_cmd_line_args_has_command(JSLCmdLineArgs* cmd_args, JSLFatPtr flag)
 
 bool jsl_cmd_line_args_pop_arg_list(JSLCmdLineArgs* cmd_args, JSLFatPtr* out_value)
 {
-    struct JSL__CmdLineArgs* args = (struct JSL__CmdLineArgs*) cmd_args;
-
     bool res = false;
 
     bool params_valid = (
-        args != NULL
+        cmd_args != NULL
         && out_value != NULL
-        && args->arg_list != NULL
-        && args->arg_list_index < args->arg_list_length
+        && cmd_args->arg_list != NULL
+        && cmd_args->arg_list_index < cmd_args->arg_list_length
     );
 
     if (params_valid)
     {
-        *out_value = args->arg_list[args->arg_list_index];
-        ++args->arg_list_index;
+        *out_value = cmd_args->arg_list[cmd_args->arg_list_index];
+        ++cmd_args->arg_list_index;
         res = true;
     }
 
@@ -2142,12 +2077,10 @@ bool jsl_cmd_line_args_pop_flag_with_value(
     JSLFatPtr* out_value
 )
 {
-    struct JSL__CmdLineArgs* args = (struct JSL__CmdLineArgs*) cmd_args;
-
     bool res = false;
 
     bool params_valid = (
-        args != NULL
+        cmd_args != NULL
         && out_value != NULL
         && flag.data != NULL
         && flag.length > -1
@@ -2156,7 +2089,7 @@ bool jsl_cmd_line_args_pop_flag_with_value(
     JSLStrToStrMultimapValueIter iter;
     bool iterator_init = params_valid
         && jsl_str_to_str_multimap_get_values_for_key_iterator_init(
-            &args->flags_with_values,
+            &cmd_args->flags_with_values,
             &iter,
             flag
         );
@@ -2171,13 +2104,13 @@ bool jsl_cmd_line_args_pop_flag_with_value(
     bool copied = false;
     if (has_value)
     {
-        copied = jsl__cmd_line_args_copy_arg(args, value, out_value);
+        copied = jsl__cmd_line_args_copy_arg(cmd_args, value, out_value);
     }
 
     if (copied)
     {
         jsl_str_to_str_multimap_delete_value(
-            &args->flags_with_values,
+            &cmd_args->flags_with_values,
             flag,
             value
         );

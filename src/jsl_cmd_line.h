@@ -74,9 +74,14 @@ enum JSL__CmdLineColorType
 /**
  * TODO: docs
  */
-typedef struct JSLCmdLineColor
-{
-    alignas(alignof(JSL_MAX_ALIGN_T)) uint8_t _buf[8];
+typedef struct JSLCmdLineColor {
+    enum JSL__CmdLineColorType color_type;
+    union
+    {
+        uint8_t ansi16;   // 0..15
+        uint8_t ansi256;  // 0..255
+        struct { uint8_t r, g, b; } rgb;
+    };
 } JSLCmdLineColor;
 
 /**
@@ -108,7 +113,9 @@ typedef enum JSLCmdLineStyleAttribute {
 } JSLCmdLineStyleAttribute;
 
 typedef struct JSLCmdLineStyle {
-    alignas(alignof(JSL_MAX_ALIGN_T)) uint8_t _buf[20];
+    JSLCmdLineColor foreground;
+    JSLCmdLineColor background;
+    uint32_t style_attributes;
 } JSLCmdLineStyle;
 
 /**
@@ -334,7 +341,20 @@ int64_t jsl_cmd_line_write_reset(JSLOutputSink sink, JSLTerminalInfo* terminal_i
  * State container struct 
  */
 typedef struct JSLCmdLineArgs {
-    alignas(alignof(JSL_MAX_ALIGN_T)) uint8_t _buf[312];
+    uint64_t sentinel;
+
+    JSLAllocatorInterface* allocator;
+
+    uint64_t short_flag_bitset[JSL__CMD_LINE_SHORT_FLAG_BUCKETS];
+
+    JSLStrToStrMap long_flags;
+    JSLStrToStrMultimap flags_with_values;
+    JSLStrSet commands;
+
+    JSLFatPtr* arg_list;
+    int64_t arg_list_length;
+    int64_t arg_list_index;
+    int64_t arg_list_capacity;
 } JSLCmdLineArgs;
 
 /**
