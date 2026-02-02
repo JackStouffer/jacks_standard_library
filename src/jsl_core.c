@@ -1208,7 +1208,7 @@ static inline uint8_t jsl__ascii_to_lower(uint8_t ch)
 }
 
 #if defined(__AVX2__)
-    static inline __m256i ascii_to_lower_avx2(__m256i data)
+    static inline __m256i jsl__ascii_to_lower_avx2(__m256i data)
     {
         __m256i upper_A = _mm256_set1_epi8('A' - 1);
         __m256i upper_Z = _mm256_set1_epi8('Z' + 1);
@@ -1223,7 +1223,7 @@ static inline uint8_t jsl__ascii_to_lower(uint8_t ch)
         return _mm256_add_epi8(data, _mm256_and_si256(is_upper, case_diff));
     }
 #elif defined(__ARM_NEON) || defined(__ARM_NEON__)
-    static inline uint8x16_t ascii_to_lower_neon(uint8x16_t data)
+    static inline uint8x16_t jsl__ascii_to_lower_neon(uint8x16_t data)
     {
         const uint8x16_t upper_A = vdupq_n_u8('A' - 1);
         const uint8x16_t upper_Z = vdupq_n_u8('Z' + 1);
@@ -1251,8 +1251,8 @@ bool jsl_fatptr_compare_ascii_insensitive(JSLFatPtr a, JSLFatPtr b)
             __m256i a_vec = _mm256_loadu_si256((__m256i*)(a.data + i));
             __m256i b_vec = _mm256_loadu_si256((__m256i*)(b.data + i));
 
-            a_vec = ascii_to_lower_avx2(a_vec);
-            b_vec = ascii_to_lower_avx2(b_vec);
+            a_vec = jsl__ascii_to_lower_avx2(a_vec);
+            b_vec = jsl__ascii_to_lower_avx2(b_vec);
 
             __m256i cmp = _mm256_cmpeq_epi8(a_vec, b_vec);
             if (_mm256_movemask_epi8(cmp) != -1)
@@ -1264,8 +1264,8 @@ bool jsl_fatptr_compare_ascii_insensitive(JSLFatPtr a, JSLFatPtr b)
             uint8x16_t a_vec = vld1q_u8(a.data + i);
             uint8x16_t b_vec = vld1q_u8(b.data + i);
 
-            a_vec = ascii_to_lower_neon(a_vec);
-            b_vec = ascii_to_lower_neon(b_vec);
+            a_vec = jsl__ascii_to_lower_neon(a_vec);
+            b_vec = jsl__ascii_to_lower_neon(b_vec);
 
             uint8x16_t cmp = vceqq_u8(a_vec, b_vec);
             if (jsl__neon_movemask(cmp) != 0xFFFF)
@@ -1399,12 +1399,19 @@ JSLOutputSink jsl_fatptr_output_sink(JSLFatPtr* buffer)
     return sink;
 }
 
-static int32_t stbsp__real_to_str(char const **start, uint32_t *len, char *out, int32_t *decimal_pos, double value, uint32_t frac_digits);
-static int32_t stbsp__real_to_parts(int64_t *bits, int32_t *expo, double value);
-#define STBSP__SPECIAL 0x7000
+static int32_t jsl__real_to_str(
+    char const **start,
+    uint32_t *len,
+    char *out,
+    int32_t *decimal_pos,
+    double value,
+    uint32_t frac_digits
+);
+static int32_t jsl__real_to_parts(int64_t *bits, int32_t *expo, double value);
 
-static char stbsp__period = '.';
-static char stbsp__comma = ',';
+
+static char jsl__period = '.';
+static char jsl__comma = ',';
 static struct
 {
     short temp; // force next field to be 2-byte aligned
@@ -1420,41 +1427,42 @@ static struct
 
 JSL__ASAN_OFF void jsl_format_set_separators(char pcomma, char pperiod)
 {
-    stbsp__period = pperiod;
-    stbsp__comma = pcomma;
+    jsl__period = pperiod;
+    jsl__comma = pcomma;
 }
 
-#define STBSP__LEFTJUST 1
-#define STBSP__LEADINGPLUS 2
-#define STBSP__LEADINGSPACE 4
-#define STBSP__LEADING_0X 8
-#define STBSP__LEADINGZERO 16
-#define STBSP__INTMAX 32
-#define STBSP__TRIPLET_COMMA 64
-#define STBSP__NEGATIVE 128
-#define STBSP__METRIC_SUFFIX 256
-#define STBSP__HALFWIDTH 512
-#define STBSP__METRIC_NOSPACE 1024
-#define STBSP__METRIC_1024 2048
-#define STBSP__METRIC_JEDEC 4096
+#define JSL__SPECIAL 0x7000
+#define JSL__LEFTJUST 1
+#define JSL__LEADINGPLUS 2
+#define JSL__LEADINGSPACE 4
+#define JSL__LEADING_0X 8
+#define JSL__LEADINGZERO 16
+#define JSL__INTMAX 32
+#define JSL__TRIPLET_COMMA 64
+#define JSL__NEGATIVE 128
+#define JSL__METRIC_SUFFIX 256
+#define JSL__HALFWIDTH 512
+#define JSL__METRIC_NOSPACE 1024
+#define JSL__METRIC_1024 2048
+#define JSL__METRIC_JEDEC 4096
 #define JSL__FORMAT_BUFFER_SIZE JSL_KILOBYTES(4)
 
-static void stbsp__lead_sign(uint32_t formatting_flags, char *sign)
+static void jsl__lead_sign(uint32_t formatting_flags, char *sign)
 {
     sign[0] = 0;
-    if (formatting_flags & STBSP__NEGATIVE) {
+    if (formatting_flags & JSL__NEGATIVE) {
         sign[0] = 1;
         sign[1] = '-';
-    } else if (formatting_flags & STBSP__LEADINGSPACE) {
+    } else if (formatting_flags & JSL__LEADINGSPACE) {
         sign[0] = 1;
         sign[1] = ' ';
-    } else if (formatting_flags & STBSP__LEADINGPLUS) {
+    } else if (formatting_flags & JSL__LEADINGPLUS) {
         sign[0] = 1;
         sign[1] = '+';
     }
 }
 
-static JSL__ASAN_OFF uint32_t stbsp__strlen_limited(char const *string, uint32_t limit)
+static JSL__ASAN_OFF uint32_t jsl__strlen_limited(char const *string, uint32_t limit)
 {
     char const* source_ptr = string;
 
@@ -1513,7 +1521,7 @@ static JSL__ASAN_OFF uint32_t stbsp__strlen_limited(char const *string, uint32_t
         // scan over 4 bytes at a time to find terminating 0
         // this will intentionally scan up to 3 bytes past the end of buffers,
         // but because it works 4B aligned, it will never cross page boundaries
-        // (hence the STBSP__ASAN markup; the over-read here is intentional
+        // (hence the JSL__ASAN markup; the over-read here is intentional
         // and harmless)
         while (limit >= 4)
         {
@@ -1788,50 +1796,50 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
             switch (f.data[0]) {
             // if we have left justify
             case '-':
-                formatting_flags |= STBSP__LEFTJUST;
+                formatting_flags |= JSL__LEFTJUST;
                 JSL_FATPTR_ADVANCE(f, 1);
                 continue;
             // if we have leading plus
             case '+':
-                formatting_flags |= STBSP__LEADINGPLUS;
+                formatting_flags |= JSL__LEADINGPLUS;
                 JSL_FATPTR_ADVANCE(f, 1);
                 continue;
             // if we have leading space
             case ' ':
-                formatting_flags |= STBSP__LEADINGSPACE;
+                formatting_flags |= JSL__LEADINGSPACE;
                 JSL_FATPTR_ADVANCE(f, 1);
                 continue;
             // if we have leading 0x
             case '#':
-                formatting_flags |= STBSP__LEADING_0X;
+                formatting_flags |= JSL__LEADING_0X;
                 JSL_FATPTR_ADVANCE(f, 1);
                 continue;
             // if we have thousand commas
             case '\'':
-                formatting_flags |= STBSP__TRIPLET_COMMA;
+                formatting_flags |= JSL__TRIPLET_COMMA;
                 JSL_FATPTR_ADVANCE(f, 1);
                 continue;
             // if we have kilo marker (none->kilo->kibi->jedec)
             case '$':
-                if (formatting_flags & STBSP__METRIC_SUFFIX) {
-                if (formatting_flags & STBSP__METRIC_1024) {
-                    formatting_flags |= STBSP__METRIC_JEDEC;
+                if (formatting_flags & JSL__METRIC_SUFFIX) {
+                if (formatting_flags & JSL__METRIC_1024) {
+                    formatting_flags |= JSL__METRIC_JEDEC;
                 } else {
-                    formatting_flags |= STBSP__METRIC_1024;
+                    formatting_flags |= JSL__METRIC_1024;
                 }
                 } else {
-                formatting_flags |= STBSP__METRIC_SUFFIX;
+                formatting_flags |= JSL__METRIC_SUFFIX;
                 }
                 JSL_FATPTR_ADVANCE(f, 1);
                 continue;
             // if we don't want space between metric suffix and number
             case '_':
-                formatting_flags |= STBSP__METRIC_NOSPACE;
+                formatting_flags |= JSL__METRIC_NOSPACE;
                 JSL_FATPTR_ADVANCE(f, 1);
                 continue;
             // if we have leading zero
             case '0':
-                formatting_flags |= STBSP__LEADINGZERO;
+                formatting_flags |= JSL__LEADINGZERO;
                 JSL_FATPTR_ADVANCE(f, 1);
                 goto flags_done;
             default: goto flags_done;
@@ -1869,43 +1877,43 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
         {
             // are we halfwidth?
             case 'h':
-                formatting_flags |= STBSP__HALFWIDTH;
+                formatting_flags |= JSL__HALFWIDTH;
                 JSL_FATPTR_ADVANCE(f, 1);
                 if (f.data[0] == 'h')
                     JSL_FATPTR_ADVANCE(f, 1);  // QUARTERWIDTH
                 break;
             // are we 64-bit (unix style)
             case 'l':
-                formatting_flags |= ((sizeof(long) == 8) ? STBSP__INTMAX : 0);
+                formatting_flags |= ((sizeof(long) == 8) ? JSL__INTMAX : 0);
                 JSL_FATPTR_ADVANCE(f, 1);
                 if (f.data[0] == 'l') {
-                    formatting_flags |= STBSP__INTMAX;
+                    formatting_flags |= JSL__INTMAX;
                     JSL_FATPTR_ADVANCE(f, 1);
                 }
                 break;
             // are we 64-bit on intmax? (c99)
             case 'j':
-                formatting_flags |= (sizeof(size_t) == 8) ? STBSP__INTMAX : 0;
+                formatting_flags |= (sizeof(size_t) == 8) ? JSL__INTMAX : 0;
                 JSL_FATPTR_ADVANCE(f, 1);
                 break;
             // are we 64-bit on size_t or ptrdiff_t? (c99)
             case 'z':
-                formatting_flags |= (sizeof(ptrdiff_t) == 8) ? STBSP__INTMAX : 0;
+                formatting_flags |= (sizeof(ptrdiff_t) == 8) ? JSL__INTMAX : 0;
                 JSL_FATPTR_ADVANCE(f, 1);
                 break;
             case 't':
-                formatting_flags |= (sizeof(ptrdiff_t) == 8) ? STBSP__INTMAX : 0;
+                formatting_flags |= (sizeof(ptrdiff_t) == 8) ? JSL__INTMAX : 0;
                 JSL_FATPTR_ADVANCE(f, 1);
                 break;
             // are we 64-bit (msft style)
             case 'I':
                 if ((f.data[1] == '6') && (f.data[2] == '4')) {
-                    formatting_flags |= STBSP__INTMAX;
+                    formatting_flags |= JSL__INTMAX;
                     JSL_FATPTR_ADVANCE(f, 3);
                 } else if ((f.data[1] == '3') && (f.data[2] == '2')) {
                     JSL_FATPTR_ADVANCE(f, 3);
                 } else {
-                    formatting_flags |= ((sizeof(void *) == 8) ? STBSP__INTMAX : 0);
+                    formatting_flags |= ((sizeof(void *) == 8) ? JSL__INTMAX : 0);
                     JSL_FATPTR_ADVANCE(f, 1);
                 }
                 break;
@@ -1915,8 +1923,8 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
         // handle each replacement
         switch (f.data[0])
         {
-            #define STBSP__NUMSZ 512 // big enough for e308 (with commas) or e-307
-            char num[STBSP__NUMSZ];
+            #define JSL__NUMSZ 512 // big enough for e308 (with commas) or e-307
+            char num[JSL__NUMSZ];
             char lead[8];
             char tail[8];
             char* string;
@@ -1940,7 +1948,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                     // get the length, limited to desired precision
                     // always limit to ~0u chars since our counts are 32b
                     l = (precision >= 0)
-                        ? stbsp__strlen_limited(string, (uint32_t) precision)
+                        ? jsl__strlen_limited(string, (uint32_t) precision)
                         : (uint32_t) JSL_STRLEN(string);
                 }
 
@@ -1984,7 +1992,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
 
             case 'c': // char
                 // get the character
-                string = num + STBSP__NUMSZ - 1;
+                string = num + JSL__NUMSZ - 1;
                 *string = (char)va_arg(va, int32_t);
                 l = 1;
                 lead[0] = 0;
@@ -2009,12 +2017,12 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 if (precision == -1)
                     precision = 6; // default is 6
                 // read the double into a string
-                if (stbsp__real_to_parts((int64_t *)&n64, &decimal_precision, float_value))
-                    formatting_flags |= STBSP__NEGATIVE;
+                if (jsl__real_to_parts((int64_t *)&n64, &decimal_precision, float_value))
+                    formatting_flags |= JSL__NEGATIVE;
 
                 string = num + 64;
 
-                stbsp__lead_sign(formatting_flags, lead);
+                jsl__lead_sign(formatting_flags, lead);
 
                 if (decimal_precision == -1023)
                     decimal_precision = (n64) ? -1022 : 0;
@@ -2032,7 +2040,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 *string++ = h[(n64 >> 60) & 15];
                 n64 <<= 4;
                 if (precision)
-                    *string++ = stbsp__period;
+                    *string++ = jsl__period;
                 source_ptr = string;
 
                 // print the bits
@@ -2079,8 +2087,8 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 else if (precision == 0)
                     precision = 1; // default is 6
                 // read the double into a string
-                if (stbsp__real_to_str(&source_ptr, &l, num, &decimal_precision, float_value, (uint32_t)(((uint32_t)(precision - 1)) | 0x80000000u)))
-                    formatting_flags |= STBSP__NEGATIVE;
+                if (jsl__real_to_str(&source_ptr, &l, num, &decimal_precision, float_value, (uint32_t)(((uint32_t)(precision - 1)) | 0x80000000u)))
+                    formatting_flags |= JSL__NEGATIVE;
 
                 // clamp the precision and delete extra zeros after clamp
                 n = (uint32_t) precision;
@@ -2114,12 +2122,12 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 if (precision == -1)
                     precision = 6; // default is 6
                 // read the double into a string
-                if (stbsp__real_to_str(&source_ptr, &l, num, &decimal_precision, float_value, ((uint32_t) precision) | 0x80000000u))
-                    formatting_flags |= STBSP__NEGATIVE;
+                if (jsl__real_to_str(&source_ptr, &l, num, &decimal_precision, float_value, ((uint32_t) precision) | 0x80000000u))
+                    formatting_flags |= JSL__NEGATIVE;
             L_DO_EXP_FROMG:
                 tail[0] = 0;
-                stbsp__lead_sign(formatting_flags, lead);
-                if (decimal_precision == STBSP__SPECIAL) {
+                jsl__lead_sign(formatting_flags, lead);
+                if (decimal_precision == JSL__SPECIAL) {
                     string = (char *)source_ptr;
                     comma_spacing = 0;
                     precision = 0;
@@ -2130,7 +2138,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 *string++ = source_ptr[0];
 
                 if (precision)
-                    *string++ = stbsp__period;
+                    *string++ = jsl__period;
 
                 // handle after decimal
                 if ((l - 1u) > (uint32_t)precision)
@@ -2166,10 +2174,10 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 float_value = va_arg(va, double);
             doafloat:
                 // do kilos
-                if (formatting_flags & STBSP__METRIC_SUFFIX) {
+                if (formatting_flags & JSL__METRIC_SUFFIX) {
                     double divisor;
                     divisor = 1000.0f;
-                    if (formatting_flags & STBSP__METRIC_1024)
+                    if (formatting_flags & JSL__METRIC_1024)
                     divisor = 1024.0;
                     while (formatting_flags < 0x4000000) {
                     if ((float_value < divisor) && (float_value > -divisor))
@@ -2181,12 +2189,12 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 if (precision == -1)
                     precision = 6; // default is 6
                 // read the double into a string
-                if (stbsp__real_to_str(&source_ptr, &l, num, &decimal_precision, float_value, (uint32_t) precision))
-                    formatting_flags |= STBSP__NEGATIVE;
+                if (jsl__real_to_str(&source_ptr, &l, num, &decimal_precision, float_value, (uint32_t) precision))
+                    formatting_flags |= JSL__NEGATIVE;
             L_DO_FLOAT_FROMG:
                 tail[0] = 0;
-                stbsp__lead_sign(formatting_flags, lead);
-                if (decimal_precision == STBSP__SPECIAL) {
+                jsl__lead_sign(formatting_flags, lead);
+                if (decimal_precision == JSL__SPECIAL) {
                     string = (char *)source_ptr;
                     comma_spacing = 0;
                     precision = 0;
@@ -2200,7 +2208,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                     // handle 0.000*000xxxx
                     *string++ = '0';
                     if (precision)
-                    *string++ = stbsp__period;
+                    *string++ = jsl__period;
                     n = (uint32_t)(-decimal_precision);
                     if ((int32_t)n > precision)
                     n = (uint32_t) precision;
@@ -2220,14 +2228,14 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 }
                 else
                 {
-                    comma_spacing = (formatting_flags & STBSP__TRIPLET_COMMA) ? ((600 - (uint32_t)decimal_precision) % 3) : 0;
+                    comma_spacing = (formatting_flags & JSL__TRIPLET_COMMA) ? ((600 - (uint32_t)decimal_precision) % 3) : 0;
                     if ((uint32_t)decimal_precision >= l) {
                     // handle xxxx000*000.0
                     n = 0;
                     for (;;) {
-                        if ((formatting_flags & STBSP__TRIPLET_COMMA) && (++comma_spacing == 4)) {
+                        if ((formatting_flags & JSL__TRIPLET_COMMA) && (++comma_spacing == 4)) {
                             comma_spacing = 0;
-                            *string++ = stbsp__comma;
+                            *string++ = jsl__comma;
                         } else {
                             *string++ = source_ptr[n];
                             ++n;
@@ -2237,7 +2245,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                     }
                     if (n < (uint32_t)decimal_precision) {
                         n = (uint32_t)(decimal_precision - (int32_t) n);
-                        if ((formatting_flags & STBSP__TRIPLET_COMMA) == 0) {
+                        if ((formatting_flags & JSL__TRIPLET_COMMA) == 0) {
                             while (n) {
                                 if ((((uintptr_t)string) & 3) == 0)
                                 break;
@@ -2251,9 +2259,9 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                             }
                         }
                         while (n) {
-                            if ((formatting_flags & STBSP__TRIPLET_COMMA) && (++comma_spacing == 4)) {
+                            if ((formatting_flags & JSL__TRIPLET_COMMA) && (++comma_spacing == 4)) {
                                 comma_spacing = 0;
-                                *string++ = stbsp__comma;
+                                *string++ = jsl__comma;
                             } else {
                                 *string++ = '0';
                                 --n;
@@ -2263,16 +2271,16 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                     comma_spacing = (uint32_t)(string - (num + 64)); // comma_spacing is how many tens
                     comma_spacing += (3u << 24);
                     if (precision) {
-                        *string++ = stbsp__period;
+                        *string++ = jsl__period;
                         trailing_zeros = precision;
                     }
                     } else {
                     // handle xxxxx.xxxx000*000
                     n = 0;
                     for (;;) {
-                        if ((formatting_flags & STBSP__TRIPLET_COMMA) && (++comma_spacing == 4)) {
+                        if ((formatting_flags & JSL__TRIPLET_COMMA) && (++comma_spacing == 4)) {
                             comma_spacing = 0;
-                            *string++ = stbsp__comma;
+                            *string++ = jsl__comma;
                         } else {
                             *string++ = source_ptr[n];
                             ++n;
@@ -2283,7 +2291,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                     comma_spacing = (uint32_t)(string - (num + 64)); // comma_spacing is how many tens
                     comma_spacing += (3u << 24);
                     if (precision)
-                        *string++ = stbsp__period;
+                        *string++ = jsl__period;
                     if ((l - (uint32_t) decimal_precision) > (uint32_t)precision)
                         l = (uint32_t)(precision + decimal_precision);
                     while (n < l) {
@@ -2296,22 +2304,22 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 precision = 0;
 
                 // handle k,m,g,t
-                if (formatting_flags & STBSP__METRIC_SUFFIX) {
+                if (formatting_flags & JSL__METRIC_SUFFIX) {
                     char idx;
                     idx = 1;
-                    if (formatting_flags & STBSP__METRIC_NOSPACE)
+                    if (formatting_flags & JSL__METRIC_NOSPACE)
                     idx = 0;
                     tail[0] = idx;
                     tail[1] = ' ';
                     {
                     if (formatting_flags >> 24) { // SI kilo is 'k', JEDEC and SI kibits are 'K'.
-                        if (formatting_flags & STBSP__METRIC_1024)
+                        if (formatting_flags & JSL__METRIC_1024)
                             tail[idx + 1] = "_KMGT"[formatting_flags >> 24];
                         else
                             tail[idx + 1] = "_kMGT"[formatting_flags >> 24];
                         idx++;
                         // If printing kibits and not in jedec, add the 'i'.
-                        if (formatting_flags & STBSP__METRIC_1024 && !(formatting_flags & STBSP__METRIC_JEDEC)) {
+                        if (formatting_flags & JSL__METRIC_1024 && !(formatting_flags & JSL__METRIC_JEDEC)) {
                             tail[idx + 1] = 'i';
                             idx++;
                         }
@@ -2330,7 +2338,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
             case 'b': // lower binary
                 h = (f.data[0] == 'B') ? hexu : hex;
                 lead[0] = 0;
-                if (formatting_flags & STBSP__LEADING_0X) {
+                if (formatting_flags & JSL__LEADING_0X) {
                     lead[0] = 2;
                     lead[1] = '0';
                     lead[2] = h[0xb];
@@ -2341,7 +2349,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
             case 'o': // octal
                 h = hexu;
                 lead[0] = 0;
-                if (formatting_flags & STBSP__LEADING_0X) {
+                if (formatting_flags & JSL__LEADING_0X) {
                     lead[0] = 1;
                     lead[1] = '0';
                 }
@@ -2349,9 +2357,9 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 goto L_RADIX_NUM;
 
             case 'p': // pointer
-                formatting_flags |= (sizeof(void *) == 8) ? STBSP__INTMAX : 0;
+                formatting_flags |= (sizeof(void *) == 8) ? JSL__INTMAX : 0;
                 precision = sizeof(void *) * 2;
-                formatting_flags &= (uint32_t) ~STBSP__LEADINGZERO; // 'p' only prints the pointer with zeros
+                formatting_flags &= (uint32_t) ~JSL__LEADINGZERO; // 'p' only prints the pointer with zeros
                                             // fall through - to X
 
                 JSL_SWITCH_FALLTHROUGH;
@@ -2361,7 +2369,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 h = (f.data[0] == 'X') ? hexu : hex;
                 l = (4 << 4) | (4 << 8);
                 lead[0] = 0;
-                if (formatting_flags & STBSP__LEADING_0X) {
+                if (formatting_flags & JSL__LEADING_0X) {
                     lead[0] = 2;
                     lead[1] = '0';
                     lead[2] = h[16];
@@ -2369,12 +2377,12 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
 
             L_RADIX_NUM:
                 // get the number
-                if (formatting_flags & STBSP__INTMAX)
+                if (formatting_flags & JSL__INTMAX)
                     n64 = va_arg(va, uint64_t);
                 else
                     n64 = va_arg(va, uint32_t);
 
-                string = num + STBSP__NUMSZ;
+                string = num + JSL__NUMSZ;
                 decimal_precision = 0;
                 // clear tail, and clear leading if value is zero
                 tail[0] = 0;
@@ -2390,20 +2398,20 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 for (;;) {
                     *--string = h[n64 & ((1 << (l >> 8)) - 1)];
                     n64 >>= (l >> 8);
-                    if (!((n64) || ((int32_t)((num + STBSP__NUMSZ) - string) < precision)))
+                    if (!((n64) || ((int32_t)((num + JSL__NUMSZ) - string) < precision)))
                     break;
-                    if (formatting_flags & STBSP__TRIPLET_COMMA) {
+                    if (formatting_flags & JSL__TRIPLET_COMMA) {
                     ++l;
                     if ((l & 15) == ((l >> 4) & 15)) {
                         l &= ~UINT32_C(15);
-                        *--string = stbsp__comma;
+                        *--string = jsl__comma;
                     }
                     }
                 };
                 // get the tens and the comma pos
-                comma_spacing = (uint32_t)((num + STBSP__NUMSZ) - string) + ((((l >> 4) & 15)) << 24);
+                comma_spacing = (uint32_t)((num + JSL__NUMSZ) - string) + ((((l >> 4) & 15)) << 24);
                 // get the length that we copied
-                l = (uint32_t)((num + STBSP__NUMSZ) - string);
+                l = (uint32_t)((num + JSL__NUMSZ) - string);
                 // copy it
                 goto L_STRING_COPY;
 
@@ -2411,23 +2419,23 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
             case 'i':
             case 'd': // integer
                 // get the integer and abs it
-                if (formatting_flags & STBSP__INTMAX) {
+                if (formatting_flags & JSL__INTMAX) {
                     int64_t i64 = va_arg(va, int64_t);
                     n64 = (uint64_t)i64;
                     if ((f.data[0] != 'u') && (i64 < 0)) {
                     n64 = (uint64_t)-i64;
-                    formatting_flags |= STBSP__NEGATIVE;
+                    formatting_flags |= JSL__NEGATIVE;
                     }
                 } else {
                     int32_t i = va_arg(va, int32_t);
                     n64 = (uint32_t)i;
                     if ((f.data[0] != 'u') && (i < 0)) {
                     n64 = (uint32_t)-i;
-                    formatting_flags |= STBSP__NEGATIVE;
+                    formatting_flags |= JSL__NEGATIVE;
                     }
                 }
 
-                if (formatting_flags & STBSP__METRIC_SUFFIX) {
+                if (formatting_flags & JSL__METRIC_SUFFIX) {
                     if (n64 < 1024)
                     precision = 0;
                     else if (precision == -1)
@@ -2437,7 +2445,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 }
 
                 // convert to string
-                string = num + STBSP__NUMSZ;
+                string = num + JSL__NUMSZ;
                 l = 0;
 
                 for (;;) {
@@ -2450,7 +2458,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                     n = (uint32_t)n64;
                     n64 = 0;
                     }
-                    if ((formatting_flags & STBSP__TRIPLET_COMMA) == 0) {
+                    if ((formatting_flags & JSL__TRIPLET_COMMA) == 0) {
                     do {
                         string -= 2;
                         *(uint16_t *)string = *(uint16_t *)&stbsp__digitpair.pair[(n % 100) * 2];
@@ -2458,9 +2466,9 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                     } while (n);
                     }
                     while (n) {
-                    if ((formatting_flags & STBSP__TRIPLET_COMMA) && (l++ == 3)) {
+                    if ((formatting_flags & JSL__TRIPLET_COMMA) && (l++ == 3)) {
                         l = 0;
-                        *--string = stbsp__comma;
+                        *--string = jsl__comma;
                         --o;
                     } else {
                         *--string = (char)(n % 10) + '0';
@@ -2468,14 +2476,14 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                     }
                     }
                     if (n64 == 0) {
-                    if ((string[0] == '0') && (string != (num + STBSP__NUMSZ)))
+                    if ((string[0] == '0') && (string != (num + JSL__NUMSZ)))
                         ++string;
                     break;
                     }
                     while (string != o)
-                    if ((formatting_flags & STBSP__TRIPLET_COMMA) && (l++ == 3)) {
+                    if ((formatting_flags & JSL__TRIPLET_COMMA) && (l++ == 3)) {
                         l = 0;
-                        *--string = stbsp__comma;
+                        *--string = jsl__comma;
                         --o;
                     } else {
                         *--string = '0';
@@ -2483,10 +2491,10 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 }
 
                 tail[0] = 0;
-                stbsp__lead_sign(formatting_flags, lead);
+                jsl__lead_sign(formatting_flags, lead);
 
                 // get the length that we copied
-                l = (uint32_t)((num + STBSP__NUMSZ) - string);
+                l = (uint32_t)((num + JSL__NUMSZ) - string);
                 if (l == 0) {
                     *--string = '0';
                     l = 1;
@@ -2506,16 +2514,16 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 precision -= (int32_t) l;
 
                 // handle right justify and leading zeros
-                if ((formatting_flags & STBSP__LEFTJUST) == 0)
+                if ((formatting_flags & JSL__LEFTJUST) == 0)
                 {
-                    if (formatting_flags & STBSP__LEADINGZERO) // if leading zeros, everything is in precision
+                    if (formatting_flags & JSL__LEADINGZERO) // if leading zeros, everything is in precision
                     {
                         precision = (field_width > precision) ? field_width : precision;
                         field_width = 0;
                     }
                     else
                     {
-                        formatting_flags &= (uint32_t) ~STBSP__TRIPLET_COMMA; // if no leading zeros, then no commas
+                        formatting_flags &= (uint32_t) ~JSL__TRIPLET_COMMA; // if no leading zeros, then no commas
                     }
                 }
 
@@ -2526,7 +2534,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                     uint32_t c;
 
                     // copy leading spaces (or when doing %8.4d stuff)
-                    if ((formatting_flags & STBSP__LEFTJUST) == 0)
+                    if ((formatting_flags & JSL__LEFTJUST) == 0)
                     {
                         while (field_width > 0)
                         {
@@ -2557,14 +2565,14 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                     // copy leading zeros
                     c = comma_spacing >> 24;
                     comma_spacing &= 0xffffff;
-                    comma_spacing = (formatting_flags & STBSP__TRIPLET_COMMA) ? ((uint32_t)(c - ((((uint32_t) precision) + comma_spacing) % (c + 1u)))) : 0;
+                    comma_spacing = (formatting_flags & JSL__TRIPLET_COMMA) ? ((uint32_t)(c - ((((uint32_t) precision) + comma_spacing) % (c + 1u)))) : 0;
 
                     while (precision > 0)
                     {
                     CLAMP_VALUE_TO_BUFFER_SIZE_THEN_ASSIGN(i, precision);
                     precision -= i;
 
-                    if (JSL_IS_BITFLAG_NOT_SET(formatting_flags, STBSP__TRIPLET_COMMA))
+                    if (JSL_IS_BITFLAG_NOT_SET(formatting_flags, JSL__TRIPLET_COMMA))
                     {
                         JSL_MEMSET(buffer_cursor, '0', (size_t) i);
                         buffer_cursor += i;
@@ -2576,7 +2584,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                             if (comma_spacing == c)
                             {
                                 comma_spacing = 0;
-                                *buffer_cursor = (uint8_t) stbsp__comma;
+                                *buffer_cursor = (uint8_t) jsl__comma;
                             }
                             else
                             {
@@ -2654,7 +2662,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 }
 
                 // handle the left justify
-                if (formatting_flags & STBSP__LEFTJUST)
+                if (formatting_flags & JSL__LEFTJUST)
                 {
                     if (field_width > 0)
                     {
@@ -2675,7 +2683,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 break;
 
             default: // unknown, just copy code
-                string = num + STBSP__NUMSZ - 1;
+                string = num + JSL__NUMSZ - 1;
                 *string = (char) f.data[0];
                 l = 1;
                 field_width = formatting_flags = 0;
@@ -2699,16 +2707,16 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
 }
 
 // cleanup
-#undef STBSP__LEFTJUST
-#undef STBSP__LEADINGPLUS
-#undef STBSP__LEADINGSPACE
-#undef STBSP__LEADING_0X
-#undef STBSP__LEADINGZERO
-#undef STBSP__INTMAX
-#undef STBSP__TRIPLET_COMMA
-#undef STBSP__NEGATIVE
-#undef STBSP__METRIC_SUFFIX
-#undef STBSP__NUMSZ
+#undef JSL__LEFTJUST
+#undef JSL__LEADINGPLUS
+#undef JSL__LEADINGSPACE
+#undef JSL__LEADING_0X
+#undef JSL__LEADINGZERO
+#undef JSL__INTMAX
+#undef JSL__TRIPLET_COMMA
+#undef JSL__NEGATIVE
+#undef JSL__METRIC_SUFFIX
+#undef JSL__NUMSZ
 #undef FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE
 #undef FLUSH_BUFFER
 #undef CLAMP_VALUE_TO_BUFFER_SIZE_THEN_ASSIGN
@@ -2739,7 +2747,7 @@ struct JSL__FormatAllocatorContext
     int64_t current_allocation_length;
 };
 
-static int64_t format_allocator_callback(void *user, JSLFatPtr data)
+static int64_t jsl__format_allocator_callback(void *user, JSLFatPtr data)
 {
     struct JSL__FormatAllocatorContext* context = (struct JSL__FormatAllocatorContext*) user;
     int64_t old_length = context->current_allocation_length;
@@ -2781,7 +2789,7 @@ JSL__ASAN_OFF JSLFatPtr jsl_format(JSLAllocatorInterface* allocator, JSLFatPtr f
     context.current_allocation_length = 0;
 
     JSLOutputSink sink;
-    sink.write_fp = format_allocator_callback;
+    sink.write_fp = jsl__format_allocator_callback;
     sink.user_data = &context;
 
     int64_t write_length = jsl_format_sink_valist(
@@ -2805,7 +2813,7 @@ JSL__ASAN_OFF JSLFatPtr jsl_format(JSLAllocatorInterface* allocator, JSLFatPtr f
 //   low level float utility functions
 
 // copies d to bits w/ strict aliasing (this compiles to nothing on /Ox)
-#define STBSP__COPYFP(dest, src)                   \
+#define JSL__COPYFP(dest, src)                   \
 {                                               \
     int32_t counter;                                      \
     for (counter = 0; counter < 8; counter++)                   \
@@ -2813,44 +2821,44 @@ JSL__ASAN_OFF JSLFatPtr jsl_format(JSLAllocatorInterface* allocator, JSLFatPtr f
 }
 
 // get float info
-static int32_t stbsp__real_to_parts(int64_t *bits, int32_t *expo, double value)
+static int32_t jsl__real_to_parts(int64_t *bits, int32_t *expo, double value)
 {
-double d;
-int64_t b = 0;
+    double d;
+    int64_t b = 0;
 
-// load value and round at the frac_digits
-d = value;
+    // load value and round at the frac_digits
+    d = value;
 
-STBSP__COPYFP(b, d);
+    JSL__COPYFP(b, d);
 
-const int64_t mantissa_mask = (int64_t)((((uint64_t)1u) << 52u) - 1u);
-*bits = b & mantissa_mask;
-*expo = (int32_t)(((b >> 52) & 2047) - 1023);
+    const int64_t mantissa_mask = (int64_t)((((uint64_t)1u) << 52u) - 1u);
+    *bits = b & mantissa_mask;
+    *expo = (int32_t)(((b >> 52) & 2047) - 1023);
 
-return (int32_t)((uint64_t) b >> 63);
+    return (int32_t)((uint64_t) b >> 63);
 }
 
-static double const stbsp__bot[23] = {
+static double const jsl__bot[23] = {
     1e+000, 1e+001, 1e+002, 1e+003, 1e+004, 1e+005, 1e+006, 1e+007, 1e+008, 1e+009, 1e+010, 1e+011,
     1e+012, 1e+013, 1e+014, 1e+015, 1e+016, 1e+017, 1e+018, 1e+019, 1e+020, 1e+021, 1e+022
 };
-static double const stbsp__negbot[22] = {
+static double const jsl__negbot[22] = {
     1e-001, 1e-002, 1e-003, 1e-004, 1e-005, 1e-006, 1e-007, 1e-008, 1e-009, 1e-010, 1e-011,
     1e-012, 1e-013, 1e-014, 1e-015, 1e-016, 1e-017, 1e-018, 1e-019, 1e-020, 1e-021, 1e-022
 };
-static double const stbsp__negboterr[22] = {
+static double const jsl__negboterr[22] = {
     -5.551115123125783e-018,  -2.0816681711721684e-019, -2.0816681711721686e-020, -4.7921736023859299e-021, -8.1803053914031305e-022, 4.5251888174113741e-023,
     4.5251888174113739e-024,  -2.0922560830128471e-025, -6.2281591457779853e-026, -3.6432197315497743e-027, 6.0503030718060191e-028,  2.0113352370744385e-029,
     -3.0373745563400371e-030, 1.1806906454401013e-032,  -7.7705399876661076e-032, 2.0902213275965398e-033,  -7.1542424054621921e-034, -7.1542424054621926e-035,
     2.4754073164739869e-036,  5.4846728545790429e-037,  9.2462547772103625e-038,  -4.8596774326570872e-039
 };
-static double const stbsp__top[13] = {
+static double const jsl__top[13] = {
     1e+023, 1e+046, 1e+069, 1e+092, 1e+115, 1e+138, 1e+161, 1e+184, 1e+207, 1e+230, 1e+253, 1e+276, 1e+299
 };
-static double const stbsp__negtop[13] = {
+static double const jsl__negtop[13] = {
     1e-023, 1e-046, 1e-069, 1e-092, 1e-115, 1e-138, 1e-161, 1e-184, 1e-207, 1e-230, 1e-253, 1e-276, 1e-299
 };
-static double const stbsp__toperr[13] = {
+static double const jsl__toperr[13] = {
     8388608,
     6.8601809640529717e+028,
     -7.253143638152921e+052,
@@ -2865,14 +2873,14 @@ static double const stbsp__toperr[13] = {
     -5.2069140800249813e+259,
     -5.2504760255204387e+282
 };
-static double const stbsp__negtoperr[13] = {
+static double const jsl__negtoperr[13] = {
     3.9565301985100693e-040,  -2.299904345391321e-063,  3.6506201437945798e-086,  1.1875228833981544e-109,
     -5.0644902316928607e-132, -6.7156837247865426e-155, -2.812077463003139e-178,  -5.7778912386589953e-201,
     7.4997100559334532e-224,  -4.6439668915134491e-247, -6.3691100762962136e-270, -9.436808465446358e-293,
     8.0970921678014997e-317
 };
 
-static uint64_t const stbsp__powten[20] = {
+static uint64_t const jsl__powten[20] = {
     1,
     10,
     100,
@@ -2894,25 +2902,25 @@ static uint64_t const stbsp__powten[20] = {
     1000000000000000000ULL,
     10000000000000000000ULL
 };
-#define stbsp__tento19th (1000000000000000000ULL)
+#define jsl__tento19th (1000000000000000000ULL)
 
-#define stbsp__ddmulthi(oh, ol, xh, yh)                             \
+#define jsl__ddmulthi(oh, ol, xh, yh)                             \
 {                                                                   \
     double ahi = 0, alo, bhi = 0, blo;                              \
     int64_t bt = 0;                                                 \
     oh = xh * yh;                                                   \
-    STBSP__COPYFP(bt, xh);                                          \
+    JSL__COPYFP(bt, xh);                                          \
     bt &= ((~(uint64_t)0) << 27);                                   \
-    STBSP__COPYFP(ahi, bt);                                         \
+    JSL__COPYFP(ahi, bt);                                         \
     alo = xh - ahi;                                                 \
-    STBSP__COPYFP(bt, yh);                                          \
+    JSL__COPYFP(bt, yh);                                          \
     bt &= ((~(uint64_t)0) << 27);                                   \
-    STBSP__COPYFP(bhi, bt);                                         \
+    JSL__COPYFP(bhi, bt);                                         \
     blo = yh - bhi;                                                 \
     ol = ((ahi * bhi - oh) + ahi * blo + alo * bhi) + alo * blo;    \
 }
 
-#define stbsp__ddtoS64(ob, xh, xl)                                  \
+#define jsl__ddtoS64(ob, xh, xl)                                  \
 {                                                                   \
     double ahi = 0, alo, vh, t;                                     \
     ob = (int64_t)xh;                                               \
@@ -2923,7 +2931,7 @@ static uint64_t const stbsp__powten[20] = {
     ob += (int64_t)(ahi + alo + xl);                                \
 }
 
-#define stbsp__ddrenorm(oh, ol) \
+#define jsl__ddrenorm(oh, ol) \
 {                            \
     double s;                 \
     s = oh + ol;              \
@@ -2931,15 +2939,15 @@ static uint64_t const stbsp__powten[20] = {
     oh = s;                   \
 }
 
-#define stbsp__ddmultlo(oh, ol, xh, xl, yh, yl) ol = ol + (xh * yl + xl * yh);
+#define jsl__ddmultlo(oh, ol, xh, xl, yh, yl) ol = ol + (xh * yl + xl * yh);
 
-#define stbsp__ddmultlos(oh, ol, xh, yl) ol = ol + (xh * yl);
+#define jsl__ddmultlos(oh, ol, xh, yl) ol = ol + (xh * yl);
 
-static void stbsp__raise_to_power10(double *ohi, double *olo, double d, int32_t power) // power can be -323 to +350
+static void jsl__raise_to_power10(double *ohi, double *olo, double d, int32_t power) // power can be -323 to +350
 {
     double ph, pl;
     if ((power >= 0) && (power <= 22)) {
-        stbsp__ddmulthi(ph, pl, d, stbsp__bot[power]);
+        jsl__ddmulthi(ph, pl, d, jsl__bot[power]);
     } else {
         int32_t e, et, eb;
         double p2h, p2l;
@@ -2957,14 +2965,14 @@ static void stbsp__raise_to_power10(double *ohi, double *olo, double d, int32_t 
         if (power < 0) {
             if (eb) {
                 --eb;
-                stbsp__ddmulthi(ph, pl, d, stbsp__negbot[eb]);
-                stbsp__ddmultlos(ph, pl, d, stbsp__negboterr[eb]);
+                jsl__ddmulthi(ph, pl, d, jsl__negbot[eb]);
+                jsl__ddmultlos(ph, pl, d, jsl__negboterr[eb]);
             }
             if (et) {
-                stbsp__ddrenorm(ph, pl);
+                jsl__ddrenorm(ph, pl);
                 --et;
-                stbsp__ddmulthi(p2h, p2l, ph, stbsp__negtop[et]);
-                stbsp__ddmultlo(p2h, p2l, ph, pl, stbsp__negtop[et], stbsp__negtoperr[et]);
+                jsl__ddmulthi(p2h, p2l, ph, jsl__negtop[et]);
+                jsl__ddmultlo(p2h, p2l, ph, pl, jsl__negtop[et], jsl__negtoperr[et]);
                 ph = p2h;
                 pl = p2l;
             }
@@ -2974,26 +2982,26 @@ static void stbsp__raise_to_power10(double *ohi, double *olo, double d, int32_t 
                 if (eb > 22)
                 eb = 22;
                 e -= eb;
-                stbsp__ddmulthi(ph, pl, d, stbsp__bot[eb]);
+                jsl__ddmulthi(ph, pl, d, jsl__bot[eb]);
                 if (e) {
-                stbsp__ddrenorm(ph, pl);
-                stbsp__ddmulthi(p2h, p2l, ph, stbsp__bot[e]);
-                stbsp__ddmultlos(p2h, p2l, stbsp__bot[e], pl);
+                jsl__ddrenorm(ph, pl);
+                jsl__ddmulthi(p2h, p2l, ph, jsl__bot[e]);
+                jsl__ddmultlos(p2h, p2l, jsl__bot[e], pl);
                 ph = p2h;
                 pl = p2l;
                 }
             }
             if (et) {
-                stbsp__ddrenorm(ph, pl);
+                jsl__ddrenorm(ph, pl);
                 --et;
-                stbsp__ddmulthi(p2h, p2l, ph, stbsp__top[et]);
-                stbsp__ddmultlo(p2h, p2l, ph, pl, stbsp__top[et], stbsp__toperr[et]);
+                jsl__ddmulthi(p2h, p2l, ph, jsl__top[et]);
+                jsl__ddmultlo(p2h, p2l, ph, pl, jsl__top[et], jsl__toperr[et]);
                 ph = p2h;
                 pl = p2l;
             }
         }
     }
-    stbsp__ddrenorm(ph, pl);
+    jsl__ddrenorm(ph, pl);
     *ohi = ph;
     *olo = pl;
 }
@@ -3002,14 +3010,14 @@ static void stbsp__raise_to_power10(double *ohi, double *olo, double d, int32_t 
 //   decimal point in decimal_pos.  +/-INF and NAN are specified by special values
 //   returned in the decimal_pos parameter.
 // frac_digits is absolute normally, but if you want from first significant digits (got %g and %e), or in 0x80000000
-static int32_t stbsp__real_to_str(char const **start, uint32_t *len, char *out, int32_t *decimal_pos, double value, uint32_t frac_digits)
+static int32_t jsl__real_to_str(char const **start, uint32_t *len, char *out, int32_t *decimal_pos, double value, uint32_t frac_digits)
 {
     double d;
     int64_t bits = 0;
     int32_t expo, e, ng, tens;
 
     d = value;
-    STBSP__COPYFP(bits, d);
+    JSL__COPYFP(bits, d);
     expo = (int32_t)((bits >> 52) & 2047);
     ng = (int32_t)((uint64_t) bits >> 63);
     if (ng)
@@ -3018,7 +3026,7 @@ static int32_t stbsp__real_to_str(char const **start, uint32_t *len, char *out, 
     if (expo == 2047) // is nan or inf?
     {
         *start = ((uint64_t) bits & ((((uint64_t) 1u) << 52u) - 1u)) ? "NaN" : "Inf";
-        *decimal_pos = STBSP__SPECIAL;
+        *decimal_pos = JSL__SPECIAL;
         *len = 3;
         return ng;
     }
@@ -3052,13 +3060,13 @@ static int32_t stbsp__real_to_str(char const **start, uint32_t *len, char *out, 
         tens = (tens < 0) ? ((tens * 617) / 2048) : (((tens * 1233) / 4096) + 1);
 
         // move the significant bits into position and stick them into an int32_t
-        stbsp__raise_to_power10(&ph, &pl, d, 18 - tens);
+        jsl__raise_to_power10(&ph, &pl, d, 18 - tens);
 
         // get full as much precision from double-double as possible
-        stbsp__ddtoS64(bits, ph, pl);
+        jsl__ddtoS64(bits, ph, pl);
 
         // check if we undershot
-        if (((uint64_t)bits) >= stbsp__tento19th)
+        if (((uint64_t)bits) >= jsl__tento19th)
             ++tens;
     }
 
@@ -3066,9 +3074,9 @@ static int32_t stbsp__real_to_str(char const **start, uint32_t *len, char *out, 
     frac_digits = (frac_digits & 0x80000000u) ? ((frac_digits & 0x7ffffffu) + 1u) : (frac_digits + (uint32_t) tens);
     if ((frac_digits < 24)) {
         uint32_t dg = 1;
-        if ((uint64_t)bits >= stbsp__powten[9])
+        if ((uint64_t)bits >= jsl__powten[9])
             dg = 10;
-        while ((uint64_t)bits >= stbsp__powten[dg]) {
+        while ((uint64_t)bits >= jsl__powten[dg]) {
             ++dg;
             if (dg == 20)
                 goto L_NO_ROUND;
@@ -3079,9 +3087,9 @@ static int32_t stbsp__real_to_str(char const **start, uint32_t *len, char *out, 
             e = (int32_t) (dg - frac_digits);
             if ((uint32_t)e >= 24)
                 goto L_NO_ROUND;
-            r = stbsp__powten[e];
+            r = jsl__powten[e];
             bits = bits + (int64_t) (r / 2);
-            if ((uint64_t) bits >= stbsp__powten[dg])
+            if ((uint64_t) bits >= jsl__powten[dg])
                 ++tens;
             bits /= r;
         }
@@ -3145,10 +3153,10 @@ static int32_t stbsp__real_to_str(char const **start, uint32_t *len, char *out, 
 }
 
 // clean up
-#undef stbsp__ddmulthi
-#undef stbsp__ddrenorm
-#undef stbsp__ddmultlo
-#undef stbsp__ddmultlos
-#undef STBSP__SPECIAL
-#undef STBSP__COPYFP
-#undef STBSP__UNALIGNED
+#undef jsl__ddmulthi
+#undef jsl__ddrenorm
+#undef jsl__ddmultlo
+#undef jsl__ddmultlos
+#undef JSL__SPECIAL
+#undef JSL__COPYFP
+#undef JSL__UNALIGNED

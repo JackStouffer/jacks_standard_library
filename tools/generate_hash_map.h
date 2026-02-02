@@ -1065,7 +1065,7 @@
             {
                 resolved_hash_function_call = jsl_format(
                     &scratch_interface,
-                    JSL_FATPTR_EXPRESSION("*out_hash = murmur3_fmix_u64((uint64_t) key, hash_map->seed)"),
+                    JSL_FATPTR_EXPRESSION("*out_hash = jsl__murmur3_fmix_u64((uint64_t) key, hash_map->seed)"),
                     key_type_name
                 );
             }

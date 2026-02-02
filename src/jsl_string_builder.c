@@ -217,7 +217,7 @@ bool jsl_string_builder_iterator_next(JSLStringBuilderIterator* iterator, JSLFat
     return true;
 }
 
-static int64_t format_string_builder_callback(void* user, JSLFatPtr data)
+static int64_t jsl__format_string_builder_callback(void* user, JSLFatPtr data)
 {
     return jsl_string_builder_insert_fatptr((JSLStringBuilder*) user, data);
 }
@@ -225,7 +225,7 @@ static int64_t format_string_builder_callback(void* user, JSLFatPtr data)
 JSLOutputSink jsl_string_builder_output_sink(JSLStringBuilder* builder)
 {
     JSLOutputSink sink;
-    sink.write_fp = format_string_builder_callback;
+    sink.write_fp = jsl__format_string_builder_callback;
     sink.user_data = builder;
     return sink;
 }

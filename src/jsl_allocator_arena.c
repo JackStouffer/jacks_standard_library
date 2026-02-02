@@ -78,19 +78,19 @@ void jsl_arena_init2(JSLArena* arena, JSLFatPtr memory)
     ASAN_POISON_MEMORY_REGION(memory.data, memory.length);
 }
 
-static void* alloc_interface_alloc(void* ctx, int64_t bytes, int32_t align, bool zeroed)
+static void* jsl__alloc_interface_alloc(void* ctx, int64_t bytes, int32_t align, bool zeroed)
 {
     JSLArena* arena = (JSLArena*) ctx;
     return jsl_arena_allocate_aligned(arena, bytes, align, zeroed);
 }
 
-static void* alloc_interface_realloc(void* ctx, void* allocation, int64_t new_bytes, int32_t alignment)
+static void* jsl__alloc_interface_realloc(void* ctx, void* allocation, int64_t new_bytes, int32_t alignment)
 {
     JSLArena* arena = (JSLArena*) ctx;
     return jsl_arena_reallocate_aligned(arena, allocation, new_bytes, alignment);
 }
 
-static bool alloc_interface_free(void* ctx, void* allocation)
+static bool jsl__alloc_interface_free(void* ctx, void* allocation)
 {
     (void) ctx;
 
@@ -113,7 +113,7 @@ static bool alloc_interface_free(void* ctx, void* allocation)
 
 }
 
-static bool alloc_interface_free_all(void* ctx)
+static bool jsl__alloc_interface_free_all(void* ctx)
 {
     JSLArena* arena = (JSLArena*) ctx;
     jsl_arena_reset(arena);
@@ -124,10 +124,10 @@ void jsl_arena_get_allocator_interface(JSLAllocatorInterface* allocator, JSLAren
 {
     jsl_allocator_interface_init(
         allocator,
-        alloc_interface_alloc,
-        alloc_interface_realloc,
-        alloc_interface_free,
-        alloc_interface_free_all,
+        jsl__alloc_interface_alloc,
+        jsl__alloc_interface_realloc,
+        jsl__alloc_interface_free,
+        jsl__alloc_interface_free_all,
         arena
     );
 }

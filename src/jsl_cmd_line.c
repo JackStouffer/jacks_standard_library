@@ -2020,6 +2020,7 @@ bool jsl_cmd_line_args_has_flag(JSLCmdLineArgs* cmd_args, JSLFatPtr flag)
 
     bool params_valid = (
         cmd_args != NULL
+        && cmd_args->sentinel == JSL__CMD_LINE_ARGS_PRIVATE_SENTINEL
         && flag.data != NULL
         && flag.length > -1
     );
@@ -2038,6 +2039,7 @@ bool jsl_cmd_line_args_has_command(JSLCmdLineArgs* cmd_args, JSLFatPtr flag)
 
     bool params_valid = (
         cmd_args != NULL
+        && cmd_args->sentinel == JSL__CMD_LINE_ARGS_PRIVATE_SENTINEL
         && flag.data != NULL
         && flag.length > -1
     );
@@ -2056,6 +2058,7 @@ bool jsl_cmd_line_args_pop_arg_list(JSLCmdLineArgs* cmd_args, JSLFatPtr* out_val
 
     bool params_valid = (
         cmd_args != NULL
+        && cmd_args->sentinel == JSL__CMD_LINE_ARGS_PRIVATE_SENTINEL
         && out_value != NULL
         && cmd_args->arg_list != NULL
         && cmd_args->arg_list_index < cmd_args->arg_list_length
@@ -2081,6 +2084,7 @@ bool jsl_cmd_line_args_pop_flag_with_value(
 
     bool params_valid = (
         cmd_args != NULL
+        && cmd_args->sentinel == JSL__CMD_LINE_ARGS_PRIVATE_SENTINEL
         && out_value != NULL
         && flag.data != NULL
         && flag.length > -1

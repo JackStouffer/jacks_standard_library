@@ -4,7 +4,7 @@
 
 // MurmurHash3 was written by Austin Appleby, and is placed in the public
 // domain. The author hereby disclaims copyright to this source code.
-static inline uint64_t murmur3_fmix_u64(uint64_t x, uint64_t seed)
+static inline uint64_t jsl__murmur3_fmix_u64(uint64_t x, uint64_t seed)
 {
     uint64_t z = x ^ seed;
     z ^= z >> 33;
