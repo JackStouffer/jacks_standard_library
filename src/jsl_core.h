@@ -1782,15 +1782,67 @@ JSL_DEF JSLFatPtr jsl_fatptr_duplicate(JSLAllocatorInterface* allocator, JSLFatP
 typedef int64_t (*JSLOutputSinkWriteFP)(void* user, JSLFatPtr data);
 
 /**
- * TODO: docs
+ * An output sink is an abstraction designed to allow arbitrary data generating processes
+ * to send data to unknown user code.
  * 
- * Add advice on writing data generation functions with this, like buffering the output,
- * don't do single char
+ * ### Purpose and Usage
  * 
- * The benefits are ...
+ * The basic problem can be illustrated with an example. Say you have a library function for
+ * string formatting. The easiest API would be one where the user provides a buffer which the
+ * function writes into. For most users this is fine, but a lot of times you just want to
+ * print to `stdout`, so copying to a buffer first is wasteful, especially since C `FILE*`s
+ * already have write buffering. So you add a file writing overload. Then, a lot of times in
+ * your program you have a larger string which is made out of a bunch of smaller fragments.
+ * So you add a overload to write into a dynamic array / string builder. And what about logging
+ * where you send your logs to a file/network socket to a log collector process, and on and on
+ * the examples go.
+ * 
+ * An output sink standardizes how a that function will send data to any of the above sources.
+ * The sink itself is a struct with two pointers: one is a function pointer that accepts a fat
+ * pointer and two is a user data pointer which is also passed to the function pointer. This
+ * very simple interface reduces a lot of duplicated code and allows for user code to interact
+ * with library code that it has no knowledge of.
+ * 
+ * To illiterate, here's the implementation of the convenience function to write data to an
+ * output sink.
+ * 
+ * ```
+ * int64_t jsl_output_sink_write_fatptr(JSLOutputSink sink, JSLFatPtr data)
+ * {
+ *     if (sink.write_fp == NULL) return -1;
+ *     return sink.write_fp(sink.user_data, data);
+ * }
+ * ```
+ * 
+ * As you can see it's very direct. The write function pointer simply needs a context pointer and
+ * what data to write. See the docs of `JSLOutputSinkWriteFP` for more information on the function
+ * pointer conventions.
+ * 
+ * ### Caveats
  * 
  * No abstraction is without it's downsides. Not all output situations will fit cleanly into
- * this forma ...
+ * this formula. By having such a abstract and simple interface the following issues cannot be
+ * solved or known about at the writing code but instead need to be handled in the function
+ * pointer:
+ * 
+ *      - Blocking or non-blocking behavior
+ *      - Retries
+ *      - Partial success
+ *      - Chunking writes
+ *      - Backpressure
+ *      - Error reporting/codes 
+ * 
+ * And a lot of times these issues cannot actually be solved when using this abstraction! If you
+ * have your own asyncio loop you probably cannot use the output sink abstraction very much, for
+ * example.
+ * 
+ * You'll also need to handle lifetime cleanup yourself. For example, when writing to a C `FILE*`
+ * based output sink, you'll need to explicitly call `fflush` and `fclose` before the original
+ * file's lifetime ends. These concepts are not covered by the output sink abstraction; the only
+ * thing the output sink deals with is the output itself.
+ *
+ * TODO: Add advice on writing data generation functions with this, like buffering the output,
+ * don't do single char
  */
 typedef struct JSLOutputSink {
     JSLOutputSinkWriteFP write_fp;
@@ -1804,7 +1856,7 @@ typedef struct JSLOutputSink {
  */
 static inline int64_t jsl_output_sink_write_fatptr(JSLOutputSink sink, JSLFatPtr data)
 {
-    if (sink.write_fp == NULL) return false;
+    if (sink.write_fp == NULL) return -1;
     return sink.write_fp(sink.user_data, data);
 }
 
