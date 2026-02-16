@@ -107,7 +107,7 @@
     #pragma comment(lib, "shell32.lib")
 #endif
 
-JSLFatPtr help_message = JSL_FATPTR_INITIALIZER(
+JSLImmutableMemory help_message = JSL_FATPTR_INITIALIZER(
     "OVERVIEW:\n\n"
     "Array C code generation utility\n\n"
     "This program generates both a C source and header file for an array with the given\n"
@@ -130,25 +130,25 @@ JSLFatPtr help_message = JSL_FATPTR_INITIALIZER(
 static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
 {
     bool show_help = false;
-    JSLFatPtr name = {0};
-    JSLFatPtr function_prefix = {0};
-    JSLFatPtr value_type = {0};
+    JSLImmutableMemory name = {0};
+    JSLImmutableMemory function_prefix = {0};
+    JSLImmutableMemory value_type = {0};
     ArrayImplementation impl = IMPL_ERROR;
-    JSLFatPtr* header_includes = NULL;
+    JSLImmutableMemory* header_includes = NULL;
     int32_t header_includes_count = 0;
 
     JSLOutputSink stdout_sink = jsl_c_file_output_sink(stdout);
     JSLOutputSink stderr_sink = jsl_c_file_output_sink(stderr);
 
-    static JSLFatPtr help_flag_str = JSL_FATPTR_INITIALIZER("help");
-    static JSLFatPtr name_flag_str = JSL_FATPTR_INITIALIZER("name");
-    static JSLFatPtr function_prefix_flag_str = JSL_FATPTR_INITIALIZER("function-prefix");
-    static JSLFatPtr value_type_flag_str = JSL_FATPTR_INITIALIZER("value-type");
-    static JSLFatPtr fixed_flag_str = JSL_FATPTR_INITIALIZER("fixed");
-    static JSLFatPtr dynamic_flag_str = JSL_FATPTR_INITIALIZER("dynamic");
-    static JSLFatPtr header_flag_str = JSL_FATPTR_INITIALIZER("header");
-    static JSLFatPtr source_flag_str = JSL_FATPTR_INITIALIZER("source");
-    static JSLFatPtr add_header_flag_str = JSL_FATPTR_INITIALIZER("add-header");
+    static JSLImmutableMemory help_flag_str = JSL_FATPTR_INITIALIZER("help");
+    static JSLImmutableMemory name_flag_str = JSL_FATPTR_INITIALIZER("name");
+    static JSLImmutableMemory function_prefix_flag_str = JSL_FATPTR_INITIALIZER("function-prefix");
+    static JSLImmutableMemory value_type_flag_str = JSL_FATPTR_INITIALIZER("value-type");
+    static JSLImmutableMemory fixed_flag_str = JSL_FATPTR_INITIALIZER("fixed");
+    static JSLImmutableMemory dynamic_flag_str = JSL_FATPTR_INITIALIZER("dynamic");
+    static JSLImmutableMemory header_flag_str = JSL_FATPTR_INITIALIZER("header");
+    static JSLImmutableMemory source_flag_str = JSL_FATPTR_INITIALIZER("source");
+    static JSLImmutableMemory add_header_flag_str = JSL_FATPTR_INITIALIZER("add-header");
 
     //
     // Parsing command line
@@ -161,13 +161,13 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     jsl_cmd_line_args_pop_flag_with_value(cmd, function_prefix_flag_str, &function_prefix);
     jsl_cmd_line_args_pop_flag_with_value(cmd, value_type_flag_str, &value_type);
 
-    JSLFatPtr custom_header = {0};
+    JSLImmutableMemory custom_header = {0};
     while (jsl_cmd_line_args_pop_flag_with_value(cmd, add_header_flag_str, &custom_header))
     {
         ++header_includes_count;
         header_includes = realloc(
             header_includes,
-            sizeof(JSLFatPtr) * (size_t) header_includes_count
+            sizeof(JSLImmutableMemory) * (size_t) header_includes_count
         );
         header_includes[header_includes_count - 1] = custom_header;
     }
@@ -316,7 +316,7 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
 
         JSLCmdLineArgs cmd;
         jsl_cmd_line_args_init(&cmd, &allocator);
-        JSLFatPtr error_message = {0};
+        JSLImmutableMemory error_message = {0};
         if (!jsl_cmd_line_args_parse_wide(&cmd, argc, argv, &error_message))
         {
             if (error_message.data != NULL)
@@ -354,7 +354,7 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
             return EXIT_FAILURE;
         }
 
-        JSLFatPtr error_message = {0};
+        JSLImmutableMemory error_message = {0};
         if (!jsl_cmd_line_args_parse(&cmd, argc, argv, &error_message))
         {
             if (error_message.data != NULL)

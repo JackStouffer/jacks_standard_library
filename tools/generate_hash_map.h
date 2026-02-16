@@ -138,12 +138,12 @@
         JSLAllocatorInterface* allocator,
         JSLOutputSink sink,
         HashMapImplementation impl,
-        JSLFatPtr hash_map_name,
-        JSLFatPtr function_prefix,
-        JSLFatPtr key_type_name,
-        JSLFatPtr value_type_name,
-        JSLFatPtr hash_function_name,
-        JSLFatPtr* include_header_array,
+        JSLImmutableMemory hash_map_name,
+        JSLImmutableMemory function_prefix,
+        JSLImmutableMemory key_type_name,
+        JSLImmutableMemory value_type_name,
+        JSLImmutableMemory hash_function_name,
+        JSLImmutableMemory* include_header_array,
         int32_t include_header_count
     );
 
@@ -165,12 +165,12 @@
         JSLAllocatorInterface* allocator,
         JSLOutputSink sink,
         HashMapImplementation impl,
-        JSLFatPtr hash_map_name,
-        JSLFatPtr function_prefix,
-        JSLFatPtr key_type_name,
-        JSLFatPtr value_type_name,
-        JSLFatPtr hash_function_name,
-        JSLFatPtr* include_header_array,
+        JSLImmutableMemory hash_map_name,
+        JSLImmutableMemory function_prefix,
+        JSLImmutableMemory key_type_name,
+        JSLImmutableMemory value_type_name,
+        JSLImmutableMemory hash_function_name,
+        JSLImmutableMemory* include_header_array,
         int32_t include_header_count
     );
     
@@ -189,7 +189,7 @@
     #include "../tools/templates/dynamic_hash_map_header.h"
     #include "../tools/templates/dynamic_hash_map_source.h"
 
-    static JSLFatPtr fixed_header_template = JSL_FATPTR_INITIALIZER(
+    static JSLImmutableMemory fixed_header_template = JSL_FATPTR_INITIALIZER(
         "/**\n"
         " * AUTO GENERATED FILE\n"
         " *\n"
@@ -379,7 +379,7 @@
         ");\n"
     );
 
-    static JSLFatPtr fixed_source_template = JSL_FATPTR_INITIALIZER(
+    static JSLImmutableMemory fixed_source_template = JSL_FATPTR_INITIALIZER(
         "/**\n"
         " * AUTO GENERATED FILE\n"
         " *\n"
@@ -738,27 +738,27 @@
         "}\n"
     );
 
-    static JSLFatPtr hash_map_name_key = JSL_FATPTR_INITIALIZER("hash_map_name");
-    static JSLFatPtr key_type_name_key = JSL_FATPTR_INITIALIZER("key_type_name");
-    static JSLFatPtr value_type_name_key = JSL_FATPTR_INITIALIZER("value_type_name");
-    static JSLFatPtr function_prefix_key = JSL_FATPTR_INITIALIZER("function_prefix");
-    static JSLFatPtr hash_function_key = JSL_FATPTR_INITIALIZER("hash_function");
-    static JSLFatPtr key_compare_key = JSL_FATPTR_INITIALIZER("key_compare");
+    static JSLImmutableMemory hash_map_name_key = JSL_FATPTR_INITIALIZER("hash_map_name");
+    static JSLImmutableMemory key_type_name_key = JSL_FATPTR_INITIALIZER("key_type_name");
+    static JSLImmutableMemory value_type_name_key = JSL_FATPTR_INITIALIZER("value_type_name");
+    static JSLImmutableMemory function_prefix_key = JSL_FATPTR_INITIALIZER("function_prefix");
+    static JSLImmutableMemory hash_function_key = JSL_FATPTR_INITIALIZER("hash_function");
+    static JSLImmutableMemory key_compare_key = JSL_FATPTR_INITIALIZER("key_compare");
 
-    static JSLFatPtr int32_t_str = JSL_FATPTR_INITIALIZER("int32_t");
-    static JSLFatPtr int_str = JSL_FATPTR_INITIALIZER("int");
-    static JSLFatPtr unsigned_str = JSL_FATPTR_INITIALIZER("unsigned");
-    static JSLFatPtr unsigned_int_str = JSL_FATPTR_INITIALIZER("unsigned int");
-    static JSLFatPtr uint32_t_str = JSL_FATPTR_INITIALIZER("uint32_t");
-    static JSLFatPtr int64_t_str = JSL_FATPTR_INITIALIZER("int64_t");
-    static JSLFatPtr long_str = JSL_FATPTR_INITIALIZER("long");
-    static JSLFatPtr long_int_str = JSL_FATPTR_INITIALIZER("long int");
-    static JSLFatPtr long_long_str = JSL_FATPTR_INITIALIZER("long long");
-    static JSLFatPtr long_long_int_str = JSL_FATPTR_INITIALIZER("long long int");
-    static JSLFatPtr uint64_t_str = JSL_FATPTR_INITIALIZER("uint64_t");
-    static JSLFatPtr unsigned_long_str = JSL_FATPTR_INITIALIZER("unsigned long");
-    static JSLFatPtr unsigned_long_long_str = JSL_FATPTR_INITIALIZER("unsigned long long");
-    static JSLFatPtr unsigned_long_long_int_str = JSL_FATPTR_INITIALIZER("unsigned long long int");
+    static JSLImmutableMemory int32_t_str = JSL_FATPTR_INITIALIZER("int32_t");
+    static JSLImmutableMemory int_str = JSL_FATPTR_INITIALIZER("int");
+    static JSLImmutableMemory unsigned_str = JSL_FATPTR_INITIALIZER("unsigned");
+    static JSLImmutableMemory unsigned_int_str = JSL_FATPTR_INITIALIZER("unsigned int");
+    static JSLImmutableMemory uint32_t_str = JSL_FATPTR_INITIALIZER("uint32_t");
+    static JSLImmutableMemory int64_t_str = JSL_FATPTR_INITIALIZER("int64_t");
+    static JSLImmutableMemory long_str = JSL_FATPTR_INITIALIZER("long");
+    static JSLImmutableMemory long_int_str = JSL_FATPTR_INITIALIZER("long int");
+    static JSLImmutableMemory long_long_str = JSL_FATPTR_INITIALIZER("long long");
+    static JSLImmutableMemory long_long_int_str = JSL_FATPTR_INITIALIZER("long long int");
+    static JSLImmutableMemory uint64_t_str = JSL_FATPTR_INITIALIZER("uint64_t");
+    static JSLImmutableMemory unsigned_long_str = JSL_FATPTR_INITIALIZER("unsigned long");
+    static JSLImmutableMemory unsigned_long_long_str = JSL_FATPTR_INITIALIZER("unsigned long long");
+    static JSLImmutableMemory unsigned_long_long_int_str = JSL_FATPTR_INITIALIZER("unsigned long long int");
 
     // because rand max on some platforms is 32k
     static inline uint32_t rand_u32(void)
@@ -775,13 +775,13 @@
 
     static void render_template(
         JSLOutputSink sink,
-        JSLFatPtr template,
+        JSLImmutableMemory template,
         JSLStrToStrMap* variables
     )
     {
-        static JSLFatPtr open_param = JSL_FATPTR_INITIALIZER("{{");
-        static JSLFatPtr close_param = JSL_FATPTR_INITIALIZER("}}");
-        JSLFatPtr template_reader = template;
+        static JSLImmutableMemory open_param = JSL_FATPTR_INITIALIZER("{{");
+        static JSLImmutableMemory close_param = JSL_FATPTR_INITIALIZER("}}");
+        JSLImmutableMemory template_reader = template;
         
         while (template_reader.length > 0)
         {
@@ -796,7 +796,7 @@
 
             if (index_of_open > 0)
             {
-                JSLFatPtr slice = jsl_fatptr_slice(template_reader, 0, index_of_open);
+                JSLImmutableMemory slice = jsl_slice(template_reader, 0, index_of_open);
                 jsl_output_sink_write_fatptr(sink, slice);
             }
 
@@ -812,10 +812,10 @@
                 break;
             }
 
-            JSLFatPtr var_name = jsl_fatptr_slice(template_reader, 0, index_of_close);
+            JSLImmutableMemory var_name = jsl_slice(template_reader, 0, index_of_close);
             jsl_fatptr_strip_whitespace(&var_name);
 
-            JSLFatPtr var_value;
+            JSLImmutableMemory var_value;
             if (jsl_str_to_str_map_get(variables, var_name, &var_value))
             {
                 jsl_output_sink_write_fatptr(sink, var_value);
@@ -848,7 +848,7 @@
      * @param include_header_count Number of additional header files to include in the generated header.
      * @param include_header_count Number of additional header files to include in the generated header.
 
-    * @return JSLFatPtr containing the generated header file content
+    * @return JSLImmutableMemory containing the generated header file content
     *
     * @warning Ensure the arena has sufficient space (minimum 512KB recommended) to avoid
     *          allocation failures during header generation.
@@ -857,12 +857,12 @@
         JSLAllocatorInterface* allocator,
         JSLOutputSink sink,
         HashMapImplementation impl,
-        JSLFatPtr hash_map_name,
-        JSLFatPtr function_prefix,
-        JSLFatPtr key_type_name,
-        JSLFatPtr value_type_name,
-        JSLFatPtr hash_function_name,
-        JSLFatPtr* include_header_array,
+        JSLImmutableMemory hash_map_name,
+        JSLImmutableMemory function_prefix,
+        JSLImmutableMemory key_type_name,
+        JSLImmutableMemory value_type_name,
+        JSLImmutableMemory hash_function_name,
+        JSLImmutableMemory* include_header_array,
         int32_t include_header_count
     )
     {
@@ -949,12 +949,12 @@
         JSLAllocatorInterface* allocator,
         JSLOutputSink sink,
         HashMapImplementation impl,
-        JSLFatPtr hash_map_name,
-        JSLFatPtr function_prefix,
-        JSLFatPtr key_type_name,
-        JSLFatPtr value_type_name,
-        JSLFatPtr hash_function_name,
-        JSLFatPtr* include_header_array,
+        JSLImmutableMemory hash_map_name,
+        JSLImmutableMemory function_prefix,
+        JSLImmutableMemory key_type_name,
+        JSLImmutableMemory value_type_name,
+        JSLImmutableMemory hash_function_name,
+        JSLImmutableMemory* include_header_array,
         int32_t include_header_count
     )
     {
@@ -1035,7 +1035,7 @@
             JSLAllocatorInterface scratch_interface;
             jsl_arena_get_allocator_interface(&scratch_interface, &hash_function_scratch_arena);
 
-            JSLFatPtr resolved_hash_function_call;
+            JSLImmutableMemory resolved_hash_function_call;
             if (hash_function_name.data != NULL && hash_function_name.length > 0)
             {
                 resolved_hash_function_call = jsl_format(
@@ -1094,7 +1094,7 @@
             JSLAllocatorInterface scratch_interface;
             jsl_arena_get_allocator_interface(&scratch_interface, &scratch_arena);
 
-            JSLFatPtr resolved_key_compare;
+            JSLImmutableMemory resolved_key_compare;
 
             if (
                 jsl_fatptr_memory_compare(key_type_name, int32_t_str)

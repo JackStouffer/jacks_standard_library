@@ -274,16 +274,25 @@ uint64_t jsl_round_up_pow2_u64(uint64_t num, uint64_t pow2)
     return (num + (pow2 - 1)) & ~(pow2 - 1);
 }
 
-JSLFatPtr jsl_fatptr_init(uint8_t* ptr, int64_t length)
+JSLImmutableMemory jsl_immutable_memory(const uint8_t* ptr, int64_t length)
 {
-    JSLFatPtr buffer = {
+    JSLImmutableMemory buffer = {
         .data = ptr,
         .length = length
     };
     return buffer;
 }
 
-JSLFatPtr jsl_fatptr_slice(JSLFatPtr fatptr, int64_t start, int64_t end)
+JSLMutableMemory jsl_mutable_memory(uint8_t* ptr, int64_t length)
+{
+    JSLMutableMemory buffer = {
+        .data = ptr,
+        .length = length
+    };
+    return buffer;
+}
+
+JSLImmutableMemory jsl_slice(JSLImmutableMemory fatptr, int64_t start, int64_t end)
 {
     JSL_ASSERT(
         fatptr.data != NULL
@@ -309,7 +318,7 @@ JSLFatPtr jsl_fatptr_slice(JSLFatPtr fatptr, int64_t start, int64_t end)
     return fatptr;
 }
 
-JSLFatPtr jsl_fatptr_slice_to_end(JSLFatPtr fatptr, int64_t start)
+JSLImmutableMemory jsl_slice_to_end(JSLImmutableMemory fatptr, int64_t start)
 {
     JSL_ASSERT(
         fatptr.data != NULL
@@ -333,7 +342,7 @@ JSLFatPtr jsl_fatptr_slice_to_end(JSLFatPtr fatptr, int64_t start)
     return fatptr;
 }
 
-int64_t jsl_fatptr_total_write_length(JSLFatPtr original_fatptr, JSLFatPtr writer_fatptr)
+int64_t jsl_total_write_length(JSLImmutableMemory original_fatptr, JSLImmutableMemory writer_fatptr)
 {
     uintptr_t orig = (uintptr_t) original_fatptr.data;
     uintptr_t writer = (uintptr_t) writer_fatptr.data;
@@ -367,7 +376,41 @@ int64_t jsl_fatptr_total_write_length(JSLFatPtr original_fatptr, JSLFatPtr write
     return length_written;
 }
 
-JSLFatPtr jsl_fatptr_auto_slice(JSLFatPtr original_fatptr, JSLFatPtr writer_fatptr)
+int64_t jsl_total_write_length_mutable(JSLMutableMemory original_fatptr, JSLMutableMemory writer_fatptr)
+{
+    uintptr_t orig = (uintptr_t) original_fatptr.data;
+    uintptr_t writer = (uintptr_t) writer_fatptr.data;
+
+    JSL_ASSERT(
+        original_fatptr.data != NULL
+        && writer_fatptr.data != NULL
+        && original_fatptr.length > -1
+        && writer_fatptr.length > -1
+        && (uint64_t) original_fatptr.length <= UINTPTR_MAX - orig // avoid wrap
+        && writer >= orig
+        && writer - orig <= (uintptr_t) original_fatptr.length
+    );
+
+    #ifdef NDEBUG
+        if (
+            original_fatptr.data == NULL
+            || writer_fatptr.data == NULL
+            || original_fatptr.length < 0
+            || writer_fatptr.length < 0
+            || (uint64_t) original_fatptr.length > UINTPTR_MAX - orig
+            || writer < orig
+            || writer - orig > (uintptr_t) original_fatptr.length
+        )
+        {
+            return -1;
+        }
+    #endif
+
+    int64_t length_written = writer_fatptr.data - original_fatptr.data;
+    return length_written;
+}
+
+JSLImmutableMemory jsl_auto_slice(JSLImmutableMemory original_fatptr, JSLImmutableMemory writer_fatptr)
 {
     uintptr_t orig = (uintptr_t) original_fatptr.data;
     uintptr_t writer = (uintptr_t) writer_fatptr.data;
@@ -402,16 +445,51 @@ JSLFatPtr jsl_fatptr_auto_slice(JSLFatPtr original_fatptr, JSLFatPtr writer_fatp
     return original_fatptr;
 }
 
-JSLFatPtr jsl_fatptr_from_cstr(const char* str)
+JSLMutableMemory jsl_auto_slice_mutable(JSLMutableMemory original_fatptr, JSLMutableMemory writer_fatptr)
 {
-    JSLFatPtr ret = {
+    uintptr_t orig = (uintptr_t) original_fatptr.data;
+    uintptr_t writer = (uintptr_t) writer_fatptr.data;
+
+    JSL_ASSERT(
+        original_fatptr.data != NULL
+        && writer_fatptr.data != NULL
+        && original_fatptr.length > -1
+        && writer_fatptr.length > -1
+        && (uint64_t) original_fatptr.length <= UINTPTR_MAX - orig // avoid wrap
+        && writer >= orig
+        && writer - orig <= (uintptr_t) original_fatptr.length
+    );
+
+    #ifdef NDEBUG
+        if (
+            original_fatptr.data == NULL
+            || writer_fatptr.data == NULL
+            || original_fatptr.length < 0
+            || writer_fatptr.length < 0
+            || (uint64_t) original_fatptr.length > UINTPTR_MAX - orig
+            || writer < orig
+            || writer - orig > (uintptr_t) original_fatptr.length
+        )
+        {
+            return -1;
+        }
+    #endif
+
+    int64_t write_length = (int64_t)(writer - orig);
+    original_fatptr.length = write_length;
+    return original_fatptr;
+}
+
+JSLImmutableMemory jsl_fatptr_from_cstr(const char* str)
+{
+    JSLImmutableMemory ret = {
         .data = (uint8_t*) str,
         .length = str == NULL ? 0 : (int64_t) JSL_STRLEN(str)
     };
     return ret;
 }
 
-JSL_WARN_UNUSED int64_t jsl_fatptr_memory_copy(JSLFatPtr* destination, JSLFatPtr source)
+JSL_WARN_UNUSED int64_t jsl_fatptr_memory_copy(JSLMutableMemory* destination, JSLImmutableMemory source)
 {
     if (
         source.length < 0
@@ -445,7 +523,7 @@ JSL_WARN_UNUSED int64_t jsl_fatptr_memory_copy(JSLFatPtr* destination, JSLFatPtr
     return memcpy_length;
 }
 
-JSL_WARN_UNUSED int64_t jsl_fatptr_cstr_memory_copy(JSLFatPtr* destination, const char* cstring, bool include_null_terminator)
+JSL_WARN_UNUSED int64_t jsl_fatptr_cstr_memory_copy(JSLMutableMemory* destination, const char* cstring, bool include_null_terminator)
 {
     if (
         cstring == NULL
@@ -466,7 +544,7 @@ JSL_WARN_UNUSED int64_t jsl_fatptr_cstr_memory_copy(JSLFatPtr* destination, cons
     return length;
 }
 
-bool jsl_fatptr_memory_compare(JSLFatPtr a, JSLFatPtr b)
+bool jsl_fatptr_memory_compare(JSLImmutableMemory a, JSLImmutableMemory b)
 {
     if (a.length != b.length || a.data == NULL || b.data == NULL)
         return false;
@@ -477,7 +555,7 @@ bool jsl_fatptr_memory_compare(JSLFatPtr a, JSLFatPtr b)
     return JSL_MEMCMP(a.data, b.data, (size_t) a.length) == 0;
 }
 
-bool jsl_fatptr_cstr_compare(JSLFatPtr string, char* cstr)
+bool jsl_fatptr_cstr_compare(JSLImmutableMemory string, char* cstr)
 {
     if (cstr == NULL || string.data == NULL)
         return false;
@@ -495,7 +573,7 @@ bool jsl_fatptr_cstr_compare(JSLFatPtr string, char* cstr)
 
 #ifdef __AVX2__
 
-    static JSL__FORCE_INLINE int64_t jsl__avx2_substring_search(JSLFatPtr string, JSLFatPtr substring)
+    static JSL__FORCE_INLINE int64_t jsl__avx2_substring_search(JSLImmutableMemory string, JSLImmutableMemory substring)
     {
         /**
          * From http://0x80.pl/notesen/2016-11-28-simd-strfind.html
@@ -599,7 +677,7 @@ bool jsl_fatptr_cstr_compare(JSLFatPtr string, char* cstr)
 
 #endif
 
-static JSL__FORCE_INLINE int64_t jsl__two_char_search(JSLFatPtr string, JSLFatPtr substring)
+static JSL__FORCE_INLINE int64_t jsl__two_char_search(JSLImmutableMemory string, JSLImmutableMemory substring)
 {
     uint8_t b0 = substring.data[0];
     uint8_t b1 = substring.data[1];
@@ -615,7 +693,7 @@ static JSL__FORCE_INLINE int64_t jsl__two_char_search(JSLFatPtr string, JSLFatPt
     return -1;
 }
 
-static JSL__FORCE_INLINE int64_t jsl__bndm_search(JSLFatPtr string, JSLFatPtr substring)
+static JSL__FORCE_INLINE int64_t jsl__bndm_search(JSLImmutableMemory string, JSLImmutableMemory substring)
 {
     uint64_t masks[256] = {0};
 
@@ -670,7 +748,7 @@ static JSL__FORCE_INLINE int64_t jsl__bndm_search(JSLFatPtr string, JSLFatPtr su
 }
 
 /* Sunday / Quick Search for m > 64 */
-static JSL__FORCE_INLINE int64_t jsl__sunday_search(JSLFatPtr string, JSLFatPtr substring)
+static JSL__FORCE_INLINE int64_t jsl__sunday_search(JSLImmutableMemory string, JSLImmutableMemory substring)
 {
     // Shift table with default m+1 for all 256 bytes
     int64_t shift[256];
@@ -707,7 +785,7 @@ static JSL__FORCE_INLINE int64_t jsl__sunday_search(JSLFatPtr string, JSLFatPtr 
     return -1;
 }
 
-static JSL__FORCE_INLINE int64_t jsl__substring_search(JSLFatPtr string, JSLFatPtr substring)
+static JSL__FORCE_INLINE int64_t jsl__substring_search(JSLImmutableMemory string, JSLImmutableMemory substring)
 {
     if (substring.length == 2)
     {
@@ -724,7 +802,7 @@ static JSL__FORCE_INLINE int64_t jsl__substring_search(JSLFatPtr string, JSLFatP
 }
 
 
-int64_t jsl_fatptr_substring_search(JSLFatPtr string, JSLFatPtr substring)
+int64_t jsl_fatptr_substring_search(JSLImmutableMemory string, JSLImmutableMemory substring)
 {
     if (JSL__UNLIKELY(
         string.data == NULL
@@ -760,7 +838,7 @@ int64_t jsl_fatptr_substring_search(JSLFatPtr string, JSLFatPtr substring)
     }
 }
 
-int64_t jsl_fatptr_index_of(JSLFatPtr string, uint8_t item)
+int64_t jsl_fatptr_index_of(JSLImmutableMemory string, uint8_t item)
 {
     if (string.data == NULL || string.length < 1)
     {
@@ -823,7 +901,7 @@ int64_t jsl_fatptr_index_of(JSLFatPtr string, uint8_t item)
     }
 }
 
-int64_t jsl_fatptr_count(JSLFatPtr str, uint8_t item)
+int64_t jsl_fatptr_count(JSLImmutableMemory str, uint8_t item)
 {
     int64_t count = 0;
 
@@ -884,7 +962,7 @@ int64_t jsl_fatptr_count(JSLFatPtr str, uint8_t item)
     return count;
 }
 
-int64_t jsl_fatptr_index_of_reverse(JSLFatPtr string, uint8_t item)
+int64_t jsl_fatptr_index_of_reverse(JSLImmutableMemory string, uint8_t item)
 {
     if (string.data == NULL || string.length < 1)
     {
@@ -1014,7 +1092,7 @@ int64_t jsl_fatptr_index_of_reverse(JSLFatPtr string, uint8_t item)
 //     }
 // #endif
 
-bool jsl_fatptr_starts_with(JSLFatPtr str, JSLFatPtr prefix)
+bool jsl_fatptr_starts_with(JSLImmutableMemory str, JSLImmutableMemory prefix)
 {
     if (JSL__UNLIKELY(str.data == NULL || prefix.data == NULL))
         return false;
@@ -1028,7 +1106,7 @@ bool jsl_fatptr_starts_with(JSLFatPtr str, JSLFatPtr prefix)
     return JSL_MEMCMP(str.data, prefix.data, (size_t) prefix.length) == 0;
 }
 
-bool jsl_fatptr_ends_with(JSLFatPtr str, JSLFatPtr postfix)
+bool jsl_fatptr_ends_with(JSLImmutableMemory str, JSLImmutableMemory postfix)
 {
     if (JSL__UNLIKELY(str.data == NULL || postfix.data == NULL))
         return false;
@@ -1046,14 +1124,14 @@ bool jsl_fatptr_ends_with(JSLFatPtr str, JSLFatPtr postfix)
     ) == 0;
 }
 
-JSLFatPtr jsl_fatptr_get_file_extension(JSLFatPtr filename)
+JSLImmutableMemory jsl_fatptr_get_file_extension(JSLImmutableMemory filename)
 {
-    JSLFatPtr ret;
+    JSLImmutableMemory ret;
     int64_t index_of_dot = jsl_fatptr_index_of_reverse(filename, '.');
 
     if (index_of_dot > -1)
     {
-        ret = jsl_fatptr_slice(filename, index_of_dot + 1, filename.length);
+        ret = jsl_slice(filename, index_of_dot + 1, filename.length);
     }
     else
     {
@@ -1064,14 +1142,14 @@ JSLFatPtr jsl_fatptr_get_file_extension(JSLFatPtr filename)
     return ret;
 }
 
-JSLFatPtr jsl_fatptr_basename(JSLFatPtr filename)
+JSLImmutableMemory jsl_fatptr_basename(JSLImmutableMemory filename)
 {
-    JSLFatPtr ret;
+    JSLImmutableMemory ret;
     int64_t slash_postion = jsl_fatptr_index_of_reverse(filename, '/');
 
     if (filename.length - slash_postion > 2)
     {
-        ret = jsl_fatptr_slice(
+        ret = jsl_slice(
             filename,
             slash_postion + 1,
             filename.length
@@ -1085,7 +1163,7 @@ JSLFatPtr jsl_fatptr_basename(JSLFatPtr filename)
     return ret;
 }
 
-char* jsl_fatptr_to_cstr(JSLAllocatorInterface* allocator, JSLFatPtr str)
+char* jsl_fatptr_to_cstr(JSLAllocatorInterface* allocator, JSLImmutableMemory str)
 {
     if (allocator == NULL || str.data == NULL || str.length < 1)
         return NULL;
@@ -1108,9 +1186,9 @@ char* jsl_fatptr_to_cstr(JSLAllocatorInterface* allocator, JSLFatPtr str)
     return ret;
 }
 
-JSLFatPtr jsl_cstr_to_fatptr(JSLAllocatorInterface* allocator, char* str)
+JSLImmutableMemory jsl_cstr_to_memory(JSLAllocatorInterface* allocator, char* str)
 {
-    JSLFatPtr ret = {0};
+    JSLImmutableMemory ret = {0};
     if (allocator == NULL || str == NULL)
         return ret;
 
@@ -1128,15 +1206,15 @@ JSLFatPtr jsl_cstr_to_fatptr(JSLAllocatorInterface* allocator, char* str)
     if (allocation == NULL)
         return ret;
 
+    JSL_MEMCPY(allocation, str, (size_t) length);
     ret.data = allocation;
     ret.length = allocation_size;
-    JSL_MEMCPY(ret.data, str, (size_t) length);
     return ret;
 }
 
-JSLFatPtr jsl_fatptr_duplicate(JSLAllocatorInterface* allocator, JSLFatPtr str)
+JSLImmutableMemory jsl_fatptr_duplicate(JSLAllocatorInterface* allocator, JSLImmutableMemory str)
 {
-    JSLFatPtr res = {0};
+    JSLImmutableMemory res = {0};
     if (allocator == NULL || str.data == NULL || str.length < 1)
         return res;
 
@@ -1153,49 +1231,29 @@ JSLFatPtr jsl_fatptr_duplicate(JSLAllocatorInterface* allocator, JSLFatPtr str)
     return res;
 }
 
-void jsl_fatptr_to_lowercase_ascii(JSLFatPtr str)
+int64_t jsl_fatptr_to_lowercase_ascii(JSLOutputSink sink, JSLImmutableMemory str)
 {
     if (str.data == NULL || str.length < 1)
-        return;
+        return -1;
 
-    #ifdef __AVX2__
-        __m256i asciiA = _mm256_set1_epi8('A' - 1);
-        __m256i asciiZ = _mm256_set1_epi8('Z' + 1);
-        __m256i diff   = _mm256_set1_epi8('a' - 'A');
+    int64_t res = 0;
 
-        // TODO, SIMD: add masked loads when length < 32
-        while (str.length >= 32)
-        {
-            __m256i base_data = _mm256_loadu_si256((__m256i*) str.data);
-
-            /* > 'A': 0xff, < 'A': 0x00 */
-            __m256i is_greater_or_equal_A = _mm256_cmpgt_epi8(base_data, asciiA);
-
-            /* <= 'Z': 0xff, > 'Z': 0x00 */
-            __m256i is_less_or_equal_Z = _mm256_cmpgt_epi8(asciiZ, base_data);
-
-            /* 'Z' >= x >= 'A': 0xFF, else 0x00 */
-            __m256i mask = _mm256_and_si256(is_greater_or_equal_A, is_less_or_equal_Z);
-
-            /* 'Z' >= x >= 'A': 'a' - 'A', else 0x00 */
-            __m256i to_add = _mm256_and_si256(mask, diff);
-
-            /* add to change to lowercase */
-            __m256i added = _mm256_add_epi8(base_data, to_add);
-            _mm256_storeu_si256((__m256i *) str.data, added);
-
-            str.length -= 32;
-            str.data += 32;
-        }
-    #endif
-
+    // TODO: simd
     for (int64_t i = 0; i < str.length; i++)
     {
+        uint8_t c;
         if (str.data[i] >= 'A' && str.data[i] <= 'Z')
-        {
-            str.data[i] += 32;
-        }
+            c =  str.data[i] + 32;
+        else
+            c =  str.data[i];
+        
+        int64_t sink_res = jsl_output_sink_write_u8(sink, c);
+        if (sink_res < 0)
+            return -1;
+        res += sink_res;
     }
+
+    return res;
 }
 
 static inline uint8_t jsl__ascii_to_lower(uint8_t ch)
@@ -1238,7 +1296,7 @@ static inline uint8_t jsl__ascii_to_lower(uint8_t ch)
     }
 #endif
 
-bool jsl_fatptr_compare_ascii_insensitive(JSLFatPtr a, JSLFatPtr b)
+bool jsl_fatptr_compare_ascii_insensitive(JSLImmutableMemory a, JSLImmutableMemory b)
 {
     if (JSL__UNLIKELY(a.data == NULL || b.data == NULL || a.length != b.length))
         return false;
@@ -1282,7 +1340,7 @@ bool jsl_fatptr_compare_ascii_insensitive(JSLFatPtr a, JSLFatPtr b)
     return true;
 }
 
-int32_t jsl_fatptr_to_int32(JSLFatPtr str, int32_t* result)
+int32_t jsl_fatptr_to_int32(JSLImmutableMemory str, int32_t* result)
 {
     if (JSL__UNLIKELY(str.data == NULL || str.length < 1))
         return 0;
@@ -1324,7 +1382,7 @@ int32_t jsl_fatptr_to_int32(JSLFatPtr str, int32_t* result)
     return i;
 }
 
-int64_t jsl_fatptr_strip_whitespace_left(JSLFatPtr* str)
+int64_t jsl_fatptr_strip_whitespace_left(JSLImmutableMemory* str)
 {
     int64_t bytes_read = str->data != NULL && str->length > -1 ?
         0 : -1;
@@ -1347,7 +1405,7 @@ int64_t jsl_fatptr_strip_whitespace_left(JSLFatPtr* str)
     return bytes_read;
 }
 
-int64_t jsl_fatptr_strip_whitespace_right(JSLFatPtr* str)
+int64_t jsl_fatptr_strip_whitespace_right(JSLImmutableMemory* str)
 {
     int64_t bytes_read = str->data != NULL && str->length > -1 ?
         0 : -1;
@@ -1371,7 +1429,7 @@ int64_t jsl_fatptr_strip_whitespace_right(JSLFatPtr* str)
     return bytes_read;
 }
 
-int64_t jsl_fatptr_strip_whitespace(JSLFatPtr* str)
+int64_t jsl_fatptr_strip_whitespace(JSLImmutableMemory* str)
 {
     int64_t bytes_read = -1;
 
@@ -1384,14 +1442,14 @@ int64_t jsl_fatptr_strip_whitespace(JSLFatPtr* str)
     return bytes_read;
 }
 
-static int64_t jsl__fatptr_output_sink_write(void *user, JSLFatPtr data)
+static int64_t jsl__fatptr_output_sink_write(void *user, JSLImmutableMemory data)
 {
-    JSLFatPtr* buffer = (JSLFatPtr*)user;
+    JSLMutableMemory* buffer = (JSLMutableMemory*) user;
     int64_t bytes_written_to_sink = jsl_fatptr_memory_copy(buffer, data);
     return bytes_written_to_sink < 1 ? -1 : bytes_written_to_sink;
 }
 
-JSLOutputSink jsl_fatptr_output_sink(JSLFatPtr* buffer)
+JSLOutputSink jsl_fatptr_output_sink(JSLMutableMemory* buffer)
 {
     JSLOutputSink sink;
     sink.write_fp = jsl__fatptr_output_sink_write;
@@ -1548,7 +1606,7 @@ static JSL__ASAN_OFF uint32_t jsl__strlen_limited(char const *string, uint32_t l
 
 JSL__ASAN_OFF int64_t jsl_format_sink_valist(
     JSLOutputSink sink,
-    JSLFatPtr fmt,
+    JSLImmutableMemory fmt,
     va_list va
 )
 {
@@ -1557,11 +1615,11 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
 
     static char hex[] = "0123456789abcdefxp";
     static char hexu[] = "0123456789ABCDEFXP";
-    static JSLFatPtr err_string = JSL_FATPTR_INITIALIZER("(ERROR)");
+    static JSLImmutableMemory err_string = JSL_FATPTR_INITIALIZER("(ERROR)");
 
     uint8_t buffer[JSL__FORMAT_BUFFER_SIZE];
     uint8_t* buffer_cursor = buffer;
-    JSLFatPtr f = fmt;
+    JSLImmutableMemory f = fmt;
     int64_t bytes_written_to_sink = 0;
     int64_t sink_err_res = 0;
 
@@ -1582,7 +1640,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 int64_t len = (int64_t)(buffer_cursor - buffer);                            \
                 if ((len + (bytes)) >= JSL__FORMAT_BUFFER_SIZE)                             \
                 {                                                                           \
-                    JSLFatPtr data_to_write = { buffer, len };                              \
+                    JSLImmutableMemory data_to_write = { buffer, len };                              \
                     int64_t sink_res = sink.write_fp(sink.user_data, data_to_write);        \
                     if (sink_res > -1)                                                      \
                     {                                                                       \
@@ -1962,7 +2020,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
 
             case 'y':
             {
-                JSLFatPtr fat_string = va_arg(va, JSLFatPtr);
+                JSLImmutableMemory fat_string = va_arg(va, JSLImmutableMemory);
 
                 if (JSL__UNLIKELY(formatting_flags != 0
                     || field_width != 0
@@ -2726,7 +2784,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
 
 JSL__ASAN_OFF int64_t jsl_format_sink(
     JSLOutputSink sink,
-    JSLFatPtr fmt,
+    JSLImmutableMemory fmt,
     ...
 )
 {
@@ -2747,7 +2805,7 @@ struct JSL__FormatAllocatorContext
     int64_t current_allocation_length;
 };
 
-static int64_t jsl__format_allocator_callback(void *user, JSLFatPtr data)
+static int64_t jsl__format_allocator_callback(void *user, JSLImmutableMemory data)
 {
     struct JSL__FormatAllocatorContext* context = (struct JSL__FormatAllocatorContext*) user;
     int64_t old_length = context->current_allocation_length;
@@ -2773,9 +2831,9 @@ static int64_t jsl__format_allocator_callback(void *user, JSLFatPtr data)
     return data.length;
 }
 
-JSL__ASAN_OFF JSLFatPtr jsl_format(JSLAllocatorInterface* allocator, JSLFatPtr fmt, ...)
+JSL__ASAN_OFF JSLImmutableMemory jsl_format(JSLAllocatorInterface* allocator, JSLImmutableMemory fmt, ...)
 {
-    JSLFatPtr ret = {0};
+    JSLImmutableMemory ret = {0};
 
     if (allocator == NULL)
         return ret;

@@ -653,5 +653,5 @@ static uint8_t __dynamic_header_template_data[] = {
     0x75, 0x73, 0x0a, 0x7d, 0x0a, 0x23, 0x65, 0x6e, 0x64, 0x69, 0x66, 0x0a
 };
 
-static JSLFatPtr dynamic_header_template = { __dynamic_header_template_data, 7752 };
+static JSLImmutableMemory dynamic_header_template = { __dynamic_header_template_data, 7752 };
 

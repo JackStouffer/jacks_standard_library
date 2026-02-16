@@ -83,7 +83,7 @@ struct JSL__StrSetEntry
             int64_t value_sso_buffer_len;
         };
 
-        JSLFatPtr value;
+        JSLImmutableMemory value;
 
         /// @brief Used to store in the free list, ignored otherwise
         struct JSL__StrSetEntry* next;
@@ -137,7 +137,7 @@ struct JSL__StrSet {
  * JSLStrSet set;
  * jsl_str_set_init(&set, &stack_arena, 0);
  *
- * JSLFatPtr value = JSL_FATPTR_INITIALIZER("hello-key");
+ * JSLImmutableMemory value = JSL_FATPTR_INITIALIZER("hello-key");
  * 
  * jsl_str_to_str_multimap_insert(
  *     &set,
@@ -241,7 +241,7 @@ JSL_STR_SET_DEF int64_t jsl_str_set_item_count(
  */
 JSL_STR_SET_DEF bool jsl_str_set_has(
     JSLStrSet* set,
-    JSLFatPtr value
+    JSLImmutableMemory value
 );
 
 /**
@@ -256,7 +256,7 @@ JSL_STR_SET_DEF bool jsl_str_set_has(
  */
 JSL_STR_SET_DEF bool jsl_str_set_insert(
     JSLStrSet* set,
-    JSLFatPtr value,
+    JSLImmutableMemory value,
     JSLStringLifeTime value_lifetime
 );
 
@@ -271,8 +271,8 @@ JSL_STR_SET_DEF bool jsl_str_set_insert(
  *     &set, &iter
  * );
  * 
- * JSLFatPtr key;
- * JSLFatPtr value;
+ * JSLImmutableMemory key;
+ * JSLImmutableMemory value;
  * while (jsl_str_set_key_value_iterator_next(&iter, &key, &value))
  * {
  *    ...
@@ -302,8 +302,8 @@ JSL_STR_SET_DEF bool jsl_str_set_iterator_init(
  *     &set, &iter
  * );
  * 
- * JSLFatPtr key;
- * JSLFatPtr value;
+ * JSLImmutableMemory key;
+ * JSLImmutableMemory value;
  * while (jsl_str_set_key_value_iterator_next(&iter, &key, &value))
  * {
  *    ...
@@ -321,7 +321,7 @@ JSL_STR_SET_DEF bool jsl_str_set_iterator_init(
  */
 JSL_STR_SET_DEF bool jsl_str_set_iterator_next(
     JSLStrSetKeyValueIter* iterator,
-    JSLFatPtr* out_value
+    JSLImmutableMemory* out_value
 );
 
 /**
@@ -336,7 +336,7 @@ JSL_STR_SET_DEF bool jsl_str_set_iterator_next(
  */
 JSL_STR_SET_DEF bool jsl_str_set_delete(
     JSLStrSet* set,
-    JSLFatPtr value
+    JSLImmutableMemory value
 );
 
 /**

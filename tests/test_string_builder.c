@@ -99,12 +99,12 @@ static JSLAllocatorInterface test_make_allocator(JSLTestAllocatorContext* contex
 }
 
 /// @brief copy all of the chunks out to a buffer
-static void debug_concatenate_builder(JSLStringBuilder* builder, JSLFatPtr* writer)
+static void debug_concatenate_builder(JSLStringBuilder* builder, JSLImmutableMemory* writer)
 {
     JSLStringBuilderIterator iterator;
     jsl_string_builder_iterator_init(builder, &iterator);
 
-    JSLFatPtr slice;
+    JSLImmutableMemory slice;
     while (jsl_string_builder_iterator_next(&iterator, &slice))
     {
         int64_t memcpy_res = jsl_fatptr_memory_copy(writer, slice);
@@ -171,25 +171,25 @@ static void test_jsl_string_builder_insert_fatptr_multi_chunk(void)
     TEST_BOOL(ok);
 
     char text[] = "abcdefghij";
-    JSLFatPtr data = jsl_fatptr_from_cstr(text);
+    JSLImmutableMemory data = jsl_fatptr_from_cstr(text);
     TEST_INT64_EQUAL(jsl_string_builder_insert_fatptr(&builder, data), 10);
 
     uint8_t actual[32] = {0};
-    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(actual);
-    JSLFatPtr writer = buffer;
+    JSLImmutableMemory buffer = JSL_MEMORY_FROM_STACK(actual);
+    JSLImmutableMemory writer = buffer;
     debug_concatenate_builder(&builder, &writer);
-    int64_t len = jsl_fatptr_total_write_length(buffer, writer);
+    int64_t len = jsl_total_write_length(buffer, writer);
 
     TEST_INT64_EQUAL(len, (int64_t) strlen(text));
     TEST_BUFFERS_EQUAL(actual, text, len);
 
     JSLStringBuilderIterator iterator;
     jsl_string_builder_iterator_init(&builder, &iterator);
-    JSLFatPtr first;
+    JSLImmutableMemory first;
     jsl_string_builder_iterator_next(&iterator, &first);
-    JSLFatPtr second;
+    JSLImmutableMemory second;
     jsl_string_builder_iterator_next(&iterator, &second);
-    JSLFatPtr third;
+    JSLImmutableMemory third;
     jsl_string_builder_iterator_next(&iterator, &third);
 
     TEST_INT64_EQUAL(first.length, (int64_t) 4);
@@ -210,22 +210,22 @@ static void test_jsl_string_builder_insert_fatptr_edge_cases(void)
     bool ok = jsl_string_builder_init2(&builder, &allocator, 8, 8);
     TEST_BOOL(ok);
 
-    JSLFatPtr empty = JSL_FATPTR_INITIALIZER("");
+    JSLImmutableMemory empty = JSL_FATPTR_INITIALIZER("");
     TEST_INT64_EQUAL(jsl_string_builder_insert_fatptr(&builder, empty), 0);
     uint8_t actual[8] = {0};
-    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(actual);
-    JSLFatPtr writer = buffer;
+    JSLImmutableMemory buffer = JSL_MEMORY_FROM_STACK(actual);
+    JSLImmutableMemory writer = buffer;
 
     debug_concatenate_builder(&builder, &writer);
-    int64_t len = jsl_fatptr_total_write_length(buffer, writer);
+    int64_t len = jsl_total_write_length(buffer, writer);
     TEST_BOOL(len == 0);
 
     writer = buffer;
     uint8_t binary_data[] = {'A', '\0', 'B'};
-    JSLFatPtr binary_ptr = jsl_fatptr_init(binary_data, 3);
+    JSLImmutableMemory binary_ptr = jsl_immutable_memory(binary_data, 3);
     TEST_INT64_EQUAL(jsl_string_builder_insert_fatptr(&builder, binary_ptr), 3);
     debug_concatenate_builder(&builder, &writer);
-    len = jsl_fatptr_total_write_length(buffer, writer);
+    len = jsl_total_write_length(buffer, writer);
 
     TEST_BOOL(len == 3);
     TEST_BOOL(actual[0] == 'A');
@@ -251,7 +251,7 @@ static void test_jsl_string_builder_iterator_behavior(void)
     jsl_string_builder_iterator_init(&builder, &iterator);
     TEST_POINTERS_EQUAL(iterator.current, builder.head);
 
-    JSLFatPtr slice;
+    JSLImmutableMemory slice;
     jsl_string_builder_iterator_next(&iterator, &slice);
     TEST_BOOL(slice.data != NULL);
     TEST_BOOL(slice.length == 0);
@@ -266,7 +266,7 @@ static void test_jsl_string_builder_iterator_behavior(void)
     TEST_BOOL(slice.length == 3);
     TEST_BUFFERS_EQUAL(slice.data, "123", 3);
 
-    JSLFatPtr end;
+    JSLImmutableMemory end;
     jsl_string_builder_iterator_next(&iterator, &end);
     TEST_POINTERS_EQUAL(end.data, NULL);
     TEST_INT64_EQUAL(end.length, (int64_t) 0);
@@ -274,7 +274,7 @@ static void test_jsl_string_builder_iterator_behavior(void)
     JSLStringBuilder invalid = {0};
     JSLStringBuilderIterator invalid_iterator;
     jsl_string_builder_iterator_init(&invalid, &invalid_iterator);
-    JSLFatPtr invalid_slice;
+    JSLImmutableMemory invalid_slice;
     TEST_BOOL(!jsl_string_builder_iterator_next(&invalid_iterator, &invalid_slice));
 }
 
@@ -293,11 +293,11 @@ static void test_jsl_string_builder_with_format(void)
     TEST_BOOL(jsl_format_sink(builder_sink, JSL_FATPTR_EXPRESSION(":%02X"), 0xAB) > -1);
 
     uint8_t actual[64] = {0};
-    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(actual);
-    JSLFatPtr writer = buffer;
+    JSLImmutableMemory buffer = JSL_MEMORY_FROM_STACK(actual);
+    JSLImmutableMemory writer = buffer;
 
     debug_concatenate_builder(&builder, &writer);
-    int64_t len = jsl_fatptr_total_write_length(buffer, writer);
+    int64_t len = jsl_total_write_length(buffer, writer);
 
     TEST_INT64_EQUAL(len, (int64_t) strlen("alpha-42:AB"));
     TEST_BUFFERS_EQUAL(actual, "alpha-42:AB", len);
@@ -320,11 +320,11 @@ static void test_jsl_string_builder_with_format_needs_multiple_chunks(void)
     TEST_BOOL(jsl_format_sink(builder_sink, JSL_FATPTR_EXPRESSION("%s"), long_fragment) > -1);
 
     uint8_t actual[128] = {0};
-    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(actual);
-    JSLFatPtr writer = buffer;
+    JSLImmutableMemory buffer = JSL_MEMORY_FROM_STACK(actual);
+    JSLImmutableMemory writer = buffer;
 
     debug_concatenate_builder(&builder, &writer);
-    int64_t len = jsl_fatptr_total_write_length(buffer, writer);
+    int64_t len = jsl_total_write_length(buffer, writer);
 
     TEST_INT64_EQUAL(len, (int64_t) strlen(long_fragment));
     TEST_BUFFERS_EQUAL(actual, long_fragment, len);

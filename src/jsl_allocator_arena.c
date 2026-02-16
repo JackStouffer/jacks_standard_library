@@ -69,7 +69,7 @@ void jsl_arena_init(JSLArena* arena, void* memory, int64_t length)
     ASAN_POISON_MEMORY_REGION(memory, length);
 }
 
-void jsl_arena_init2(JSLArena* arena, JSLFatPtr memory)
+void jsl_arena_init2(JSLArena* arena, JSLMutableMemory memory)
 {
     arena->start = memory.data;
     arena->current = memory.data;
@@ -90,7 +90,7 @@ static void* jsl__alloc_interface_realloc(void* ctx, void* allocation, int64_t n
     return jsl_arena_reallocate_aligned(arena, allocation, new_bytes, alignment);
 }
 
-static bool jsl__alloc_interface_free(void* ctx, void* allocation)
+static bool jsl__alloc_interface_free(void* ctx, const void* allocation)
 {
     (void) ctx;
 
@@ -101,7 +101,7 @@ static bool jsl__alloc_interface_free(void* ctx, void* allocation)
             (uint8_t*) allocation - header_size
         );
 
-        jsl__arena_debug_memset_old_memory(allocation, header->length);
+        jsl__arena_debug_memset_old_memory((void*) allocation, header->length);
         return true;
 
     #else

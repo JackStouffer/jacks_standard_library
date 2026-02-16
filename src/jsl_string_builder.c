@@ -153,7 +153,7 @@ bool jsl_string_builder_init2(
     return res;
 }
 
-int64_t jsl_string_builder_insert_fatptr(JSLStringBuilder* builder, JSLFatPtr data)
+int64_t jsl_string_builder_insert_fatptr(JSLStringBuilder* builder, JSLImmutableMemory data)
 {
     if (
         builder == NULL
@@ -201,23 +201,27 @@ void jsl_string_builder_iterator_init(JSLStringBuilder* builder, JSLStringBuilde
         iterator->current = builder->head;
 }
 
-bool jsl_string_builder_iterator_next(JSLStringBuilderIterator* iterator, JSLFatPtr* out_chunk)
+bool jsl_string_builder_iterator_next(JSLStringBuilderIterator* iterator, JSLImmutableMemory* out_chunk)
 {
     if (iterator == NULL || out_chunk == NULL)
         return false;
 
-    *out_chunk = (JSLFatPtr){0};
+    *out_chunk = (JSLImmutableMemory){0};
 
     struct JSL__StringBuilderChunk* current = iterator->current;
     if (current == NULL || current->buffer.data == NULL)
         return false;
 
     iterator->current = current->next;
-    *out_chunk = jsl_fatptr_auto_slice(current->buffer, current->writer);
+
+    JSLMutableMemory buffer = jsl_auto_slice_mutable(current->buffer, current->writer);
+    out_chunk->data = buffer.data;
+    out_chunk->length = buffer.length;
+
     return true;
 }
 
-static int64_t jsl__format_string_builder_callback(void* user, JSLFatPtr data)
+static int64_t jsl__format_string_builder_callback(void* user, JSLImmutableMemory data)
 {
     return jsl_string_builder_insert_fatptr((JSLStringBuilder*) user, data);
 }

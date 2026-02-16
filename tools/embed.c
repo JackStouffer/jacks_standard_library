@@ -21,7 +21,7 @@
 #define EMBED_IMPLEMENTATION
 #include "embed.h"
 
-static JSLFatPtr help_message = JSL_FATPTR_INITIALIZER(
+static JSLImmutableMemory help_message = JSL_FATPTR_INITIALIZER(
     "OVERVIEW:\n\n"
     "Embed a file into a C program by generating a header file.\n"
     "Pass in the file path as an argument or pass in the file data from stdin.\n\n"
@@ -32,11 +32,11 @@ static JSLFatPtr help_message = JSL_FATPTR_INITIALIZER(
     "\t--binary\t\tThe output will be in bytes of hex data.\n"
     "\t--text\t\tThe output will be a multiline C str with length. Expects text file input\n"
 );
-static JSLFatPtr default_var_name = JSL_FATPTR_INITIALIZER("data");
-static JSLFatPtr help_flag_str = JSL_FATPTR_INITIALIZER("help");
-static JSLFatPtr binary_flag_str = JSL_FATPTR_INITIALIZER("binary");
-static JSLFatPtr text_flag_str = JSL_FATPTR_INITIALIZER("text");
-static JSLFatPtr var_name_flag_str = JSL_FATPTR_INITIALIZER("var-name");
+static JSLImmutableMemory default_var_name = JSL_FATPTR_INITIALIZER("data");
+static JSLImmutableMemory help_flag_str = JSL_FATPTR_INITIALIZER("help");
+static JSLImmutableMemory binary_flag_str = JSL_FATPTR_INITIALIZER("binary");
+static JSLImmutableMemory text_flag_str = JSL_FATPTR_INITIALIZER("text");
+static JSLImmutableMemory var_name_flag_str = JSL_FATPTR_INITIALIZER("var-name");
 
 static int32_t entrypoint(
     JSLCmdLineArgs* cmd,
@@ -47,9 +47,9 @@ static int32_t entrypoint(
     JSLOutputSink stdout_sink = jsl_c_file_output_sink(stdout);
     JSLOutputSink stderr_sink = jsl_c_file_output_sink(stderr);
 
-    JSLFatPtr file_path = {0};
-    JSLFatPtr file_contents = {0};
-    JSLFatPtr var_name = default_var_name;
+    JSLImmutableMemory file_path = {0};
+    JSLImmutableMemory file_contents = {0};
+    JSLImmutableMemory var_name = default_var_name;
     int32_t load_errno = 0;
     EmbedOuputTypeEnum output_type = OUTPUT_TYPE_INVALID;
 
@@ -149,7 +149,7 @@ static int32_t entrypoint(
             cursor += (int64_t) n;
         }
 
-        file_contents = jsl_fatptr_init(stdin_buffer, cursor);
+        file_contents = jsl_immutable_memory(stdin_buffer, cursor);
     }
     else
     {
@@ -201,7 +201,7 @@ static int32_t entrypoint(
 
         JSLCmdLineArgs cmd;
         jsl_cmd_line_args_init(&cmd, &allocator);
-        JSLFatPtr error_message = {0};
+        JSLImmutableMemory error_message = {0};
         if (!jsl_cmd_line_args_parse_wide(&cmd, argc, argv, &error_message))
         {
             if (error_message.data != NULL)
@@ -257,7 +257,7 @@ static int32_t entrypoint(
             return EXIT_FAILURE;
         }
 
-        JSLFatPtr error_message = {0};
+        JSLImmutableMemory error_message = {0};
         if (!jsl_cmd_line_args_parse(&cmd, argc, argv, &error_message))
         {
             if (error_message.data != NULL)

@@ -405,7 +405,7 @@ typedef struct JSLCmdLineArgs {
     JSLStrToStrMultimap _flags_with_values;
     JSLStrSet _commands;
 
-    JSLFatPtr* _arg_list;
+    JSLImmutableMemory* _arg_list;
     int64_t _arg_list_length;
     int64_t _arg_list_index;
     int64_t _arg_list_capacity;
@@ -449,7 +449,7 @@ bool jsl_cmd_line_args_init(JSLCmdLineArgs* args, JSLAllocatorInterface* allocat
  *      jsl_infinite_arena_get_allocator_interface(&allocator, &arena);
  *      jsl_cmd_line_args_init(&args, &allocator);
  * 
- *      JSLFatPtr out_err;
+ *      JSLImmutableMemory out_err;
  *      bool parse_success = jsl_cmd_line_args_parse(&args, argc, argv, &out_err);
  * 
  *      if (parse_success)
@@ -477,7 +477,7 @@ bool jsl_cmd_line_args_parse(
     JSLCmdLineArgs* args,
     int32_t argc,
     char** argv,
-    JSLFatPtr* out_error
+    JSLImmutableMemory* out_error
 );
 
 /**
@@ -509,7 +509,7 @@ bool jsl_cmd_line_args_parse(
  *      jsl_infinite_arena_get_allocator_interface(&allocator, &arena);
  *      jsl_cmd_line_args_init(&args, &allocator);
  * 
- *      JSLFatPtr out_err;
+ *      JSLImmutableMemory out_err;
  *      bool parse_success = jsl_cmd_line_args_parse_wide(&args, argc, argv, &out_err);
  * 
  *      if (parse_success)
@@ -537,7 +537,7 @@ bool jsl_cmd_line_args_parse_wide(
     JSLCmdLineArgs* args,
     int32_t argc,
     wchar_t** argv,
-    JSLFatPtr* out_error
+    JSLImmutableMemory* out_error
 );
 
 /**
@@ -583,7 +583,7 @@ bool jsl_cmd_line_args_has_short_flag(JSLCmdLineArgs* args, uint8_t flag);
  * @param flag The flag to check
  * @returns true if the parameters are valid and the flag is present
  */
-bool jsl_cmd_line_args_has_flag(JSLCmdLineArgs* args, JSLFatPtr flag);
+bool jsl_cmd_line_args_has_flag(JSLCmdLineArgs* args, JSLImmutableMemory flag);
 
 /**
  * Checks if the user passed in the given command.
@@ -606,7 +606,7 @@ bool jsl_cmd_line_args_has_flag(JSLCmdLineArgs* args, JSLFatPtr flag);
  * @param flag The command to check
  * @returns true if the parameters are valid and the command is present
  */
-bool jsl_cmd_line_args_has_command(JSLCmdLineArgs* args, JSLFatPtr command);
+bool jsl_cmd_line_args_has_command(JSLCmdLineArgs* args, JSLImmutableMemory command);
 
 /**
  * If the user passed in a argument list, pop one off returning true if
@@ -633,7 +633,7 @@ bool jsl_cmd_line_args_has_command(JSLCmdLineArgs* args, JSLFatPtr command);
  * @param flag The command to check
  * @returns true if the parameters are valid and the command is present
  */
-bool jsl_cmd_line_args_pop_arg_list(JSLCmdLineArgs* args, JSLFatPtr* out_value);
+bool jsl_cmd_line_args_pop_arg_list(JSLCmdLineArgs* args, JSLImmutableMemory* out_value);
 
 /**
  * If the user passed in multiple instances of flag with a value, this function
@@ -649,7 +649,7 @@ bool jsl_cmd_line_args_pop_arg_list(JSLCmdLineArgs* args, JSLFatPtr* out_value);
  * ```
  * 
  * ```
- * JSLFatPtr arg;
+ * JSLImmutableMemory arg;
  * 
  * jsl_cmd_line_args_pop_flag_with_value(cmd, JSL_FATPTR_EXPRESSION("ignore"), &arg); // arg == foo
  * jsl_cmd_line_args_pop_flag_with_value(cmd, JSL_FATPTR_EXPRESSION("ignore"), &arg); // arg == bar
@@ -663,8 +663,8 @@ bool jsl_cmd_line_args_pop_arg_list(JSLCmdLineArgs* args, JSLFatPtr* out_value);
  */
 bool jsl_cmd_line_args_pop_flag_with_value(
     JSLCmdLineArgs* args,
-    JSLFatPtr flag,
-    JSLFatPtr* out_value
+    JSLImmutableMemory flag,
+    JSLImmutableMemory* out_value
 );
 
 #ifdef __cplusplus

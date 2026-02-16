@@ -64,7 +64,7 @@ static void test_jsl_load_file_contents(void)
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &arena);
 
-    JSLFatPtr contents;
+    JSLImmutableMemory contents;
     JSLLoadFileResultEnum res = jsl_load_file_contents(
         &allocator,
         jsl_fatptr_from_cstr(path),
@@ -135,8 +135,8 @@ static void test_jsl_load_file_contents_buffer(void)
         assert(res > 0);
     }
 
-    JSLFatPtr buffer = jsl_fatptr_init(malloc(4*1024), 4*1024);
-    JSLFatPtr writer = buffer;
+    JSLImmutableMemory buffer = jsl_immutable_memory(malloc(4*1024), 4*1024);
+    JSLImmutableMemory writer = buffer;
 
     JSLLoadFileResultEnum res = jsl_load_file_contents_buffer(
         &writer,
@@ -261,7 +261,7 @@ static void test_jsl_format_file_null_out_parameter(void)
 
 static void test_jsl_format_file_null_format_pointer(void)
 {
-    JSLFatPtr fmt = {
+    JSLImmutableMemory fmt = {
         .data = NULL,
         .length = 5
     };
@@ -274,7 +274,7 @@ static void test_jsl_format_file_null_format_pointer(void)
 
 static void test_jsl_format_file_negative_length(void)
 {
-    JSLFatPtr fmt = {
+    JSLImmutableMemory fmt = {
         .data = (uint8_t*)"Hello",
         .length = -1
     };

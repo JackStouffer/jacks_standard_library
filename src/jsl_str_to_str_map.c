@@ -232,7 +232,7 @@ static bool jsl__str_to_str_map_rehash(
 static JSL__FORCE_INLINE void jsl__str_to_str_map_store_key(
     JSLStrToStrMap* map,
     struct JSL__StrToStrMapEntry* entry,
-    JSLFatPtr key,
+    JSLImmutableMemory key,
     JSLStringLifeTime key_lifetime
 )
 {
@@ -299,7 +299,7 @@ static JSL__FORCE_INLINE void jsl__str_to_str_map_entry_free_value(
 static JSL__FORCE_INLINE void jsl__str_to_str_map_store_value(
     JSLStrToStrMap* map,
     struct JSL__StrToStrMapEntry* entry,
-    JSLFatPtr value,
+    JSLImmutableMemory value,
     JSLStringLifeTime value_lifetime
 )
 {
@@ -327,7 +327,7 @@ static JSL__FORCE_INLINE void jsl__str_to_str_map_store_value(
     }
 }
 
-static JSL__FORCE_INLINE JSLFatPtr jsl__str_to_str_map_get_entry_key(
+static JSL__FORCE_INLINE JSLImmutableMemory jsl__str_to_str_map_get_entry_key(
     struct JSL__StrToStrMapEntry* entry
 )
 {
@@ -336,7 +336,7 @@ static JSL__FORCE_INLINE JSLFatPtr jsl__str_to_str_map_get_entry_key(
         && entry->key_sso_buffer_length <= JSL__MAP_SSO_LENGTH
     )
     {
-        JSLFatPtr res = {entry->key_sso_buffer, entry->key_sso_buffer_length};
+        JSLImmutableMemory res = {entry->key_sso_buffer, entry->key_sso_buffer_length};
         return res;
     }
     else
@@ -345,7 +345,7 @@ static JSL__FORCE_INLINE JSLFatPtr jsl__str_to_str_map_get_entry_key(
     }
 }
 
-static JSL__FORCE_INLINE JSLFatPtr jsl__str_to_str_map_get_entry_value(
+static JSL__FORCE_INLINE JSLImmutableMemory jsl__str_to_str_map_get_entry_value(
     struct JSL__StrToStrMapEntry* entry
 )
 {
@@ -354,7 +354,7 @@ static JSL__FORCE_INLINE JSLFatPtr jsl__str_to_str_map_get_entry_value(
         && entry->value_sso_buffer_length <= JSL__MAP_SSO_LENGTH
     )
     {
-        JSLFatPtr res = {entry->value_sso_buffer, entry->value_sso_buffer_length};
+        JSLImmutableMemory res = {entry->value_sso_buffer, entry->value_sso_buffer_length};
         return res;
     }
     else
@@ -365,9 +365,9 @@ static JSL__FORCE_INLINE JSLFatPtr jsl__str_to_str_map_get_entry_value(
 
 static JSL__FORCE_INLINE bool jsl__str_to_str_map_add_new_entry(
     JSLStrToStrMap* map,
-    JSLFatPtr key,
+    JSLImmutableMemory key,
     JSLStringLifeTime key_lifetime,
-    JSLFatPtr value,
+    JSLImmutableMemory value,
     JSLStringLifeTime value_lifetime,
     int64_t lut_index,
     uint64_t hash
@@ -408,7 +408,7 @@ static JSL__FORCE_INLINE bool jsl__str_to_str_map_add_new_entry(
 
 static inline void jsl__str_to_str_map_probe(
     JSLStrToStrMap* map,
-    JSLFatPtr key,
+    JSLImmutableMemory key,
     int64_t* out_lut_index,
     uint64_t* out_hash,
     bool* out_found
@@ -456,7 +456,7 @@ static inline void jsl__str_to_str_map_probe(
         bool matches = false;
         if (entry != NULL)
         {
-            JSLFatPtr entry_key = jsl__str_to_str_map_get_entry_key(entry);
+            JSLImmutableMemory entry_key = jsl__str_to_str_map_get_entry_key(entry);
             matches = *out_hash == entry->hash && jsl_fatptr_memory_compare(key, entry_key);
         }
 
@@ -495,9 +495,9 @@ static inline void jsl__str_to_str_map_probe(
 
 JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_insert(
     JSLStrToStrMap* map,
-    JSLFatPtr key,
+    JSLImmutableMemory key,
     JSLStringLifeTime key_lifetime,
-    JSLFatPtr value,
+    JSLImmutableMemory value,
     JSLStringLifeTime value_lifetime
 )
 {
@@ -562,7 +562,7 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_insert(
 
 JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_has_key(
     JSLStrToStrMap* map,
-    JSLFatPtr key
+    JSLImmutableMemory key
 )
 {
     uint64_t hash = 0;
@@ -584,8 +584,8 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_has_key(
 
 JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_get(
     JSLStrToStrMap* map,
-    JSLFatPtr key,
-    JSLFatPtr* out_value
+    JSLImmutableMemory key,
+    JSLImmutableMemory* out_value
 )
 {
     bool res = false;
@@ -617,7 +617,7 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_get(
     }
     else if (out_value != NULL)
     {
-        *out_value = (JSLFatPtr) {0};
+        *out_value = (JSLImmutableMemory) {0};
     }
 
     return res;
@@ -665,8 +665,8 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_key_value_iterator_init(
 
 JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_key_value_iterator_next(
     JSLStrToStrMapKeyValueIter* iterator,
-    JSLFatPtr* out_key,
-    JSLFatPtr* out_value
+    JSLImmutableMemory* out_key,
+    JSLImmutableMemory* out_value
 )
 {
     bool found = false;
@@ -722,7 +722,7 @@ JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_key_value_iterator_next(
 
 JSL_STR_TO_STR_MAP_DEF bool jsl_str_to_str_map_delete(
     JSLStrToStrMap* map,
-    JSLFatPtr key
+    JSLImmutableMemory key
 )
 {
     bool res = false;

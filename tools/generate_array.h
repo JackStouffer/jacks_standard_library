@@ -135,10 +135,10 @@
         JSLAllocatorInterface* allocator,
         JSLOutputSink sink,
         ArrayImplementation impl,
-        JSLFatPtr array_type_name,
-        JSLFatPtr function_prefix,
-        JSLFatPtr value_type_name,
-        JSLFatPtr* include_header_array,
+        JSLImmutableMemory array_type_name,
+        JSLImmutableMemory function_prefix,
+        JSLImmutableMemory value_type_name,
+        JSLImmutableMemory* include_header_array,
         int32_t include_header_count
     );
 
@@ -158,10 +158,10 @@
         JSLAllocatorInterface* allocator,
         JSLOutputSink sink,
         ArrayImplementation impl,
-        JSLFatPtr array_type_name,
-        JSLFatPtr function_prefix,
-        JSLFatPtr value_type_name,
-        JSLFatPtr* include_header_array,
+        JSLImmutableMemory array_type_name,
+        JSLImmutableMemory function_prefix,
+        JSLImmutableMemory value_type_name,
+        JSLImmutableMemory* include_header_array,
         int32_t include_header_count
     );
     
@@ -177,7 +177,7 @@
     #include <time.h>
     #include <assert.h>
 
-    static JSLFatPtr dynamic_header_template = JSL_FATPTR_INITIALIZER(
+    static JSLImmutableMemory dynamic_header_template = JSL_FATPTR_INITIALIZER(
         "/**\n"
         " * AUTO GENERATED FILE\n"
         " *\n"
@@ -339,7 +339,7 @@
         "#endif\n"
     );
 
-    static JSLFatPtr dynamic_source_template = JSL_FATPTR_INITIALIZER(
+    static JSLImmutableMemory dynamic_source_template = JSL_FATPTR_INITIALIZER(
         "/**\n"
         " * AUTO GENERATED FILE\n"
         " *\n"
@@ -586,9 +586,9 @@
         "}\n"
     );
 
-    static JSLFatPtr array_type_name_key = JSL_FATPTR_INITIALIZER("array_type_name");
-    static JSLFatPtr value_type_name_key = JSL_FATPTR_INITIALIZER("value_type_name");
-    static JSLFatPtr function_prefix_key = JSL_FATPTR_INITIALIZER("function_prefix");
+    static JSLImmutableMemory array_type_name_key = JSL_FATPTR_INITIALIZER("array_type_name");
+    static JSLImmutableMemory value_type_name_key = JSL_FATPTR_INITIALIZER("value_type_name");
+    static JSLImmutableMemory function_prefix_key = JSL_FATPTR_INITIALIZER("function_prefix");
 
     // because rand max on some platforms is 32k
     static inline uint64_t rand_u64(void)
@@ -609,13 +609,13 @@
 
     static void render_template(
         JSLOutputSink sink,
-        JSLFatPtr template,
+        JSLImmutableMemory template,
         JSLStrToStrMap* variables
     )
     {
-        static JSLFatPtr open_param = JSL_FATPTR_INITIALIZER("{{");
-        static JSLFatPtr close_param = JSL_FATPTR_INITIALIZER("}}");
-        JSLFatPtr template_reader = template;
+        static JSLImmutableMemory open_param = JSL_FATPTR_INITIALIZER("{{");
+        static JSLImmutableMemory close_param = JSL_FATPTR_INITIALIZER("}}");
+        JSLImmutableMemory template_reader = template;
         
         while (template_reader.length > 0)
         {
@@ -630,7 +630,7 @@
 
             if (index_of_open > 0)
             {
-                JSLFatPtr slice = jsl_fatptr_slice(template_reader, 0, index_of_open);
+                JSLImmutableMemory slice = jsl_slice(template_reader, 0, index_of_open);
                 jsl_output_sink_write_fatptr(sink, slice);
             }
 
@@ -646,10 +646,10 @@
                 break;
             }
 
-            JSLFatPtr var_name = jsl_fatptr_slice(template_reader, 0, index_of_close);
+            JSLImmutableMemory var_name = jsl_slice(template_reader, 0, index_of_close);
             jsl_fatptr_strip_whitespace(&var_name);
 
-            JSLFatPtr var_value;
+            JSLImmutableMemory var_value;
             if (jsl_str_to_str_map_get(variables, var_name, &var_value))
             {
                 jsl_output_sink_write_fatptr(sink, var_value);
@@ -682,7 +682,7 @@
      * @param include_header_count Number of additional header files to include in the generated header.
      * @param include_header_count Number of additional header files to include in the generated header.
 
-    * @return JSLFatPtr containing the generated header file content
+    * @return JSLImmutableMemory containing the generated header file content
     *
     * @warning Ensure the arena has sufficient space (minimum 512KB recommended) to avoid
     *          allocation failures during header generation.
@@ -691,10 +691,10 @@
         JSLAllocatorInterface* allocator,
         JSLOutputSink sink,
         ArrayImplementation impl,
-        JSLFatPtr array_type_name,
-        JSLFatPtr function_prefix,
-        JSLFatPtr value_type_name,
-        JSLFatPtr* include_header_array,
+        JSLImmutableMemory array_type_name,
+        JSLImmutableMemory function_prefix,
+        JSLImmutableMemory value_type_name,
+        JSLImmutableMemory* include_header_array,
         int32_t include_header_count
     )
     {
@@ -768,10 +768,10 @@
         JSLAllocatorInterface* allocator,
         JSLOutputSink sink,
         ArrayImplementation impl,
-        JSLFatPtr array_type_name,
-        JSLFatPtr function_prefix,
-        JSLFatPtr value_type_name,
-        JSLFatPtr* include_header_array,
+        JSLImmutableMemory array_type_name,
+        JSLImmutableMemory function_prefix,
+        JSLImmutableMemory value_type_name,
+        JSLImmutableMemory* include_header_array,
         int32_t include_header_count
     )
     {

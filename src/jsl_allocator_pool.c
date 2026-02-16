@@ -45,7 +45,7 @@ JSL_DEF void jsl_pool_init(
     int64_t allocation_size
 )
 {
-    JSLFatPtr mem = {memory, length};
+    JSLImmutableMemory mem = {memory, length};
     jsl_pool_init2(
         pool, mem, allocation_size
     );
@@ -53,7 +53,7 @@ JSL_DEF void jsl_pool_init(
 
 JSL_DEF void jsl_pool_init2(
     JSLPoolAllocator* pool,
-    JSLFatPtr memory,
+    JSLImmutableMemory memory,
     int64_t allocation_size
 )
 {
@@ -82,7 +82,7 @@ JSL_DEF void jsl_pool_init2(
 
     #endif
 
-    JSLFatPtr memory_cursor = memory;
+    JSLImmutableMemory memory_cursor = memory;
     uintptr_t memory_end = (uintptr_t) memory.data + (uintptr_t) memory.length;
 
     const int64_t stopping_point = allocation_size + (int64_t) sizeof(struct JSL__PoolAllocatorHeader);

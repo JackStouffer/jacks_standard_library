@@ -62,7 +62,7 @@ static void test_arena_init2_sets_pointers(void)
 {
     uint8_t buffer[96];
     JSLArena arena = {0};
-    JSLFatPtr memory = jsl_fatptr_init(buffer, (int64_t) sizeof(buffer));
+    JSLImmutableMemory memory = jsl_immutable_memory(buffer, (int64_t) sizeof(buffer));
 
     jsl_arena_init2(&arena, memory);
 

@@ -47,8 +47,8 @@
      */
     EMBED_DEF bool generate_embed_header(
         JSLOutputSink sink,
-        JSLFatPtr variable_name,
-        JSLFatPtr file_data,
+        JSLImmutableMemory variable_name,
+        JSLImmutableMemory file_data,
         EmbedOuputTypeEnum output_type
     );
 
@@ -62,8 +62,8 @@
 
     bool generate_embed_header(
         JSLOutputSink sink,
-        JSLFatPtr variable_name,
-        JSLFatPtr file_data,
+        JSLImmutableMemory variable_name,
+        JSLImmutableMemory file_data,
         EmbedOuputTypeEnum output_type
     )
     {
@@ -109,7 +109,7 @@
 
             jsl_format_sink(
                 sink,
-                JSL_FATPTR_EXPRESSION("static JSLFatPtr %y = { __%y_data, %lld };\n\n"),
+                JSL_FATPTR_EXPRESSION("static JSLImmutableMemory %y = { __%y_data, %lld };\n\n"),
                 variable_name,
                 variable_name,
                 (long long) file_data.length
@@ -119,7 +119,7 @@
         {
             jsl_format_sink(
                 sink,
-                JSL_FATPTR_EXPRESSION("static JSLFatPtr %y = JSL_FATPTR_INITIALIZER(\n"),
+                JSL_FATPTR_EXPRESSION("static JSLImmutableMemory %y = JSL_FATPTR_INITIALIZER(\n"),
                 variable_name
             );
 

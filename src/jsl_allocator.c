@@ -77,7 +77,7 @@ void* jsl_allocator_interface_realloc(
 
 bool jsl_allocator_interface_free(
     JSLAllocatorInterface* allocator,
-    void* allocation
+    const void* allocation
 )
 {
     if (allocator == NULL || allocator->sentinel != JSL__ALLOCATOR_PRIVATE_SENTINEL)

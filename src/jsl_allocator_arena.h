@@ -137,12 +137,12 @@ JSL_DEF void jsl_arena_init(JSLArena* arena, void* memory, int64_t length);
  * Initialize an arena using a fat pointer as the backing buffer.
  *
  * This is a convenience overload for cases where the backing memory and its
- * length are already packaged in a `JSLFatPtr`.
+ * length are already packaged in a `JSLMutableMemory`.
  *
  * @param arena Arena to initialize; must not be null.
  * @param memory Backing storage for the arena; `memory.data` must not be null.
  */
-JSL_DEF void jsl_arena_init2(JSLArena* arena, JSLFatPtr memory);
+JSL_DEF void jsl_arena_init2(JSLArena* arena, JSLMutableMemory memory);
 
 /**
  * Get an allocator interface for the given arena.

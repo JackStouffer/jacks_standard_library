@@ -141,7 +141,7 @@ typedef enum {
 * @returns An enum which denotes success or failure
 */
 JSL_WARN_UNUSED JSLGetFileSizeResultEnum jsl_get_file_size(
-    JSLFatPtr path,
+    JSLImmutableMemory path,
     int64_t* out_size,
     int32_t* out_os_error_code
 );
@@ -154,8 +154,8 @@ JSL_WARN_UNUSED JSLGetFileSizeResultEnum jsl_get_file_size(
     */
 JSL_WARN_UNUSED JSL_DEF JSLLoadFileResultEnum jsl_load_file_contents(
     JSLAllocatorInterface* allocator,
-    JSLFatPtr path,
-    JSLFatPtr* out_contents,
+    JSLImmutableMemory path,
+    JSLImmutableMemory* out_contents,
     int32_t* out_errno
 );
 
@@ -173,8 +173,8 @@ JSL_WARN_UNUSED JSL_DEF JSLLoadFileResultEnum jsl_load_file_contents(
 * @returns An enum which represents the result
 */
 JSL_WARN_UNUSED JSL_DEF JSLLoadFileResultEnum jsl_load_file_contents_buffer(
-    JSLFatPtr* buffer,
-    JSLFatPtr path,
+    JSLMutableMemory* buffer,
+    JSLImmutableMemory path,
     int32_t* out_errno
 );
 
@@ -193,8 +193,8 @@ JSL_WARN_UNUSED JSL_DEF JSLLoadFileResultEnum jsl_load_file_contents_buffer(
 * @returns A result enum describing the write outcome
 */
 JSL_WARN_UNUSED JSL_DEF JSLWriteFileResultEnum jsl_write_file_contents(
-    JSLFatPtr contents,
-    JSLFatPtr path,
+    JSLImmutableMemory contents,
+    JSLImmutableMemory path,
     int64_t* bytes_written,
     int32_t* out_errno
 );
@@ -211,7 +211,7 @@ JSL_WARN_UNUSED JSL_DEF JSLWriteFileResultEnum jsl_write_file_contents(
 * @param data Buffer containing the bytes to write
 * @returns Bytes written, or `-1` when arguments are invalid, or `-errno` on error
 */
-int64_t jsl_write_to_c_file(FILE* out, JSLFatPtr data);
+int64_t jsl_write_to_c_file(FILE* out, JSLImmutableMemory data);
 
 /**
 * TODO: docs

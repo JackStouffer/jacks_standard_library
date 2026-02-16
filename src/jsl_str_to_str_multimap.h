@@ -90,7 +90,7 @@ struct JSL__StrToStrMultimapValue
             int64_t sso_len;
             uint8_t small_string_buffer[JSL__MULTIMAP_VALUE_SSO_LENGTH];
         };
-        JSLFatPtr value;
+        JSLImmutableMemory value;
     };
     
     struct JSL__StrToStrMultimapValue* next;
@@ -107,7 +107,7 @@ struct JSL__StrToStrMultimapEntry {
             int64_t sso_len;
         };
         // TODO: docs
-        JSLFatPtr key;
+        JSLImmutableMemory key;
         /// @brief Used to store in the free list, ignored otherwise
         struct JSL__StrToStrMultimapEntry* next;
     };
@@ -164,7 +164,7 @@ struct JSL__StrToStrMultimap {
 
 /**
  * This is an open addressed, hash based multimap with linear probing that maps
- * JSLFatPtr keys to multiple JSLFatPtr values.
+ * JSLImmutableMemory keys to multiple JSLImmutableMemory values.
  * 
  * Example:
  *
@@ -175,7 +175,7 @@ struct JSL__StrToStrMultimap {
  * JSLStrToStrMultimap map;
  * jsl_str_to_str_multimap_init(&map, &stack_arena, 0);
  *
- * JSLFatPtr key = JSL_FATPTR_INITIALIZER("hello-key");
+ * JSLImmutableMemory key = JSL_FATPTR_INITIALIZER("hello-key");
  * 
  * jsl_str_to_str_multimap_insert(
  *     &map,
@@ -318,7 +318,7 @@ JSL_STR_TO_STR_MULTIMAP_DEF int64_t jsl_str_to_str_multimap_get_value_count(
  */
 JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_has_key(
     JSLStrToStrMultimap* map,
-    JSLFatPtr key
+    JSLImmutableMemory key
 );
 
 /**
@@ -340,9 +340,9 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_has_key(
  */
 JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_insert(
     JSLStrToStrMultimap* map,
-    JSLFatPtr key,
+    JSLImmutableMemory key,
     JSLStringLifeTime key_lifetime,
-    JSLFatPtr value,
+    JSLImmutableMemory value,
     JSLStringLifeTime value_lifetime
 );
 
@@ -355,7 +355,7 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_insert(
  */
 JSL_STR_TO_STR_MULTIMAP_DEF int64_t jsl_str_to_str_multimap_get_value_count_for_key(
     JSLStrToStrMultimap* map,
-    JSLFatPtr key
+    JSLImmutableMemory key
 );
 
 /**
@@ -369,8 +369,8 @@ JSL_STR_TO_STR_MULTIMAP_DEF int64_t jsl_str_to_str_multimap_get_value_count_for_
  *     &map, &iter
  * );
  * 
- * JSLFatPtr key;
- * JSLFatPtr value;
+ * JSLImmutableMemory key;
+ * JSLImmutableMemory value;
  * while (jsl_str_to_str_multimap_get_values_for_key_iterator_next(&iter, &key, &value))
  * {
  *    ...
@@ -401,8 +401,8 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_key_value_iterator_init
  *     &map, &iter
  * );
  * 
- * JSLFatPtr key;
- * JSLFatPtr value;
+ * JSLImmutableMemory key;
+ * JSLImmutableMemory value;
  * while (jsl_str_to_str_multimap_get_values_for_key_iterator_next(&iter, &key, &value))
  * {
  *    ...
@@ -420,8 +420,8 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_key_value_iterator_init
  */
 JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_key_value_iterator_next(
     JSLStrToStrMultimapKeyValueIter* iterator,
-    JSLFatPtr* out_key,
-    JSLFatPtr* out_value
+    JSLImmutableMemory* out_key,
+    JSLImmutableMemory* out_value
 );
 
 /**
@@ -435,7 +435,7 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_key_value_iterator_next
  *     &map, &iter
  * );
  * 
- * JSLFatPtr value;
+ * JSLImmutableMemory value;
  * while (jsl_str_to_str_multimap_get_values_for_key_iterator_next(&iter, &value))
  * {
  *    ...
@@ -455,7 +455,7 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_key_value_iterator_next
 JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_get_values_for_key_iterator_init(
     JSLStrToStrMultimap* map,
     JSLStrToStrMultimapValueIter* iterator,
-    JSLFatPtr key
+    JSLImmutableMemory key
 );
 
 /**
@@ -469,7 +469,7 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_get_values_for_key_iter
  *     &map, &iter
  * );
  * 
- * JSLFatPtr value;
+ * JSLImmutableMemory value;
  * while (jsl_str_to_str_multimap_get_values_for_key_iterator_next(&iter, &value))
  * {
  *    ...
@@ -488,7 +488,7 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_get_values_for_key_iter
  */
 JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_get_values_for_key_iterator_next(
     JSLStrToStrMultimapValueIter* iterator,
-    JSLFatPtr* out_value
+    JSLImmutableMemory* out_value
 );
 
 /**
@@ -503,7 +503,7 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_get_values_for_key_iter
  */
 JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_delete_key(
     JSLStrToStrMultimap* map,
-    JSLFatPtr key
+    JSLImmutableMemory key
 );
 
 /**
@@ -521,8 +521,8 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_delete_key(
  */
 JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_delete_value(
     JSLStrToStrMultimap* map,
-    JSLFatPtr key,
-    JSLFatPtr value
+    JSLImmutableMemory key,
+    JSLImmutableMemory value
 );
 
 /**

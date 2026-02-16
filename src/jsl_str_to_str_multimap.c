@@ -254,7 +254,7 @@ static bool jsl__str_to_str_multimap_rehash(
 static JSL__FORCE_INLINE void jsl__str_to_str_multimap_store_key(
     JSLStrToStrMultimap* map,
     struct JSL__StrToStrMultimapEntry* entry,
-    JSLFatPtr key,
+    JSLImmutableMemory key,
     JSLStringLifeTime key_lifetime
 )
 {
@@ -282,18 +282,18 @@ static JSL__FORCE_INLINE void jsl__str_to_str_multimap_store_key(
     }
 }
 
-static JSL__FORCE_INLINE JSLFatPtr jsl__str_to_str_multimap_get_key(
+static JSL__FORCE_INLINE JSLImmutableMemory jsl__str_to_str_multimap_get_key(
     struct JSL__StrToStrMultimapEntry* entry
 )
 {
     if (entry == NULL)
     {
-        return (JSLFatPtr) {0};
+        return (JSLImmutableMemory) {0};
     }
 
     if (entry->key_state == JSL__SSO)
     {
-        return (JSLFatPtr) {entry->small_string_buffer, entry->sso_len};
+        return (JSLImmutableMemory) {entry->small_string_buffer, entry->sso_len};
     }
     else
     {
@@ -304,7 +304,7 @@ static JSL__FORCE_INLINE JSLFatPtr jsl__str_to_str_multimap_get_key(
 static JSL__FORCE_INLINE void jsl__str_to_str_multimap_store_value(
     JSLStrToStrMultimap* map,
     struct JSL__StrToStrMultimapValue* value_record,
-    JSLFatPtr value,
+    JSLImmutableMemory value,
     JSLStringLifeTime value_lifetime
 )
 {
@@ -332,25 +332,25 @@ static JSL__FORCE_INLINE void jsl__str_to_str_multimap_store_value(
     }
 }
 
-static JSL__FORCE_INLINE JSLFatPtr jsl__str_to_str_multimap_get_value(
+static JSL__FORCE_INLINE JSLImmutableMemory jsl__str_to_str_multimap_get_value(
     struct JSL__StrToStrMultimapValue* value_record
 )
 {
     if (value_record == NULL)
     {
-        return (JSLFatPtr) {0};
+        return (JSLImmutableMemory) {0};
     }
 
     if (value_record->value_state == JSL__SSO)
     {
-        return (JSLFatPtr) {value_record->small_string_buffer, value_record->sso_len};
+        return (JSLImmutableMemory) {value_record->small_string_buffer, value_record->sso_len};
     }
     else if (value_record->value_state == JSL__DUPLICATED || value_record->value_state == JSL__STATIC)
     {
         return value_record->value;
     }
 
-    return (JSLFatPtr) {0};
+    return (JSLImmutableMemory) {0};
 }
 
 static JSL__FORCE_INLINE void jsl__str_to_str_multimap_free_key_if_needed(
@@ -399,7 +399,7 @@ static JSL__FORCE_INLINE void jsl__str_to_str_multimap_free_value_if_needed(
 
 static JSL__FORCE_INLINE bool jsl__str_to_str_multimap_add_key(
     JSLStrToStrMultimap* map,
-    JSLFatPtr key,
+    JSLImmutableMemory key,
     JSLStringLifeTime key_lifetime,
     int64_t lut_index,
     uint64_t hash
@@ -441,7 +441,7 @@ static JSL__FORCE_INLINE bool jsl__str_to_str_multimap_add_key(
 
 static JSL__FORCE_INLINE bool jsl__str_to_str_multimap_add_value_to_key(
     JSLStrToStrMultimap* map,
-    JSLFatPtr value,
+    JSLImmutableMemory value,
     JSLStringLifeTime value_lifetime,
     int64_t lut_index
 )
@@ -479,7 +479,7 @@ static JSL__FORCE_INLINE bool jsl__str_to_str_multimap_add_value_to_key(
 
 static inline void jsl__str_to_str_multimap_probe(
     JSLStrToStrMultimap* map,
-    JSLFatPtr key,
+    JSLImmutableMemory key,
     int64_t* out_lut_index,
     uint64_t* out_hash,
     bool* out_found
@@ -528,7 +528,7 @@ static inline void jsl__str_to_str_multimap_probe(
             && entry != NULL
             && entry->value_count > 0;
 
-        JSLFatPtr entry_key = entry_valid ? jsl__str_to_str_multimap_get_key(entry) : (JSLFatPtr) {0};
+        JSLImmutableMemory entry_key = entry_valid ? jsl__str_to_str_multimap_get_key(entry) : (JSLImmutableMemory) {0};
         bool matches = entry_valid
             && *out_hash == entry->hash
             && jsl_fatptr_memory_compare(key, entry_key);
@@ -571,9 +571,9 @@ static inline void jsl__str_to_str_multimap_probe(
 
 JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_insert(
     JSLStrToStrMultimap* map,
-    JSLFatPtr key,
+    JSLImmutableMemory key,
     JSLStringLifeTime key_lifetime,
-    JSLFatPtr value,
+    JSLImmutableMemory value,
     JSLStringLifeTime value_lifetime
 )
 {
@@ -633,7 +633,7 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_insert(
 
 JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_has_key(
     JSLStrToStrMultimap* map,
-    JSLFatPtr key
+    JSLImmutableMemory key
 )
 {
     uint64_t hash = 0;
@@ -691,7 +691,7 @@ JSL_STR_TO_STR_MULTIMAP_DEF int64_t jsl_str_to_str_multimap_get_value_count(
 
 JSL_STR_TO_STR_MULTIMAP_DEF int64_t jsl_str_to_str_multimap_get_value_count_for_key(
     JSLStrToStrMultimap* map,
-    JSLFatPtr key
+    JSLImmutableMemory key
 )
 {
     int64_t res = -1;
@@ -755,8 +755,8 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_key_value_iterator_init
 
 JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_key_value_iterator_next(
     JSLStrToStrMultimapKeyValueIter* iterator,
-    JSLFatPtr* out_key,
-    JSLFatPtr* out_value
+    JSLImmutableMemory* out_key,
+    JSLImmutableMemory* out_value
 )
 {
     bool found = false;
@@ -874,7 +874,7 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_key_value_iterator_next
 JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_get_values_for_key_iterator_init(
     JSLStrToStrMultimap* map,
     JSLStrToStrMultimapValueIter* iterator,
-    JSLFatPtr key
+    JSLImmutableMemory key
 )
 {
     bool iterator_valid = iterator != NULL;
@@ -937,7 +937,7 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_get_values_for_key_iter
 
 JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_get_values_for_key_iterator_next(
     JSLStrToStrMultimapValueIter* iterator,
-    JSLFatPtr* out_value
+    JSLImmutableMemory* out_value
 )
 {
     bool found = false;
@@ -984,7 +984,7 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_get_values_for_key_iter
 
 JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_delete_key(
     JSLStrToStrMultimap* map,
-    JSLFatPtr key
+    JSLImmutableMemory key
 )
 {
     bool res = false;
@@ -1056,8 +1056,8 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_delete_key(
 
 JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_delete_value(
     JSLStrToStrMultimap* map,
-    JSLFatPtr key,
-    JSLFatPtr value
+    JSLImmutableMemory key,
+    JSLImmutableMemory value
 )
 {
     bool res = false;
@@ -1103,7 +1103,7 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_delete_value(
     bool value_found = false;
     while (entry_valid && current != NULL && !value_found)
     {
-        JSLFatPtr stored_value = jsl__str_to_str_multimap_get_value(current);
+        JSLImmutableMemory stored_value = jsl__str_to_str_multimap_get_value(current);
         bool equal = jsl_fatptr_memory_compare(stored_value, value);
         if (equal)
         {

@@ -96,7 +96,7 @@ typedef void* (*JSLReallocateFP)(void* ctx, void* allocation, int64_t new_bytes,
 /**
  * TODO: docs
  */
-typedef bool (*JSLFreeFP)(void* ctx, void* allocation);
+typedef bool (*JSLFreeFP)(void* ctx, const void* allocation);
 
 /**
  * TODO: docs
@@ -173,7 +173,7 @@ void* jsl_allocator_interface_realloc(
  */
 bool jsl_allocator_interface_free(
     JSLAllocatorInterface* allocator,
-    void* allocation
+    const void* allocation
 );
 
 /**

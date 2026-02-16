@@ -106,11 +106,11 @@ static JSL__FORCE_INLINE void jsl__str_set_entry_free_value(
     }
 }
 
-static JSL__FORCE_INLINE JSLFatPtr jsl__get_entry_value(
+static JSL__FORCE_INLINE JSLImmutableMemory jsl__get_entry_value(
     struct JSL__StrSetEntry* entry
 )
 {
-    JSLFatPtr res = {0};
+    JSLImmutableMemory res = {0};
 
     if (entry == NULL)
     {
@@ -245,7 +245,7 @@ static bool jsl__str_set_rehash(
 
 static inline void jsl__str_set_probe(
     JSLStrSet* set,
-    JSLFatPtr value,
+    JSLImmutableMemory value,
     int64_t* out_lut_index,
     uint64_t* out_hash,
     bool* out_found
@@ -289,7 +289,7 @@ static inline void jsl__str_set_probe(
             ? (struct JSL__StrSetEntry*) lut_res
             : NULL;
 
-        JSLFatPtr entry_value = jsl__get_entry_value(entry);
+        JSLImmutableMemory entry_value = jsl__get_entry_value(entry);
         uint8_t status = entry != NULL ? entry->status : 0;
 
         bool matches = entry != NULL
@@ -331,7 +331,7 @@ static inline void jsl__str_set_probe(
 
 JSL_STR_SET_DEF bool jsl_str_set_has(
     JSLStrSet* set,
-    JSLFatPtr value
+    JSLImmutableMemory value
 )
 {
     uint64_t hash = 0;
@@ -353,7 +353,7 @@ JSL_STR_SET_DEF bool jsl_str_set_has(
 
 static JSL__FORCE_INLINE bool jsl__str_set_add(
     JSLStrSet* set,
-    JSLFatPtr value,
+    JSLImmutableMemory value,
     JSLStringLifeTime value_lifetime,
     int64_t lut_index,
     uint64_t hash
@@ -427,7 +427,7 @@ static JSL__FORCE_INLINE bool jsl__str_set_add(
 
 JSL_STR_SET_DEF bool jsl_str_set_insert(
     JSLStrSet* set,
-    JSLFatPtr value,
+    JSLImmutableMemory value,
     JSLStringLifeTime value_lifetime
 )
 { 
@@ -504,7 +504,7 @@ JSL_STR_SET_DEF bool jsl_str_set_iterator_init(
 
 JSL_STR_SET_DEF bool jsl_str_set_iterator_next(
     JSLStrSetKeyValueIter* iterator,
-    JSLFatPtr* out_value
+    JSLImmutableMemory* out_value
 )
 {
     bool found = false;
@@ -571,7 +571,7 @@ JSL_STR_SET_DEF bool jsl_str_set_iterator_next(
 
 JSL_STR_SET_DEF bool jsl_str_set_delete(
     JSLStrSet* set,
-    JSLFatPtr value
+    JSLImmutableMemory value
 )
 {
     bool res = false;
@@ -728,7 +728,7 @@ JSL_STR_SET_DEF bool jsl_str_set_intersection(
     jsl_str_set_iterator_init(smaller, &iterator);
 
     bool success = params_valid;
-    JSLFatPtr out_value = {0};
+    JSLImmutableMemory out_value = {0};
     while (success && jsl_str_set_iterator_next(&iterator, &out_value))
     {
         if (jsl_str_set_has(larger, out_value) && !jsl_str_set_insert(out, out_value, JSL_STRING_LIFETIME_TRANSIENT))
@@ -765,7 +765,7 @@ JSL_STR_SET_DEF bool jsl_str_set_union(
     }
 
     bool success = params_valid;
-    JSLFatPtr out_value = {0};
+    JSLImmutableMemory out_value = {0};
     while (success && jsl_str_set_iterator_next(&a_iterator, &out_value))
     {
         if (!jsl_str_set_insert(out, out_value, JSL_STRING_LIFETIME_TRANSIENT))
@@ -808,7 +808,7 @@ JSL_STR_SET_DEF bool jsl_str_set_difference(
     }
 
     bool success = params_valid;
-    JSLFatPtr out_value = {0};
+    JSLImmutableMemory out_value = {0};
     while (success && jsl_str_set_iterator_next(&iterator, &out_value))
     {
         bool do_insert = jsl_str_set_has(b, out_value) == false;

@@ -54,7 +54,7 @@
 #include "jsl_os.h"
 
 JSLGetFileSizeResultEnum jsl_get_file_size(
-    JSLFatPtr path,
+    JSLImmutableMemory path,
     int64_t* out_size,
     int32_t* out_os_error_code
 )
@@ -175,8 +175,8 @@ static inline int64_t jsl__get_file_size_from_fileno(int32_t file_descriptor)
 
 JSLLoadFileResultEnum jsl_load_file_contents(
     JSLAllocatorInterface* allocator,
-    JSLFatPtr path,
-    JSLFatPtr* out_contents,
+    JSLImmutableMemory path,
+    JSLImmutableMemory* out_contents,
     int32_t* out_errno
 )
 {
@@ -233,7 +233,7 @@ JSLLoadFileResultEnum jsl_load_file_contents(
             *out_errno = errno;
     }
 
-    JSLFatPtr allocation = {0};
+    JSLMutableMemory allocation = {0};
     bool got_memory = false;
     if (got_file_size)
     {
@@ -313,8 +313,8 @@ JSLLoadFileResultEnum jsl_load_file_contents(
 }
 
 JSLLoadFileResultEnum jsl_load_file_contents_buffer(
-    JSLFatPtr* buffer,
-    JSLFatPtr path,
+    JSLMutableMemory* buffer,
+    JSLImmutableMemory path,
     int32_t* out_errno
 )
 {
@@ -436,8 +436,8 @@ JSLLoadFileResultEnum jsl_load_file_contents_buffer(
 }
 
 JSLWriteFileResultEnum jsl_write_file_contents(
-    JSLFatPtr contents,
-    JSLFatPtr path,
+    JSLImmutableMemory contents,
+    JSLImmutableMemory path,
     int64_t* out_bytes_written,
     int32_t* out_errno
 )
@@ -530,7 +530,7 @@ JSLWriteFileResultEnum jsl_write_file_contents(
     return res;
 }
 
-int64_t jsl_write_to_c_file(FILE* out, JSLFatPtr data)
+int64_t jsl_write_to_c_file(FILE* out, JSLImmutableMemory data)
 {
     if (out == NULL || data.data == NULL || data.length < 0)
         return -1;
@@ -548,7 +548,7 @@ int64_t jsl_write_to_c_file(FILE* out, JSLFatPtr data)
         return -errno;
 }
 
-static int64_t jsl__c_file_sink_out(void* user, JSLFatPtr data)
+static int64_t jsl__c_file_sink_out(void* user, JSLImmutableMemory data)
 {
     FILE* file = (FILE*) user;
     if (file == NULL)

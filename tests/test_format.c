@@ -56,86 +56,86 @@ SOFTWARE.
 #include "../src/jsl_allocator_arena.h"
 
 #define CHECK_END(str)                                                              \
-    JSLFatPtr written = jsl_fatptr_slice(buffer, 0, ret);                           \
+    JSLImmutableMemory written = jsl_slice(buffer, 0, ret);                           \
     TEST_BOOL(jsl_fatptr_cstr_compare(written, str) && ret == (int64_t) strlen(str))
 
 #define CHECK9(str, v1, v2, v3, v4, v5, v6, v7, v8, v9) \
 {                                                                                   \
-    JSLFatPtr writer = buffer;                                                      \
+    JSLImmutableMemory writer = buffer;                                                      \
     JSLOutputSink sink = jsl_fatptr_output_sink(&writer);                           \
-    JSLFatPtr fmt_str = jsl_fatptr_from_cstr(v1);                                   \
+    JSLImmutableMemory fmt_str = jsl_fatptr_from_cstr(v1);                                   \
     int64_t ret = jsl_format_sink(sink, fmt_str, v2, v3, v4, v5, v6, v7, v8, v9);   \
     CHECK_END(str);                                                                 \
 }
 
 #define CHECK8(str, v1, v2, v3, v4, v5, v6, v7, v8)                                 \
 {                                                                                   \
-    JSLFatPtr writer = buffer;                                                      \
+    JSLImmutableMemory writer = buffer;                                                      \
     JSLOutputSink sink = jsl_fatptr_output_sink(&writer);                           \
-    JSLFatPtr fmt_str = jsl_fatptr_from_cstr(v1);                                   \
+    JSLImmutableMemory fmt_str = jsl_fatptr_from_cstr(v1);                                   \
     int64_t ret = jsl_format_sink(sink, fmt_str, v2, v3, v4, v5, v6, v7, v8);       \
     CHECK_END(str);                                                                 \
 }
 
 #define CHECK7(str, v1, v2, v3, v4, v5, v6, v7)                                     \
 {                                                                                   \
-    JSLFatPtr writer = buffer;                                                      \
+    JSLImmutableMemory writer = buffer;                                                      \
     JSLOutputSink sink = jsl_fatptr_output_sink(&writer);                           \
-    JSLFatPtr fmt_str = jsl_fatptr_from_cstr(v1);                                   \
+    JSLImmutableMemory fmt_str = jsl_fatptr_from_cstr(v1);                                   \
     int64_t ret = jsl_format_sink(sink, fmt_str, v2, v3, v4, v5, v6, v7);    \
     CHECK_END(str);                                                                 \
 }
 
 #define CHECK6(str, v1, v2, v3, v4, v5, v6)                                         \
 {                                                                                   \
-    JSLFatPtr writer = buffer;                                                      \
+    JSLImmutableMemory writer = buffer;                                                      \
     JSLOutputSink sink = jsl_fatptr_output_sink(&writer);                           \
-    JSLFatPtr fmt_str = jsl_fatptr_from_cstr(v1);                                   \
+    JSLImmutableMemory fmt_str = jsl_fatptr_from_cstr(v1);                                   \
     int64_t ret = jsl_format_sink(sink, fmt_str, v2, v3, v4, v5, v6);        \
     CHECK_END(str);                                                                 \
 }
 
 #define CHECK5(str, v1, v2, v3, v4, v5)                                             \
 {                                                                                   \
-    JSLFatPtr writer = buffer;                                                      \
+    JSLImmutableMemory writer = buffer;                                                      \
     JSLOutputSink sink = jsl_fatptr_output_sink(&writer);                           \
-    JSLFatPtr fmt_str = jsl_fatptr_from_cstr(v1);                                   \
+    JSLImmutableMemory fmt_str = jsl_fatptr_from_cstr(v1);                                   \
     int64_t ret = jsl_format_sink(sink, fmt_str, v2, v3, v4, v5);            \
     CHECK_END(str);                                                                 \
 }
 
 #define CHECK4(str, v1, v2, v3, v4)                                                 \
 {                                                                                   \
-    JSLFatPtr writer = buffer;                                                      \
+    JSLImmutableMemory writer = buffer;                                                      \
     JSLOutputSink sink = jsl_fatptr_output_sink(&writer);                           \
-    JSLFatPtr fmt_str = jsl_fatptr_from_cstr(v1);                                   \
+    JSLImmutableMemory fmt_str = jsl_fatptr_from_cstr(v1);                                   \
     int64_t ret = jsl_format_sink(sink, fmt_str, v2, v3, v4);                \
     CHECK_END(str);                                                                 \
 }
 
 #define CHECK3(str, v1, v2, v3)                                                     \
 {                                                                                   \
-    JSLFatPtr writer = buffer;                                                      \
+    JSLImmutableMemory writer = buffer;                                                      \
     JSLOutputSink sink = jsl_fatptr_output_sink(&writer);                           \
-    JSLFatPtr fmt_str = jsl_fatptr_from_cstr(v1);                                   \
+    JSLImmutableMemory fmt_str = jsl_fatptr_from_cstr(v1);                                   \
     int64_t ret = jsl_format_sink(sink, fmt_str, v2, v3);                    \
     CHECK_END(str);                                                                 \
 }
 
 #define CHECK2(str, v1, v2)                                                         \
 {                                                                                   \
-    JSLFatPtr writer = buffer;                                                      \
+    JSLImmutableMemory writer = buffer;                                                      \
     JSLOutputSink sink = jsl_fatptr_output_sink(&writer);                           \
-    JSLFatPtr fmt_str = jsl_fatptr_from_cstr(v1);                                   \
+    JSLImmutableMemory fmt_str = jsl_fatptr_from_cstr(v1);                                   \
     int64_t ret = jsl_format_sink(sink, fmt_str, v2);                        \
     CHECK_END(str);                                                                 \
 }
 
 #define CHECK1(str, v1)                                                             \
 {                                                                                   \
-    JSLFatPtr writer = buffer;                                                      \
+    JSLImmutableMemory writer = buffer;                                                      \
     JSLOutputSink sink = jsl_fatptr_output_sink(&writer);                           \
-    JSLFatPtr fmt_str = jsl_fatptr_from_cstr(v1);                                   \
+    JSLImmutableMemory fmt_str = jsl_fatptr_from_cstr(v1);                                   \
     int64_t ret = jsl_format_sink(sink, fmt_str);                            \
     CHECK_END(str);                                                                 \
 }
@@ -144,7 +144,7 @@ SOFTWARE.
 static void test_integers(void)
 {
     uint8_t _buf[1024];
-    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(_buf);
+    JSLImmutableMemory buffer = JSL_MEMORY_FROM_STACK(_buf);
 
     CHECK4("a b     1", "%c %s     %d", 'a', "b", 1);
     CHECK4("This is a very long string which will call SIMD code for sure a b     1", "This is a very long string which will call SIMD code for sure %c %s     %d", 'a', "b", 1);
@@ -168,7 +168,7 @@ static void test_integers(void)
 static void test_floating_point(void)
 {
     uint8_t _buf[1024];
-    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(_buf);
+    JSLImmutableMemory buffer = JSL_MEMORY_FROM_STACK(_buf);
 
     const double pow_2_85 = 38685626227668133590597632.0;
 
@@ -209,7 +209,7 @@ static void test_floating_point(void)
 static void test_n(void)
 {
     uint8_t _buf[1024];
-    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(_buf);
+    JSLImmutableMemory buffer = JSL_MEMORY_FROM_STACK(_buf);
 
     int n = 0;
     CHECK3("aaa ", "%.3s %n", "aaaaaaaaaaaaa", &n);
@@ -219,7 +219,7 @@ static void test_n(void)
 static void test_hex_floats(void)
 {
     uint8_t _buf[1024];
-    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(_buf);
+    JSLImmutableMemory buffer = JSL_MEMORY_FROM_STACK(_buf);
 
     CHECK2("0x1.fedcbap+98", "%a", 0x1.fedcbap+98);
     CHECK2("0x1.999999999999a0p-4", "%.14a", 0.1);
@@ -231,7 +231,7 @@ static void test_hex_floats(void)
 static void test_pointer(void)
 {
     uint8_t _buf[1024];
-    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(_buf);
+    JSLImmutableMemory buffer = JSL_MEMORY_FROM_STACK(_buf);
 
     CHECK2("0000000000000000", "%p", (void*) NULL);
 }
@@ -239,21 +239,21 @@ static void test_pointer(void)
 static void test_fatptr_format(void)
 {
     uint8_t _buf[4096];
-    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(_buf);
+    JSLImmutableMemory buffer = JSL_MEMORY_FROM_STACK(_buf);
 
-    JSLFatPtr hello = JSL_FATPTR_INITIALIZER("hello");
+    JSLImmutableMemory hello = JSL_FATPTR_INITIALIZER("hello");
     CHECK2("hello", "%y", hello);
 
-    JSLFatPtr world = JSL_FATPTR_INITIALIZER("world");
+    JSLImmutableMemory world = JSL_FATPTR_INITIALIZER("world");
     CHECK2("begin-world", "begin-%y", world);
 
-    JSLFatPtr empty = {0};
+    JSLImmutableMemory empty = {0};
     CHECK2("ed(ERROR)ge", "ed%yge", empty);
 
-    JSLFatPtr beta = JSL_FATPTR_INITIALIZER("beta");
+    JSLImmutableMemory beta = JSL_FATPTR_INITIALIZER("beta");
     CHECK3("hello-beta", "%y-%y", hello, beta);
 
-    JSLFatPtr medium_str = JSL_FATPTR_INITIALIZER(
+    JSLImmutableMemory medium_str = JSL_FATPTR_INITIALIZER(
         "This is a very long string that is going to trigger SIMD code, "
         "as it's longer than a single AVX2 register when using 8-bit "
         "values, which we are since we're using ASCII/UTF-8."
@@ -286,7 +286,7 @@ static void test_fatptr_format(void)
 static void test_quote_modifier(void)
 {
     uint8_t _buf[1024];
-    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(_buf);
+    JSLImmutableMemory buffer = JSL_MEMORY_FROM_STACK(_buf);
 
     CHECK2("1,200,000", "%'d", 1200000);
     CHECK2("-100,006,789", "%'d", -100006789);
@@ -300,7 +300,7 @@ static void test_quote_modifier(void)
 static void test_nonstandard(void)
 {
     uint8_t _buf[1024];
-    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(_buf);
+    JSLImmutableMemory buffer = JSL_MEMORY_FROM_STACK(_buf);
 
     CHECK2("(ERROR)", "%s", (char*) NULL);
     CHECK2("123,4abc:", "%'x:", 0x1234ABC);
@@ -314,7 +314,7 @@ static void test_nonstandard(void)
 static void test_separators(void)
 {
     uint8_t _buf[1024];
-    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(_buf);
+    JSLImmutableMemory buffer = JSL_MEMORY_FROM_STACK(_buf);
 
     jsl_format_set_separators(' ', ',');
     CHECK2("12 345,678900", "%'f", 12345.6789);

@@ -1640,5 +1640,5 @@ static uint8_t __dynamic_source_template_data[] = {
     0x5f, 0x53, 0x45, 0x4e, 0x54, 0x49, 0x4e, 0x45, 0x4c, 0x0a
 };
 
-static JSLFatPtr dynamic_source_template = { __dynamic_source_template_data, 19594 };
+static JSLImmutableMemory dynamic_source_template = { __dynamic_source_template_data, 19594 };
 

@@ -91,8 +91,8 @@ extern "C" {
 
 struct JSL__StringBuilderChunk
 {
-    JSLFatPtr buffer;
-    JSLFatPtr writer;
+    JSLMutableMemory buffer;
+    JSLMutableMemory writer;
     struct JSL__StringBuilderChunk* next;
 };
 
@@ -181,7 +181,7 @@ JSL_STRING_BUILDER_DEF bool jsl_string_builder_init2(
  * @param data A fat pointer describing the bytes to copy; its length may be zero.
  * @returns number of bytes written, `-1` if error
  */
-JSL_STRING_BUILDER_DEF int64_t jsl_string_builder_insert_fatptr(JSLStringBuilder* builder, JSLFatPtr data);
+JSL_STRING_BUILDER_DEF int64_t jsl_string_builder_insert_fatptr(JSLStringBuilder* builder, JSLImmutableMemory data);
 
 /**
  * TODO: docs
@@ -223,7 +223,7 @@ JSL_STRING_BUILDER_DEF void jsl_string_builder_iterator_init(JSLStringBuilder* b
  * JSLStringBuilderIterator iter;
  * jsl_string_builder_iterator_init(&builder, &iter);
  *
- * JSLFatPtr str;
+ * JSLImmutableMemory str;
  * while (jsl_string_builder_iterator_next(&iter. &str))
  * {
  *      jsl_format_to_c_file(stdout, str);
@@ -235,7 +235,7 @@ JSL_STRING_BUILDER_DEF void jsl_string_builder_iterator_init(JSLStringBuilder* b
  */
 JSL_STRING_BUILDER_DEF bool jsl_string_builder_iterator_next(
     JSLStringBuilderIterator* iterator,
-    JSLFatPtr* out_chunk
+    JSLImmutableMemory* out_chunk
 );
 
 #ifdef __cplusplus

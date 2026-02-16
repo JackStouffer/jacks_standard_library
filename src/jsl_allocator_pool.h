@@ -120,7 +120,7 @@ JSL_DEF void jsl_pool_init(
  */
 JSL_DEF void jsl_pool_init2(
     JSLPoolAllocator* pool,
-    JSLFatPtr memory,
+    JSLImmutableMemory memory,
     int64_t allocation_size
 );
 

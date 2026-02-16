@@ -143,7 +143,7 @@ static void* jsl__infinite_arena_alloc_interface_realloc(
     return jsl_infinite_arena_reallocate_aligned(arena, allocation, new_bytes, alignment);
 }
 
-static bool jsl__infinite_arena_alloc_interface_free(void* ctx, void* allocation)
+static bool jsl__infinite_arena_alloc_interface_free(void* ctx, const void* allocation)
 {
     (void) ctx;
 
@@ -156,7 +156,7 @@ static bool jsl__infinite_arena_alloc_interface_free(void* ctx, void* allocation
             (uint8_t*) allocation - header_size
         );
 
-        jsl__infinite_arena_debug_memset_old_memory(allocation, header->length);
+        jsl__infinite_arena_debug_memset_old_memory((void*) allocation, header->length);
         return true;
 
     #else
