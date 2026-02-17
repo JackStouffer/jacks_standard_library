@@ -309,10 +309,10 @@ static CompilerConfig msvc_configs[] = {
 
 static UnitTestDecl unit_test_declarations[] = {
     {
-        "test_fatptr",
+        "test_core",
         (char*[])
         {
-            "tests/test_fatptr.c",
+            "tests/test_core.c",
             "src/jsl_core.c",
             "src/jsl_allocator.c",
             "src/jsl_allocator_arena.c",

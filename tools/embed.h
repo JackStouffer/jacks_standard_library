@@ -77,7 +77,7 @@
         {
             jsl_format_sink(
                 sink,
-                JSL_FATPTR_EXPRESSION("static uint8_t __%y_data[] = {\n"),
+                JSL_CSTR_EXPRESSION("static uint8_t __%y_data[] = {\n"),
                 variable_name
             );
 
@@ -89,7 +89,7 @@
 
                 jsl_format_sink(
                     sink,
-                    JSL_FATPTR_EXPRESSION("0x%02x"),
+                    JSL_CSTR_EXPRESSION("0x%02x"),
                     file_data.data[i]
                 );
 
@@ -109,7 +109,7 @@
 
             jsl_format_sink(
                 sink,
-                JSL_FATPTR_EXPRESSION("static JSLImmutableMemory %y = { __%y_data, %lld };\n\n"),
+                JSL_CSTR_EXPRESSION("static JSLImmutableMemory %y = { __%y_data, %lld };\n\n"),
                 variable_name,
                 variable_name,
                 (long long) file_data.length
@@ -119,7 +119,7 @@
         {
             jsl_format_sink(
                 sink,
-                JSL_FATPTR_EXPRESSION("static JSLImmutableMemory %y = JSL_FATPTR_INITIALIZER(\n"),
+                JSL_CSTR_EXPRESSION("static JSLImmutableMemory %y = JSL_CSTR_INITIALIZER(\n"),
                 variable_name
             );
 

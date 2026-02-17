@@ -295,7 +295,7 @@ static inline void jsl__str_set_probe(
         bool matches = entry != NULL
             && (status == JSL__STATE_VALUE_IS_SET || status == JSL__STATE_SSO_IS_SET)
             && *out_hash == entry->hash
-            && jsl_fatptr_memory_compare(value, entry_value);
+            && jsl_memory_compare(value, entry_value);
 
         if (matches)
         {
@@ -417,7 +417,7 @@ static JSL__FORCE_INLINE bool jsl__str_set_add(
         && value.length > JSL__STR_SET_SSO_LENGTH
     )
     {
-        entry->value = jsl_fatptr_duplicate(set->allocator, value);
+        entry->value = jsl_duplicate(set->allocator, value);
         entry->status = JSL__STATE_VALUE_IS_SET;
         entry->lifetime = (uint8_t) value_lifetime;
     }

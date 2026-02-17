@@ -61,9 +61,9 @@ static void test_arena_init_sets_pointers(void)
 static void test_arena_init2_sets_pointers(void)
 {
     uint8_t buffer[96];
-    JSLArena arena = {0};
-    JSLImmutableMemory memory = jsl_immutable_memory(buffer, (int64_t) sizeof(buffer));
+    JSLMutableMemory memory = JSL_MEMORY_FROM_STACK(buffer);
 
+    JSLArena arena = {0};
     jsl_arena_init2(&arena, memory);
 
     TEST_POINTERS_EQUAL(arena.start, buffer);

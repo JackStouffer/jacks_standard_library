@@ -105,7 +105,7 @@
     #pragma comment(lib, "shell32.lib")
 #endif
 
-JSLImmutableMemory help_message = JSL_FATPTR_INITIALIZER(
+JSLImmutableMemory help_message = JSL_CSTR_INITIALIZER(
     "OVERVIEW:\n\n"
     "Hash map C code generation utility\n\n"
     "This program generates both a C source and header file for a hash map with the given\n"
@@ -141,17 +141,17 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     JSLOutputSink stdout_sink = jsl_c_file_output_sink(stdout);
     JSLOutputSink stderr_sink = jsl_c_file_output_sink(stderr);
 
-    static JSLImmutableMemory help_flag_str = JSL_FATPTR_INITIALIZER("help");
-    static JSLImmutableMemory name_flag_str = JSL_FATPTR_INITIALIZER("name");
-    static JSLImmutableMemory function_prefix_flag_str = JSL_FATPTR_INITIALIZER("function-prefix");
-    static JSLImmutableMemory key_type_flag_str = JSL_FATPTR_INITIALIZER("key-type");
-    static JSLImmutableMemory value_type_flag_str = JSL_FATPTR_INITIALIZER("value-type");
-    static JSLImmutableMemory fixed_flag_str = JSL_FATPTR_INITIALIZER("fixed");
-    static JSLImmutableMemory dynamic_flag_str = JSL_FATPTR_INITIALIZER("dynamic");
-    static JSLImmutableMemory header_flag_str = JSL_FATPTR_INITIALIZER("header");
-    static JSLImmutableMemory source_flag_str = JSL_FATPTR_INITIALIZER("source");
-    static JSLImmutableMemory add_header_flag_str = JSL_FATPTR_INITIALIZER("add-header");
-    static JSLImmutableMemory custom_hash_flag_str = JSL_FATPTR_INITIALIZER("custom-hash");
+    static JSLImmutableMemory help_flag_str = JSL_CSTR_INITIALIZER("help");
+    static JSLImmutableMemory name_flag_str = JSL_CSTR_INITIALIZER("name");
+    static JSLImmutableMemory function_prefix_flag_str = JSL_CSTR_INITIALIZER("function-prefix");
+    static JSLImmutableMemory key_type_flag_str = JSL_CSTR_INITIALIZER("key-type");
+    static JSLImmutableMemory value_type_flag_str = JSL_CSTR_INITIALIZER("value-type");
+    static JSLImmutableMemory fixed_flag_str = JSL_CSTR_INITIALIZER("fixed");
+    static JSLImmutableMemory dynamic_flag_str = JSL_CSTR_INITIALIZER("dynamic");
+    static JSLImmutableMemory header_flag_str = JSL_CSTR_INITIALIZER("header");
+    static JSLImmutableMemory source_flag_str = JSL_CSTR_INITIALIZER("source");
+    static JSLImmutableMemory add_header_flag_str = JSL_CSTR_INITIALIZER("add-header");
+    static JSLImmutableMemory custom_hash_flag_str = JSL_CSTR_INITIALIZER("custom-hash");
 
     //
     // Parsing command line
@@ -185,7 +185,7 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
 
     if (show_help)
     {
-        jsl_output_sink_write_fatptr(stdout_sink, help_message);
+        jsl_output_sink_write(stdout_sink, help_message);
         return EXIT_SUCCESS;
     }
     
@@ -197,7 +197,7 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     {
         jsl_format_sink(
             stderr_sink,
-            JSL_FATPTR_EXPRESSION("Error: --%y is required\n"),
+            JSL_CSTR_EXPRESSION("Error: --%y is required\n"),
             name_flag_str
         );
         return EXIT_FAILURE;
@@ -206,7 +206,7 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     {
         jsl_format_sink(
             stderr_sink,
-            JSL_FATPTR_EXPRESSION("Error: --%y is required\n"),
+            JSL_CSTR_EXPRESSION("Error: --%y is required\n"),
             key_type_flag_str
         );
         return EXIT_FAILURE;
@@ -215,7 +215,7 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     {
         jsl_format_sink(
             stderr_sink,
-            JSL_FATPTR_EXPRESSION("Error: --%y is required\n"),
+            JSL_CSTR_EXPRESSION("Error: --%y is required\n"),
             value_type_flag_str
         );
         return EXIT_FAILURE;
@@ -224,7 +224,7 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     {
         jsl_format_sink(
             stderr_sink,
-            JSL_FATPTR_EXPRESSION("Error: --%y is required\n"),
+            JSL_CSTR_EXPRESSION("Error: --%y is required\n"),
             function_prefix_flag_str
         );
         return EXIT_FAILURE;
@@ -233,7 +233,7 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     {
         jsl_format_sink(
             stderr_sink,
-            JSL_FATPTR_EXPRESSION("Error: cannot set both --%y and --%y\n"),
+            JSL_CSTR_EXPRESSION("Error: cannot set both --%y and --%y\n"),
             fixed_flag_str,
             dynamic_flag_str
         );
@@ -243,7 +243,7 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     {
         jsl_format_sink(
             stderr_sink,
-            JSL_FATPTR_EXPRESSION("Error: you must provide either --%y or --%y\n"),
+            JSL_CSTR_EXPRESSION("Error: you must provide either --%y or --%y\n"),
             fixed_flag_str,
             dynamic_flag_str
         );
@@ -253,7 +253,7 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     {
         jsl_format_sink(
             stderr_sink,
-            JSL_FATPTR_EXPRESSION("Error: cannot set both --%y and --%y\n"),
+            JSL_CSTR_EXPRESSION("Error: cannot set both --%y and --%y\n"),
             header_flag_str,
             source_flag_str
         );
@@ -263,7 +263,7 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     {
         jsl_format_sink(
             stderr_sink,
-            JSL_FATPTR_EXPRESSION("Error: you must provide either --%y or --%y\n"),
+            JSL_CSTR_EXPRESSION("Error: you must provide either --%y or --%y\n"),
             header_flag_str,
             source_flag_str
         );
@@ -344,9 +344,9 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
             }
             else
             {
-                jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Parsing failure"));
+                jsl_write_to_c_file(stderr, JSL_CSTR_EXPRESSION("Parsing failure"));
             }
-            jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("\n"));
+            jsl_write_to_c_file(stderr, JSL_CSTR_EXPRESSION("\n"));
             return EXIT_FAILURE;
         }
 
@@ -369,7 +369,7 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
         JSLCmdLineArgs cmd;
         if (!jsl_cmd_line_args_init(&cmd, &allocator))
         {
-            jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Command line input exceeds memory limit"));
+            jsl_write_to_c_file(stderr, JSL_CSTR_EXPRESSION("Command line input exceeds memory limit"));
             return EXIT_FAILURE;
         }
 
@@ -382,9 +382,9 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
             }
             else
             {
-                jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Parsing failure"));
+                jsl_write_to_c_file(stderr, JSL_CSTR_EXPRESSION("Parsing failure"));
             }
-            jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("\n"));
+            jsl_write_to_c_file(stderr, JSL_CSTR_EXPRESSION("\n"));
             return EXIT_FAILURE;
         }
 

@@ -1333,7 +1333,7 @@ typedef int64_t (*JSLOutputSinkWriteFP)(void* user, JSLImmutableMemory data);
  * output sink.
  * 
  * ```
- * int64_t jsl_output_sink_write_fatptr(JSLOutputSink sink, JSLImmutableMemory data)
+ * int64_t jsl_output_sink_write(JSLOutputSink sink, JSLImmutableMemory data)
  * {
  *     if (sink.write_fp == NULL) return -1;
  *     return sink.write_fp(sink.user_data, data);
@@ -1386,12 +1386,12 @@ typedef struct JSLOutputSink {
 *
 * ```c
 * // Create fat pointers from string literals
-* JSLImmutableMemory hello = JSL_FATPTR_INITIALIZER("Hello, World!");
-* JSLImmutableMemory path = JSL_FATPTR_INITIALIZER("/usr/local/bin");
-* JSLImmutableMemory empty = JSL_FATPTR_INITIALIZER("");
+* JSLImmutableMemory hello = JSL_CSTR_INITIALIZER("Hello, World!");
+* JSLImmutableMemory path = JSL_CSTR_INITIALIZER("/usr/local/bin");
+* JSLImmutableMemory empty = JSL_CSTR_INITIALIZER("");
 * ```
 */
-#define JSL_FATPTR_INITIALIZER(s) { (uint8_t*)(s), (int64_t)(sizeof(s) - 1) }
+#define JSL_CSTR_INITIALIZER(s) { (uint8_t*)(s), (int64_t)(sizeof(s) - 1) }
 
 #if defined(_MSC_VER) && !defined(__clang__)
 
@@ -1407,10 +1407,10 @@ typedef struct JSLOutputSink {
      * ```c
      * void my_function(JSLImmutableMemory data);
      *
-     * my_function(JSL_FATPTR_EXPRESSION("my data"));
+     * my_function(JSL_CSTR_EXPRESSION("my data"));
      * ```
      */
-    #define JSL_FATPTR_EXPRESSION(s) jsl_immutable_memory((uint8_t*) (s), (int64_t)(sizeof(s) - 1))
+    #define JSL_CSTR_EXPRESSION(s) jsl_immutable_memory((uint8_t*) (s), (int64_t)(sizeof(s) - 1))
 
 #else
 
@@ -1426,10 +1426,10 @@ typedef struct JSLOutputSink {
      * ```c
      * void my_function(JSLImmutableMemory data);
      *
-     * my_function(JSL_FATPTR_EXPRESSION("my data"));
+     * my_function(JSL_CSTR_EXPRESSION("my data"));
      * ```
      */
-    #define JSL_FATPTR_EXPRESSION(s) ((JSLImmutableMemory){ (uint8_t*)(s), (int64_t)(sizeof(s) - 1) })
+    #define JSL_CSTR_EXPRESSION(s) ((JSLImmutableMemory){ (uint8_t*)(s), (int64_t)(sizeof(s) - 1) })
 
 #endif
 
@@ -1439,9 +1439,9 @@ typedef struct JSLOutputSink {
  * and is intentionally tiny so it can live in hot loops without adding overhead.
  * Only use this in cases where you've already checked the length.
  */
-#define JSL_FATPTR_ADVANCE(fatptr, n) do { \
-    fatptr.data += n; \
-    fatptr.length -= n; \
+#define JSL_MEMORY_ADVANCE(memory, n) do { \
+    memory.data += n; \
+    memory.length -= n; \
 } while (0)
 
 /**
@@ -1476,6 +1476,17 @@ static inline JSLImmutableMemory jsl_cast_immutable_memory(JSLMutableMemory memo
     return res;
 }
 
+#if JSL_IS_MSVC
+    #define JSL__AS_IMMUTABLE_IMPL(x) \
+        jsl_immutable_memory((const uint8_t*)(x).data, (x).length)
+#else
+    #define JSL__AS_IMMUTABLE_IMPL(x) \
+        ((JSLImmutableMemory){(const uint8_t*)(x).data, (x).length})
+#endif
+
+/// TODO: docs
+#define JSL_AS_IMMUTABLE(x) JSL__AS_IMMUTABLE_IMPL(x)
+
 /**
  * Constructor utility function to make a fat pointer out of a pointer and a length.
  * Useful in cases where you can't use C's struct init syntax, like as a parameter
@@ -1486,13 +1497,16 @@ JSL_DEF JSLImmutableMemory jsl_immutable_memory(const uint8_t* ptr, int64_t leng
 /// TODO: docs
 JSLMutableMemory jsl_mutable_memory(uint8_t* ptr, int64_t length);
 
+// private
+JSLImmutableMemory jsl__slice(JSLImmutableMemory memory, int64_t start, int64_t end);
+
 /**
  * Create a new fat pointer that points to the given parameter's data but
  * with a view of [start, end).
  *
  * This function is bounds checked. Out of bounds slices will assert.
  */
-JSL_DEF JSLImmutableMemory jsl_slice(JSLImmutableMemory fatptr, int64_t start, int64_t end);
+#define jsl_slice(memory, start, end) jsl__slice(JSL_AS_IMMUTABLE(memory), start, end)
 
 /**
  * Create a new fat pointer that points to the given parameter's data but
@@ -1500,7 +1514,10 @@ JSL_DEF JSLImmutableMemory jsl_slice(JSLImmutableMemory fatptr, int64_t start, i
  *
  * This function is bounds checked. Out of bounds slices will assert.
  */
-JSL_DEF JSLImmutableMemory jsl_slice_to_end(JSLImmutableMemory fatptr, int64_t start);
+JSL_DEF JSLImmutableMemory jsl_slice_to_end(JSLImmutableMemory memory, int64_t start);
+
+// private
+int64_t jsl__total_write_length(JSLImmutableMemory original_memory, JSLImmutableMemory writer_memory);
 
 /**
  * Utility function to get the total amount of bytes written to the original
@@ -1509,9 +1526,9 @@ JSL_DEF JSLImmutableMemory jsl_slice_to_end(JSLImmutableMemory fatptr, int64_t s
  * 
  * This function asserts on the following conditions
  * 
- *      * Either fatptr has a null data field
- *      * Either fatptr has a negative length
- *      * The writer_fatptr does not point to the memory of original_fatptr
+ *      * Either memory has a null data field
+ *      * Either memory has a negative length
+ *      * The writer_memory does not point to the memory of original_memory
  *
  * ```
  * JSLImmutableMemory original = jsl_arena_allocate(arena, 128 * 1024 * 1024);
@@ -1521,24 +1538,24 @@ JSL_DEF JSLImmutableMemory jsl_slice_to_end(JSLImmutableMemory fatptr, int64_t s
  * int64_t write_len = jsl_total_write_length(original, writer);
  * ```
  *
- * @param original_fatptr The pointer to the originally allocated buffer
- * @param writer_fatptr The pointer that has been advanced during writing operations
+ * @param original_memory The pointer to the originally allocated buffer
+ * @param writer_memory The pointer that has been advanced during writing operations
  * @returns The amount of data which has been written, or -1 if there was an issue
  */
-JSL_DEF int64_t jsl_total_write_length(JSLImmutableMemory original_fatptr, JSLImmutableMemory writer_fatptr);
+#define jsl_total_write_length(original_memory, writer_memory) jsl__total_write_length(JSL_AS_IMMUTABLE(original_memory), JSL_AS_IMMUTABLE(writer_memory))
 
-/// TODO: docs
-int64_t jsl_total_write_length_mutable(JSLMutableMemory original_fatptr, JSLMutableMemory writer_fatptr);
+// private
+JSLImmutableMemory jsl__auto_slice(JSLImmutableMemory original_memory, JSLImmutableMemory writer_memory);
 
 /**
- * Returns the slice in `original_fatptr` that represents the written to portion, given
- * the size and pointer in `writer_fatptr`.
+ * Returns the slice in `original_memory` that represents the written to portion, given
+ * the size and pointer in `writer_memory`.
  * 
  * This function asserts on the following conditions
  * 
- *      * Either fatptr has a null data field
- *      * Either fatptr has a negative length
- *      * The writer_fatptr does not point to the memory of original_fatptr
+ *      * Either memory has a null data field
+ *      * Either memory has a negative length
+ *      * The writer_memory does not point to the memory of original_memory
  *
  * Example:
  *
@@ -1550,15 +1567,12 @@ int64_t jsl_total_write_length_mutable(JSLMutableMemory original_fatptr, JSLMuta
  * JSLImmutableMemory portion_with_file_data = jsl_auto_slice(original, writer);
  * ```
  *
- * @param original_fatptr The pointer to the originally allocated buffer
- * @param writer_fatptr The pointer that has been advanced during writing operations
+ * @param original_memory The pointer to the originally allocated buffer
+ * @param writer_memory The pointer that has been advanced during writing operations
  * @returns A new fat pointer pointing to the written portion of the original buffer.
  * It will be `NULL` if there was an issue.
  */
-JSL_DEF JSLImmutableMemory jsl_auto_slice(JSLImmutableMemory original_fatptr, JSLImmutableMemory writer_fatptr);
-
-/// TODO: docs
-JSLMutableMemory jsl_auto_slice_mutable(JSLMutableMemory original_fatptr, JSLMutableMemory writer_fatptr);
+#define jsl_auto_slice(original_memory, writer_memory) jsl__auto_slice(JSL_AS_IMMUTABLE(original_memory), JSL_AS_IMMUTABLE(writer_memory))
 
 /**
  * Build a fat pointer from a null terminated string. **DOES NOT** copy the data.
@@ -1568,7 +1582,10 @@ JSLMutableMemory jsl_auto_slice_mutable(JSLMutableMemory original_fatptr, JSLMut
  * @param str the str to create the fat ptr from
  * @return A fat ptr
  */
-JSL_DEF JSLImmutableMemory jsl_fatptr_from_cstr(const char* str);
+JSL_DEF JSLImmutableMemory jsl_cstr_to_memory(const char* str);
+
+// private
+int64_t jsl__memory_copy(JSLMutableMemory* destination, JSLImmutableMemory source);
 
 /**
  * Copy the contents of `source` into `destination`.
@@ -1592,7 +1609,7 @@ JSL_DEF JSLImmutableMemory jsl_fatptr_from_cstr(const char* str);
  *
  * @return Number of bytes written or `-1` if the above error conditions were present.
  */
-JSL_DEF int64_t jsl_fatptr_memory_copy(JSLMutableMemory* destination, JSLImmutableMemory source);
+#define jsl_memory_copy(destination, source) jsl__memory_copy(destination, JSL_AS_IMMUTABLE(source))
 
 /**
  * Writes the contents of the null terminated string at `cstring` into `buffer`.
@@ -1609,7 +1626,7 @@ JSL_DEF int64_t jsl_fatptr_memory_copy(JSLMutableMemory* destination, JSLImmutab
  *
  * @returns Number of bytes written or `-1` if `string` or the fat pointer was null.
  */
-JSL_DEF int64_t jsl_fatptr_cstr_memory_copy(
+JSL_DEF int64_t jsl_cstr_memory_copy(
     JSLMutableMemory* destination,
     const char* cstring,
     bool include_null_terminator
@@ -1643,7 +1660,7 @@ JSL_DEF int64_t jsl_fatptr_cstr_memory_copy(
  * @param substring the substring to search for
  * @returns Index of the first occurrence.
  */
-JSL_DEF int64_t jsl_fatptr_substring_search(JSLImmutableMemory string, JSLImmutableMemory substring);
+JSL_DEF int64_t jsl_substring_search(JSLImmutableMemory string, JSLImmutableMemory substring);
 
 /**
  * Locate the first byte equal to `item` in a fat pointer. This is roughly equivalent to C's
@@ -1658,7 +1675,7 @@ JSL_DEF int64_t jsl_fatptr_substring_search(JSLImmutableMemory string, JSLImmuta
  * @param item Byte value to search for.
  * @returns index of the first match, or -1 if none is found.
  */
-JSL_DEF int64_t jsl_fatptr_index_of(JSLImmutableMemory data, uint8_t item);
+JSL_DEF int64_t jsl_index_of(JSLImmutableMemory data, uint8_t item);
 
 /**
  * Count the number of occurrences of `item` within a fat pointer.
@@ -1672,7 +1689,7 @@ JSL_DEF int64_t jsl_fatptr_index_of(JSLImmutableMemory data, uint8_t item);
  * @param item Byte value to count.
  * @returns Total number of matches, or 0 when the sequence is empty.
  */
-JSL_DEF int64_t jsl_fatptr_count(JSLImmutableMemory str, uint8_t item);
+JSL_DEF int64_t jsl_count(JSLImmutableMemory str, uint8_t item);
 
 /**
  * Locate the final occurrence of `character` within a fat pointer.
@@ -1686,7 +1703,7 @@ JSL_DEF int64_t jsl_fatptr_count(JSLImmutableMemory str, uint8_t item);
  * @param character Byte value to search for.
  * @returns index of the last match, or -1 when no match exists.
  */
-JSL_DEF int64_t jsl_fatptr_index_of_reverse(JSLImmutableMemory str, uint8_t character);
+JSL_DEF int64_t jsl_index_of_reverse(JSLImmutableMemory str, uint8_t character);
 
 /**
  * Check whether `str` begins with the bytes stored in `prefix`.
@@ -1703,7 +1720,7 @@ JSL_DEF int64_t jsl_fatptr_index_of_reverse(JSLImmutableMemory str, uint8_t char
  * @param prefix Sequence that must appear at the start of `str`.
  * @returns `true` if `str` starts with `prefix`, otherwise `false`.
  */
-JSL_DEF bool jsl_fatptr_starts_with(JSLImmutableMemory str, JSLImmutableMemory prefix);
+JSL_DEF bool jsl_starts_with(JSLImmutableMemory str, JSLImmutableMemory prefix);
 
 /**
  * Check whether `str` ends with the bytes stored in `postfix`.
@@ -1719,7 +1736,7 @@ JSL_DEF bool jsl_fatptr_starts_with(JSLImmutableMemory str, JSLImmutableMemory p
  * @param postfix Sequence that must appear at the end of `str`.
  * @returns `true` if `str` ends with `postfix`, otherwise `false`.
  */
-JSL_DEF bool jsl_fatptr_ends_with(JSLImmutableMemory str, JSLImmutableMemory postfix);
+JSL_DEF bool jsl_ends_with(JSLImmutableMemory str, JSLImmutableMemory postfix);
 
 /**
  * Get the file name from a filepath.
@@ -1740,11 +1757,11 @@ JSL_DEF bool jsl_fatptr_ends_with(JSLImmutableMemory str, JSLImmutableMemory pos
  * original input pointer.
  *
  * @code
- * JSLImmutableMemory path = JSL_FATPTR_INITIALIZER("/tmp/example.txt");
- * JSLImmutableMemory base = jsl_fatptr_basename(path); // "example.txt"
+ * JSLImmutableMemory path = JSL_CSTR_INITIALIZER("/tmp/example.txt");
+ * JSLImmutableMemory base = jsl_basename(path); // "example.txt"
  * @endcode
  */
-JSL_DEF JSLImmutableMemory jsl_fatptr_basename(JSLImmutableMemory filename);
+JSL_DEF JSLImmutableMemory jsl_basename(JSLImmutableMemory filename);
 
 /**
  * Get the file extension from a file name or file path.
@@ -1764,11 +1781,14 @@ JSL_DEF JSLImmutableMemory jsl_fatptr_basename(JSLImmutableMemory filename);
  * when no extension exists.
  *
  * @code
- * JSLImmutableMemory path = JSL_FATPTR_INITIALIZER("archive.tar.gz");
- * JSLImmutableMemory ext = jsl_fatptr_get_file_extension(path); // "gz"
+ * JSLImmutableMemory path = JSL_CSTR_INITIALIZER("archive.tar.gz");
+ * JSLImmutableMemory ext = jsl_get_file_extension(path); // "gz"
  * @endcode
  */
-JSL_DEF JSLImmutableMemory jsl_fatptr_get_file_extension(JSLImmutableMemory filename);
+JSL_DEF JSLImmutableMemory jsl_get_file_extension(JSLImmutableMemory filename);
+
+// private
+bool jsl__memory_compare(JSLImmutableMemory a, JSLImmutableMemory b);
 
 /**
  * Element by element comparison of the contents of the two fat pointers. If either
@@ -1785,7 +1805,7 @@ JSL_DEF JSLImmutableMemory jsl_fatptr_get_file_extension(JSLImmutableMemory file
  *
  * @returns true if equal, false otherwise.
  */
-JSL_DEF bool jsl_fatptr_memory_compare(JSLImmutableMemory a, JSLImmutableMemory b);
+#define jsl_memory_compare(a, b) jsl__memory_compare(JSL_AS_IMMUTABLE(a), JSL_AS_IMMUTABLE(b))
 
 /**
  * Element by element comparison of the contents of a fat pointer and a null terminated
@@ -1800,21 +1820,21 @@ JSL_DEF bool jsl_fatptr_memory_compare(JSLImmutableMemory a, JSLImmutableMemory 
  * @param a First comparator
  * @param cstr A valid null terminated string
  */
-JSL_DEF bool jsl_fatptr_cstr_compare(JSLImmutableMemory a, char* cstr);
+JSL_DEF bool jsl_memory_cstr_compare(JSLImmutableMemory a, const char* cstr);
 
 /**
- * Compare two fatptrs that both contain ASCII data for equality while ignoring case
+ * Compare two memorys that both contain ASCII data for equality while ignoring case
  * differences. ASCII data validity is not checked.
  *
  * @returns true for equals, false for not equal
  */
-JSL_DEF bool jsl_fatptr_compare_ascii_insensitive(JSLImmutableMemory a, JSLImmutableMemory b);
+JSL_DEF bool jsl_compare_ascii_insensitive(JSLImmutableMemory a, JSLImmutableMemory b);
 
 /**
- * Modify the ASCII data in the fatptr in place to change all capital letters to
+ * Modify the ASCII data in the memory in place to change all capital letters to
  * lowercase. ASCII validity is not checked.
  */
-JSL_DEF void jsl_fatptr_to_lowercase_ascii(JSLOutputSink sink, JSLImmutableMemory str);
+JSL_DEF int64_t jsl_to_lowercase_ascii(JSLOutputSink sink, JSLImmutableMemory str);
 
 /**
  * Reads a 32 bit integer in base-10 from the beginning of `str`.
@@ -1828,7 +1848,7 @@ JSL_DEF void jsl_fatptr_to_lowercase_ascii(JSLOutputSink sink, JSLImmutableMemor
  * @param result out parameter where the parsing result will be stored
  * @return The number of bytes that were successfully read from the string
  */
-JSL_DEF int32_t jsl_fatptr_to_int32(JSLImmutableMemory str, int32_t* result);
+JSL_DEF int32_t jsl_memory_to_int32(JSLImmutableMemory str, int32_t* result);
 
 /**
  * Advance the fat pointer until the first non-whitespace character is
@@ -1838,7 +1858,7 @@ JSL_DEF int32_t jsl_fatptr_to_int32(JSLImmutableMemory str, int32_t* result);
  * @param str a fat pointer
  * @return The number of bytes that were advanced or -1
  */
-JSL_DEF int64_t jsl_fatptr_strip_whitespace_left(JSLImmutableMemory* str);
+JSL_DEF int64_t jsl_strip_whitespace_left(JSLImmutableMemory* str);
 
 /**
  * Reduce the fat pointer's length until the first non-whitespace character is
@@ -1848,7 +1868,7 @@ JSL_DEF int64_t jsl_fatptr_strip_whitespace_left(JSLImmutableMemory* str);
  * @param str a fat pointer
  * @return The number of bytes that were advanced or -1
  */
-JSL_DEF int64_t jsl_fatptr_strip_whitespace_right(JSLImmutableMemory* str);
+JSL_DEF int64_t jsl_strip_whitespace_right(JSLImmutableMemory* str);
 
 /**
  * Modify the fat pointer such that it points to the part of the string
@@ -1858,34 +1878,35 @@ JSL_DEF int64_t jsl_fatptr_strip_whitespace_right(JSLImmutableMemory* str);
  * @param str a fat pointer
  * @return The number of bytes that were advanced or -1
  */
-JSL_DEF int64_t jsl_fatptr_strip_whitespace(JSLImmutableMemory* str);
+JSL_DEF int64_t jsl_strip_whitespace(JSLImmutableMemory* str);
 
 /**
  * Allocate a new buffer from the arena and copy the contents of a fat pointer with
  * a null terminator.
  */
-JSL_DEF char* jsl_fatptr_to_cstr(JSLAllocatorInterface* allocator, JSLImmutableMemory str);
+JSL_DEF const char* jsl_memory_to_cstr(JSLAllocatorInterface* allocator, JSLImmutableMemory str);
 
 /**
- * Allocate and copy the contents of a fat pointer with a null terminator.
+ * Allocate a new buffer and copy the contents of the null terminated string into that buffer.
+ * Returns the written to memory.
  *
- * @note Use `jsl_fatptr_from_cstr` to make a fat pointer without copying.
+ * @note Use `jsl_cstr_to_memory` to make a fat pointer without copying.
  */
-JSL_DEF JSLImmutableMemory jsl_cstr_to_memory(JSLAllocatorInterface* allocator, char* str);
+JSL_DEF JSLImmutableMemory jsl_duplicate_cstr(JSLAllocatorInterface* allocator, const char* str);
 
 /**
  * Allocate space for, and copy the contents of a fat pointer.
  *
- * @note Use `jsl_cstr_to_memory` to copy a c string into a fatptr.
+ * @note Use `jsl_duplicate_cstr` to copy a c string into a memory.
  */
-JSL_DEF JSLImmutableMemory jsl_fatptr_duplicate(JSLAllocatorInterface* allocator, JSLImmutableMemory str);
+JSL_DEF JSLImmutableMemory jsl_duplicate(JSLAllocatorInterface* allocator, JSLImmutableMemory str);
 
 /**
  * TODO: docs
  * 
  * one line convenience function 
  */
-static inline int64_t jsl_output_sink_write_fatptr(JSLOutputSink sink, JSLImmutableMemory data)
+static inline int64_t jsl_output_sink_write(JSLOutputSink sink, JSLImmutableMemory data)
 {
     if (sink.write_fp == NULL) return -1;
     return sink.write_fp(sink.user_data, data);
@@ -1899,7 +1920,7 @@ static inline int64_t jsl_output_sink_write_fatptr(JSLOutputSink sink, JSLImmuta
 static inline int64_t jsl_output_sink_write_i8(JSLOutputSink sink, int8_t data)
 {
     JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(int8_t)};
-    return jsl_output_sink_write_fatptr(sink, fp);
+    return jsl_output_sink_write(sink, fp);
 }
 
 /**
@@ -1910,7 +1931,7 @@ static inline int64_t jsl_output_sink_write_i8(JSLOutputSink sink, int8_t data)
 static inline int64_t jsl_output_sink_write_u8(JSLOutputSink sink, uint8_t data)
 {
     JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(uint8_t)};
-    return jsl_output_sink_write_fatptr(sink, fp);
+    return jsl_output_sink_write(sink, fp);
 }
 
 /**
@@ -1931,7 +1952,7 @@ static inline int64_t jsl_output_sink_write_bool(JSLOutputSink sink, bool data)
 static inline int64_t jsl_output_sink_write_i16(JSLOutputSink sink, int16_t data)
 {
     JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(int16_t)};
-    return jsl_output_sink_write_fatptr(sink, fp);
+    return jsl_output_sink_write(sink, fp);
 }
 
 /**
@@ -1942,7 +1963,7 @@ static inline int64_t jsl_output_sink_write_i16(JSLOutputSink sink, int16_t data
 static inline int64_t jsl_output_sink_write_u16(JSLOutputSink sink, uint16_t data)
 {
     JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(uint16_t)};
-    return jsl_output_sink_write_fatptr(sink, fp);
+    return jsl_output_sink_write(sink, fp);
 }
 
 /**
@@ -1953,7 +1974,7 @@ static inline int64_t jsl_output_sink_write_u16(JSLOutputSink sink, uint16_t dat
 static inline int64_t jsl_output_sink_write_i32(JSLOutputSink sink, int32_t data)
 {
     JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(int32_t)};
-    return jsl_output_sink_write_fatptr(sink, fp);
+    return jsl_output_sink_write(sink, fp);
 }
 
 /**
@@ -1964,7 +1985,7 @@ static inline int64_t jsl_output_sink_write_i32(JSLOutputSink sink, int32_t data
 static inline int64_t jsl_output_sink_write_u32(JSLOutputSink sink, uint32_t data)
 {
     JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(uint32_t)};
-    return jsl_output_sink_write_fatptr(sink, fp);
+    return jsl_output_sink_write(sink, fp);
 }
 
 /**
@@ -1975,7 +1996,7 @@ static inline int64_t jsl_output_sink_write_u32(JSLOutputSink sink, uint32_t dat
 static inline int64_t jsl_output_sink_write_i64(JSLOutputSink sink, int64_t data)
 {
     JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(int64_t)};
-    return jsl_output_sink_write_fatptr(sink, fp);
+    return jsl_output_sink_write(sink, fp);
 }
 
 /**
@@ -1986,7 +2007,7 @@ static inline int64_t jsl_output_sink_write_i64(JSLOutputSink sink, int64_t data
 static inline int64_t jsl_output_sink_write_u64(JSLOutputSink sink, uint64_t data)
 {
     JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(uint64_t)};
-    return jsl_output_sink_write_fatptr(sink, fp);
+    return jsl_output_sink_write(sink, fp);
 }
 
 /**
@@ -1997,7 +2018,7 @@ static inline int64_t jsl_output_sink_write_u64(JSLOutputSink sink, uint64_t dat
 static inline int64_t jsl_output_sink_write_f32(JSLOutputSink sink, float data)
 {
     JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(float)};
-    return jsl_output_sink_write_fatptr(sink, fp);
+    return jsl_output_sink_write(sink, fp);
 }
 
 /**
@@ -2008,7 +2029,7 @@ static inline int64_t jsl_output_sink_write_f32(JSLOutputSink sink, float data)
 static inline int64_t jsl_output_sink_write_f64(JSLOutputSink sink, double data)
 {
     JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(double)};
-    return jsl_output_sink_write_fatptr(sink, fp);
+    return jsl_output_sink_write(sink, fp);
 }
 
 /**
@@ -2018,14 +2039,14 @@ static inline int64_t jsl_output_sink_write_f64(JSLOutputSink sink, double data)
  */
 static inline int64_t jsl_output_sink_write_cstr(JSLOutputSink sink, const char* data)
 {
-    JSLImmutableMemory fp = jsl_fatptr_from_cstr(data);
-    return jsl_output_sink_write_fatptr(sink, fp);
+    JSLImmutableMemory fp = jsl_cstr_to_memory(data);
+    return jsl_output_sink_write(sink, fp);
 }
 
 /**
  * TODO: docs
  */
-JSLOutputSink jsl_fatptr_output_sink(JSLMutableMemory* buffer);
+JSLOutputSink jsl_memory_output_sink(JSLMutableMemory* buffer);
 
 /**
  * This is a full snprintf replacement that supports everything that the C

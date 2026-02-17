@@ -67,7 +67,7 @@ static void test_jsl_load_file_contents(void)
     JSLImmutableMemory contents;
     JSLLoadFileResultEnum res = jsl_load_file_contents(
         &allocator,
-        jsl_fatptr_from_cstr(path),
+        jsl_cstr_to_memory(path),
         &contents,
         NULL
     );
@@ -87,7 +87,7 @@ static void test_jsl_get_file_size(void)
     int64_t size = -1;
     int32_t os_error = 0;
     JSLGetFileSizeResultEnum res = jsl_get_file_size(
-        jsl_fatptr_from_cstr(NULL),
+        jsl_cstr_to_memory(NULL),
         &size,
         &os_error
     );
@@ -107,7 +107,7 @@ static void test_jsl_get_file_size(void)
     size = -1;
     os_error = 0;
     res = jsl_get_file_size(
-        jsl_fatptr_from_cstr(path),
+        jsl_cstr_to_memory(path),
         &size,
         &os_error
     );
@@ -135,12 +135,12 @@ static void test_jsl_load_file_contents_buffer(void)
         assert(res > 0);
     }
 
-    JSLImmutableMemory buffer = jsl_immutable_memory(malloc(4*1024), 4*1024);
-    JSLImmutableMemory writer = buffer;
+    JSLMutableMemory buffer = jsl_mutable_memory(malloc(4*1024), 4*1024);
+    JSLMutableMemory writer = buffer;
 
     JSLLoadFileResultEnum res = jsl_load_file_contents_buffer(
         &writer,
-        JSL_FATPTR_EXPRESSION("./tests/example.txt"),
+        JSL_CSTR_EXPRESSION("./tests/example.txt"),
         NULL
     );
 
@@ -213,7 +213,7 @@ static void test_jsl_format_file_formats_and_writes_output(void)
 
     bool res = jsl_format_sink(
         sink,
-        JSL_FATPTR_EXPRESSION("Hello %s %d"),
+        JSL_CSTR_EXPRESSION("Hello %s %d"),
         "World",
         42
     );
@@ -240,7 +240,7 @@ static void test_jsl_format_file_accepts_empty_format(void)
 
     JSLOutputSink sink = jsl_c_file_output_sink(file);
 
-    int64_t res = jsl_format_sink(sink, JSL_FATPTR_EXPRESSION(""));
+    int64_t res = jsl_format_sink(sink, JSL_CSTR_EXPRESSION(""));
     TEST_INT64_EQUAL(res, 0);
 
     TEST_BOOL(fflush(file) == 0);
@@ -255,7 +255,7 @@ static void test_jsl_format_file_null_out_parameter(void)
 {
     JSLOutputSink sink = jsl_c_file_output_sink(NULL);
 
-    bool res = jsl_format_sink(sink, JSL_FATPTR_EXPRESSION("Hello"));
+    bool res = jsl_format_sink(sink, JSL_CSTR_EXPRESSION("Hello"));
     TEST_BOOL(!res);
 }
 
@@ -301,7 +301,7 @@ static void test_jsl_format_file_write_failure(void)
 
             JSLOutputSink sink = jsl_c_file_output_sink(writer);
 
-            int64_t res = jsl_format_sink(sink, JSL_FATPTR_EXPRESSION("Hello"));
+            int64_t res = jsl_format_sink(sink, JSL_CSTR_EXPRESSION("Hello"));
             TEST_BOOL(res < 0);
 
             fclose(writer);
@@ -325,7 +325,7 @@ static void test_jsl_format_file_write_failure(void)
     if (file != NULL)
     {
         JSLOutputSink sink = jsl_c_file_output_sink(file);
-        int64_t res1 = jsl_format_sink(sink, JSL_FATPTR_EXPRESSION("Hello"));
+        int64_t res1 = jsl_format_sink(sink, JSL_CSTR_EXPRESSION("Hello"));
         TEST_INT64_EQUAL(res1, -1);
 
         fclose(file);
@@ -346,7 +346,7 @@ static void test_jsl_format_file_write_failure(void)
     }
 
     JSLOutputSink ro_sink = jsl_c_file_output_sink(read_only);
-    int64_t res2 = jsl_format_sink(ro_sink, JSL_FATPTR_EXPRESSION("Hello"));
+    int64_t res2 = jsl_format_sink(ro_sink, JSL_CSTR_EXPRESSION("Hello"));
     TEST_BOOL(res2 < 0);
 
     fclose(read_only);
@@ -361,9 +361,9 @@ int main(void)
         setvbuf(stdout, NULL, _IONBF, 0);
     #endif
 
-    RUN_TEST_FUNCTION("Test jsl_fatptr_load_file_contents", test_jsl_load_file_contents);
+    RUN_TEST_FUNCTION("Test jsl_load_file_contents", test_jsl_load_file_contents);
     RUN_TEST_FUNCTION("Test jsl_get_file_size", test_jsl_get_file_size);
-    RUN_TEST_FUNCTION("Test jsl_fatptr_load_file_contents_buffer", test_jsl_load_file_contents_buffer);
+    RUN_TEST_FUNCTION("Test jsl_load_file_contents_buffer", test_jsl_load_file_contents_buffer);
 
     RUN_TEST_FUNCTION("Test jsl_format_to_c_file formats and writes output", test_jsl_format_file_formats_and_writes_output);
     RUN_TEST_FUNCTION("Test jsl_format_to_c_file accepts empty format", test_jsl_format_file_accepts_empty_format);

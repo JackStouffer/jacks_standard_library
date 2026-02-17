@@ -63,7 +63,7 @@
 #define JSL__CMD_LINE_OUTPUT_MODE_ANSI256 3
 #define JSL__CMD_LINE_OUTPUT_MODE_TRUECOLOR 4
 
-static const JSLImmutableMemory JSL__CMD_LINE_EMPTY_VALUE = JSL_FATPTR_INITIALIZER("");
+static const JSLImmutableMemory JSL__CMD_LINE_EMPTY_VALUE = JSL_CSTR_INITIALIZER("");
 
 static JSL__FORCE_INLINE void jsl__cmd_line_args_set_error(struct JSLCmdLineArgs* args, JSLImmutableMemory* out_error, JSLImmutableMemory message)
 {
@@ -479,7 +479,7 @@ static bool jsl__cmd_line_args_add_command(
             out_error,
             jsl_format(
                 args->_allocator,
-                JSL_FATPTR_EXPRESSION("Unable to store argument %d: %y"),
+                JSL_CSTR_EXPRESSION("Unable to store argument %d: %y"),
                 arg_index,
                 command
             )
@@ -524,7 +524,7 @@ static bool jsl__cmd_line_args_handle_long_option(
                 out_error,
                 jsl_format(
                     args->_allocator,
-                    JSL_FATPTR_EXPRESSION("Expected a flag name after \"--\" in argument %d"),
+                    JSL_CSTR_EXPRESSION("Expected a flag name after \"--\" in argument %d"),
                     arg_index
                 )
             );
@@ -534,7 +534,7 @@ static bool jsl__cmd_line_args_handle_long_option(
     int64_t equals_index = -1;
     if (params_valid)
     {
-        equals_index = jsl_fatptr_index_of(flag_body, '=');
+        equals_index = jsl_index_of(flag_body, '=');
         if (equals_index == 0)
         {
             if (out_error != NULL)
@@ -544,7 +544,7 @@ static bool jsl__cmd_line_args_handle_long_option(
                     out_error,
                     jsl_format(
                         args->_allocator,
-                        JSL_FATPTR_EXPRESSION("Expected a flag name before '=' in argument %d"),
+                        JSL_CSTR_EXPRESSION("Expected a flag name before '=' in argument %d"),
                         arg_index
                     )
                 );
@@ -580,7 +580,7 @@ static bool jsl__cmd_line_args_handle_long_option(
                     out_error,
                     jsl_format(
                         args->_allocator,
-                        JSL_FATPTR_EXPRESSION("Unable to record flag --%y"),
+                        JSL_CSTR_EXPRESSION("Unable to record flag --%y"),
                         flag_body
                     )
                 );
@@ -623,7 +623,7 @@ static bool jsl__cmd_line_args_handle_long_option(
                 out_error,
                 jsl_format(
                     args->_allocator,
-                    JSL_FATPTR_EXPRESSION("Expected a flag name before value in argument %d"),
+                    JSL_CSTR_EXPRESSION("Expected a flag name before value in argument %d"),
                     arg_index
                 )
             );
@@ -644,7 +644,7 @@ static bool jsl__cmd_line_args_handle_long_option(
                 out_error,
                 jsl_format(
                     args->_allocator,
-                    JSL_FATPTR_EXPRESSION("Unable to store value for --%y"),
+                    JSL_CSTR_EXPRESSION("Unable to store value for --%y"),
                     key
                 )
             );
@@ -689,7 +689,7 @@ static bool jsl__cmd_line_args_handle_short_option(
     int64_t equals_index = -1;
     if (params_valid)
     {
-        equals_index = jsl_fatptr_index_of(flags, '=');
+        equals_index = jsl_index_of(flags, '=');
         if (equals_index >= 0)
         {
             if (out_error != NULL)
@@ -699,7 +699,7 @@ static bool jsl__cmd_line_args_handle_short_option(
                     out_error,
                     jsl_format(
                         args->_allocator,
-                        JSL_FATPTR_EXPRESSION("Short flags cannot use '=' (argument %d: %y)"),
+                        JSL_CSTR_EXPRESSION("Short flags cannot use '=' (argument %d: %y)"),
                         arg_index,
                         arg
                     )
@@ -730,7 +730,7 @@ static bool jsl__cmd_line_args_handle_short_option(
                 out_error,
                 jsl_format(
                     args->_allocator,
-                    JSL_FATPTR_EXPRESSION("Short flags must be ASCII (argument %d: %y)"),
+                    JSL_CSTR_EXPRESSION("Short flags must be ASCII (argument %d: %y)"),
                     arg_index,
                     arg
                 )
@@ -773,7 +773,7 @@ static bool jsl__cmd_line_args_process_arg(
             out_error,
             jsl_format(
                 args->_allocator,
-                JSL_FATPTR_EXPRESSION("Invalid argument at position %d"),
+                JSL_CSTR_EXPRESSION("Invalid argument at position %d"),
                 arg_index
             )
         );
@@ -858,7 +858,7 @@ static bool jsl__cmd_line_args_process_arg(
             out_error,
             jsl_format(
                 args->_allocator,
-                JSL_FATPTR_EXPRESSION("Could not parse argument %d: %y"),
+                JSL_CSTR_EXPRESSION("Could not parse argument %d: %y"),
                 arg_index,
                 stored_arg
             )
@@ -926,7 +926,7 @@ static bool jsl__cmd_line_args_prepare_utf8_arg(
     if (params_valid)
     {
         char** arg_array = (char**) argv;
-        raw = jsl_fatptr_from_cstr(arg_array[index]);
+        raw = jsl_cstr_to_memory(arg_array[index]);
         params_valid = raw.data != NULL;
         if (!params_valid && out_error != NULL)
         {
@@ -935,7 +935,7 @@ static bool jsl__cmd_line_args_prepare_utf8_arg(
                 out_error,
                 jsl_format(
                     args->_allocator,
-                    JSL_FATPTR_EXPRESSION("Argument %d is missing"),
+                    JSL_CSTR_EXPRESSION("Argument %d is missing"),
                     index
                 )
             );
@@ -950,7 +950,7 @@ static bool jsl__cmd_line_args_prepare_utf8_arg(
             out_error,
             jsl_format(
                 args->_allocator,
-                JSL_FATPTR_EXPRESSION("Argument %d is not valid UTF-8"),
+                JSL_CSTR_EXPRESSION("Argument %d is not valid UTF-8"),
                 index
             )
         );
@@ -965,7 +965,7 @@ static bool jsl__cmd_line_args_prepare_utf8_arg(
             out_error,
             jsl_format(
                 args->_allocator,
-                JSL_FATPTR_EXPRESSION("Unable to store argument %d"),
+                JSL_CSTR_EXPRESSION("Unable to store argument %d"),
                 index
             )
         );
@@ -1010,7 +1010,7 @@ static bool jsl__cmd_line_args_prepare_wide_arg(
                 out_error,
                 jsl_format(
                     args->_allocator,
-                    JSL_FATPTR_EXPRESSION("Argument %d is missing"),
+                    JSL_CSTR_EXPRESSION("Argument %d is missing"),
                     index
                 )
             );
@@ -1029,7 +1029,7 @@ static bool jsl__cmd_line_args_prepare_wide_arg(
                 out_error,
                 jsl_format(
                     args->_allocator,
-                    JSL_FATPTR_EXPRESSION("Argument %d is not valid UTF-16"),
+                    JSL_CSTR_EXPRESSION("Argument %d is not valid UTF-16"),
                     index
                 )
             );
@@ -1092,7 +1092,7 @@ static bool jsl__cmd_line_args_parse_common(
                 out_error,
                 jsl_format(
                     args->_allocator,
-                    JSL_FATPTR_EXPRESSION("Command line input exceeds memory limit")
+                    JSL_CSTR_EXPRESSION("Command line input exceeds memory limit")
                 )
             );
         }
@@ -1116,7 +1116,7 @@ static bool jsl__cmd_line_args_parse_common(
             && stored.length > 2
             && stored.data[0] == '-'
             && stored.data[1] == '-'
-            && jsl_fatptr_index_of(stored, '=') < 0
+            && jsl_index_of(stored, '=') < 0
             && !next_is_flag;
 
         JSLImmutableMemory next_stored = {0};
@@ -1162,7 +1162,7 @@ static bool jsl__cmd_line_args_parse_common(
                 out_error,
                 jsl_format(
                     args->_allocator,
-                    JSL_FATPTR_EXPRESSION("Failed to parse command line input")
+                    JSL_CSTR_EXPRESSION("Failed to parse command line input")
                 )
             );
         }
@@ -1241,15 +1241,15 @@ static bool jsl__cmd_line_env_truthy(JSLImmutableMemory value)
         return false;
     }
 
-    static JSLImmutableMemory zero_str = JSL_FATPTR_INITIALIZER("0");
-    static JSLImmutableMemory false_str = JSL_FATPTR_INITIALIZER("false");
-    static JSLImmutableMemory no_str = JSL_FATPTR_INITIALIZER("no");
-    static JSLImmutableMemory off_str = JSL_FATPTR_INITIALIZER("off");
+    static JSLImmutableMemory zero_str = JSL_CSTR_INITIALIZER("0");
+    static JSLImmutableMemory false_str = JSL_CSTR_INITIALIZER("false");
+    static JSLImmutableMemory no_str = JSL_CSTR_INITIALIZER("no");
+    static JSLImmutableMemory off_str = JSL_CSTR_INITIALIZER("off");
 
-    if (jsl_fatptr_memory_compare(value, zero_str)
-        || jsl_fatptr_memory_compare(value, false_str)
-        || jsl_fatptr_memory_compare(value, no_str)
-        || jsl_fatptr_memory_compare(value, off_str))
+    if (jsl_memory_compare(value, zero_str)
+        || jsl_memory_compare(value, false_str)
+        || jsl_memory_compare(value, no_str)
+        || jsl_memory_compare(value, off_str))
     {
         return false;
     }
@@ -1339,21 +1339,21 @@ bool jsl_cmd_line_get_terminal_info(JSLTerminalInfo* info, uint32_t flags)
 
     #else
 
-        JSLImmutableMemory env_no_color = jsl_fatptr_from_cstr(getenv("NO_COLOR"));
-        JSLImmutableMemory env_term = jsl_fatptr_from_cstr(getenv("TERM"));
-        JSLImmutableMemory env_colorterm = jsl_fatptr_from_cstr(getenv("COLORTERM"));
-        JSLImmutableMemory env_clicolor = jsl_fatptr_from_cstr(getenv("CLICOLOR"));
-        JSLImmutableMemory env_clicolor_force = jsl_fatptr_from_cstr(getenv("CLICOLOR_FORCE"));
-        JSLImmutableMemory env_force_color = jsl_fatptr_from_cstr(getenv("FORCE_COLOR"));
-        JSLImmutableMemory env_vte_version = jsl_fatptr_from_cstr(getenv("VTE_VERSION"));
-        JSLImmutableMemory env_ansicon = jsl_fatptr_from_cstr(getenv("ANSICON"));
-        JSLImmutableMemory env_conemu_ansi = jsl_fatptr_from_cstr(getenv("ConEmuANSI"));
-        JSLImmutableMemory env_wt_session = jsl_fatptr_from_cstr(getenv("WT_SESSION"));
+        JSLImmutableMemory env_no_color = jsl_cstr_to_memory(getenv("NO_COLOR"));
+        JSLImmutableMemory env_term = jsl_cstr_to_memory(getenv("TERM"));
+        JSLImmutableMemory env_colorterm = jsl_cstr_to_memory(getenv("COLORTERM"));
+        JSLImmutableMemory env_clicolor = jsl_cstr_to_memory(getenv("CLICOLOR"));
+        JSLImmutableMemory env_clicolor_force = jsl_cstr_to_memory(getenv("CLICOLOR_FORCE"));
+        JSLImmutableMemory env_force_color = jsl_cstr_to_memory(getenv("FORCE_COLOR"));
+        JSLImmutableMemory env_vte_version = jsl_cstr_to_memory(getenv("VTE_VERSION"));
+        JSLImmutableMemory env_ansicon = jsl_cstr_to_memory(getenv("ANSICON"));
+        JSLImmutableMemory env_conemu_ansi = jsl_cstr_to_memory(getenv("ConEmuANSI"));
+        JSLImmutableMemory env_wt_session = jsl_cstr_to_memory(getenv("WT_SESSION"));
 
     #endif
 
-    static JSLImmutableMemory dumb_str = JSL_FATPTR_INITIALIZER("dumb");
-    bool term_dumb = jsl_fatptr_compare_ascii_insensitive(env_term, dumb_str);
+    static JSLImmutableMemory dumb_str = JSL_CSTR_INITIALIZER("dumb");
+    bool term_dumb = jsl_compare_ascii_insensitive(env_term, dumb_str);
 
     bool clicolor_disabled = env_clicolor.length > 0
         && !jsl__cmd_line_env_truthy(env_clicolor);
@@ -1426,10 +1426,10 @@ bool jsl_cmd_line_get_terminal_info(JSLTerminalInfo* info, uint32_t flags)
         }
     #endif
 
-    static JSLImmutableMemory color_str = JSL_FATPTR_INITIALIZER("color");
-    static JSLImmutableMemory truecolor_str = JSL_FATPTR_INITIALIZER("truecolor");
-    static JSLImmutableMemory bit24_str = JSL_FATPTR_INITIALIZER("24bit");
-    static JSLImmutableMemory color256_str = JSL_FATPTR_INITIALIZER("256color");
+    static JSLImmutableMemory color_str = JSL_CSTR_INITIALIZER("color");
+    static JSLImmutableMemory truecolor_str = JSL_CSTR_INITIALIZER("truecolor");
+    static JSLImmutableMemory bit24_str = JSL_CSTR_INITIALIZER("24bit");
+    static JSLImmutableMemory color256_str = JSL_CSTR_INITIALIZER("256color");
 
     bool colorterm_truecolor = jsl__cmd_line_str_contains_ci(env_colorterm, truecolor_str)
         || jsl__cmd_line_str_contains_ci(env_colorterm, bit24_str);
@@ -1703,11 +1703,11 @@ static int64_t jsl__cmd_line_write_color(
     bool is_foreground
 )
 {
-    static const JSLImmutableMemory ansi16_fmt = JSL_FATPTR_INITIALIZER("\x1b[%dm");
-    static const JSLImmutableMemory fg_256_fmt = JSL_FATPTR_INITIALIZER("\x1b[38;5;%dm");
-    static const JSLImmutableMemory bg_256_fmt = JSL_FATPTR_INITIALIZER("\x1b[48;5;%dm");
-    static const JSLImmutableMemory fg_rgb_fmt = JSL_FATPTR_INITIALIZER("\x1b[38;2;%d;%d;%dm");
-    static const JSLImmutableMemory bg_rgb_fmt = JSL_FATPTR_INITIALIZER("\x1b[48;2;%d;%d;%dm");
+    static const JSLImmutableMemory ansi16_fmt = JSL_CSTR_INITIALIZER("\x1b[%dm");
+    static const JSLImmutableMemory fg_256_fmt = JSL_CSTR_INITIALIZER("\x1b[38;5;%dm");
+    static const JSLImmutableMemory bg_256_fmt = JSL_CSTR_INITIALIZER("\x1b[48;5;%dm");
+    static const JSLImmutableMemory fg_rgb_fmt = JSL_CSTR_INITIALIZER("\x1b[38;2;%d;%d;%dm");
+    static const JSLImmutableMemory bg_rgb_fmt = JSL_CSTR_INITIALIZER("\x1b[48;2;%d;%d;%dm");
 
     if (color->_color_type == JSL__CMD_LINE_COLOR_DEFAULT)
         return 0;
@@ -1817,85 +1817,85 @@ int64_t jsl_cmd_line_write_style(JSLOutputSink sink, JSLTerminalInfo* terminal_i
     int64_t bytes_written = 0;
     int64_t result = 0;
 
-    static const JSLImmutableMemory bold_code = JSL_FATPTR_INITIALIZER("\x1b[1m");
-    static const JSLImmutableMemory dim_code = JSL_FATPTR_INITIALIZER("\x1b[2m");
-    static const JSLImmutableMemory italic_code = JSL_FATPTR_INITIALIZER("\x1b[3m");
-    static const JSLImmutableMemory underline_code = JSL_FATPTR_INITIALIZER("\x1b[4m");
-    static const JSLImmutableMemory dunderline_code = JSL_FATPTR_INITIALIZER("\x1b[21m");
-    static const JSLImmutableMemory blink_code = JSL_FATPTR_INITIALIZER("\x1b[5m");
-    static const JSLImmutableMemory rblink_code = JSL_FATPTR_INITIALIZER("\x1b[6m");
-    static const JSLImmutableMemory inverse_code = JSL_FATPTR_INITIALIZER("\x1b[7m");
-    static const JSLImmutableMemory hidden_code = JSL_FATPTR_INITIALIZER("\x1b[8m");
-    static const JSLImmutableMemory strike_code = JSL_FATPTR_INITIALIZER("\x1b[9m");
+    static const JSLImmutableMemory bold_code = JSL_CSTR_INITIALIZER("\x1b[1m");
+    static const JSLImmutableMemory dim_code = JSL_CSTR_INITIALIZER("\x1b[2m");
+    static const JSLImmutableMemory italic_code = JSL_CSTR_INITIALIZER("\x1b[3m");
+    static const JSLImmutableMemory underline_code = JSL_CSTR_INITIALIZER("\x1b[4m");
+    static const JSLImmutableMemory dunderline_code = JSL_CSTR_INITIALIZER("\x1b[21m");
+    static const JSLImmutableMemory blink_code = JSL_CSTR_INITIALIZER("\x1b[5m");
+    static const JSLImmutableMemory rblink_code = JSL_CSTR_INITIALIZER("\x1b[6m");
+    static const JSLImmutableMemory inverse_code = JSL_CSTR_INITIALIZER("\x1b[7m");
+    static const JSLImmutableMemory hidden_code = JSL_CSTR_INITIALIZER("\x1b[8m");
+    static const JSLImmutableMemory strike_code = JSL_CSTR_INITIALIZER("\x1b[9m");
 
     uint32_t attributes = style->_style_attributes;
 
     if (JSL_IS_BITFLAG_SET(attributes, JSL_CMD_LINE_STYLE_BOLD))
     {
-        result = jsl_output_sink_write_fatptr(sink, bold_code);
+        result = jsl_output_sink_write(sink, bold_code);
         if (result < 0) return -1;
         bytes_written += result;
     }
 
     if (JSL_IS_BITFLAG_SET(attributes, JSL_CMD_LINE_STYLE_DIM))
     {
-        result = jsl_output_sink_write_fatptr(sink, dim_code);
+        result = jsl_output_sink_write(sink, dim_code);
         if (result < 0) return -1;
         bytes_written += result;
     }
 
     if (JSL_IS_BITFLAG_SET(attributes, JSL_CMD_LINE_STYLE_ITALIC))
     {
-        result = jsl_output_sink_write_fatptr(sink, italic_code);
+        result = jsl_output_sink_write(sink, italic_code);
         if (result < 0) return -1;
         bytes_written += result;
     }
 
     if (JSL_IS_BITFLAG_SET(attributes, JSL_CMD_LINE_STYLE_UNDERLINE))
     {
-        result = jsl_output_sink_write_fatptr(sink, underline_code);
+        result = jsl_output_sink_write(sink, underline_code);
         if (result < 0) return -1;
         bytes_written += result;
     }
 
     if (JSL_IS_BITFLAG_SET(attributes, JSL_CMD_LINE_STYLE_DUNDERLINE))
     {
-        result = jsl_output_sink_write_fatptr(sink, dunderline_code);
+        result = jsl_output_sink_write(sink, dunderline_code);
         if (result < 0) return -1;
         bytes_written += result;
     }
 
     if (JSL_IS_BITFLAG_SET(attributes, JSL_CMD_LINE_STYLE_BLINK))
     {
-        result = jsl_output_sink_write_fatptr(sink, blink_code);
+        result = jsl_output_sink_write(sink, blink_code);
         if (result < 0) return -1;
         bytes_written += result;
     }
 
     if (JSL_IS_BITFLAG_SET(attributes, JSL_CMD_LINE_STYLE_RBLINK))
     {
-        result = jsl_output_sink_write_fatptr(sink, rblink_code);
+        result = jsl_output_sink_write(sink, rblink_code);
         if (result < 0) return -1;
         bytes_written += result;
     }
 
     if (JSL_IS_BITFLAG_SET(attributes, JSL_CMD_LINE_STYLE_INVERSE))
     {
-        result = jsl_output_sink_write_fatptr(sink, inverse_code);
+        result = jsl_output_sink_write(sink, inverse_code);
         if (result < 0) return -1;
         bytes_written += result;
     }
 
     if (JSL_IS_BITFLAG_SET(attributes, JSL_CMD_LINE_STYLE_HIDDEN))
     {
-        result = jsl_output_sink_write_fatptr(sink, hidden_code);
+        result = jsl_output_sink_write(sink, hidden_code);
         if (result < 0) return -1;
         bytes_written += result;
     }
 
     if (JSL_IS_BITFLAG_SET(attributes, JSL_CMD_LINE_STYLE_STRIKE))
     {
-        result = jsl_output_sink_write_fatptr(sink, strike_code);
+        result = jsl_output_sink_write(sink, strike_code);
         if (result < 0) return -1;
         bytes_written += result;
     }
@@ -1930,8 +1930,8 @@ int64_t jsl_cmd_line_write_reset(JSLOutputSink sink, JSLTerminalInfo* terminal_i
         || terminal_info->_output_mode == JSL__CMD_LINE_OUTPUT_MODE_ANSI256
         || terminal_info->_output_mode == JSL__CMD_LINE_OUTPUT_MODE_TRUECOLOR)
     {
-        static JSLImmutableMemory reset_code = JSL_FATPTR_INITIALIZER("\x1b[0m");
-        return jsl_output_sink_write_fatptr(sink, reset_code);
+        static JSLImmutableMemory reset_code = JSL_CSTR_INITIALIZER("\x1b[0m");
+        return jsl_output_sink_write(sink, reset_code);
     }
 
     return 0;

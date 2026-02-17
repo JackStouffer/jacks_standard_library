@@ -250,7 +250,7 @@ static JSL__FORCE_INLINE void jsl__str_to_str_map_store_key(
         && key.length > JSL__MAP_SSO_LENGTH
     )
     {
-        entry->key = jsl_fatptr_duplicate(map->allocator, key);
+        entry->key = jsl_duplicate(map->allocator, key);
         entry->key_lifetime = JSL__MAP_LIFETIME_DUPLICATED;
     }
     else
@@ -317,7 +317,7 @@ static JSL__FORCE_INLINE void jsl__str_to_str_map_store_value(
         && value.length > JSL__MAP_SSO_LENGTH
     )
     {
-        entry->value = jsl_fatptr_duplicate(map->allocator, value);
+        entry->value = jsl_duplicate(map->allocator, value);
         entry->value_lifetime = JSL__MAP_LIFETIME_DUPLICATED;
     }
     else
@@ -457,7 +457,7 @@ static inline void jsl__str_to_str_map_probe(
         if (entry != NULL)
         {
             JSLImmutableMemory entry_key = jsl__str_to_str_map_get_entry_key(entry);
-            matches = *out_hash == entry->hash && jsl_fatptr_memory_compare(key, entry_key);
+            matches = *out_hash == entry->hash && jsl_memory_compare(key, entry_key);
         }
 
         if (matches)

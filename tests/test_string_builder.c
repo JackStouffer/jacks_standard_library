@@ -69,10 +69,10 @@ static void* test_allocator_reallocate(void* ctx, void* allocation, int64_t new_
     return realloc(allocation, (size_t) new_bytes);
 }
 
-static bool test_allocator_free(void* ctx, void* allocation)
+static bool test_allocator_free(void* ctx, const void* allocation)
 {
     JSLTestAllocatorContext* context = (JSLTestAllocatorContext*) ctx;
-    free(allocation);
+    free((void*) allocation);
     context->free_count += 1;
     context->active_allocations -= 1;
     return true;
@@ -99,7 +99,7 @@ static JSLAllocatorInterface test_make_allocator(JSLTestAllocatorContext* contex
 }
 
 /// @brief copy all of the chunks out to a buffer
-static void debug_concatenate_builder(JSLStringBuilder* builder, JSLImmutableMemory* writer)
+static void debug_concatenate_builder(JSLStringBuilder* builder, JSLMutableMemory* writer)
 {
     JSLStringBuilderIterator iterator;
     jsl_string_builder_iterator_init(builder, &iterator);
@@ -107,7 +107,7 @@ static void debug_concatenate_builder(JSLStringBuilder* builder, JSLImmutableMem
     JSLImmutableMemory slice;
     while (jsl_string_builder_iterator_next(&iterator, &slice))
     {
-        int64_t memcpy_res = jsl_fatptr_memory_copy(writer, slice);
+        int64_t memcpy_res = jsl_memory_copy(writer, slice);
         TEST_INT64_EQUAL(memcpy_res, slice.length);
     }
 }
@@ -161,7 +161,7 @@ static void test_jsl_string_builder_init_invalid_arguments(void)
     TEST_BOOL(!jsl_string_builder_init2(&builder, &allocator, 16, 0));
 }
 
-static void test_jsl_string_builder_insert_fatptr_multi_chunk(void)
+static void test_jsl_string_builder_insert_memory_multi_chunk(void)
 {
     JSLStringBuilder builder;
     JSLAllocatorInterface allocator;
@@ -171,12 +171,12 @@ static void test_jsl_string_builder_insert_fatptr_multi_chunk(void)
     TEST_BOOL(ok);
 
     char text[] = "abcdefghij";
-    JSLImmutableMemory data = jsl_fatptr_from_cstr(text);
-    TEST_INT64_EQUAL(jsl_string_builder_insert_fatptr(&builder, data), 10);
+    JSLImmutableMemory data = jsl_cstr_to_memory(text);
+    TEST_INT64_EQUAL(jsl_string_builder_insert_memory(&builder, data), 10);
 
     uint8_t actual[32] = {0};
-    JSLImmutableMemory buffer = JSL_MEMORY_FROM_STACK(actual);
-    JSLImmutableMemory writer = buffer;
+    JSLMutableMemory buffer = JSL_MEMORY_FROM_STACK(actual);
+    JSLMutableMemory writer = buffer;
     debug_concatenate_builder(&builder, &writer);
     int64_t len = jsl_total_write_length(buffer, writer);
 
@@ -201,7 +201,7 @@ static void test_jsl_string_builder_insert_fatptr_multi_chunk(void)
     TEST_BUFFERS_EQUAL(third.data, "ij", 2);
 }
 
-static void test_jsl_string_builder_insert_fatptr_edge_cases(void)
+static void test_jsl_string_builder_insert_memory_edge_cases(void)
 {
     JSLStringBuilder builder;
     JSLAllocatorInterface allocator;
@@ -210,11 +210,11 @@ static void test_jsl_string_builder_insert_fatptr_edge_cases(void)
     bool ok = jsl_string_builder_init2(&builder, &allocator, 8, 8);
     TEST_BOOL(ok);
 
-    JSLImmutableMemory empty = JSL_FATPTR_INITIALIZER("");
-    TEST_INT64_EQUAL(jsl_string_builder_insert_fatptr(&builder, empty), 0);
+    JSLImmutableMemory empty = JSL_CSTR_INITIALIZER("");
+    TEST_INT64_EQUAL(jsl_string_builder_insert_memory(&builder, empty), 0);
     uint8_t actual[8] = {0};
-    JSLImmutableMemory buffer = JSL_MEMORY_FROM_STACK(actual);
-    JSLImmutableMemory writer = buffer;
+    JSLMutableMemory buffer = JSL_MEMORY_FROM_STACK(actual);
+    JSLMutableMemory writer = buffer;
 
     debug_concatenate_builder(&builder, &writer);
     int64_t len = jsl_total_write_length(buffer, writer);
@@ -223,7 +223,7 @@ static void test_jsl_string_builder_insert_fatptr_edge_cases(void)
     writer = buffer;
     uint8_t binary_data[] = {'A', '\0', 'B'};
     JSLImmutableMemory binary_ptr = jsl_immutable_memory(binary_data, 3);
-    TEST_INT64_EQUAL(jsl_string_builder_insert_fatptr(&builder, binary_ptr), 3);
+    TEST_INT64_EQUAL(jsl_string_builder_insert_memory(&builder, binary_ptr), 3);
     debug_concatenate_builder(&builder, &writer);
     len = jsl_total_write_length(buffer, writer);
 
@@ -233,7 +233,7 @@ static void test_jsl_string_builder_insert_fatptr_edge_cases(void)
     TEST_BOOL(actual[2] == 'B');
 
     JSLStringBuilder uninitialized = {0};
-    TEST_INT64_EQUAL(jsl_string_builder_insert_fatptr(&uninitialized, binary_ptr), -1);
+    TEST_INT64_EQUAL(jsl_string_builder_insert_memory(&uninitialized, binary_ptr), -1);
 }
 
 static void test_jsl_string_builder_iterator_behavior(void)
@@ -289,12 +289,12 @@ static void test_jsl_string_builder_with_format(void)
 
     JSLOutputSink builder_sink = jsl_string_builder_output_sink(&builder);
 
-    TEST_BOOL(jsl_format_sink(builder_sink, JSL_FATPTR_EXPRESSION("%s-%d"), "alpha", 42) > -1);
-    TEST_BOOL(jsl_format_sink(builder_sink, JSL_FATPTR_EXPRESSION(":%02X"), 0xAB) > -1);
+    TEST_BOOL(jsl_format_sink(builder_sink, JSL_CSTR_EXPRESSION("%s-%d"), "alpha", 42) > -1);
+    TEST_BOOL(jsl_format_sink(builder_sink, JSL_CSTR_EXPRESSION(":%02X"), 0xAB) > -1);
 
     uint8_t actual[64] = {0};
-    JSLImmutableMemory buffer = JSL_MEMORY_FROM_STACK(actual);
-    JSLImmutableMemory writer = buffer;
+    JSLMutableMemory buffer = JSL_MEMORY_FROM_STACK(actual);
+    JSLMutableMemory writer = buffer;
 
     debug_concatenate_builder(&builder, &writer);
     int64_t len = jsl_total_write_length(buffer, writer);
@@ -317,11 +317,11 @@ static void test_jsl_string_builder_with_format_needs_multiple_chunks(void)
     JSLOutputSink builder_sink = jsl_string_builder_output_sink(&builder);
 
     char long_fragment[] = "0123456789ABCDEF0123456789";
-    TEST_BOOL(jsl_format_sink(builder_sink, JSL_FATPTR_EXPRESSION("%s"), long_fragment) > -1);
+    TEST_BOOL(jsl_format_sink(builder_sink, JSL_CSTR_EXPRESSION("%s"), long_fragment) > -1);
 
     uint8_t actual[128] = {0};
-    JSLImmutableMemory buffer = JSL_MEMORY_FROM_STACK(actual);
-    JSLImmutableMemory writer = buffer;
+    JSLMutableMemory buffer = JSL_MEMORY_FROM_STACK(actual);
+    JSLMutableMemory writer = buffer;
 
     debug_concatenate_builder(&builder, &writer);
     int64_t len = jsl_total_write_length(buffer, writer);
@@ -335,7 +335,7 @@ static void test_jsl_string_builder_with_format_invalid_builder(void)
 {
     JSLStringBuilder builder = {0};
     JSLOutputSink builder_sink = jsl_string_builder_output_sink(&builder);
-    TEST_INT64_EQUAL(jsl_format_sink(builder_sink, jsl_fatptr_from_cstr("abc")), -1);
+    TEST_INT64_EQUAL(jsl_format_sink(builder_sink, jsl_cstr_to_memory("abc")), -1);
 }
 
 static void test_jsl_string_builder_free_null_and_uninitialized(void)
@@ -462,13 +462,13 @@ int main(void)
     RUN_TEST_FUNCTION("Test invalid init args", test_jsl_string_builder_init_invalid_arguments);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("Test empty string and null bytes", test_jsl_string_builder_insert_fatptr_edge_cases);
+    RUN_TEST_FUNCTION("Test empty string and null bytes", test_jsl_string_builder_insert_memory_edge_cases);
     jsl_arena_reset(&global_arena);
 
     RUN_TEST_FUNCTION("Test iterator", test_jsl_string_builder_iterator_behavior);
     jsl_arena_reset(&global_arena);
 
-    RUN_TEST_FUNCTION("Test iterator across chunks", test_jsl_string_builder_insert_fatptr_multi_chunk);
+    RUN_TEST_FUNCTION("Test iterator across chunks", test_jsl_string_builder_insert_memory_multi_chunk);
     jsl_arena_reset(&global_arena);
 
     RUN_TEST_FUNCTION("Test format", test_jsl_string_builder_with_format);

@@ -272,7 +272,7 @@ static JSL__FORCE_INLINE void jsl__str_to_str_multimap_store_key(
         && key.length > JSL__MULTIMAP_KEY_SSO_LENGTH
     )
     {
-        entry->key = jsl_fatptr_duplicate(map->allocator, key);
+        entry->key = jsl_duplicate(map->allocator, key);
         entry->key_state = JSL__DUPLICATED;
     }
     else
@@ -322,7 +322,7 @@ static JSL__FORCE_INLINE void jsl__str_to_str_multimap_store_value(
         && value.length > JSL__MULTIMAP_VALUE_SSO_LENGTH
     )
     {
-        value_record->value = jsl_fatptr_duplicate(map->allocator, value);
+        value_record->value = jsl_duplicate(map->allocator, value);
         value_record->value_state = JSL__DUPLICATED;
     }
     else
@@ -531,7 +531,7 @@ static inline void jsl__str_to_str_multimap_probe(
         JSLImmutableMemory entry_key = entry_valid ? jsl__str_to_str_multimap_get_key(entry) : (JSLImmutableMemory) {0};
         bool matches = entry_valid
             && *out_hash == entry->hash
-            && jsl_fatptr_memory_compare(key, entry_key);
+            && jsl_memory_compare(key, entry_key);
 
         if (matches)
         {
@@ -1104,7 +1104,7 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_delete_value(
     while (entry_valid && current != NULL && !value_found)
     {
         JSLImmutableMemory stored_value = jsl__str_to_str_multimap_get_value(current);
-        bool equal = jsl_fatptr_memory_compare(stored_value, value);
+        bool equal = jsl_memory_compare(stored_value, value);
         if (equal)
         {
             value_found = true;

@@ -137,7 +137,7 @@ struct JSL__StrSet {
  * JSLStrSet set;
  * jsl_str_set_init(&set, &stack_arena, 0);
  *
- * JSLImmutableMemory value = JSL_FATPTR_INITIALIZER("hello-key");
+ * JSLImmutableMemory value = JSL_CSTR_INITIALIZER("hello-key");
  * 
  * jsl_str_to_str_multimap_insert(
  *     &set,

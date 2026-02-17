@@ -212,7 +212,7 @@ void* jsl_arena_allocate_aligned(JSLArena* arena, int64_t bytes, int32_t alignme
     return (void*) aligned_allocation_addr;
 }
 
-void* jsl_arena_reallocate(JSLArena* arena, void* original_allocation, int64_t new_num_bytes)
+void* jsl_arena_reallocate(JSLArena* arena, const void* original_allocation, int64_t new_num_bytes)
 {
     return jsl_arena_reallocate_aligned(
         arena, original_allocation, new_num_bytes, JSL_DEFAULT_ALLOCATION_ALIGNMENT
@@ -221,7 +221,7 @@ void* jsl_arena_reallocate(JSLArena* arena, void* original_allocation, int64_t n
 
 void* jsl_arena_reallocate_aligned(
     JSLArena* arena,
-    void* original_allocation,
+    const void* original_allocation,
     int64_t new_num_bytes,
     int32_t align
 )
@@ -319,7 +319,7 @@ void* jsl_arena_reallocate_aligned(
             );
         }
 
-        return original_allocation;
+        return (void*) original_allocation;
     }
 
     void* res = jsl_arena_allocate_aligned(arena, new_num_bytes, align, false);

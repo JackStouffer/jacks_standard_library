@@ -189,7 +189,7 @@
     #include "../tools/templates/dynamic_hash_map_header.h"
     #include "../tools/templates/dynamic_hash_map_source.h"
 
-    static JSLImmutableMemory fixed_header_template = JSL_FATPTR_INITIALIZER(
+    static JSLImmutableMemory fixed_header_template = JSL_CSTR_INITIALIZER(
         "/**\n"
         " * AUTO GENERATED FILE\n"
         " *\n"
@@ -379,7 +379,7 @@
         ");\n"
     );
 
-    static JSLImmutableMemory fixed_source_template = JSL_FATPTR_INITIALIZER(
+    static JSLImmutableMemory fixed_source_template = JSL_CSTR_INITIALIZER(
         "/**\n"
         " * AUTO GENERATED FILE\n"
         " *\n"
@@ -738,27 +738,27 @@
         "}\n"
     );
 
-    static JSLImmutableMemory hash_map_name_key = JSL_FATPTR_INITIALIZER("hash_map_name");
-    static JSLImmutableMemory key_type_name_key = JSL_FATPTR_INITIALIZER("key_type_name");
-    static JSLImmutableMemory value_type_name_key = JSL_FATPTR_INITIALIZER("value_type_name");
-    static JSLImmutableMemory function_prefix_key = JSL_FATPTR_INITIALIZER("function_prefix");
-    static JSLImmutableMemory hash_function_key = JSL_FATPTR_INITIALIZER("hash_function");
-    static JSLImmutableMemory key_compare_key = JSL_FATPTR_INITIALIZER("key_compare");
+    static JSLImmutableMemory hash_map_name_key = JSL_CSTR_INITIALIZER("hash_map_name");
+    static JSLImmutableMemory key_type_name_key = JSL_CSTR_INITIALIZER("key_type_name");
+    static JSLImmutableMemory value_type_name_key = JSL_CSTR_INITIALIZER("value_type_name");
+    static JSLImmutableMemory function_prefix_key = JSL_CSTR_INITIALIZER("function_prefix");
+    static JSLImmutableMemory hash_function_key = JSL_CSTR_INITIALIZER("hash_function");
+    static JSLImmutableMemory key_compare_key = JSL_CSTR_INITIALIZER("key_compare");
 
-    static JSLImmutableMemory int32_t_str = JSL_FATPTR_INITIALIZER("int32_t");
-    static JSLImmutableMemory int_str = JSL_FATPTR_INITIALIZER("int");
-    static JSLImmutableMemory unsigned_str = JSL_FATPTR_INITIALIZER("unsigned");
-    static JSLImmutableMemory unsigned_int_str = JSL_FATPTR_INITIALIZER("unsigned int");
-    static JSLImmutableMemory uint32_t_str = JSL_FATPTR_INITIALIZER("uint32_t");
-    static JSLImmutableMemory int64_t_str = JSL_FATPTR_INITIALIZER("int64_t");
-    static JSLImmutableMemory long_str = JSL_FATPTR_INITIALIZER("long");
-    static JSLImmutableMemory long_int_str = JSL_FATPTR_INITIALIZER("long int");
-    static JSLImmutableMemory long_long_str = JSL_FATPTR_INITIALIZER("long long");
-    static JSLImmutableMemory long_long_int_str = JSL_FATPTR_INITIALIZER("long long int");
-    static JSLImmutableMemory uint64_t_str = JSL_FATPTR_INITIALIZER("uint64_t");
-    static JSLImmutableMemory unsigned_long_str = JSL_FATPTR_INITIALIZER("unsigned long");
-    static JSLImmutableMemory unsigned_long_long_str = JSL_FATPTR_INITIALIZER("unsigned long long");
-    static JSLImmutableMemory unsigned_long_long_int_str = JSL_FATPTR_INITIALIZER("unsigned long long int");
+    static JSLImmutableMemory int32_t_str = JSL_CSTR_INITIALIZER("int32_t");
+    static JSLImmutableMemory int_str = JSL_CSTR_INITIALIZER("int");
+    static JSLImmutableMemory unsigned_str = JSL_CSTR_INITIALIZER("unsigned");
+    static JSLImmutableMemory unsigned_int_str = JSL_CSTR_INITIALIZER("unsigned int");
+    static JSLImmutableMemory uint32_t_str = JSL_CSTR_INITIALIZER("uint32_t");
+    static JSLImmutableMemory int64_t_str = JSL_CSTR_INITIALIZER("int64_t");
+    static JSLImmutableMemory long_str = JSL_CSTR_INITIALIZER("long");
+    static JSLImmutableMemory long_int_str = JSL_CSTR_INITIALIZER("long int");
+    static JSLImmutableMemory long_long_str = JSL_CSTR_INITIALIZER("long long");
+    static JSLImmutableMemory long_long_int_str = JSL_CSTR_INITIALIZER("long long int");
+    static JSLImmutableMemory uint64_t_str = JSL_CSTR_INITIALIZER("uint64_t");
+    static JSLImmutableMemory unsigned_long_str = JSL_CSTR_INITIALIZER("unsigned long");
+    static JSLImmutableMemory unsigned_long_long_str = JSL_CSTR_INITIALIZER("unsigned long long");
+    static JSLImmutableMemory unsigned_long_long_int_str = JSL_CSTR_INITIALIZER("unsigned long long int");
 
     // because rand max on some platforms is 32k
     static inline uint32_t rand_u32(void)
@@ -779,49 +779,49 @@
         JSLStrToStrMap* variables
     )
     {
-        static JSLImmutableMemory open_param = JSL_FATPTR_INITIALIZER("{{");
-        static JSLImmutableMemory close_param = JSL_FATPTR_INITIALIZER("}}");
+        static JSLImmutableMemory open_param = JSL_CSTR_INITIALIZER("{{");
+        static JSLImmutableMemory close_param = JSL_CSTR_INITIALIZER("}}");
         JSLImmutableMemory template_reader = template;
         
         while (template_reader.length > 0)
         {
-            int64_t index_of_open = jsl_fatptr_substring_search(template_reader, open_param);
+            int64_t index_of_open = jsl_substring_search(template_reader, open_param);
 
             // No more variables, write everything
             if (index_of_open == -1)
             {
-                jsl_output_sink_write_fatptr(sink, template_reader);
+                jsl_output_sink_write(sink, template_reader);
                 break;
             }
 
             if (index_of_open > 0)
             {
                 JSLImmutableMemory slice = jsl_slice(template_reader, 0, index_of_open);
-                jsl_output_sink_write_fatptr(sink, slice);
+                jsl_output_sink_write(sink, slice);
             }
 
-            JSL_FATPTR_ADVANCE(template_reader, index_of_open + open_param.length);
+            JSL_MEMORY_ADVANCE(template_reader, index_of_open + open_param.length);
 
-            int64_t index_of_close = jsl_fatptr_substring_search(template_reader, close_param);
+            int64_t index_of_close = jsl_substring_search(template_reader, close_param);
 
             // Improperly closed template param, write everything including the open marker
             if (index_of_close == -1)
             {
-                jsl_output_sink_write_fatptr(sink, open_param);
-                jsl_output_sink_write_fatptr(sink, template_reader);
+                jsl_output_sink_write(sink, open_param);
+                jsl_output_sink_write(sink, template_reader);
                 break;
             }
 
             JSLImmutableMemory var_name = jsl_slice(template_reader, 0, index_of_close);
-            jsl_fatptr_strip_whitespace(&var_name);
+            jsl_strip_whitespace(&var_name);
 
             JSLImmutableMemory var_value;
             if (jsl_str_to_str_map_get(variables, var_name, &var_value))
             {
-                jsl_output_sink_write_fatptr(sink, var_value);
+                jsl_output_sink_write(sink, var_value);
             }
 
-            JSL_FATPTR_ADVANCE(template_reader, index_of_close + close_param.length);
+            JSL_MEMORY_ADVANCE(template_reader, index_of_close + close_param.length);
         }
     }
 
@@ -870,40 +870,40 @@
 
         srand((uint32_t) (time(NULL) % UINT32_MAX));
 
-        jsl_output_sink_write_fatptr(
+        jsl_output_sink_write(
             sink,
-            JSL_FATPTR_EXPRESSION("// DEFAULT INCLUDED HEADERS\n")
+            JSL_CSTR_EXPRESSION("// DEFAULT INCLUDED HEADERS\n")
         );
 
-        jsl_output_sink_write_fatptr(sink, JSL_FATPTR_EXPRESSION("#pragma once\n\n"));
-        jsl_output_sink_write_fatptr(sink, JSL_FATPTR_EXPRESSION("#include <stdint.h>\n"));
-        jsl_output_sink_write_fatptr(sink, JSL_FATPTR_EXPRESSION("#include \"jsl_allocator.h\"\n"));
-        jsl_output_sink_write_fatptr(sink, JSL_FATPTR_EXPRESSION("#include \"jsl_hash_map_common.h\"\n"));
+        jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("#pragma once\n\n"));
+        jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("#include <stdint.h>\n"));
+        jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("#include \"jsl_allocator.h\"\n"));
+        jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("#include \"jsl_hash_map_common.h\"\n"));
         jsl_output_sink_write_u8(
             sink,
             '\n'
         );
 
-        jsl_output_sink_write_fatptr(
+        jsl_output_sink_write(
             sink,
-            JSL_FATPTR_EXPRESSION("// USER INCLUDED HEADERS\n")
+            JSL_CSTR_EXPRESSION("// USER INCLUDED HEADERS\n")
         );
 
         for (int32_t i = 0; i < include_header_count; ++i)
         {
-            jsl_format_sink(sink, JSL_FATPTR_EXPRESSION("#include \"%y\"\n"), include_header_array[i]);
+            jsl_format_sink(sink, JSL_CSTR_EXPRESSION("#include \"%y\"\n"), include_header_array[i]);
         }
 
-        jsl_output_sink_write_fatptr(sink, JSL_FATPTR_EXPRESSION("\n"));
+        jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("\n"));
         
         jsl_format_sink(
             sink,
-            JSL_FATPTR_EXPRESSION("#define PRIVATE_SENTINEL_%y %" PRIu32 "U \n"),
+            JSL_CSTR_EXPRESSION("#define PRIVATE_SENTINEL_%y %" PRIu32 "U \n"),
             hash_map_name,
             rand_u32()
         );
 
-        jsl_output_sink_write_fatptr(sink, JSL_FATPTR_EXPRESSION("\n"));
+        jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("\n"));
 
         JSLStrToStrMap map;
         jsl_str_to_str_map_init(&map, allocator, 0x123456789);
@@ -960,40 +960,40 @@
     {
         (void) impl;
 
-        jsl_output_sink_write_fatptr(
+        jsl_output_sink_write(
             sink,
-            JSL_FATPTR_EXPRESSION("// DEFAULT INCLUDED HEADERS\n")
+            JSL_CSTR_EXPRESSION("// DEFAULT INCLUDED HEADERS\n")
         );
 
-        jsl_output_sink_write_fatptr(
+        jsl_output_sink_write(
             sink,
-            JSL_FATPTR_EXPRESSION("#include <stddef.h>\n")
+            JSL_CSTR_EXPRESSION("#include <stddef.h>\n")
         );
-        jsl_output_sink_write_fatptr(
+        jsl_output_sink_write(
             sink,
-            JSL_FATPTR_EXPRESSION("#include <stdint.h>\n")
+            JSL_CSTR_EXPRESSION("#include <stdint.h>\n")
         );
-        jsl_output_sink_write_fatptr(
+        jsl_output_sink_write(
             sink,
-            JSL_FATPTR_EXPRESSION("#include \"jsl_core.h\"\n")
+            JSL_CSTR_EXPRESSION("#include \"jsl_core.h\"\n")
         );
-        jsl_output_sink_write_fatptr(sink, JSL_FATPTR_EXPRESSION("#include \"jsl_allocator.h\"\n"));
-        jsl_output_sink_write_fatptr(
+        jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("#include \"jsl_allocator.h\"\n"));
+        jsl_output_sink_write(
             sink,
-            JSL_FATPTR_EXPRESSION("#include \"jsl_hash_map_common.h\"\n\n")
+            JSL_CSTR_EXPRESSION("#include \"jsl_hash_map_common.h\"\n\n")
         );
 
-        jsl_output_sink_write_fatptr(
+        jsl_output_sink_write(
             sink,
-            JSL_FATPTR_EXPRESSION("// USER INCLUDED HEADERS\n")
+            JSL_CSTR_EXPRESSION("// USER INCLUDED HEADERS\n")
         );
 
         for (int32_t i = 0; i < include_header_count; ++i)
         {
-            jsl_format_sink(sink, JSL_FATPTR_EXPRESSION("#include \"%y\"\n"), include_header_array[i]);
+            jsl_format_sink(sink, JSL_CSTR_EXPRESSION("#include \"%y\"\n"), include_header_array[i]);
         }
 
-        jsl_output_sink_write_fatptr(sink, JSL_FATPTR_EXPRESSION("\n"));
+        jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("\n"));
 
 
         JSLStrToStrMap map;
@@ -1040,32 +1040,32 @@
             {
                 resolved_hash_function_call = jsl_format(
                     &scratch_interface,
-                    JSL_FATPTR_EXPRESSION("uint64_t hash = %y(&key, sizeof(%y), hash_map->seed)"),
+                    JSL_CSTR_EXPRESSION("uint64_t hash = %y(&key, sizeof(%y), hash_map->seed)"),
                     hash_function_name,
                     key_type_name
                 );
             }
             else if (
-                jsl_fatptr_memory_compare(key_type_name, int32_t_str)
-                || jsl_fatptr_memory_compare(key_type_name, int_str)
-                || jsl_fatptr_memory_compare(key_type_name, unsigned_str)
-                || jsl_fatptr_memory_compare(key_type_name, unsigned_int_str)
-                || jsl_fatptr_memory_compare(key_type_name, uint32_t_str)
-                || jsl_fatptr_memory_compare(key_type_name, int64_t_str)
-                || jsl_fatptr_memory_compare(key_type_name, long_str)
-                || jsl_fatptr_memory_compare(key_type_name, uint64_t_str)
-                || jsl_fatptr_memory_compare(key_type_name, unsigned_long_str)
-                || jsl_fatptr_memory_compare(key_type_name, long_int_str)
-                || jsl_fatptr_memory_compare(key_type_name, long_long_str)
-                || jsl_fatptr_memory_compare(key_type_name, long_long_int_str)
-                || jsl_fatptr_memory_compare(key_type_name, unsigned_long_long_str)
-                || jsl_fatptr_memory_compare(key_type_name, unsigned_long_long_int_str)
+                jsl_memory_compare(key_type_name, int32_t_str)
+                || jsl_memory_compare(key_type_name, int_str)
+                || jsl_memory_compare(key_type_name, unsigned_str)
+                || jsl_memory_compare(key_type_name, unsigned_int_str)
+                || jsl_memory_compare(key_type_name, uint32_t_str)
+                || jsl_memory_compare(key_type_name, int64_t_str)
+                || jsl_memory_compare(key_type_name, long_str)
+                || jsl_memory_compare(key_type_name, uint64_t_str)
+                || jsl_memory_compare(key_type_name, unsigned_long_str)
+                || jsl_memory_compare(key_type_name, long_int_str)
+                || jsl_memory_compare(key_type_name, long_long_str)
+                || jsl_memory_compare(key_type_name, long_long_int_str)
+                || jsl_memory_compare(key_type_name, unsigned_long_long_str)
+                || jsl_memory_compare(key_type_name, unsigned_long_long_int_str)
                 || key_type_name.data[key_type_name.length - 1] == '*'
             )
             {
                 resolved_hash_function_call = jsl_format(
                     &scratch_interface,
-                    JSL_FATPTR_EXPRESSION("*out_hash = jsl__murmur3_fmix_u64((uint64_t) key, hash_map->seed)"),
+                    JSL_CSTR_EXPRESSION("*out_hash = jsl__murmur3_fmix_u64((uint64_t) key, hash_map->seed)"),
                     key_type_name
                 );
             }
@@ -1073,7 +1073,7 @@
             {
                 resolved_hash_function_call = jsl_format(
                     &scratch_interface,
-                    JSL_FATPTR_EXPRESSION("*out_hash = jsl__rapidhash_withSeed(&key, sizeof(%y), hash_map->seed)"),
+                    JSL_CSTR_EXPRESSION("*out_hash = jsl__rapidhash_withSeed(&key, sizeof(%y), hash_map->seed)"),
                     key_type_name
                 );
             }
@@ -1097,26 +1097,26 @@
             JSLImmutableMemory resolved_key_compare;
 
             if (
-                jsl_fatptr_memory_compare(key_type_name, int32_t_str)
-                || jsl_fatptr_memory_compare(key_type_name, int_str)
-                || jsl_fatptr_memory_compare(key_type_name, unsigned_str)
-                || jsl_fatptr_memory_compare(key_type_name, unsigned_int_str)
-                || jsl_fatptr_memory_compare(key_type_name, uint32_t_str)
-                || jsl_fatptr_memory_compare(key_type_name, int64_t_str)
-                || jsl_fatptr_memory_compare(key_type_name, long_str)
-                || jsl_fatptr_memory_compare(key_type_name, uint64_t_str)
-                || jsl_fatptr_memory_compare(key_type_name, unsigned_long_str)
-                || jsl_fatptr_memory_compare(key_type_name, long_int_str)
-                || jsl_fatptr_memory_compare(key_type_name, long_long_str)
-                || jsl_fatptr_memory_compare(key_type_name, long_long_int_str)
-                || jsl_fatptr_memory_compare(key_type_name, unsigned_long_long_str)
-                || jsl_fatptr_memory_compare(key_type_name, unsigned_long_long_int_str)
+                jsl_memory_compare(key_type_name, int32_t_str)
+                || jsl_memory_compare(key_type_name, int_str)
+                || jsl_memory_compare(key_type_name, unsigned_str)
+                || jsl_memory_compare(key_type_name, unsigned_int_str)
+                || jsl_memory_compare(key_type_name, uint32_t_str)
+                || jsl_memory_compare(key_type_name, int64_t_str)
+                || jsl_memory_compare(key_type_name, long_str)
+                || jsl_memory_compare(key_type_name, uint64_t_str)
+                || jsl_memory_compare(key_type_name, unsigned_long_str)
+                || jsl_memory_compare(key_type_name, long_int_str)
+                || jsl_memory_compare(key_type_name, long_long_str)
+                || jsl_memory_compare(key_type_name, long_long_int_str)
+                || jsl_memory_compare(key_type_name, unsigned_long_long_str)
+                || jsl_memory_compare(key_type_name, unsigned_long_long_int_str)
                 || key_type_name.data[key_type_name.length - 1] == '*'
             )
             {
                 resolved_key_compare = jsl_format(
                     &scratch_interface,
-                    JSL_FATPTR_EXPRESSION("key == hash_map->keys_array[slot]"),
+                    JSL_CSTR_EXPRESSION("key == hash_map->keys_array[slot]"),
                     key_type_name
                 );
             }
@@ -1124,7 +1124,7 @@
             {
                 resolved_key_compare = jsl_format(
                     &scratch_interface,
-                    JSL_FATPTR_EXPRESSION("JSL_MEMCMP(&key, &hash_map->keys_array[slot], sizeof(%y)) == 0"),
+                    JSL_CSTR_EXPRESSION("JSL_MEMCMP(&key, &hash_map->keys_array[slot], sizeof(%y)) == 0"),
                     key_type_name
                 );
             }

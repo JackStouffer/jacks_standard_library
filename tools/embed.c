@@ -21,7 +21,7 @@
 #define EMBED_IMPLEMENTATION
 #include "embed.h"
 
-static JSLImmutableMemory help_message = JSL_FATPTR_INITIALIZER(
+static JSLImmutableMemory help_message = JSL_CSTR_INITIALIZER(
     "OVERVIEW:\n\n"
     "Embed a file into a C program by generating a header file.\n"
     "Pass in the file path as an argument or pass in the file data from stdin.\n\n"
@@ -32,11 +32,11 @@ static JSLImmutableMemory help_message = JSL_FATPTR_INITIALIZER(
     "\t--binary\t\tThe output will be in bytes of hex data.\n"
     "\t--text\t\tThe output will be a multiline C str with length. Expects text file input\n"
 );
-static JSLImmutableMemory default_var_name = JSL_FATPTR_INITIALIZER("data");
-static JSLImmutableMemory help_flag_str = JSL_FATPTR_INITIALIZER("help");
-static JSLImmutableMemory binary_flag_str = JSL_FATPTR_INITIALIZER("binary");
-static JSLImmutableMemory text_flag_str = JSL_FATPTR_INITIALIZER("text");
-static JSLImmutableMemory var_name_flag_str = JSL_FATPTR_INITIALIZER("var-name");
+static JSLImmutableMemory default_var_name = JSL_CSTR_INITIALIZER("data");
+static JSLImmutableMemory help_flag_str = JSL_CSTR_INITIALIZER("help");
+static JSLImmutableMemory binary_flag_str = JSL_CSTR_INITIALIZER("binary");
+static JSLImmutableMemory text_flag_str = JSL_CSTR_INITIALIZER("text");
+static JSLImmutableMemory var_name_flag_str = JSL_CSTR_INITIALIZER("var-name");
 
 static int32_t entrypoint(
     JSLCmdLineArgs* cmd,
@@ -70,7 +70,7 @@ static int32_t entrypoint(
     {
         jsl_format_sink(
             stderr_sink,
-            JSL_FATPTR_EXPRESSION("Error: cannot specify both --%y and --%y"),
+            JSL_CSTR_EXPRESSION("Error: cannot specify both --%y and --%y"),
             binary_flag_str,
             text_flag_str
         );
@@ -100,7 +100,7 @@ static int32_t entrypoint(
         {
             jsl_format_sink(
                 stderr_sink,
-                JSL_FATPTR_EXPRESSION("Only provide zero or one file path\n")
+                JSL_CSTR_EXPRESSION("Only provide zero or one file path\n")
             );
             return EXIT_FAILURE;
         }
@@ -116,7 +116,7 @@ static int32_t entrypoint(
         {
             jsl_format_sink(
                 stderr_sink,
-                JSL_FATPTR_EXPRESSION("Failed to load template file %y (errno %d)\n"),
+                JSL_CSTR_EXPRESSION("Failed to load template file %y (errno %d)\n"),
                 file_contents,
                 load_errno
             );
@@ -170,7 +170,7 @@ static int32_t entrypoint(
     }
     else
     {
-        jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Error: no input data"));
+        jsl_write_to_c_file(stderr, JSL_CSTR_EXPRESSION("Error: no input data"));
         return EXIT_FAILURE;
     }
 }
@@ -210,10 +210,10 @@ static int32_t entrypoint(
             }
             else
             {
-                jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Parsing failure"));
+                jsl_write_to_c_file(stderr, JSL_CSTR_EXPRESSION("Parsing failure"));
             }
 
-            jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("\n"));
+            jsl_write_to_c_file(stderr, JSL_CSTR_EXPRESSION("\n"));
             return EXIT_FAILURE;
         }
 
@@ -253,7 +253,7 @@ static int32_t entrypoint(
         JSLCmdLineArgs cmd;
         if (!jsl_cmd_line_args_init(&cmd, &allocator))
         {
-            jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Command line input exceeds memory limit"));
+            jsl_write_to_c_file(stderr, JSL_CSTR_EXPRESSION("Command line input exceeds memory limit"));
             return EXIT_FAILURE;
         }
 
@@ -266,10 +266,10 @@ static int32_t entrypoint(
             }
             else
             {
-                jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("Parsing failure"));
+                jsl_write_to_c_file(stderr, JSL_CSTR_EXPRESSION("Parsing failure"));
             }
 
-            jsl_write_to_c_file(stderr, JSL_FATPTR_EXPRESSION("\n"));
+            jsl_write_to_c_file(stderr, JSL_CSTR_EXPRESSION("\n"));
             return EXIT_FAILURE;
         }
 

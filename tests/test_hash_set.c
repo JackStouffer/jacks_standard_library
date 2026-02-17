@@ -48,7 +48,7 @@ static bool insert_values(JSLStrSet* set, const char** values, size_t count)
 {
     for (size_t i = 0; i < count; i++)
     {
-        JSLImmutableMemory value = jsl_fatptr_from_cstr(values[i]);
+        JSLImmutableMemory value = jsl_cstr_to_memory(values[i]);
         if (!jsl_str_set_insert(set, value, JSL_STRING_LIFETIME_STATIC))
         {
             return false;
@@ -102,9 +102,9 @@ static void test_jsl_str_set_insert_and_has(void)
     TEST_BOOL(ok);
     if (!ok) return;
 
-    JSLImmutableMemory alpha = JSL_FATPTR_INITIALIZER("alpha");
-    JSLImmutableMemory beta = JSL_FATPTR_INITIALIZER("beta");
-    JSLImmutableMemory missing = JSL_FATPTR_INITIALIZER("missing");
+    JSLImmutableMemory alpha = JSL_CSTR_INITIALIZER("alpha");
+    JSLImmutableMemory beta = JSL_CSTR_INITIALIZER("beta");
+    JSLImmutableMemory missing = JSL_CSTR_INITIALIZER("missing");
 
     TEST_BOOL(!jsl_str_set_has(&set, alpha));
     TEST_INT64_EQUAL(jsl_str_set_item_count(&set), (int64_t) 0);
@@ -139,9 +139,9 @@ static void test_jsl_str_set_respects_lifetime_rules(void)
 
     char small_buffer[] = "short-string";
     char long_buffer[] = "this string is definitely longer than sixteen chars";
-    JSLImmutableMemory small_value = jsl_fatptr_from_cstr(small_buffer);
-    JSLImmutableMemory long_value = jsl_fatptr_from_cstr(long_buffer);
-    JSLImmutableMemory literal_value = JSL_FATPTR_INITIALIZER("literal-static");
+    JSLImmutableMemory small_value = jsl_cstr_to_memory(small_buffer);
+    JSLImmutableMemory long_value = jsl_cstr_to_memory(long_buffer);
+    JSLImmutableMemory literal_value = JSL_CSTR_INITIALIZER("literal-static");
 
     TEST_BOOL(jsl_str_set_insert(&set, small_value, JSL_STRING_LIFETIME_TRANSIENT));
     TEST_BOOL(jsl_str_set_insert(&set, long_value, JSL_STRING_LIFETIME_TRANSIENT));
@@ -159,17 +159,17 @@ static void test_jsl_str_set_respects_lifetime_rules(void)
     JSLImmutableMemory out_value = {0};
     while (jsl_str_set_iterator_next(&iter, &out_value))
     {
-        if (jsl_fatptr_memory_compare(out_value, JSL_FATPTR_EXPRESSION("short-string")))
+        if (jsl_memory_compare(out_value, JSL_CSTR_EXPRESSION("short-string")))
         {
             saw_small = true;
             TEST_BOOL(out_value.data != (uint8_t*) small_buffer);
         }
-        else if (jsl_fatptr_memory_compare(out_value, JSL_FATPTR_EXPRESSION("this string is definitely longer than sixteen chars")))
+        else if (jsl_memory_compare(out_value, JSL_CSTR_EXPRESSION("this string is definitely longer than sixteen chars")))
         {
             saw_long = true;
             TEST_BOOL(out_value.data != (uint8_t*) long_buffer);
         }
-        else if (jsl_fatptr_memory_compare(out_value, literal_value))
+        else if (jsl_memory_compare(out_value, literal_value))
         {
             saw_literal = true;
             TEST_POINTERS_EQUAL(out_value.data, literal_value.data);
@@ -192,10 +192,10 @@ static void test_jsl_str_set_iterator_covers_all_values(void)
     if (!ok) return;
 
     ExpectedValue expected[] = {
-        { JSL_FATPTR_INITIALIZER("a"), false },
-        { JSL_FATPTR_INITIALIZER("b"), false },
-        { JSL_FATPTR_INITIALIZER("c"), false },
-        { JSL_FATPTR_INITIALIZER("d"), false }
+        { JSL_CSTR_INITIALIZER("a"), false },
+        { JSL_CSTR_INITIALIZER("b"), false },
+        { JSL_CSTR_INITIALIZER("c"), false },
+        { JSL_CSTR_INITIALIZER("d"), false }
     };
 
     for (size_t i = 0; i < sizeof(expected) / sizeof(expected[0]); i++)
@@ -213,7 +213,7 @@ static void test_jsl_str_set_iterator_covers_all_values(void)
         bool matched = false;
         for (size_t i = 0; i < sizeof(expected) / sizeof(expected[0]); i++)
         {
-            if (!expected[i].seen && jsl_fatptr_memory_compare(out_value, expected[i].value))
+            if (!expected[i].seen && jsl_memory_compare(out_value, expected[i].value))
             {
                 expected[i].seen = true;
                 matched = true;
@@ -243,12 +243,12 @@ static void test_jsl_str_set_iterator_invalidated_on_mutation(void)
     TEST_BOOL(ok);
     if (!ok) return;
 
-    TEST_BOOL(jsl_str_set_insert(&set, JSL_FATPTR_EXPRESSION("first"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_set_insert(&set, JSL_CSTR_EXPRESSION("first"), JSL_STRING_LIFETIME_STATIC));
 
     JSLStrSetKeyValueIter iter;
     TEST_BOOL(jsl_str_set_iterator_init(&set, &iter));
 
-    TEST_BOOL(jsl_str_set_insert(&set, JSL_FATPTR_EXPRESSION("second"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_set_insert(&set, JSL_CSTR_EXPRESSION("second"), JSL_STRING_LIFETIME_STATIC));
 
     JSLImmutableMemory out_value = {0};
     TEST_BOOL(!jsl_str_set_iterator_next(&iter, &out_value));
@@ -264,22 +264,22 @@ static void test_jsl_str_set_delete(void)
     TEST_BOOL(ok);
     if (!ok) return;
 
-    JSLImmutableMemory keep = JSL_FATPTR_INITIALIZER("keep");
-    JSLImmutableMemory drop = JSL_FATPTR_INITIALIZER("drop");
-    JSLImmutableMemory other = JSL_FATPTR_INITIALIZER("other");
+    JSLImmutableMemory keep = JSL_CSTR_INITIALIZER("keep");
+    JSLImmutableMemory drop = JSL_CSTR_INITIALIZER("drop");
+    JSLImmutableMemory other = JSL_CSTR_INITIALIZER("other");
 
     TEST_BOOL(jsl_str_set_insert(&set, keep, JSL_STRING_LIFETIME_STATIC));
     TEST_BOOL(jsl_str_set_insert(&set, drop, JSL_STRING_LIFETIME_STATIC));
     TEST_BOOL(jsl_str_set_insert(&set, other, JSL_STRING_LIFETIME_STATIC));
 
-    TEST_BOOL(!jsl_str_set_delete(&set, JSL_FATPTR_EXPRESSION("missing")));
+    TEST_BOOL(!jsl_str_set_delete(&set, JSL_CSTR_EXPRESSION("missing")));
 
     TEST_BOOL(jsl_str_set_delete(&set, drop));
     TEST_BOOL(!jsl_str_set_has(&set, drop));
     TEST_INT64_EQUAL(jsl_str_set_item_count(&set), (int64_t) 2);
 
-    TEST_BOOL(jsl_str_set_insert(&set, JSL_FATPTR_EXPRESSION("new"), JSL_STRING_LIFETIME_STATIC));
-    TEST_BOOL(jsl_str_set_has(&set, JSL_FATPTR_EXPRESSION("new")));
+    TEST_BOOL(jsl_str_set_insert(&set, JSL_CSTR_EXPRESSION("new"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_set_has(&set, JSL_CSTR_EXPRESSION("new")));
 }
 
 static void test_jsl_str_set_clear(void)
@@ -292,16 +292,16 @@ static void test_jsl_str_set_clear(void)
     TEST_BOOL(ok);
     if (!ok) return;
 
-    TEST_BOOL(jsl_str_set_insert(&set, JSL_FATPTR_EXPRESSION("x"), JSL_STRING_LIFETIME_STATIC));
-    TEST_BOOL(jsl_str_set_insert(&set, JSL_FATPTR_EXPRESSION("y"), JSL_STRING_LIFETIME_STATIC));
-    TEST_BOOL(jsl_str_set_insert(&set, JSL_FATPTR_EXPRESSION("z"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_set_insert(&set, JSL_CSTR_EXPRESSION("x"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_set_insert(&set, JSL_CSTR_EXPRESSION("y"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_set_insert(&set, JSL_CSTR_EXPRESSION("z"), JSL_STRING_LIFETIME_STATIC));
 
     jsl_str_set_clear(&set);
 
     TEST_INT64_EQUAL(jsl_str_set_item_count(&set), (int64_t) 0);
-    TEST_BOOL(!jsl_str_set_has(&set, JSL_FATPTR_EXPRESSION("x")));
-    TEST_BOOL(!jsl_str_set_has(&set, JSL_FATPTR_EXPRESSION("y")));
-    TEST_BOOL(!jsl_str_set_has(&set, JSL_FATPTR_EXPRESSION("z")));
+    TEST_BOOL(!jsl_str_set_has(&set, JSL_CSTR_EXPRESSION("x")));
+    TEST_BOOL(!jsl_str_set_has(&set, JSL_CSTR_EXPRESSION("y")));
+    TEST_BOOL(!jsl_str_set_has(&set, JSL_CSTR_EXPRESSION("z")));
     TEST_INT64_EQUAL(set.tombstone_count, (int64_t) 0);
 
     JSLStrSetKeyValueIter iter;
@@ -309,9 +309,9 @@ static void test_jsl_str_set_clear(void)
     JSLImmutableMemory out_value = {0};
     TEST_BOOL(!jsl_str_set_iterator_next(&iter, &out_value));
 
-    TEST_BOOL(jsl_str_set_insert(&set, JSL_FATPTR_EXPRESSION("reused"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_set_insert(&set, JSL_CSTR_EXPRESSION("reused"), JSL_STRING_LIFETIME_STATIC));
     TEST_INT64_EQUAL(jsl_str_set_item_count(&set), (int64_t) 1);
-    TEST_BOOL(jsl_str_set_has(&set, JSL_FATPTR_EXPRESSION("reused")));
+    TEST_BOOL(jsl_str_set_has(&set, JSL_CSTR_EXPRESSION("reused")));
 }
 
 static void test_jsl_str_set_handles_empty_and_binary_values(void)
@@ -324,7 +324,7 @@ static void test_jsl_str_set_handles_empty_and_binary_values(void)
     TEST_BOOL(ok);
     if (!ok) return;
 
-    JSLImmutableMemory empty_value = JSL_FATPTR_INITIALIZER("");
+    JSLImmutableMemory empty_value = JSL_CSTR_INITIALIZER("");
     uint8_t binary_buf[] = { 'A', 0x00, 'B', 0x7F };
     JSLImmutableMemory binary_value = jsl_immutable_memory(binary_buf, 4);
 
@@ -348,7 +348,7 @@ static void test_jsl_str_set_handles_empty_and_binary_values(void)
         bool matched = false;
         for (size_t i = 0; i < sizeof(expected) / sizeof(expected[0]); i++)
         {
-            if (!expected[i].seen && jsl_fatptr_memory_compare(out_value, expected[i].value))
+            if (!expected[i].seen && jsl_memory_compare(out_value, expected[i].value))
             {
                 expected[i].seen = true;
                 matched = true;
@@ -388,11 +388,11 @@ static void test_jsl_str_set_intersection_basic(void)
 
     TEST_BOOL(jsl_str_set_intersection(&a, &b, &out));
     TEST_INT64_EQUAL(jsl_str_set_item_count(&out), (int64_t) 2);
-    TEST_BOOL(jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("common-one")));
-    TEST_BOOL(jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("common-two")));
-    TEST_BOOL(!jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("alpha")));
-    TEST_BOOL(!jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("beta")));
-    TEST_BOOL(!jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("gamma")));
+    TEST_BOOL(jsl_str_set_has(&out, JSL_CSTR_EXPRESSION("common-one")));
+    TEST_BOOL(jsl_str_set_has(&out, JSL_CSTR_EXPRESSION("common-two")));
+    TEST_BOOL(!jsl_str_set_has(&out, JSL_CSTR_EXPRESSION("alpha")));
+    TEST_BOOL(!jsl_str_set_has(&out, JSL_CSTR_EXPRESSION("beta")));
+    TEST_BOOL(!jsl_str_set_has(&out, JSL_CSTR_EXPRESSION("gamma")));
 }
 
 static void test_jsl_str_set_intersection_with_empty_sets(void)
@@ -448,12 +448,12 @@ static void test_jsl_str_set_union_collects_all_unique_values(void)
     TEST_BOOL(jsl_str_set_union(&a, &b, &out));
     TEST_INT64_EQUAL(jsl_str_set_item_count(&out), (int64_t) 6);
 
-    TEST_BOOL(jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("alpha")));
-    TEST_BOOL(jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("beta")));
-    TEST_BOOL(jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("shared")));
-    TEST_BOOL(jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("shared-two")));
-    TEST_BOOL(jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("gamma")));
-    TEST_BOOL(jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("delta")));
+    TEST_BOOL(jsl_str_set_has(&out, JSL_CSTR_EXPRESSION("alpha")));
+    TEST_BOOL(jsl_str_set_has(&out, JSL_CSTR_EXPRESSION("beta")));
+    TEST_BOOL(jsl_str_set_has(&out, JSL_CSTR_EXPRESSION("shared")));
+    TEST_BOOL(jsl_str_set_has(&out, JSL_CSTR_EXPRESSION("shared-two")));
+    TEST_BOOL(jsl_str_set_has(&out, JSL_CSTR_EXPRESSION("gamma")));
+    TEST_BOOL(jsl_str_set_has(&out, JSL_CSTR_EXPRESSION("delta")));
 }
 
 static void test_jsl_str_set_union_with_empty_sets(void)
@@ -482,13 +482,13 @@ static void test_jsl_str_set_union_with_empty_sets(void)
 
     TEST_BOOL(jsl_str_set_union(&filled, &empty, &out_one));
     TEST_INT64_EQUAL(jsl_str_set_item_count(&out_one), (int64_t) 2);
-    TEST_BOOL(jsl_str_set_has(&out_one, JSL_FATPTR_EXPRESSION("solo")));
-    TEST_BOOL(jsl_str_set_has(&out_one, JSL_FATPTR_EXPRESSION("duo")));
+    TEST_BOOL(jsl_str_set_has(&out_one, JSL_CSTR_EXPRESSION("solo")));
+    TEST_BOOL(jsl_str_set_has(&out_one, JSL_CSTR_EXPRESSION("duo")));
 
     TEST_BOOL(jsl_str_set_union(&empty, &filled, &out_two));
     TEST_INT64_EQUAL(jsl_str_set_item_count(&out_two), (int64_t) 2);
-    TEST_BOOL(jsl_str_set_has(&out_two, JSL_FATPTR_EXPRESSION("solo")));
-    TEST_BOOL(jsl_str_set_has(&out_two, JSL_FATPTR_EXPRESSION("duo")));
+    TEST_BOOL(jsl_str_set_has(&out_two, JSL_CSTR_EXPRESSION("solo")));
+    TEST_BOOL(jsl_str_set_has(&out_two, JSL_CSTR_EXPRESSION("duo")));
 
     TEST_BOOL(jsl_str_set_union(&empty, &empty, &out_three));
     TEST_INT64_EQUAL(jsl_str_set_item_count(&out_three), (int64_t) 0);
@@ -518,11 +518,11 @@ static void test_jsl_str_set_difference_basic(void)
 
     TEST_BOOL(jsl_str_set_difference(&a, &b, &out));
     TEST_INT64_EQUAL(jsl_str_set_item_count(&out), (int64_t) 2);
-    TEST_BOOL(jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("keep-one")));
-    TEST_BOOL(jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("keep-two")));
-    TEST_BOOL(!jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("drop-me")));
-    TEST_BOOL(!jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("shared")));
-    TEST_BOOL(!jsl_str_set_has(&out, JSL_FATPTR_EXPRESSION("other")));
+    TEST_BOOL(jsl_str_set_has(&out, JSL_CSTR_EXPRESSION("keep-one")));
+    TEST_BOOL(jsl_str_set_has(&out, JSL_CSTR_EXPRESSION("keep-two")));
+    TEST_BOOL(!jsl_str_set_has(&out, JSL_CSTR_EXPRESSION("drop-me")));
+    TEST_BOOL(!jsl_str_set_has(&out, JSL_CSTR_EXPRESSION("shared")));
+    TEST_BOOL(!jsl_str_set_has(&out, JSL_CSTR_EXPRESSION("other")));
 }
 
 static void test_jsl_str_set_difference_with_empty_sets(void)
@@ -555,8 +555,8 @@ static void test_jsl_str_set_difference_with_empty_sets(void)
 
     TEST_BOOL(jsl_str_set_difference(&filled, &empty, &out_one));
     TEST_INT64_EQUAL(jsl_str_set_item_count(&out_one), (int64_t) 2);
-    TEST_BOOL(jsl_str_set_has(&out_one, JSL_FATPTR_EXPRESSION("a")));
-    TEST_BOOL(jsl_str_set_has(&out_one, JSL_FATPTR_EXPRESSION("b")));
+    TEST_BOOL(jsl_str_set_has(&out_one, JSL_CSTR_EXPRESSION("a")));
+    TEST_BOOL(jsl_str_set_has(&out_one, JSL_CSTR_EXPRESSION("b")));
 
     TEST_BOOL(jsl_str_set_difference(&empty, &filled, &out_two));
     TEST_INT64_EQUAL(jsl_str_set_item_count(&out_two), (int64_t) 0);
@@ -624,7 +624,7 @@ static void test_jsl_str_set_rehash_preserves_entries(void)
     {
         int len = snprintf(buffer, sizeof(buffer), "value-%d", i);
         (void) len;
-        JSLImmutableMemory value = jsl_fatptr_from_cstr(buffer);
+        JSLImmutableMemory value = jsl_cstr_to_memory(buffer);
         TEST_BOOL(jsl_str_set_insert(&set, value, JSL_STRING_LIFETIME_TRANSIENT));
     }
 
@@ -634,7 +634,7 @@ static void test_jsl_str_set_rehash_preserves_entries(void)
     for (size_t i = 0; i < sizeof(checks) / sizeof(checks[0]); i++)
     {
         snprintf(buffer, sizeof(buffer), "value-%d", checks[i]);
-        JSLImmutableMemory value = jsl_fatptr_from_cstr(buffer);
+        JSLImmutableMemory value = jsl_cstr_to_memory(buffer);
         TEST_BOOL(jsl_str_set_has(&set, value));
     }
 
@@ -654,7 +654,7 @@ static void test_jsl_str_set_rejects_invalid_parameters(void)
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
-    JSLImmutableMemory value = JSL_FATPTR_INITIALIZER("value");
+    JSLImmutableMemory value = JSL_CSTR_INITIALIZER("value");
     TEST_BOOL(!jsl_str_set_insert(NULL, value, JSL_STRING_LIFETIME_STATIC));
 
     JSLStrSet set = (JSLStrSet) {0};

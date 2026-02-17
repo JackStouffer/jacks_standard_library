@@ -737,12 +737,12 @@ static void test_jsl_str_to_str_map_item_count_and_has_key(void)
 
     TEST_INT64_EQUAL(jsl_str_to_str_map_item_count(&map), (int64_t) 0);
 
-    JSLImmutableMemory key1 = JSL_FATPTR_INITIALIZER("alpha");
-    JSLImmutableMemory key2 = JSL_FATPTR_INITIALIZER("beta");
-    JSLImmutableMemory missing = JSL_FATPTR_INITIALIZER("missing");
+    JSLImmutableMemory key1 = JSL_CSTR_INITIALIZER("alpha");
+    JSLImmutableMemory key2 = JSL_CSTR_INITIALIZER("beta");
+    JSLImmutableMemory missing = JSL_CSTR_INITIALIZER("missing");
 
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, key1, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("one"), JSL_STRING_LIFETIME_STATIC));
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, key2, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("two"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, key1, JSL_STRING_LIFETIME_STATIC, JSL_CSTR_EXPRESSION("one"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, key2, JSL_STRING_LIFETIME_STATIC, JSL_CSTR_EXPRESSION("two"), JSL_STRING_LIFETIME_STATIC));
 
     TEST_INT64_EQUAL(jsl_str_to_str_map_item_count(&map), (int64_t) 2);
     TEST_BOOL(jsl_str_to_str_map_has_key(&map, key1));
@@ -765,10 +765,10 @@ static void test_jsl_str_to_str_map_get(void)
     TEST_BOOL(ok);
     if (!ok) return;
 
-    JSLImmutableMemory key = JSL_FATPTR_INITIALIZER("lookup-key");
-    JSLImmutableMemory value = JSL_FATPTR_INITIALIZER("lookup-value");
+    JSLImmutableMemory key = JSL_CSTR_INITIALIZER("lookup-key");
+    JSLImmutableMemory value = JSL_CSTR_INITIALIZER("lookup-value");
 
-    JSLImmutableMemory out_value = JSL_FATPTR_EXPRESSION("should-reset");
+    JSLImmutableMemory out_value = JSL_CSTR_EXPRESSION("should-reset");
     TEST_BOOL(!jsl_str_to_str_map_get(&map, key, &out_value));
     TEST_INT64_EQUAL(out_value.length, (int64_t) 0);
 
@@ -779,10 +779,10 @@ static void test_jsl_str_to_str_map_get(void)
     ));
 
     TEST_BOOL(jsl_str_to_str_map_get(&map, key, &out_value));
-    TEST_BOOL(jsl_fatptr_memory_compare(out_value, value));
+    TEST_BOOL(jsl_memory_compare(out_value, value));
 
-    JSLImmutableMemory missing = JSL_FATPTR_INITIALIZER("missing");
-    out_value = JSL_FATPTR_EXPRESSION("still-reset");
+    JSLImmutableMemory missing = JSL_CSTR_INITIALIZER("missing");
+    out_value = JSL_CSTR_EXPRESSION("still-reset");
     TEST_BOOL(!jsl_str_to_str_map_get(&map, missing, &out_value));
     TEST_INT64_EQUAL(out_value.length, (int64_t) 0);
 
@@ -800,12 +800,12 @@ static void test_jsl_str_to_str_map_insert_overwrites_value(void)
     TEST_BOOL(ok);
     if (!ok) return;
 
-    JSLImmutableMemory key = JSL_FATPTR_INITIALIZER("dup-key");
+    JSLImmutableMemory key = JSL_CSTR_INITIALIZER("dup-key");
 
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, key, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("first"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, key, JSL_STRING_LIFETIME_STATIC, JSL_CSTR_EXPRESSION("first"), JSL_STRING_LIFETIME_STATIC));
     TEST_INT64_EQUAL(jsl_str_to_str_map_item_count(&map), (int64_t) 1);
 
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, key, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("second"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, key, JSL_STRING_LIFETIME_STATIC, JSL_CSTR_EXPRESSION("second"), JSL_STRING_LIFETIME_STATIC));
     TEST_INT64_EQUAL(jsl_str_to_str_map_item_count(&map), (int64_t) 1);
 
     JSLStrToStrMapKeyValueIter iter;
@@ -816,10 +816,10 @@ static void test_jsl_str_to_str_map_insert_overwrites_value(void)
     bool found = false;
     while (jsl_str_to_str_map_key_value_iterator_next(&iter, &out_key, &out_value))
     {
-        if (jsl_fatptr_memory_compare(out_key, key))
+        if (jsl_memory_compare(out_key, key))
         {
             found = true;
-            TEST_BOOL(jsl_fatptr_memory_compare(out_value, JSL_FATPTR_EXPRESSION("second")));
+            TEST_BOOL(jsl_memory_compare(out_value, JSL_CSTR_EXPRESSION("second")));
             break;
         }
     }
@@ -843,10 +843,10 @@ static void test_jsl_str_to_str_map_transient_lifetime_copies_data(void)
     char key_long_buf[] = "a-longer-key";
     char val_long_buf[] = "a-longer-value";
 
-    JSLImmutableMemory key_small = jsl_fatptr_from_cstr(key_small_buf);
-    JSLImmutableMemory val_small = jsl_fatptr_from_cstr(val_small_buf);
-    JSLImmutableMemory key_long = jsl_fatptr_from_cstr(key_long_buf);
-    JSLImmutableMemory val_long = jsl_fatptr_from_cstr(val_long_buf);
+    JSLImmutableMemory key_small = jsl_cstr_to_memory(key_small_buf);
+    JSLImmutableMemory val_small = jsl_cstr_to_memory(val_small_buf);
+    JSLImmutableMemory key_long = jsl_cstr_to_memory(key_long_buf);
+    JSLImmutableMemory val_long = jsl_cstr_to_memory(val_long_buf);
 
     TEST_BOOL(jsl_str_to_str_map_insert(&map, key_small, JSL_STRING_LIFETIME_TRANSIENT, val_small, JSL_STRING_LIFETIME_TRANSIENT));
     TEST_BOOL(jsl_str_to_str_map_insert(&map, key_long, JSL_STRING_LIFETIME_TRANSIENT, val_long, JSL_STRING_LIFETIME_TRANSIENT));
@@ -856,10 +856,10 @@ static void test_jsl_str_to_str_map_transient_lifetime_copies_data(void)
     key_long_buf[0] = 'Y';
     val_long_buf[0] = 'Q';
 
-    const JSLImmutableMemory expected_small_key = JSL_FATPTR_EXPRESSION("short");
-    const JSLImmutableMemory expected_small_value = JSL_FATPTR_EXPRESSION("miniVal");
-    const JSLImmutableMemory expected_long_key = JSL_FATPTR_EXPRESSION("a-longer-key");
-    const JSLImmutableMemory expected_long_value = JSL_FATPTR_EXPRESSION("a-longer-value");
+    const JSLImmutableMemory expected_small_key = JSL_CSTR_EXPRESSION("short");
+    const JSLImmutableMemory expected_small_value = JSL_CSTR_EXPRESSION("miniVal");
+    const JSLImmutableMemory expected_long_key = JSL_CSTR_EXPRESSION("a-longer-key");
+    const JSLImmutableMemory expected_long_value = JSL_CSTR_EXPRESSION("a-longer-value");
 
     JSLStrToStrMapKeyValueIter iter;
     jsl_str_to_str_map_key_value_iterator_init(&map, &iter);
@@ -870,17 +870,17 @@ static void test_jsl_str_to_str_map_transient_lifetime_copies_data(void)
     JSLImmutableMemory out_value = (JSLImmutableMemory) {0};
     while (jsl_str_to_str_map_key_value_iterator_next(&iter, &out_key, &out_value))
     {
-        if (jsl_fatptr_memory_compare(out_key, expected_small_key))
+        if (jsl_memory_compare(out_key, expected_small_key))
         {
             saw_small = true;
-            TEST_BOOL(jsl_fatptr_memory_compare(out_value, expected_small_value));
+            TEST_BOOL(jsl_memory_compare(out_value, expected_small_value));
             TEST_BOOL(out_key.data != (uint8_t*) key_small_buf);
             TEST_BOOL(out_value.data != (uint8_t*) val_small_buf);
         }
-        else if (jsl_fatptr_memory_compare(out_key, expected_long_key))
+        else if (jsl_memory_compare(out_key, expected_long_key))
         {
             saw_long = true;
-            TEST_BOOL(jsl_fatptr_memory_compare(out_value, expected_long_value));
+            TEST_BOOL(jsl_memory_compare(out_value, expected_long_value));
             TEST_BOOL(out_key.data != (uint8_t*) key_long_buf);
             TEST_BOOL(out_value.data != (uint8_t*) val_long_buf);
         }
@@ -901,8 +901,8 @@ static void test_jsl_str_to_str_map_fixed_lifetime_uses_original_pointers(void)
     TEST_BOOL(ok);
     if (!ok) return;
 
-    JSLImmutableMemory key = JSL_FATPTR_INITIALIZER("fixed-key");
-    JSLImmutableMemory value = JSL_FATPTR_INITIALIZER("fixed-value");
+    JSLImmutableMemory key = JSL_CSTR_INITIALIZER("fixed-key");
+    JSLImmutableMemory value = JSL_CSTR_INITIALIZER("fixed-value");
 
     const uint8_t* expected_key_ptr = key.data;
     const uint8_t* expected_val_ptr = value.data;
@@ -920,8 +920,8 @@ static void test_jsl_str_to_str_map_fixed_lifetime_uses_original_pointers(void)
 
     TEST_POINTERS_EQUAL(out_key.data, expected_key_ptr);
     TEST_POINTERS_EQUAL(out_value.data, expected_val_ptr);
-    TEST_BOOL(jsl_fatptr_memory_compare(out_key, key));
-    TEST_BOOL(jsl_fatptr_memory_compare(out_value, value));
+    TEST_BOOL(jsl_memory_compare(out_key, key));
+    TEST_BOOL(jsl_memory_compare(out_value, value));
 }
 
 static void test_jsl_str_to_str_map_handles_empty_and_binary_strings(void)
@@ -935,15 +935,15 @@ static void test_jsl_str_to_str_map_handles_empty_and_binary_strings(void)
     TEST_BOOL(ok);
     if (!ok) return;
 
-    JSLImmutableMemory empty_key = JSL_FATPTR_INITIALIZER("");
-    JSLImmutableMemory binary_key = JSL_FATPTR_INITIALIZER("bin");
-    JSLImmutableMemory empty_value_key = JSL_FATPTR_INITIALIZER("empty-value-key");
+    JSLImmutableMemory empty_key = JSL_CSTR_INITIALIZER("");
+    JSLImmutableMemory binary_key = JSL_CSTR_INITIALIZER("bin");
+    JSLImmutableMemory empty_value_key = JSL_CSTR_INITIALIZER("empty-value-key");
 
     uint8_t binary_value_buf[] = { 'A', 0x00, 'B', 0x7F };
     JSLImmutableMemory binary_value = jsl_immutable_memory(binary_value_buf, 4);
-    JSLImmutableMemory empty_value = JSL_FATPTR_INITIALIZER("");
+    JSLImmutableMemory empty_value = JSL_CSTR_INITIALIZER("");
 
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, empty_key, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("empty-key-value"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, empty_key, JSL_STRING_LIFETIME_STATIC, JSL_CSTR_EXPRESSION("empty-key-value"), JSL_STRING_LIFETIME_STATIC));
     TEST_BOOL(jsl_str_to_str_map_insert(&map, binary_key, JSL_STRING_LIFETIME_STATIC, binary_value, JSL_STRING_LIFETIME_TRANSIENT));
     TEST_BOOL(jsl_str_to_str_map_insert(&map, empty_value_key, JSL_STRING_LIFETIME_STATIC, empty_value, JSL_STRING_LIFETIME_STATIC));
 
@@ -952,7 +952,7 @@ static void test_jsl_str_to_str_map_handles_empty_and_binary_strings(void)
     TEST_BOOL(jsl_str_to_str_map_has_key(&map, empty_value_key));
 
     ExpectedPair expected[] = {
-        { empty_key, JSL_FATPTR_EXPRESSION("empty-key-value"), false },
+        { empty_key, JSL_CSTR_EXPRESSION("empty-key-value"), false },
         { binary_key, binary_value, false },
         { empty_value_key, empty_value, false }
     };
@@ -967,7 +967,7 @@ static void test_jsl_str_to_str_map_handles_empty_and_binary_strings(void)
         bool matched = false;
         for (size_t i = 0; i < sizeof(expected) / sizeof(expected[0]); i++)
         {
-            if (!expected[i].seen && jsl_fatptr_memory_compare(out_key, expected[i].key))
+            if (!expected[i].seen && jsl_memory_compare(out_key, expected[i].key))
             {
                 if (expected[i].value.length == out_value.length)
                 {
@@ -1006,10 +1006,10 @@ static void test_jsl_str_to_str_map_iterator_covers_all_pairs(void)
     if (!ok) return;
 
     ExpectedPair expected[] = {
-        { JSL_FATPTR_INITIALIZER("a"), JSL_FATPTR_INITIALIZER("1"), false },
-        { JSL_FATPTR_INITIALIZER("b"), JSL_FATPTR_INITIALIZER("2"), false },
-        { JSL_FATPTR_INITIALIZER("c"), JSL_FATPTR_INITIALIZER("3"), false },
-        { JSL_FATPTR_INITIALIZER("d"), JSL_FATPTR_INITIALIZER("4"), false }
+        { JSL_CSTR_INITIALIZER("a"), JSL_CSTR_INITIALIZER("1"), false },
+        { JSL_CSTR_INITIALIZER("b"), JSL_CSTR_INITIALIZER("2"), false },
+        { JSL_CSTR_INITIALIZER("c"), JSL_CSTR_INITIALIZER("3"), false },
+        { JSL_CSTR_INITIALIZER("d"), JSL_CSTR_INITIALIZER("4"), false }
     };
 
     for (size_t i = 0; i < sizeof(expected) / sizeof(expected[0]); i++)
@@ -1034,7 +1034,7 @@ static void test_jsl_str_to_str_map_iterator_covers_all_pairs(void)
         bool matched = false;
         for (size_t i = 0; i < sizeof(expected) / sizeof(expected[0]); i++)
         {
-            if (!expected[i].seen && jsl_fatptr_memory_compare(out_key, expected[i].key) && jsl_fatptr_memory_compare(out_value, expected[i].value))
+            if (!expected[i].seen && jsl_memory_compare(out_key, expected[i].key) && jsl_memory_compare(out_value, expected[i].value))
             {
                 expected[i].seen = true;
                 matched = true;
@@ -1065,12 +1065,12 @@ static void test_jsl_str_to_str_map_iterator_invalidated_on_mutation(void)
     TEST_BOOL(ok);
     if (!ok) return;
 
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, JSL_FATPTR_EXPRESSION("key1"), JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("value1"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, JSL_CSTR_EXPRESSION("key1"), JSL_STRING_LIFETIME_STATIC, JSL_CSTR_EXPRESSION("value1"), JSL_STRING_LIFETIME_STATIC));
 
     JSLStrToStrMapKeyValueIter iter;
     jsl_str_to_str_map_key_value_iterator_init(&map, &iter);
 
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, JSL_FATPTR_EXPRESSION("key2"), JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("value2"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, JSL_CSTR_EXPRESSION("key2"), JSL_STRING_LIFETIME_STATIC, JSL_CSTR_EXPRESSION("value2"), JSL_STRING_LIFETIME_STATIC));
 
     JSLImmutableMemory out_key = (JSLImmutableMemory) {0};
     JSLImmutableMemory out_value = (JSLImmutableMemory) {0};
@@ -1089,15 +1089,15 @@ static void test_jsl_str_to_str_map_delete(void)
     TEST_BOOL(ok);
     if (!ok) return;
 
-    JSLImmutableMemory keep = JSL_FATPTR_INITIALIZER("keep");
-    JSLImmutableMemory drop = JSL_FATPTR_INITIALIZER("drop");
-    JSLImmutableMemory other = JSL_FATPTR_INITIALIZER("other");
+    JSLImmutableMemory keep = JSL_CSTR_INITIALIZER("keep");
+    JSLImmutableMemory drop = JSL_CSTR_INITIALIZER("drop");
+    JSLImmutableMemory other = JSL_CSTR_INITIALIZER("other");
 
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, keep, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("1"), JSL_STRING_LIFETIME_STATIC));
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, drop, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("2"), JSL_STRING_LIFETIME_STATIC));
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, other, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("3"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, keep, JSL_STRING_LIFETIME_STATIC, JSL_CSTR_EXPRESSION("1"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, drop, JSL_STRING_LIFETIME_STATIC, JSL_CSTR_EXPRESSION("2"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, other, JSL_STRING_LIFETIME_STATIC, JSL_CSTR_EXPRESSION("3"), JSL_STRING_LIFETIME_STATIC));
 
-    TEST_BOOL(!jsl_str_to_str_map_delete(&map, JSL_FATPTR_EXPRESSION("missing")));
+    TEST_BOOL(!jsl_str_to_str_map_delete(&map, JSL_CSTR_EXPRESSION("missing")));
 
     TEST_BOOL(jsl_str_to_str_map_delete(&map, drop));
     TEST_BOOL(!jsl_str_to_str_map_has_key(&map, drop));
@@ -1120,14 +1120,14 @@ static void test_jsl_str_to_str_map_clear(void)
     TEST_BOOL(ok);
     if (!ok) return;
 
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, JSL_FATPTR_EXPRESSION("a"), JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("1"), JSL_STRING_LIFETIME_STATIC));
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, JSL_FATPTR_EXPRESSION("b"), JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("2"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, JSL_CSTR_EXPRESSION("a"), JSL_STRING_LIFETIME_STATIC, JSL_CSTR_EXPRESSION("1"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, JSL_CSTR_EXPRESSION("b"), JSL_STRING_LIFETIME_STATIC, JSL_CSTR_EXPRESSION("2"), JSL_STRING_LIFETIME_STATIC));
 
     jsl_str_to_str_map_clear(&map);
 
     TEST_INT64_EQUAL(jsl_str_to_str_map_item_count(&map), (int64_t) 0);
-    TEST_BOOL(!jsl_str_to_str_map_has_key(&map, JSL_FATPTR_EXPRESSION("a")));
-    TEST_BOOL(!jsl_str_to_str_map_has_key(&map, JSL_FATPTR_EXPRESSION("b")));
+    TEST_BOOL(!jsl_str_to_str_map_has_key(&map, JSL_CSTR_EXPRESSION("a")));
+    TEST_BOOL(!jsl_str_to_str_map_has_key(&map, JSL_CSTR_EXPRESSION("b")));
 
     JSLStrToStrMapKeyValueIter iter;
     jsl_str_to_str_map_key_value_iterator_init(&map, &iter);
@@ -1135,9 +1135,9 @@ static void test_jsl_str_to_str_map_clear(void)
     JSLImmutableMemory out_value = (JSLImmutableMemory) {0};
     TEST_BOOL(!jsl_str_to_str_map_key_value_iterator_next(&iter, &out_key, &out_value));
 
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, JSL_FATPTR_EXPRESSION("c"), JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("3"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, JSL_CSTR_EXPRESSION("c"), JSL_STRING_LIFETIME_STATIC, JSL_CSTR_EXPRESSION("3"), JSL_STRING_LIFETIME_STATIC));
     TEST_INT64_EQUAL(jsl_str_to_str_map_item_count(&map), (int64_t) 1);
-    TEST_BOOL(jsl_str_to_str_map_has_key(&map, JSL_FATPTR_EXPRESSION("c")));
+    TEST_BOOL(jsl_str_to_str_map_has_key(&map, JSL_CSTR_EXPRESSION("c")));
 }
 
 static void test_jsl_str_to_str_map_rehash(void)
@@ -1159,8 +1159,8 @@ static void test_jsl_str_to_str_map_rehash(void)
 
     for (int i = 0; i < key_count; ++i)
     {
-        keys[i] = jsl_format(&allocator, JSL_FATPTR_EXPRESSION("key-%d"), i);
-        values[i] = jsl_format(&allocator, JSL_FATPTR_EXPRESSION("val-%d"), i);
+        keys[i] = jsl_format(&allocator, JSL_CSTR_EXPRESSION("key-%d"), i);
+        values[i] = jsl_format(&allocator, JSL_CSTR_EXPRESSION("val-%d"), i);
 
         bool insert_res = jsl_str_to_str_map_insert(
             &map,
@@ -1189,7 +1189,7 @@ static void test_jsl_str_to_str_map_rehash(void)
         bool matched = false;
         for (int i = 0; i < key_count; ++i)
         {
-            if (jsl_fatptr_memory_compare(out_key, keys[i]) && jsl_fatptr_memory_compare(out_value, values[i]))
+            if (jsl_memory_compare(out_key, keys[i]) && jsl_memory_compare(out_value, values[i]))
             {
                 matched = true;
                 break;
@@ -1215,8 +1215,8 @@ static void test_jsl_str_to_str_map_invalid_inserts(void)
     TEST_BOOL(ok);
     if (!ok) return;
 
-    JSLImmutableMemory key = JSL_FATPTR_INITIALIZER("key");
-    JSLImmutableMemory value = JSL_FATPTR_INITIALIZER("value");
+    JSLImmutableMemory key = JSL_CSTR_INITIALIZER("key");
+    JSLImmutableMemory value = JSL_CSTR_INITIALIZER("value");
 
     TEST_BOOL(!jsl_str_to_str_map_insert(NULL, key, JSL_STRING_LIFETIME_STATIC, value, JSL_STRING_LIFETIME_STATIC));
 

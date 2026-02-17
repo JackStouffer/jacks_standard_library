@@ -123,7 +123,7 @@ struct JSL__StringBuilder
  * * jsl_string_builder_init2
  * * jsl_string_builder_insert_char
  * * jsl_string_builder_insert_uint8_t
- * * jsl_string_builder_insert_fatptr
+ * * jsl_string_builder_insert_memory
  * * jsl_string_builder_format
  */
 typedef struct JSL__StringBuilder JSLStringBuilder;
@@ -181,7 +181,7 @@ JSL_STRING_BUILDER_DEF bool jsl_string_builder_init2(
  * @param data A fat pointer describing the bytes to copy; its length may be zero.
  * @returns number of bytes written, `-1` if error
  */
-JSL_STRING_BUILDER_DEF int64_t jsl_string_builder_insert_fatptr(JSLStringBuilder* builder, JSLImmutableMemory data);
+JSL_STRING_BUILDER_DEF int64_t jsl_string_builder_insert_memory(JSLStringBuilder* builder, JSLImmutableMemory data);
 
 /**
  * TODO: docs

@@ -292,148 +292,113 @@ JSLMutableMemory jsl_mutable_memory(uint8_t* ptr, int64_t length)
     return buffer;
 }
 
-JSLImmutableMemory jsl_slice(JSLImmutableMemory fatptr, int64_t start, int64_t end)
+JSLImmutableMemory jsl__slice(JSLImmutableMemory memory, int64_t start, int64_t end)
 {
     JSL_ASSERT(
-        fatptr.data != NULL
+        memory.data != NULL
         && start > -1
         && start <= end
-        && end <= fatptr.length
+        && end <= memory.length
     );
 
     #ifdef NDEBUG
-        if (fatptr.data == NULL
+        if (memory.data == NULL
             || start < 0
             || start > end
-            || end > fatptr.length)
+            || end > memory.length)
         {
-            fatptr.data = NULL;
-            fatptr.length = 0;
-            return fatptr;
+            memory.data = NULL;
+            memory.length = 0;
+            return memory;
         }
     #endif
 
-    fatptr.data += start;
-    fatptr.length = end - start;
-    return fatptr;
+    JSLImmutableMemory res = { memory.data + start, end - start };
+    return res;
 }
 
-JSLImmutableMemory jsl_slice_to_end(JSLImmutableMemory fatptr, int64_t start)
+JSLImmutableMemory jsl_slice_to_end(JSLImmutableMemory memory, int64_t start)
 {
     JSL_ASSERT(
-        fatptr.data != NULL
+        memory.data != NULL
         && start > -1
-        && start <= fatptr.length
+        && start <= memory.length
     );
 
     #ifdef NDEBUG
-        if (fatptr.data == NULL
+        if (memory.data == NULL
             || start < 0
-            || start > fatptr.length)
+            || start > memory.length)
         {
-            fatptr.data = NULL;
-            fatptr.length = 0;
-            return fatptr;
+            memory.data = NULL;
+            memory.length = 0;
+            return memory;
         }
     #endif
 
-    fatptr.data += start;
-    fatptr.length -= start;
-    return fatptr;
+    memory.data += start;
+    memory.length -= start;
+    return memory;
 }
 
-int64_t jsl_total_write_length(JSLImmutableMemory original_fatptr, JSLImmutableMemory writer_fatptr)
+int64_t jsl__total_write_length(JSLImmutableMemory original_memory, JSLImmutableMemory writer_memory)
 {
-    uintptr_t orig = (uintptr_t) original_fatptr.data;
-    uintptr_t writer = (uintptr_t) writer_fatptr.data;
+    uintptr_t orig = (uintptr_t) original_memory.data;
+    uintptr_t writer = (uintptr_t) writer_memory.data;
 
     JSL_ASSERT(
-        original_fatptr.data != NULL
-        && writer_fatptr.data != NULL
-        && original_fatptr.length > -1
-        && writer_fatptr.length > -1
-        && (uint64_t) original_fatptr.length <= UINTPTR_MAX - orig // avoid wrap
+        original_memory.data != NULL
+        && writer_memory.data != NULL
+        && original_memory.length > -1
+        && writer_memory.length > -1
+        && (uint64_t) original_memory.length <= UINTPTR_MAX - orig // avoid wrap
         && writer >= orig
-        && writer - orig <= (uintptr_t) original_fatptr.length
+        && writer - orig <= (uintptr_t) original_memory.length
     );
 
     #ifdef NDEBUG
         if (
-            original_fatptr.data == NULL
-            || writer_fatptr.data == NULL
-            || original_fatptr.length < 0
-            || writer_fatptr.length < 0
-            || (uint64_t) original_fatptr.length > UINTPTR_MAX - orig
+            original_memory.data == NULL
+            || writer_memory.data == NULL
+            || original_memory.length < 0
+            || writer_memory.length < 0
+            || (uint64_t) original_memory.length > UINTPTR_MAX - orig
             || writer < orig
-            || writer - orig > (uintptr_t) original_fatptr.length
+            || writer - orig > (uintptr_t) original_memory.length
         )
         {
             return -1;
         }
     #endif
 
-    int64_t length_written = writer_fatptr.data - original_fatptr.data;
+    int64_t length_written = writer_memory.data - original_memory.data;
     return length_written;
 }
 
-int64_t jsl_total_write_length_mutable(JSLMutableMemory original_fatptr, JSLMutableMemory writer_fatptr)
+JSLImmutableMemory jsl__auto_slice(JSLImmutableMemory original_memory, JSLImmutableMemory writer_memory)
 {
-    uintptr_t orig = (uintptr_t) original_fatptr.data;
-    uintptr_t writer = (uintptr_t) writer_fatptr.data;
+    uintptr_t orig = (uintptr_t) original_memory.data;
+    uintptr_t writer = (uintptr_t) writer_memory.data;
 
     JSL_ASSERT(
-        original_fatptr.data != NULL
-        && writer_fatptr.data != NULL
-        && original_fatptr.length > -1
-        && writer_fatptr.length > -1
-        && (uint64_t) original_fatptr.length <= UINTPTR_MAX - orig // avoid wrap
+        original_memory.data != NULL
+        && writer_memory.data != NULL
+        && original_memory.length > -1
+        && writer_memory.length > -1
+        && (uint64_t) original_memory.length <= UINTPTR_MAX - orig // avoid wrap
         && writer >= orig
-        && writer - orig <= (uintptr_t) original_fatptr.length
+        && writer - orig <= (uintptr_t) original_memory.length
     );
 
     #ifdef NDEBUG
         if (
-            original_fatptr.data == NULL
-            || writer_fatptr.data == NULL
-            || original_fatptr.length < 0
-            || writer_fatptr.length < 0
-            || (uint64_t) original_fatptr.length > UINTPTR_MAX - orig
+            original_memory.data == NULL
+            || writer_memory.data == NULL
+            || original_memory.length < 0
+            || writer_memory.length < 0
+            || (uint64_t) original_memory.length > UINTPTR_MAX - orig
             || writer < orig
-            || writer - orig > (uintptr_t) original_fatptr.length
-        )
-        {
-            return -1;
-        }
-    #endif
-
-    int64_t length_written = writer_fatptr.data - original_fatptr.data;
-    return length_written;
-}
-
-JSLImmutableMemory jsl_auto_slice(JSLImmutableMemory original_fatptr, JSLImmutableMemory writer_fatptr)
-{
-    uintptr_t orig = (uintptr_t) original_fatptr.data;
-    uintptr_t writer = (uintptr_t) writer_fatptr.data;
-
-    JSL_ASSERT(
-        original_fatptr.data != NULL
-        && writer_fatptr.data != NULL
-        && original_fatptr.length > -1
-        && writer_fatptr.length > -1
-        && (uint64_t) original_fatptr.length <= UINTPTR_MAX - orig // avoid wrap
-        && writer >= orig
-        && writer - orig <= (uintptr_t) original_fatptr.length
-    );
-
-    #ifdef NDEBUG
-        if (
-            original_fatptr.data == NULL
-            || writer_fatptr.data == NULL
-            || original_fatptr.length < 0
-            || writer_fatptr.length < 0
-            || (uint64_t) original_fatptr.length > UINTPTR_MAX - orig
-            || writer < orig
-            || writer - orig > (uintptr_t) original_fatptr.length
+            || writer - orig > (uintptr_t) original_memory.length
         )
         {
             return -1;
@@ -441,46 +406,11 @@ JSLImmutableMemory jsl_auto_slice(JSLImmutableMemory original_fatptr, JSLImmutab
     #endif
 
     int64_t write_length = (int64_t)(writer - orig);
-    original_fatptr.length = write_length;
-    return original_fatptr;
+    original_memory.length = write_length;
+    return original_memory;
 }
 
-JSLMutableMemory jsl_auto_slice_mutable(JSLMutableMemory original_fatptr, JSLMutableMemory writer_fatptr)
-{
-    uintptr_t orig = (uintptr_t) original_fatptr.data;
-    uintptr_t writer = (uintptr_t) writer_fatptr.data;
-
-    JSL_ASSERT(
-        original_fatptr.data != NULL
-        && writer_fatptr.data != NULL
-        && original_fatptr.length > -1
-        && writer_fatptr.length > -1
-        && (uint64_t) original_fatptr.length <= UINTPTR_MAX - orig // avoid wrap
-        && writer >= orig
-        && writer - orig <= (uintptr_t) original_fatptr.length
-    );
-
-    #ifdef NDEBUG
-        if (
-            original_fatptr.data == NULL
-            || writer_fatptr.data == NULL
-            || original_fatptr.length < 0
-            || writer_fatptr.length < 0
-            || (uint64_t) original_fatptr.length > UINTPTR_MAX - orig
-            || writer < orig
-            || writer - orig > (uintptr_t) original_fatptr.length
-        )
-        {
-            return -1;
-        }
-    #endif
-
-    int64_t write_length = (int64_t)(writer - orig);
-    original_fatptr.length = write_length;
-    return original_fatptr;
-}
-
-JSLImmutableMemory jsl_fatptr_from_cstr(const char* str)
+JSLImmutableMemory jsl_cstr_to_memory(const char* str)
 {
     JSLImmutableMemory ret = {
         .data = (uint8_t*) str,
@@ -489,7 +419,7 @@ JSLImmutableMemory jsl_fatptr_from_cstr(const char* str)
     return ret;
 }
 
-JSL_WARN_UNUSED int64_t jsl_fatptr_memory_copy(JSLMutableMemory* destination, JSLImmutableMemory source)
+JSL_WARN_UNUSED int64_t jsl__memory_copy(JSLMutableMemory* destination, JSLImmutableMemory source)
 {
     if (
         source.length < 0
@@ -523,7 +453,7 @@ JSL_WARN_UNUSED int64_t jsl_fatptr_memory_copy(JSLMutableMemory* destination, JS
     return memcpy_length;
 }
 
-JSL_WARN_UNUSED int64_t jsl_fatptr_cstr_memory_copy(JSLMutableMemory* destination, const char* cstring, bool include_null_terminator)
+JSL_WARN_UNUSED int64_t jsl_cstr_memory_copy(JSLMutableMemory* destination, const char* cstring, bool include_null_terminator)
 {
     if (
         cstring == NULL
@@ -544,7 +474,7 @@ JSL_WARN_UNUSED int64_t jsl_fatptr_cstr_memory_copy(JSLMutableMemory* destinatio
     return length;
 }
 
-bool jsl_fatptr_memory_compare(JSLImmutableMemory a, JSLImmutableMemory b)
+bool jsl__memory_compare(JSLImmutableMemory a, JSLImmutableMemory b)
 {
     if (a.length != b.length || a.data == NULL || b.data == NULL)
         return false;
@@ -555,7 +485,7 @@ bool jsl_fatptr_memory_compare(JSLImmutableMemory a, JSLImmutableMemory b)
     return JSL_MEMCMP(a.data, b.data, (size_t) a.length) == 0;
 }
 
-bool jsl_fatptr_cstr_compare(JSLImmutableMemory string, char* cstr)
+bool jsl_memory_cstr_compare(JSLImmutableMemory string, const char* cstr)
 {
     if (cstr == NULL || string.data == NULL)
         return false;
@@ -802,7 +732,7 @@ static JSL__FORCE_INLINE int64_t jsl__substring_search(JSLImmutableMemory string
 }
 
 
-int64_t jsl_fatptr_substring_search(JSLImmutableMemory string, JSLImmutableMemory substring)
+int64_t jsl_substring_search(JSLImmutableMemory string, JSLImmutableMemory substring)
 {
     if (JSL__UNLIKELY(
         string.data == NULL
@@ -816,7 +746,7 @@ int64_t jsl_fatptr_substring_search(JSLImmutableMemory string, JSLImmutableMemor
     }
     else if (substring.length == 1)
     {
-        return jsl_fatptr_index_of(string, substring.data[0]);
+        return jsl_index_of(string, substring.data[0]);
     }
     else if (string.length == substring.length)
     {
@@ -838,7 +768,7 @@ int64_t jsl_fatptr_substring_search(JSLImmutableMemory string, JSLImmutableMemor
     }
 }
 
-int64_t jsl_fatptr_index_of(JSLImmutableMemory string, uint8_t item)
+int64_t jsl_index_of(JSLImmutableMemory string, uint8_t item)
 {
     if (string.data == NULL || string.length < 1)
     {
@@ -901,7 +831,7 @@ int64_t jsl_fatptr_index_of(JSLImmutableMemory string, uint8_t item)
     }
 }
 
-int64_t jsl_fatptr_count(JSLImmutableMemory str, uint8_t item)
+int64_t jsl_count(JSLImmutableMemory str, uint8_t item)
 {
     int64_t count = 0;
 
@@ -917,7 +847,7 @@ int64_t jsl_fatptr_count(JSLImmutableMemory str, uint8_t item)
 
                 count += JSL_PLATFORM_POPULATION_COUNT(mask);
 
-                JSL_FATPTR_ADVANCE(str, 32);
+                JSL_MEMORY_ADVANCE(str, 32);
             }
         #endif
 
@@ -932,7 +862,7 @@ int64_t jsl_fatptr_count(JSLImmutableMemory str, uint8_t item)
 
                 count += JSL_PLATFORM_POPULATION_COUNT(mask);
 
-                JSL_FATPTR_ADVANCE(str, 16);
+                JSL_MEMORY_ADVANCE(str, 16);
             }
         #endif
     #elif JSL_IS_ARM
@@ -946,7 +876,7 @@ int64_t jsl_fatptr_count(JSLImmutableMemory str, uint8_t item)
                 uint8x16_t ones = vshrq_n_u8(cmp, 7);
                 count += vaddvq_u8(ones);
 
-                JSL_FATPTR_ADVANCE(str, 16);
+                JSL_MEMORY_ADVANCE(str, 16);
             }
         #endif
     #endif
@@ -956,13 +886,13 @@ int64_t jsl_fatptr_count(JSLImmutableMemory str, uint8_t item)
         if (str.data[0] == item)
             count++;
 
-        JSL_FATPTR_ADVANCE(str, 1);
+        JSL_MEMORY_ADVANCE(str, 1);
     }
 
     return count;
 }
 
-int64_t jsl_fatptr_index_of_reverse(JSLImmutableMemory string, uint8_t item)
+int64_t jsl_index_of_reverse(JSLImmutableMemory string, uint8_t item)
 {
     if (string.data == NULL || string.length < 1)
     {
@@ -1031,7 +961,7 @@ int64_t jsl_fatptr_index_of_reverse(JSLImmutableMemory string, uint8_t item)
 }
 
 // #ifdef __AVX2__
-//     static inline bool jsl__fatptr_small_prefix_match(const uint8_t* str_ptr, const uint8_t* pre_ptr, int64_t len)
+//     static inline bool jsl__memory_small_prefix_match(const uint8_t* str_ptr, const uint8_t* pre_ptr, int64_t len)
 //     {
 //         if (len <= 3)
 //         {
@@ -1073,11 +1003,11 @@ int64_t jsl_fatptr_index_of_reverse(JSLImmutableMemory string, uint8_t item)
 //         }
 //     }
 
-//     static inline bool jsl__fatptr_compare_upto_32(const uint8_t* str_ptr, const uint8_t* pre_ptr, int64_t len)
+//     static inline bool jsl__memory_compare_upto_32(const uint8_t* str_ptr, const uint8_t* pre_ptr, int64_t len)
 //     {
 //         if (len <= 16)
 //         {
-//             return jsl__fatptr_small_prefix_match(str_ptr, pre_ptr, len);
+//             return jsl__memory_small_prefix_match(str_ptr, pre_ptr, len);
 //         }
 
 //         __m128i head = _mm_loadu_si128((__m128i*) str_ptr);
@@ -1092,7 +1022,7 @@ int64_t jsl_fatptr_index_of_reverse(JSLImmutableMemory string, uint8_t item)
 //     }
 // #endif
 
-bool jsl_fatptr_starts_with(JSLImmutableMemory str, JSLImmutableMemory prefix)
+bool jsl_starts_with(JSLImmutableMemory str, JSLImmutableMemory prefix)
 {
     if (JSL__UNLIKELY(str.data == NULL || prefix.data == NULL))
         return false;
@@ -1106,7 +1036,7 @@ bool jsl_fatptr_starts_with(JSLImmutableMemory str, JSLImmutableMemory prefix)
     return JSL_MEMCMP(str.data, prefix.data, (size_t) prefix.length) == 0;
 }
 
-bool jsl_fatptr_ends_with(JSLImmutableMemory str, JSLImmutableMemory postfix)
+bool jsl_ends_with(JSLImmutableMemory str, JSLImmutableMemory postfix)
 {
     if (JSL__UNLIKELY(str.data == NULL || postfix.data == NULL))
         return false;
@@ -1124,10 +1054,10 @@ bool jsl_fatptr_ends_with(JSLImmutableMemory str, JSLImmutableMemory postfix)
     ) == 0;
 }
 
-JSLImmutableMemory jsl_fatptr_get_file_extension(JSLImmutableMemory filename)
+JSLImmutableMemory jsl_get_file_extension(JSLImmutableMemory filename)
 {
     JSLImmutableMemory ret;
-    int64_t index_of_dot = jsl_fatptr_index_of_reverse(filename, '.');
+    int64_t index_of_dot = jsl_index_of_reverse(filename, '.');
 
     if (index_of_dot > -1)
     {
@@ -1142,10 +1072,10 @@ JSLImmutableMemory jsl_fatptr_get_file_extension(JSLImmutableMemory filename)
     return ret;
 }
 
-JSLImmutableMemory jsl_fatptr_basename(JSLImmutableMemory filename)
+JSLImmutableMemory jsl_basename(JSLImmutableMemory filename)
 {
     JSLImmutableMemory ret;
-    int64_t slash_postion = jsl_fatptr_index_of_reverse(filename, '/');
+    int64_t slash_postion = jsl_index_of_reverse(filename, '/');
 
     if (filename.length - slash_postion > 2)
     {
@@ -1163,7 +1093,7 @@ JSLImmutableMemory jsl_fatptr_basename(JSLImmutableMemory filename)
     return ret;
 }
 
-char* jsl_fatptr_to_cstr(JSLAllocatorInterface* allocator, JSLImmutableMemory str)
+const char* jsl_memory_to_cstr(JSLAllocatorInterface* allocator, JSLImmutableMemory str)
 {
     if (allocator == NULL || str.data == NULL || str.length < 1)
         return NULL;
@@ -1186,7 +1116,7 @@ char* jsl_fatptr_to_cstr(JSLAllocatorInterface* allocator, JSLImmutableMemory st
     return ret;
 }
 
-JSLImmutableMemory jsl_cstr_to_memory(JSLAllocatorInterface* allocator, char* str)
+JSLImmutableMemory jsl_duplicate_cstr(JSLAllocatorInterface* allocator, const char* str)
 {
     JSLImmutableMemory ret = {0};
     if (allocator == NULL || str == NULL)
@@ -1212,7 +1142,7 @@ JSLImmutableMemory jsl_cstr_to_memory(JSLAllocatorInterface* allocator, char* st
     return ret;
 }
 
-JSLImmutableMemory jsl_fatptr_duplicate(JSLAllocatorInterface* allocator, JSLImmutableMemory str)
+JSLImmutableMemory jsl_duplicate(JSLAllocatorInterface* allocator, JSLImmutableMemory str)
 {
     JSLImmutableMemory res = {0};
     if (allocator == NULL || str.data == NULL || str.length < 1)
@@ -1231,25 +1161,42 @@ JSLImmutableMemory jsl_fatptr_duplicate(JSLAllocatorInterface* allocator, JSLImm
     return res;
 }
 
-int64_t jsl_fatptr_to_lowercase_ascii(JSLOutputSink sink, JSLImmutableMemory str)
+int64_t jsl_to_lowercase_ascii(JSLOutputSink sink, JSLImmutableMemory str)
 {
     if (str.data == NULL || str.length < 1)
         return -1;
 
     int64_t res = 0;
+    // small chunked buffer before writing to the output sink
+    uint8_t buf[64];
+    int64_t buf_len = 0;
 
-    // TODO: simd
     for (int64_t i = 0; i < str.length; i++)
     {
-        uint8_t c;
         if (str.data[i] >= 'A' && str.data[i] <= 'Z')
-            c =  str.data[i] + 32;
+            buf[buf_len] = str.data[i] + 32;
         else
-            c =  str.data[i];
-        
-        int64_t sink_res = jsl_output_sink_write_u8(sink, c);
+            buf[buf_len] = str.data[i];
+
+        buf_len++;
+
+        if (buf_len == 64)
+        {
+            JSLImmutableMemory chunk = {buf, buf_len};
+            int64_t sink_res = jsl_output_sink_write(sink, chunk);
+            if (sink_res < 0)
+                return sink_res;
+            res += sink_res;
+            buf_len = 0;
+        }
+    }
+
+    if (buf_len > 0)
+    {
+        JSLImmutableMemory chunk = {buf, buf_len};
+        int64_t sink_res = jsl_output_sink_write(sink, chunk);
         if (sink_res < 0)
-            return -1;
+            return sink_res;
         res += sink_res;
     }
 
@@ -1296,7 +1243,7 @@ static inline uint8_t jsl__ascii_to_lower(uint8_t ch)
     }
 #endif
 
-bool jsl_fatptr_compare_ascii_insensitive(JSLImmutableMemory a, JSLImmutableMemory b)
+bool jsl_compare_ascii_insensitive(JSLImmutableMemory a, JSLImmutableMemory b)
 {
     if (JSL__UNLIKELY(a.data == NULL || b.data == NULL || a.length != b.length))
         return false;
@@ -1340,7 +1287,7 @@ bool jsl_fatptr_compare_ascii_insensitive(JSLImmutableMemory a, JSLImmutableMemo
     return true;
 }
 
-int32_t jsl_fatptr_to_int32(JSLImmutableMemory str, int32_t* result)
+int32_t jsl_memory_to_int32(JSLImmutableMemory str, int32_t* result)
 {
     if (JSL__UNLIKELY(str.data == NULL || str.length < 1))
         return 0;
@@ -1382,7 +1329,7 @@ int32_t jsl_fatptr_to_int32(JSLImmutableMemory str, int32_t* result)
     return i;
 }
 
-int64_t jsl_fatptr_strip_whitespace_left(JSLImmutableMemory* str)
+int64_t jsl_strip_whitespace_left(JSLImmutableMemory* str)
 {
     int64_t bytes_read = str->data != NULL && str->length > -1 ?
         0 : -1;
@@ -1405,7 +1352,7 @@ int64_t jsl_fatptr_strip_whitespace_left(JSLImmutableMemory* str)
     return bytes_read;
 }
 
-int64_t jsl_fatptr_strip_whitespace_right(JSLImmutableMemory* str)
+int64_t jsl_strip_whitespace_right(JSLImmutableMemory* str)
 {
     int64_t bytes_read = str->data != NULL && str->length > -1 ?
         0 : -1;
@@ -1429,30 +1376,30 @@ int64_t jsl_fatptr_strip_whitespace_right(JSLImmutableMemory* str)
     return bytes_read;
 }
 
-int64_t jsl_fatptr_strip_whitespace(JSLImmutableMemory* str)
+int64_t jsl_strip_whitespace(JSLImmutableMemory* str)
 {
     int64_t bytes_read = -1;
 
     if (str->data != NULL && str->length > -1)
     {
-        bytes_read = jsl_fatptr_strip_whitespace_left(str);
-        bytes_read += jsl_fatptr_strip_whitespace_right(str);
+        bytes_read = jsl_strip_whitespace_left(str);
+        bytes_read += jsl_strip_whitespace_right(str);
     }
 
     return bytes_read;
 }
 
-static int64_t jsl__fatptr_output_sink_write(void *user, JSLImmutableMemory data)
+static int64_t jsl__memory_output_sink_write(void *user, JSLImmutableMemory data)
 {
     JSLMutableMemory* buffer = (JSLMutableMemory*) user;
-    int64_t bytes_written_to_sink = jsl_fatptr_memory_copy(buffer, data);
+    int64_t bytes_written_to_sink = jsl_memory_copy(buffer, data);
     return bytes_written_to_sink < 1 ? -1 : bytes_written_to_sink;
 }
 
-JSLOutputSink jsl_fatptr_output_sink(JSLMutableMemory* buffer)
+JSLOutputSink jsl_memory_output_sink(JSLMutableMemory* buffer)
 {
     JSLOutputSink sink;
-    sink.write_fp = jsl__fatptr_output_sink_write;
+    sink.write_fp = jsl__memory_output_sink_write;
     sink.user_data = buffer;
     return sink;
 }
@@ -1615,7 +1562,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
 
     static char hex[] = "0123456789abcdefxp";
     static char hexu[] = "0123456789ABCDEFXP";
-    static JSLImmutableMemory err_string = JSL_FATPTR_INITIALIZER("(ERROR)");
+    static JSLImmutableMemory err_string = JSL_CSTR_INITIALIZER("(ERROR)");
 
     uint8_t buffer[JSL__FORMAT_BUFFER_SIZE];
     uint8_t* buffer_cursor = buffer;
@@ -1686,7 +1633,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
                 *buffer_cursor = f.data[0];
                 ++buffer_cursor;
-                JSL_FATPTR_ADVANCE(f, 1);
+                JSL_MEMORY_ADVANCE(f, 1);
             }
 
             while (f.length > 31)
@@ -1703,7 +1650,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                     // No special characters found, store entire block
                     FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(32);
                     _mm256_storeu_si256(wide_dest, data);
-                    JSL_FATPTR_ADVANCE(f, 32);
+                    JSL_MEMORY_ADVANCE(f, 32);
                     buffer_cursor += 32;
                 }
                 else
@@ -1712,7 +1659,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                     FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(special_pos);
 
                     JSL_MEMCPY(buffer_cursor, f.data, (size_t) special_pos);
-                    JSL_FATPTR_ADVANCE(f, special_pos);
+                    JSL_MEMORY_ADVANCE(f, special_pos);
                     buffer_cursor += special_pos;
 
                     goto L_PROCESS_PERCENT;
@@ -1741,7 +1688,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
                 *buffer_cursor = f.data[0];
                 ++buffer_cursor;
-                JSL_FATPTR_ADVANCE(f, 1);
+                JSL_MEMORY_ADVANCE(f, 1);
             }
 
             while (f.length > 31)
@@ -1760,7 +1707,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                     FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(32);
                     vst1q_u8(buffer_cursor, data0);
                     vst1q_u8(buffer_cursor + 16, data1);
-                    JSL_FATPTR_ADVANCE(f, 32);
+                    JSL_MEMORY_ADVANCE(f, 32);
                     buffer_cursor += 32;
                 }
                 else
@@ -1773,7 +1720,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                     FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(special_pos);
                     JSL_MEMCPY(buffer_cursor, f.data, (size_t) special_pos);
 
-                    JSL_FATPTR_ADVANCE(f, special_pos);
+                    JSL_MEMORY_ADVANCE(f, special_pos);
                     buffer_cursor += special_pos;
 
                     goto L_PROCESS_PERCENT;
@@ -1797,7 +1744,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
                 *buffer_cursor = f.data[0];
                 ++buffer_cursor;
-                JSL_FATPTR_ADVANCE(f, 1);
+                JSL_MEMORY_ADVANCE(f, 1);
             }
 
             // fast copy everything up to the next %
@@ -1829,7 +1776,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 }
 
                 buffer_cursor += 4;
-                JSL_FATPTR_ADVANCE(f, 4);
+                JSL_MEMORY_ADVANCE(f, 4);
             }
 
             if (f.length == 0)
@@ -1841,7 +1788,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
 
         L_PROCESS_PERCENT:
 
-        JSL_FATPTR_ADVANCE(f, 1);
+        JSL_MEMORY_ADVANCE(f, 1);
 
         // ok, we have a percent, read the modifiers first
         field_width = 0;
@@ -1855,27 +1802,27 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
             // if we have left justify
             case '-':
                 formatting_flags |= JSL__LEFTJUST;
-                JSL_FATPTR_ADVANCE(f, 1);
+                JSL_MEMORY_ADVANCE(f, 1);
                 continue;
             // if we have leading plus
             case '+':
                 formatting_flags |= JSL__LEADINGPLUS;
-                JSL_FATPTR_ADVANCE(f, 1);
+                JSL_MEMORY_ADVANCE(f, 1);
                 continue;
             // if we have leading space
             case ' ':
                 formatting_flags |= JSL__LEADINGSPACE;
-                JSL_FATPTR_ADVANCE(f, 1);
+                JSL_MEMORY_ADVANCE(f, 1);
                 continue;
             // if we have leading 0x
             case '#':
                 formatting_flags |= JSL__LEADING_0X;
-                JSL_FATPTR_ADVANCE(f, 1);
+                JSL_MEMORY_ADVANCE(f, 1);
                 continue;
             // if we have thousand commas
             case '\'':
                 formatting_flags |= JSL__TRIPLET_COMMA;
-                JSL_FATPTR_ADVANCE(f, 1);
+                JSL_MEMORY_ADVANCE(f, 1);
                 continue;
             // if we have kilo marker (none->kilo->kibi->jedec)
             case '$':
@@ -1888,17 +1835,17 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 } else {
                 formatting_flags |= JSL__METRIC_SUFFIX;
                 }
-                JSL_FATPTR_ADVANCE(f, 1);
+                JSL_MEMORY_ADVANCE(f, 1);
                 continue;
             // if we don't want space between metric suffix and number
             case '_':
                 formatting_flags |= JSL__METRIC_NOSPACE;
-                JSL_FATPTR_ADVANCE(f, 1);
+                JSL_MEMORY_ADVANCE(f, 1);
                 continue;
             // if we have leading zero
             case '0':
                 formatting_flags |= JSL__LEADINGZERO;
-                JSL_FATPTR_ADVANCE(f, 1);
+                JSL_MEMORY_ADVANCE(f, 1);
                 goto flags_done;
             default: goto flags_done;
             }
@@ -1908,24 +1855,24 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
         // get the field width
         if (f.data[0] == '*') {
             field_width = (int32_t) va_arg(va, uint32_t);
-            JSL_FATPTR_ADVANCE(f, 1);
+            JSL_MEMORY_ADVANCE(f, 1);
         } else {
             while ((f.data[0] >= '0') && (f.data[0] <= '9')) {
                 field_width = field_width * 10 + f.data[0] - '0';
-                JSL_FATPTR_ADVANCE(f, 1);
+                JSL_MEMORY_ADVANCE(f, 1);
             }
         }
         // get the precision
         if (f.data[0] == '.') {
-            JSL_FATPTR_ADVANCE(f, 1);
+            JSL_MEMORY_ADVANCE(f, 1);
             if (f.data[0] == '*') {
                 precision = (int32_t) va_arg(va, uint32_t);
-                JSL_FATPTR_ADVANCE(f, 1);
+                JSL_MEMORY_ADVANCE(f, 1);
             } else {
                 precision = 0;
                 while ((f.data[0] >= '0') && (f.data[0] <= '9')) {
                 precision = precision * 10 + f.data[0] - '0';
-                JSL_FATPTR_ADVANCE(f, 1);
+                JSL_MEMORY_ADVANCE(f, 1);
                 }
             }
         }
@@ -1936,43 +1883,43 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
             // are we halfwidth?
             case 'h':
                 formatting_flags |= JSL__HALFWIDTH;
-                JSL_FATPTR_ADVANCE(f, 1);
+                JSL_MEMORY_ADVANCE(f, 1);
                 if (f.data[0] == 'h')
-                    JSL_FATPTR_ADVANCE(f, 1);  // QUARTERWIDTH
+                    JSL_MEMORY_ADVANCE(f, 1);  // QUARTERWIDTH
                 break;
             // are we 64-bit (unix style)
             case 'l':
                 formatting_flags |= ((sizeof(long) == 8) ? JSL__INTMAX : 0);
-                JSL_FATPTR_ADVANCE(f, 1);
+                JSL_MEMORY_ADVANCE(f, 1);
                 if (f.data[0] == 'l') {
                     formatting_flags |= JSL__INTMAX;
-                    JSL_FATPTR_ADVANCE(f, 1);
+                    JSL_MEMORY_ADVANCE(f, 1);
                 }
                 break;
             // are we 64-bit on intmax? (c99)
             case 'j':
                 formatting_flags |= (sizeof(size_t) == 8) ? JSL__INTMAX : 0;
-                JSL_FATPTR_ADVANCE(f, 1);
+                JSL_MEMORY_ADVANCE(f, 1);
                 break;
             // are we 64-bit on size_t or ptrdiff_t? (c99)
             case 'z':
                 formatting_flags |= (sizeof(ptrdiff_t) == 8) ? JSL__INTMAX : 0;
-                JSL_FATPTR_ADVANCE(f, 1);
+                JSL_MEMORY_ADVANCE(f, 1);
                 break;
             case 't':
                 formatting_flags |= (sizeof(ptrdiff_t) == 8) ? JSL__INTMAX : 0;
-                JSL_FATPTR_ADVANCE(f, 1);
+                JSL_MEMORY_ADVANCE(f, 1);
                 break;
             // are we 64-bit (msft style)
             case 'I':
                 if ((f.data[1] == '6') && (f.data[2] == '4')) {
                     formatting_flags |= JSL__INTMAX;
-                    JSL_FATPTR_ADVANCE(f, 3);
+                    JSL_MEMORY_ADVANCE(f, 3);
                 } else if ((f.data[1] == '3') && (f.data[2] == '2')) {
-                    JSL_FATPTR_ADVANCE(f, 3);
+                    JSL_MEMORY_ADVANCE(f, 3);
                 } else {
                     formatting_flags |= ((sizeof(void *) == 8) ? JSL__INTMAX : 0);
-                    JSL_FATPTR_ADVANCE(f, 1);
+                    JSL_MEMORY_ADVANCE(f, 1);
                 }
                 break;
             default: break;
@@ -2753,7 +2700,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 goto L_STRING_COPY;
         }
 
-        JSL_FATPTR_ADVANCE(f, 1);
+        JSL_MEMORY_ADVANCE(f, 1);
     }
 
 

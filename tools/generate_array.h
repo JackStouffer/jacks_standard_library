@@ -177,7 +177,7 @@
     #include <time.h>
     #include <assert.h>
 
-    static JSLImmutableMemory dynamic_header_template = JSL_FATPTR_INITIALIZER(
+    static JSLImmutableMemory dynamic_header_template = JSL_CSTR_INITIALIZER(
         "/**\n"
         " * AUTO GENERATED FILE\n"
         " *\n"
@@ -339,7 +339,7 @@
         "#endif\n"
     );
 
-    static JSLImmutableMemory dynamic_source_template = JSL_FATPTR_INITIALIZER(
+    static JSLImmutableMemory dynamic_source_template = JSL_CSTR_INITIALIZER(
         "/**\n"
         " * AUTO GENERATED FILE\n"
         " *\n"
@@ -586,9 +586,9 @@
         "}\n"
     );
 
-    static JSLImmutableMemory array_type_name_key = JSL_FATPTR_INITIALIZER("array_type_name");
-    static JSLImmutableMemory value_type_name_key = JSL_FATPTR_INITIALIZER("value_type_name");
-    static JSLImmutableMemory function_prefix_key = JSL_FATPTR_INITIALIZER("function_prefix");
+    static JSLImmutableMemory array_type_name_key = JSL_CSTR_INITIALIZER("array_type_name");
+    static JSLImmutableMemory value_type_name_key = JSL_CSTR_INITIALIZER("value_type_name");
+    static JSLImmutableMemory function_prefix_key = JSL_CSTR_INITIALIZER("function_prefix");
 
     // because rand max on some platforms is 32k
     static inline uint64_t rand_u64(void)
@@ -613,49 +613,49 @@
         JSLStrToStrMap* variables
     )
     {
-        static JSLImmutableMemory open_param = JSL_FATPTR_INITIALIZER("{{");
-        static JSLImmutableMemory close_param = JSL_FATPTR_INITIALIZER("}}");
+        static JSLImmutableMemory open_param = JSL_CSTR_INITIALIZER("{{");
+        static JSLImmutableMemory close_param = JSL_CSTR_INITIALIZER("}}");
         JSLImmutableMemory template_reader = template;
         
         while (template_reader.length > 0)
         {
-            int64_t index_of_open = jsl_fatptr_substring_search(template_reader, open_param);
+            int64_t index_of_open = jsl_substring_search(template_reader, open_param);
 
             // No more variables, write everything
             if (index_of_open == -1)
             {
-                jsl_output_sink_write_fatptr(sink, template_reader);
+                jsl_output_sink_write(sink, template_reader);
                 break;
             }
 
             if (index_of_open > 0)
             {
                 JSLImmutableMemory slice = jsl_slice(template_reader, 0, index_of_open);
-                jsl_output_sink_write_fatptr(sink, slice);
+                jsl_output_sink_write(sink, slice);
             }
 
-            JSL_FATPTR_ADVANCE(template_reader, index_of_open + open_param.length);
+            JSL_MEMORY_ADVANCE(template_reader, index_of_open + open_param.length);
 
-            int64_t index_of_close = jsl_fatptr_substring_search(template_reader, close_param);
+            int64_t index_of_close = jsl_substring_search(template_reader, close_param);
 
             // Improperly closed template param, write everything including the open marker
             if (index_of_close == -1)
             {
-                jsl_output_sink_write_fatptr(sink, open_param);
-                jsl_output_sink_write_fatptr(sink, template_reader);
+                jsl_output_sink_write(sink, open_param);
+                jsl_output_sink_write(sink, template_reader);
                 break;
             }
 
             JSLImmutableMemory var_name = jsl_slice(template_reader, 0, index_of_close);
-            jsl_fatptr_strip_whitespace(&var_name);
+            jsl_strip_whitespace(&var_name);
 
             JSLImmutableMemory var_value;
             if (jsl_str_to_str_map_get(variables, var_name, &var_value))
             {
-                jsl_output_sink_write_fatptr(sink, var_value);
+                jsl_output_sink_write(sink, var_value);
             }
 
-            JSL_FATPTR_ADVANCE(template_reader, index_of_close + close_param.length);
+            JSL_MEMORY_ADVANCE(template_reader, index_of_close + close_param.length);
         }
     }
 
@@ -701,35 +701,35 @@
         (void) impl;
         srand((uint32_t) (time(NULL) % UINT32_MAX));
 
-        jsl_output_sink_write_fatptr(sink, JSL_FATPTR_EXPRESSION("#pragma once\n\n"));
+        jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("#pragma once\n\n"));
 
-        jsl_output_sink_write_fatptr(
+        jsl_output_sink_write(
             sink,
-            JSL_FATPTR_EXPRESSION("// DEFAULT INCLUDED HEADERS\n")
+            JSL_CSTR_EXPRESSION("// DEFAULT INCLUDED HEADERS\n")
         );
-        jsl_output_sink_write_fatptr(sink, JSL_FATPTR_EXPRESSION("#include <stdint.h>\n"));
-        jsl_output_sink_write_fatptr(sink, JSL_FATPTR_EXPRESSION("#include \"jsl_hash_map_common.h\"\n\n"));
+        jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("#include <stdint.h>\n"));
+        jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("#include \"jsl_hash_map_common.h\"\n\n"));
 
-        jsl_output_sink_write_fatptr(
+        jsl_output_sink_write(
             sink,
-            JSL_FATPTR_EXPRESSION("// USER INCLUDED HEADERS\n")
+            JSL_CSTR_EXPRESSION("// USER INCLUDED HEADERS\n")
         );
 
         for (int32_t i = 0; i < include_header_count; ++i)
         {
-            jsl_format_sink(sink, JSL_FATPTR_EXPRESSION("#include \"%y\"\n"), include_header_array[i]);
+            jsl_format_sink(sink, JSL_CSTR_EXPRESSION("#include \"%y\"\n"), include_header_array[i]);
         }
 
-        jsl_output_sink_write_fatptr(sink, JSL_FATPTR_EXPRESSION("\n"));
+        jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("\n"));
         
         jsl_format_sink(
             sink,
-            JSL_FATPTR_EXPRESSION("#define PRIVATE_SENTINEL_%y %" PRIu64 "U \n"),
+            JSL_CSTR_EXPRESSION("#define PRIVATE_SENTINEL_%y %" PRIu64 "U \n"),
             array_type_name,
             rand_u64()
         );
 
-        jsl_output_sink_write_fatptr(sink, JSL_FATPTR_EXPRESSION("\n"));
+        jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("\n"));
 
         JSLStrToStrMap map;
         jsl_str_to_str_map_init(&map, allocator, 0x123456789);
@@ -777,35 +777,35 @@
     {
         (void) impl;
 
-        jsl_output_sink_write_fatptr(
+        jsl_output_sink_write(
             sink,
-            JSL_FATPTR_EXPRESSION("// DEFAULT INCLUDED HEADERS\n")
+            JSL_CSTR_EXPRESSION("// DEFAULT INCLUDED HEADERS\n")
         );
 
-        jsl_output_sink_write_fatptr(
+        jsl_output_sink_write(
             sink,
-            JSL_FATPTR_EXPRESSION("#include <stddef.h>\n")
+            JSL_CSTR_EXPRESSION("#include <stddef.h>\n")
         );
-        jsl_output_sink_write_fatptr(
+        jsl_output_sink_write(
             sink,
-            JSL_FATPTR_EXPRESSION("#include <stdint.h>\n")
+            JSL_CSTR_EXPRESSION("#include <stdint.h>\n")
         );
-        jsl_output_sink_write_fatptr(
+        jsl_output_sink_write(
             sink,
-            JSL_FATPTR_EXPRESSION("#include \"jsl_core.h\"\n")
+            JSL_CSTR_EXPRESSION("#include \"jsl_core.h\"\n")
         );
 
-        jsl_output_sink_write_fatptr(
+        jsl_output_sink_write(
             sink,
-            JSL_FATPTR_EXPRESSION("// USER INCLUDED HEADERS\n")
+            JSL_CSTR_EXPRESSION("// USER INCLUDED HEADERS\n")
         );
 
         for (int32_t i = 0; i < include_header_count; ++i)
         {
-            jsl_format_sink(sink, JSL_FATPTR_EXPRESSION("#include \"%y\"\n"), include_header_array[i]);
+            jsl_format_sink(sink, JSL_CSTR_EXPRESSION("#include \"%y\"\n"), include_header_array[i]);
         }
 
-        jsl_format_sink(sink, JSL_FATPTR_EXPRESSION("\n"));
+        jsl_format_sink(sink, JSL_CSTR_EXPRESSION("\n"));
 
         JSLStrToStrMap map;
         jsl_str_to_str_map_init(&map, allocator, 0x123456789);

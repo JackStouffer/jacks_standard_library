@@ -154,13 +154,13 @@ struct JSL__StrToStrMap {
  * JSLStrToStrMap map;
  * jsl_str_to_str_map_init(&map, &stack_arena, 0);
  *
- * JSLImmutableMemory key = JSL_FATPTR_INITIALIZER("hello-key");
+ * JSLImmutableMemory key = JSL_CSTR_INITIALIZER("hello-key");
  * 
  * jsl_str_to_str_multimap_insert(
  *     &map,
  *     key,
  *     JSL_STRING_LIFETIME_STATIC,
- *     JSL_FATPTR_EXPRESSION("hello-value"),
+ *     JSL_CSTR_EXPRESSION("hello-value"),
  *     JSL_STRING_LIFETIME_STATIC
  * );
  * 

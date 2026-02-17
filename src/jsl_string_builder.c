@@ -153,7 +153,7 @@ bool jsl_string_builder_init2(
     return res;
 }
 
-int64_t jsl_string_builder_insert_fatptr(JSLStringBuilder* builder, JSLImmutableMemory data)
+int64_t jsl_string_builder_insert_memory(JSLStringBuilder* builder, JSLImmutableMemory data)
 {
     if (
         builder == NULL
@@ -172,11 +172,11 @@ int64_t jsl_string_builder_insert_fatptr(JSLStringBuilder* builder, JSLImmutable
             break;
         }
 
-        int64_t copy_res = jsl_fatptr_memory_copy(&builder->tail->writer, data);
+        int64_t copy_res = jsl_memory_copy(&builder->tail->writer, data);
         
         if (copy_res > 0)
         {
-            JSL_FATPTR_ADVANCE(data, copy_res);
+            JSL_MEMORY_ADVANCE(data, copy_res);
             bytes_written += copy_res;
         }
         else
@@ -214,16 +214,14 @@ bool jsl_string_builder_iterator_next(JSLStringBuilderIterator* iterator, JSLImm
 
     iterator->current = current->next;
 
-    JSLMutableMemory buffer = jsl_auto_slice_mutable(current->buffer, current->writer);
-    out_chunk->data = buffer.data;
-    out_chunk->length = buffer.length;
+    *out_chunk = jsl_auto_slice(current->buffer, current->writer);
 
     return true;
 }
 
 static int64_t jsl__format_string_builder_callback(void* user, JSLImmutableMemory data)
 {
-    return jsl_string_builder_insert_fatptr((JSLStringBuilder*) user, data);
+    return jsl_string_builder_insert_memory((JSLStringBuilder*) user, data);
 }
 
 JSLOutputSink jsl_string_builder_output_sink(JSLStringBuilder* builder)

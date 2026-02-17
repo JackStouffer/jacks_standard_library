@@ -111,7 +111,7 @@ static inline JSLArena jsl__arena_from_stack_internal(void* buf, size_t len)
  *
  *      // example hash map, not real
  *      IntToStrMap map = int_to_str_ctor(&arena);
- *      int_to_str_add(&map, 64, JSL_FATPTR_INITIALIZER("This is my string data!"));
+ *      int_to_str_add(&map, 64, JSL_CSTR_INITIALIZER("This is my string data!"));
  *
  *      my_hash_map_calculations(&map);
  *
@@ -216,7 +216,7 @@ JSL_DEF void* jsl_arena_allocate_aligned(JSLArena* arena, int64_t bytes, int32_t
  */
 JSL_DEF void* jsl_arena_reallocate(
     JSLArena* arena,
-    void* original_allocation,
+    const void* original_allocation,
     int64_t new_num_bytes
 );
 
@@ -226,7 +226,7 @@ JSL_DEF void* jsl_arena_reallocate(
  */
 JSL_DEF void* jsl_arena_reallocate_aligned(
     JSLArena* arena,
-    void* original_allocation,
+    const void* original_allocation,
     int64_t new_num_bytes,
     int32_t align
 );

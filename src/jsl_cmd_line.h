@@ -573,10 +573,10 @@ bool jsl_cmd_line_args_has_short_flag(JSLCmdLineArgs* args, uint8_t flag);
  * ```
  * 
  * ```
- * jsl_cmd_line_args_has_flag(cmd, JSL_FATPTR_EXPRESSION("long-flag")); // true
- * jsl_cmd_line_args_has_flag(cmd, JSL_FATPTR_EXPRESSION("arg2")); // true
- * jsl_cmd_line_args_has_flag(cmd, JSL_FATPTR_EXPRESSION("arg")); // false
- * jsl_cmd_line_args_has_flag(cmd, JSL_FATPTR_EXPRESSION("my-command")); // false
+ * jsl_cmd_line_args_has_flag(cmd, JSL_CSTR_EXPRESSION("long-flag")); // true
+ * jsl_cmd_line_args_has_flag(cmd, JSL_CSTR_EXPRESSION("arg2")); // true
+ * jsl_cmd_line_args_has_flag(cmd, JSL_CSTR_EXPRESSION("arg")); // false
+ * jsl_cmd_line_args_has_flag(cmd, JSL_CSTR_EXPRESSION("my-command")); // false
  * ```
  *
  * @param args The command line argument parser instance
@@ -595,11 +595,11 @@ bool jsl_cmd_line_args_has_flag(JSLCmdLineArgs* args, JSLImmutableMemory flag);
  * ```
  * 
  * ```
- * jsl_cmd_line_args_has_command(cmd, JSL_FATPTR_EXPRESSION("clean")); // true
- * jsl_cmd_line_args_has_command(cmd, JSL_FATPTR_EXPRESSION("build")); // true
- * jsl_cmd_line_args_has_command(cmd, JSL_FATPTR_EXPRESSION("restart")); // false
- * jsl_cmd_line_args_has_command(cmd, JSL_FATPTR_EXPRESSION("flag")); // false
- * jsl_cmd_line_args_has_command(cmd, JSL_FATPTR_EXPRESSION("v")); // false
+ * jsl_cmd_line_args_has_command(cmd, JSL_CSTR_EXPRESSION("clean")); // true
+ * jsl_cmd_line_args_has_command(cmd, JSL_CSTR_EXPRESSION("build")); // true
+ * jsl_cmd_line_args_has_command(cmd, JSL_CSTR_EXPRESSION("restart")); // false
+ * jsl_cmd_line_args_has_command(cmd, JSL_CSTR_EXPRESSION("flag")); // false
+ * jsl_cmd_line_args_has_command(cmd, JSL_CSTR_EXPRESSION("v")); // false
  * ```
  *
  * @param args The command line argument parser instance
@@ -651,9 +651,9 @@ bool jsl_cmd_line_args_pop_arg_list(JSLCmdLineArgs* args, JSLImmutableMemory* ou
  * ```
  * JSLImmutableMemory arg;
  * 
- * jsl_cmd_line_args_pop_flag_with_value(cmd, JSL_FATPTR_EXPRESSION("ignore"), &arg); // arg == foo
- * jsl_cmd_line_args_pop_flag_with_value(cmd, JSL_FATPTR_EXPRESSION("ignore"), &arg); // arg == bar
- * jsl_cmd_line_args_pop_flag_with_value(cmd, JSL_FATPTR_EXPRESSION("ignore"), &arg); // returns false
+ * jsl_cmd_line_args_pop_flag_with_value(cmd, JSL_CSTR_EXPRESSION("ignore"), &arg); // arg == foo
+ * jsl_cmd_line_args_pop_flag_with_value(cmd, JSL_CSTR_EXPRESSION("ignore"), &arg); // arg == bar
+ * jsl_cmd_line_args_pop_flag_with_value(cmd, JSL_CSTR_EXPRESSION("ignore"), &arg); // returns false
  * ```
  *
  * @param args The command line argument parser instance
