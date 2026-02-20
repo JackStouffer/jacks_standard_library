@@ -15,8 +15,6 @@
 bin/
 *.dSYM
 run_tests
-generate_hash_map
-embed
 *.old
 tests/arrays
 tests/hash_maps

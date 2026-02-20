@@ -1391,7 +1391,7 @@ typedef struct JSLOutputSink {
 * JSLImmutableMemory empty = JSL_CSTR_INITIALIZER("");
 * ```
 */
-#define JSL_CSTR_INITIALIZER(s) { (uint8_t*)(s), (int64_t)(sizeof(s) - 1) }
+#define JSL_CSTR_INITIALIZER(s) { (const uint8_t*)(s), (int64_t)(sizeof(s) - 1) }
 
 #if defined(_MSC_VER) && !defined(__clang__)
 
@@ -1410,7 +1410,7 @@ typedef struct JSLOutputSink {
      * my_function(JSL_CSTR_EXPRESSION("my data"));
      * ```
      */
-    #define JSL_CSTR_EXPRESSION(s) jsl_immutable_memory((uint8_t*) (s), (int64_t)(sizeof(s) - 1))
+    #define JSL_CSTR_EXPRESSION(s) jsl_immutable_memory((const uint8_t*) (s), (int64_t)(sizeof(s) - 1))
 
 #else
 
@@ -1429,7 +1429,7 @@ typedef struct JSLOutputSink {
      * my_function(JSL_CSTR_EXPRESSION("my data"));
      * ```
      */
-    #define JSL_CSTR_EXPRESSION(s) ((JSLImmutableMemory){ (uint8_t*)(s), (int64_t)(sizeof(s) - 1) })
+    #define JSL_CSTR_EXPRESSION(s) ((JSLImmutableMemory){ (const uint8_t*)(s), (int64_t)(sizeof(s) - 1) })
 
 #endif
 
