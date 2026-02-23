@@ -16,7 +16,7 @@
     #include <stdbool.h>
 #endif
 
-#include "../src/jsl_everything.c"
+#include "../../src/jsl_everything.c"
 
 #define EMBED_IMPLEMENTATION
 #include "embed.h"

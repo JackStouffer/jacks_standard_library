@@ -20,3 +20,4 @@ tests/arrays
 tests/hash_maps
 .DS_Store
 experiments/
+build/
