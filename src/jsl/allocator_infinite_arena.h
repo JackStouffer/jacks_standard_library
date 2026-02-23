@@ -5,12 +5,12 @@
     #include <stdbool.h>
 #endif
 
-#include "jsl_core.h"
-#include "jsl_allocator.h"
+#include "core.h"
+#include "allocator.h"
 
 #if !JSL_IS_WINDOWS && !JSL_IS_POSIX
 
-    #error "jsl_allocator_infinite_arena.h: Unsupported OS detected. The infinite arena is for POSIX and Windows systems only."
+    #error "allocator_infinite_arena.h: Unsupported OS detected. The infinite arena is for POSIX and Windows systems only."
 
 #endif
 

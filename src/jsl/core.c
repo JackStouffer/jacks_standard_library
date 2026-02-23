@@ -51,8 +51,8 @@
     #include <stdbool.h>
 #endif
 
-#include "jsl_core.h"
-#include "jsl_allocator.h"
+#include "core.h"
+#include "allocator.h"
 
 #if JSL_IS_X86
     #include <immintrin.h>

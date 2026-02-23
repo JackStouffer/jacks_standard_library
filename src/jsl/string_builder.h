@@ -68,15 +68,15 @@
     #include <stdbool.h>
 #endif
 
-#include "jsl_core.h"
-#include "jsl_allocator.h"
+#include "core.h"
+#include "allocator.h"
 
 /* Versioning to catch mismatches across deps */
 #ifndef JSL_STRING_BUILDER_VERSION
     #define JSL_STRING_BUILDER_VERSION 0x010000  /* 1.0.0 */
 #else
     #if JSL_STRING_BUILDER_VERSION != 0x010200
-        #error "jsl_string_builder.h version mismatch across includes"
+        #error "string_builder.h version mismatch across includes"
     #endif
 #endif
 

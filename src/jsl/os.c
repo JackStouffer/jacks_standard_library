@@ -49,9 +49,9 @@
     #include <stdbool.h>
 #endif
 
-#include "jsl_core.h"
-#include "jsl_allocator.h"
-#include "jsl_os.h"
+#include "core.h"
+#include "allocator.h"
+#include "os.h"
 
 JSLGetFileSizeResultEnum jsl_get_file_size(
     JSLImmutableMemory path,

@@ -93,7 +93,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#include "../../src/jsl_everything.c"
+#include "jsl/everything.c"
 
 #define GENERATE_HASH_MAP_IMPLEMENTATION
 #include "generate_hash_map.h"

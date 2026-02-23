@@ -28,9 +28,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../src/jsl_core.h"
-#include "../src/jsl_allocator.h"
-#include "../src/jsl_allocator_pool.h"
+#include "jsl/core.h"
+#include "jsl/allocator.h"
+#include "jsl/allocator_pool.h"
 
 #include "minctest.h"
 

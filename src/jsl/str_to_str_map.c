@@ -50,10 +50,10 @@
     #include <stdbool.h>
 #endif
 
-#include "jsl_core.h"
-#include "jsl_hash_map_common.h"
-#include "jsl_allocator.h"
-#include "jsl_str_to_str_map.h"
+#include "core.h"
+#include "hash_map_common.h"
+#include "allocator.h"
+#include "str_to_str_map.h"
 
 #define JSL__MAP_PRIVATE_SENTINEL 8973815015742603881U
 #define JSL__MAP_LIFETIME_STATIC 1u

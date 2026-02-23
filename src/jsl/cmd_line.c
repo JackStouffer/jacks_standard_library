@@ -33,12 +33,12 @@
     #include <stdbool.h>
 #endif
 
-#include "jsl_core.h"
-#include "jsl_allocator.h"
-#include "jsl_cmd_line.h"
-#include "jsl_str_set.h"
-#include "jsl_str_to_str_map.h"
-#include "jsl_str_to_str_multimap.h"
+#include "core.h"
+#include "allocator.h"
+#include "cmd_line.h"
+#include "str_set.h"
+#include "str_to_str_map.h"
+#include "str_to_str_multimap.h"
 
 #if JSL_IS_WINDOWS
     #include <windows.h>

@@ -3,9 +3,9 @@
     #include <stdbool.h>
 #endif
 
-#include "jsl_core.h"
-#include "jsl_allocator.h"
-#include "jsl_allocator_pool.h"
+#include "core.h"
+#include "allocator.h"
+#include "allocator_pool.h"
 
 #define JSL__POOL_PRIVATE_SENTINEL (uint64_t) 659574655145560084UL
 #define JSL__ITEM_PRIVATE_SENTINEL (uint64_t) 2471501631370269720UL

@@ -50,16 +50,16 @@
     #include <stdbool.h>
 #endif
 
-#include "jsl_core.h"
-#include "jsl_allocator.h"
-#include "jsl_hash_map_common.h"
+#include "core.h"
+#include "allocator.h"
+#include "hash_map_common.h"
 
 /* Versioning to catch mismatches across deps */
 #ifndef JSL_STR_SET_VERSION
     #define JSL_STR_SET_VERSION 0x010000  /* 1.0.0 */
 #else
     #if JSL_STR_SET_VERSION != 0x010000
-        #error "jsl_str_set.h version mismatch across includes"
+        #error "str_set.h version mismatch across includes"
     #endif
 #endif
 

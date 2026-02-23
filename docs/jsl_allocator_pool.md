@@ -18,7 +18,7 @@
 - [`jsl_pool_free`](#function-jsl_pool_free)
 - [`jsl_pool_free_all`](#function-jsl_pool_free_all)
 
-## File: src/jsl_allocator_pool.h
+## File: src/jsl/allocator_pool.h
 
 <a id="type-typedef-jslpoolallocator"></a>
 ### Typedef: `JSLPoolAllocator`
@@ -79,7 +79,7 @@ typedef struct JSL__PoolAllocator JSLPoolAllocator;
 ```
 
 
-*Defined at*: `src/jsl_allocator_pool.h:86`
+*Defined at*: `src/jsl/allocator_pool.h:86`
 
 ---
 
@@ -107,7 +107,7 @@ void jsl_pool_init(JSLPoolAllocator *pool, void *memory, int64_t length, int64_t
 ```
 
 
-*Defined at*: `src/jsl_allocator_pool.h:101`
+*Defined at*: `src/jsl/allocator_pool.h:101`
 
 ---
 
@@ -135,7 +135,7 @@ void jsl_pool_init2(JSLPoolAllocator *pool, JSLFatPtr memory, int64_t allocation
 ```
 
 
-*Defined at*: `src/jsl_allocator_pool.h:121`
+*Defined at*: `src/jsl/allocator_pool.h:121`
 
 ---
 
@@ -154,7 +154,7 @@ int jsl_pool_free_allocation_count(JSLPoolAllocator *pool);
 ```
 
 
-*Defined at*: `src/jsl_allocator_pool.h:133`
+*Defined at*: `src/jsl/allocator_pool.h:133`
 
 ---
 
@@ -174,7 +174,7 @@ int jsl_pool_total_allocation_count(JSLPoolAllocator *pool);
 ```
 
 
-*Defined at*: `src/jsl_allocator_pool.h:144`
+*Defined at*: `src/jsl/allocator_pool.h:144`
 
 ---
 
@@ -203,7 +203,7 @@ void * jsl_pool_allocate(JSLPoolAllocator *pool, bool zeroed);
 ```
 
 
-*Defined at*: `src/jsl_allocator_pool.h:158`
+*Defined at*: `src/jsl/allocator_pool.h:158`
 
 ---
 
@@ -224,7 +224,7 @@ int jsl_pool_free(JSLPoolAllocator *pool, void *allocation);
 ```
 
 
-*Defined at*: `src/jsl_allocator_pool.h:168`
+*Defined at*: `src/jsl/allocator_pool.h:168`
 
 ---
 
@@ -239,7 +239,7 @@ void jsl_pool_free_all(JSLPoolAllocator *pool);
 ```
 
 
-*Defined at*: `src/jsl_allocator_pool.h:174`
+*Defined at*: `src/jsl/allocator_pool.h:174`
 
 ---
 

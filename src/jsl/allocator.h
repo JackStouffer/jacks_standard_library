@@ -65,7 +65,7 @@
     #include <stdbool.h>
 #endif
 
-#include "jsl_core.h"
+#include "core.h"
 
 /**
  * TODO: docs

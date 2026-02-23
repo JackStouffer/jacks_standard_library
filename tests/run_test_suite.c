@@ -45,7 +45,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "../src/jsl_everything.c"
+#include "../src/jsl/everything.c"
 
 #if JSL_IS_POSIX
     #include <sys/types.h>
@@ -313,9 +313,9 @@ static UnitTestDecl unit_test_declarations[] = {
         (char*[])
         {
             "tests/test_core.c",
-            "src/jsl_core.c",
-            "src/jsl_allocator.c",
-            "src/jsl_allocator_arena.c",
+            "src/jsl/core.c",
+            "src/jsl/allocator.c",
+            "src/jsl/allocator_arena.c",
             NULL
         }
     },
@@ -324,10 +324,10 @@ static UnitTestDecl unit_test_declarations[] = {
         (char*[])
         {
             "tests/test_allocator_arena.c",
-            "src/jsl_core.c",
-            "src/jsl_allocator.c",
-            "src/jsl_allocator_arena.c",
-            "src/jsl_allocator_infinite_arena.c",
+            "src/jsl/core.c",
+            "src/jsl/allocator.c",
+            "src/jsl/allocator_arena.c",
+            "src/jsl/allocator_infinite_arena.c",
             NULL
         }
     },
@@ -336,9 +336,9 @@ static UnitTestDecl unit_test_declarations[] = {
         (char*[])
         {
             "tests/test_allocator_pool.c",
-            "src/jsl_core.c",
-            "src/jsl_allocator.c",
-            "src/jsl_allocator_pool.c",
+            "src/jsl/core.c",
+            "src/jsl/allocator.c",
+            "src/jsl/allocator_pool.c",
             NULL
         }
     },
@@ -347,9 +347,9 @@ static UnitTestDecl unit_test_declarations[] = {
         (char*[])
         {
             "tests/test_format.c",
-            "src/jsl_core.c",
-            "src/jsl_allocator.c",
-            "src/jsl_allocator_arena.c",
+            "src/jsl/core.c",
+            "src/jsl/allocator.c",
+            "src/jsl/allocator_arena.c",
             NULL
         }
     },
@@ -358,10 +358,10 @@ static UnitTestDecl unit_test_declarations[] = {
         (char*[])
         {
             "tests/test_string_builder.c",
-            "src/jsl_core.c",
-            "src/jsl_allocator.c",
-            "src/jsl_allocator_arena.c",
-            "src/jsl_string_builder.c",
+            "src/jsl/core.c",
+            "src/jsl/allocator.c",
+            "src/jsl/allocator_arena.c",
+            "src/jsl/string_builder.c",
             NULL
         }
     },
@@ -370,13 +370,13 @@ static UnitTestDecl unit_test_declarations[] = {
         (char*[])
         {
             "tests/test_cmd_line.c",
-            "src/jsl_core.c",
-            "src/jsl_allocator.c",
-            "src/jsl_allocator_arena.c",
-            "src/jsl_str_set.c",
-            "src/jsl_str_to_str_map.c",
-            "src/jsl_str_to_str_multimap.c",
-            "src/jsl_cmd_line.c",
+            "src/jsl/core.c",
+            "src/jsl/allocator.c",
+            "src/jsl/allocator_arena.c",
+            "src/jsl/str_set.c",
+            "src/jsl/str_to_str_map.c",
+            "src/jsl/str_to_str_multimap.c",
+            "src/jsl/cmd_line.c",
             NULL
         }
     },
@@ -385,28 +385,28 @@ static UnitTestDecl unit_test_declarations[] = {
         (char*[])
         {
             "tests/test_intrinsics.c",
-            "src/jsl_core.c",
-            "src/jsl_allocator.c",
-            "src/jsl_allocator_arena.c",
+            "src/jsl/core.c",
+            "src/jsl/allocator.c",
+            "src/jsl/allocator_arena.c",
             NULL
         }
     },
     { "test_file_utils", (char*[]) {
         "tests/test_file_utils.c",
-        "src/jsl_core.c",
-        "src/jsl_allocator.c",
-        "src/jsl_allocator_arena.c",
-        "src/jsl_os.c",
+        "src/jsl/core.c",
+        "src/jsl/allocator.c",
+        "src/jsl/allocator_arena.c",
+        "src/jsl/os.c",
         NULL
     } },
     {
         "test_str_to_str_multimap",
         (char*[]) {
             "tests/test_str_to_str_multimap.c",
-            "src/jsl_core.c",
-            "src/jsl_allocator.c",
-            "src/jsl_allocator_arena.c",
-            "src/jsl_str_to_str_multimap.c",
+            "src/jsl/core.c",
+            "src/jsl/allocator.c",
+            "src/jsl/allocator_arena.c",
+            "src/jsl/str_to_str_multimap.c",
             NULL
         }
     },
@@ -414,10 +414,10 @@ static UnitTestDecl unit_test_declarations[] = {
         "test_hash_set",
         (char*[]) {
             "tests/test_hash_set.c",
-            "src/jsl_core.c",
-            "src/jsl_allocator.c",
-            "src/jsl_allocator_arena.c",
-            "src/jsl_str_set.c",
+            "src/jsl/core.c",
+            "src/jsl/allocator.c",
+            "src/jsl/allocator_arena.c",
+            "src/jsl/str_set.c",
             NULL
         }
     },
@@ -425,9 +425,9 @@ static UnitTestDecl unit_test_declarations[] = {
         "test_array",
         (char*[]) {
             "tests/test_array.c",
-            "src/jsl_core.c",
-            "src/jsl_allocator.c",
-            "src/jsl_allocator_arena.c",
+            "src/jsl/core.c",
+            "src/jsl/allocator.c",
+            "src/jsl/allocator_arena.c",
             "tests/arrays/dynamic_comp1_array.c",
             "tests/arrays/dynamic_comp2_array.c",
             "tests/arrays/dynamic_comp3_array.c",
@@ -439,10 +439,10 @@ static UnitTestDecl unit_test_declarations[] = {
         "test_hash_map",
         (char*[]) {
             "tests/test_hash_map.c",
-            "src/jsl_core.c",
-            "src/jsl_allocator.c",
-            "src/jsl_allocator_arena.c",
-            "src/jsl_str_to_str_map.c",
+            "src/jsl/core.c",
+            "src/jsl/allocator.c",
+            "src/jsl/allocator_arena.c",
+            "src/jsl/str_to_str_map.c",
             "tests/hash_maps/fixed_comp2_to_int_map.c",
             "tests/hash_maps/fixed_comp3_to_comp2_map.c",
             "tests/hash_maps/fixed_int32_to_comp1_map.c",
@@ -695,7 +695,7 @@ int32_t main(int32_t argc, char **argv)
             &embed_compile_command,
             "-o", generate_array_exe_name,
             "-Isrc/",
-            "tools/embed.c"
+            "tools/embed/embed.c"
         );
 
         if (!nob_cmd_run(&embed_compile_command)) return 1;
@@ -748,7 +748,7 @@ int32_t main(int32_t argc, char **argv)
             &generate_array_compile_command,
             "-o", generate_array_exe_name,
             "-Isrc/",
-            "tools/generate_array.c"
+            "tools/generate_array/generate_array.c"
         );
 
         if (!nob_cmd_run(&generate_array_compile_command)) return 1;
@@ -878,7 +878,7 @@ int32_t main(int32_t argc, char **argv)
             &generate_hash_map_compile_command,
             "-o", generate_hash_map_exe_name,
             "-Isrc/",
-            "tools/generate_hash_map.c"
+            "tools/generate_hash_map/generate_hash_map.c"
         );
 
         if (!nob_cmd_run(&generate_hash_map_compile_command)) return 1;

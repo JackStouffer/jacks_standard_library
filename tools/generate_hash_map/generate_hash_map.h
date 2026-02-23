@@ -93,9 +93,9 @@
         #include <stdbool.h>
     #endif
 
-    #include "../../src/jsl_core.h"
-    #include "../../src/jsl_allocator.h"
-    #include "../../src/jsl_allocator_arena.h"
+    #include "jsl/core.h"
+    #include "jsl/allocator.h"
+    #include "jsl/allocator_arena.h"
 
     /* Versioning to catch mismatches across deps */
     #ifndef GENERATE_HASH_MAP_VERSION
@@ -744,8 +744,8 @@
         "    #include <stdbool.h>\n"
         "#endif\n"
         "\n"
-        "#include \"jsl_core.h\"\n"
-        "#include \"jsl_hash_map_common.h\"\n"
+        "#include \"jsl/core.h\"\n"
+        "#include \"jsl/hash_map_common.h\"\n"
         "\n"
         "#ifdef __cplusplus\n"
         "extern \"C\" {\n"
@@ -1071,9 +1071,9 @@
         "    #include <stdbool.h>\n"
         "#endif\n"
         "\n"
-        "#include \"jsl_core.h\"\n"
-        "#include \"jsl_hash_map_common.h\"\n"
-        "#include \"jsl_str_to_str_map.h\"\n"
+        "#include \"jsl/core.h\"\n"
+        "#include \"jsl/hash_map_common.h\"\n"
+        "#include \"jsl/str_to_str_map.h\"\n"
         "\n"
         "#define JSL__MAP_PRIVATE_SENTINEL 8973815015742603881U\n"
         "\n"
@@ -1912,8 +1912,8 @@
 
         jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("#pragma once\n\n"));
         jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("#include <stdint.h>\n"));
-        jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("#include \"jsl_allocator.h\"\n"));
-        jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("#include \"jsl_hash_map_common.h\"\n"));
+        jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("#include \"jsl/allocator.h\"\n"));
+        jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("#include \"jsl/hash_map_common.h\"\n"));
         jsl_output_sink_write_u8(
             sink,
             '\n'
@@ -2010,12 +2010,12 @@
         );
         jsl_output_sink_write(
             sink,
-            JSL_CSTR_EXPRESSION("#include \"jsl_core.h\"\n")
+            JSL_CSTR_EXPRESSION("#include \"jsl/core.h\"\n")
         );
-        jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("#include \"jsl_allocator.h\"\n"));
+        jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("#include \"jsl/allocator.h\"\n"));
         jsl_output_sink_write(
             sink,
-            JSL_CSTR_EXPRESSION("#include \"jsl_hash_map_common.h\"\n\n")
+            JSL_CSTR_EXPRESSION("#include \"jsl/hash_map_common.h\"\n\n")
         );
 
         jsl_output_sink_write(

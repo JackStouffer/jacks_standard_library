@@ -19,9 +19,9 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "jsl_core.h"
-#include "jsl_allocator.h"
-#include "jsl_allocator_infinite_arena.h"
+#include "core.h"
+#include "allocator.h"
+#include "allocator_infinite_arena.h"
 
 #include <errno.h>
 #include <stdint.h>
@@ -34,7 +34,7 @@
 #elif JSL_IS_POSIX
     #include <sys/mman.h>
 #else
-    #error "jsl_allocator_infinite_arena.c: Only windows and posix systems are supported"
+    #error "allocator_infinite_arena.c: Only windows and posix systems are supported"
 #endif
 
 #define JSL__INFINITE_ARENA_PRIVATE_SENTINEL 8926154793150255142U

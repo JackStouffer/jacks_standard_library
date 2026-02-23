@@ -28,10 +28,10 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include "../src/jsl_core.h"
-#include "../src/jsl_allocator.h"
-#include "../src/jsl_allocator_arena.h"
-#include "../src/jsl_str_to_str_multimap.h"
+#include "jsl/core.h"
+#include "jsl/allocator.h"
+#include "jsl/allocator_arena.h"
+#include "jsl/str_to_str_multimap.h"
 
 #include "minctest.h"
 

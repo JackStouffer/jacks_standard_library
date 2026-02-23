@@ -37,11 +37,11 @@
     #include <stdbool.h>
 #endif
 
-#include "jsl_core.h"
-#include "jsl_allocator.h"
-#include "jsl_str_set.h"
-#include "jsl_str_to_str_map.h"
-#include "jsl_str_to_str_multimap.h"
+#include "core.h"
+#include "allocator.h"
+#include "str_set.h"
+#include "str_to_str_map.h"
+#include "str_to_str_multimap.h"
 
 #define JSL__CMD_LINE_SHORT_FLAG_BUCKETS 4
 #define JSL__CMD_LINE_UTF8_CONT_MASK 0xC0u
@@ -434,10 +434,10 @@ bool jsl_cmd_line_args_init(JSLCmdLineArgs* args, JSLAllocatorInterface* allocat
  * 
  * ```
  * #include <stdio.h>
- * #include "jsl_core.h"
- * #include "jsl_cmd_line.h"
- * #include "jsl_os.h"
- * #include "jsl_allocator_infinite_arena.h"
+ * #include "jsl/core.h"
+ * #include "jsl/cmd_line.h"
+ * #include "jsl/os.h"
+ * #include "jsl/allocator_infinite_arena.h"
  * 
  * int main(int argc, char** argv)
  * {
@@ -494,10 +494,10 @@ bool jsl_cmd_line_args_parse(
  * 
  * ```
  * #include <stdio.h>
- * #include "jsl_core.h"
- * #include "jsl_cmd_line.h"
- * #include "jsl_os.h"
- * #include "jsl_allocator_infinite_arena.h"
+ * #include "jsl/core.h"
+ * #include "jsl/cmd_line.h"
+ * #include "jsl/os.h"
+ * #include "jsl/allocator_infinite_arena.h"
  * 
  * int wmain(int argc, wchar_t** argv)
  * {

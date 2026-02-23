@@ -16,8 +16,8 @@
         #include <stdbool.h>
     #endif
 
-    #include "../../src/jsl_core.h"
-    #include "../../src/jsl_string_builder.h"
+    #include "jsl/core.h"
+    #include "jsl/string_builder.h"
 
     /* Versioning to catch mismatches across deps */
     #ifndef EMBED_VERSION
@@ -71,7 +71,7 @@
 
         jsl_output_sink_write_cstr(sink, "#pragma once\n\n");
         jsl_output_sink_write_cstr(sink, "#include <stdint.h>\n\n");
-        jsl_output_sink_write_cstr(sink, "#include \"jsl_core.h\"\n\n");
+        jsl_output_sink_write_cstr(sink, "#include \"jsl/core.h\"\n\n");
 
         if (output_type == OUTPUT_TYPE_BINARY)
         {

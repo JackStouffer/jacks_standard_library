@@ -51,9 +51,9 @@ SOFTWARE.
 
 #include "minctest.h"
 
-#include "../src/jsl_core.h"
-#include "../src/jsl_allocator.h"
-#include "../src/jsl_allocator_arena.h"
+#include "jsl/core.h"
+#include "jsl/allocator.h"
+#include "jsl/allocator_arena.h"
 
 #define CHECK_END(str)                                                              \
     JSLImmutableMemory written = jsl_slice(buffer, 0, ret);                           \

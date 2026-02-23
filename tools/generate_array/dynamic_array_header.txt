@@ -22,8 +22,8 @@
     #include <stdbool.h>
 #endif
 
-#include "jsl_core.h"
-#include "jsl_allocator.h"
+#include "jsl/core.h"
+#include "jsl/allocator.h"
 
 #ifdef __cplusplus
 extern "C" {

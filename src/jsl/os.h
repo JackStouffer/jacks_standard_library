@@ -51,7 +51,7 @@
     #include <stdbool.h>
 #endif
 
-#include "jsl_core.h"
+#include "core.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -80,7 +80,7 @@ extern "C" {
 
 #else
 
-    #error "jsl_os.h: Unsupported OS detected. The JSL OS interface is for POSIX and Windows systems only."
+    #error "os.h: Unsupported OS detected. The JSL OS interface is for POSIX and Windows systems only."
 
 #endif
 

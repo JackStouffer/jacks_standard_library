@@ -21,8 +21,8 @@
 #endif
 #include <string.h>
 
-#include "jsl_core.h"
-#include "jsl_allocator.h"
+#include "jsl/core.h"
+#include "jsl/allocator.h"
 
 static inline bool {{ function_prefix }}__ensure_capacity(
     {{ array_type_name }}* array,

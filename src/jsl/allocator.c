@@ -24,8 +24,8 @@
     #include <stdbool.h>
 #endif
 
-#include "jsl_core.h"
-#include "jsl_allocator.h"
+#include "core.h"
+#include "allocator.h"
 
 #define JSL__ALLOCATOR_PRIVATE_SENTINEL 2954080723981509744U
 

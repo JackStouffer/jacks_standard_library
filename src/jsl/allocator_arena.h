@@ -34,8 +34,8 @@
     #include <stdbool.h>
 #endif
 
-#include "jsl_core.h"
-#include "jsl_allocator.h"
+#include "core.h"
+#include "allocator.h"
 
 // Stored immediately before every allocation so realloc can recover the length.
 struct JSL__ArenaAllocationHeader

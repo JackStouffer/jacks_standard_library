@@ -67,9 +67,9 @@
     #include <stdbool.h>
 #endif
 
-#include "jsl_core.h"
-#include "jsl_allocator.h"
-#include "jsl_string_builder.h"
+#include "core.h"
+#include "allocator.h"
+#include "string_builder.h"
 
 #define JSL__BUILDER_PRIVATE_SENTINEL 4401537694999363085U
 

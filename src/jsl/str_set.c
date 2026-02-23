@@ -5,9 +5,9 @@
     #include <stdbool.h>
 #endif
 
-#include "jsl_core.h"
-#include "jsl_hash_map_common.h"
-#include "jsl_str_set.h"
+#include "core.h"
+#include "hash_map_common.h"
+#include "str_set.h"
 
 #define JSL__SET_PRIVATE_SENTINEL 4086971745778309672U
 

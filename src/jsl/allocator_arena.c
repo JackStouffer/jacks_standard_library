@@ -24,9 +24,9 @@
     #include <stdbool.h>
 #endif
 
-#include "jsl_core.h"
-#include "jsl_allocator.h"
-#include "jsl_allocator_arena.h"
+#include "core.h"
+#include "allocator.h"
+#include "allocator_arena.h"
 
 static JSL__FORCE_INLINE int32_t jsl__arena_effective_alignment(int32_t requested_alignment)
 {

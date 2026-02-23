@@ -29,10 +29,10 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "../src/jsl_core.h"
-#include "../src/jsl_allocator.h"
-#include "../src/jsl_allocator_arena.h"
-#include "../src/jsl_str_set.h"
+#include "jsl/core.h"
+#include "jsl/allocator.h"
+#include "jsl/allocator_arena.h"
+#include "jsl/str_set.h"
 
 #include "minctest.h"
 

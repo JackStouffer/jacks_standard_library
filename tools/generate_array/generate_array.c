@@ -95,7 +95,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-#include "../src/jsl_everything.c"
+#include "jsl/everything.c"
 
 #define GENERATE_ARRAY_IMPLEMENTATION
 #include "generate_array.h"

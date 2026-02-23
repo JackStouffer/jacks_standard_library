@@ -93,8 +93,8 @@
         #include <stdbool.h>
     #endif
 
-    #include "../src/jsl_core.h"
-    #include "../src/jsl_allocator.h"
+    #include "jsl/core.h"
+    #include "jsl/allocator.h"
 
     /* Versioning to catch mismatches across deps */
     #ifndef GENERATE_ARRAY_VERSION
@@ -202,8 +202,8 @@
         "    #include <stdbool.h>\n"
         "#endif\n"
         "\n"
-        "#include \"jsl_core.h\"\n"
-        "#include \"jsl_allocator.h\"\n"
+        "#include \"jsl/core.h\"\n"
+        "#include \"jsl/allocator.h\"\n"
         "\n"
         "#ifdef __cplusplus\n"
         "extern \"C\" {\n"
@@ -363,8 +363,8 @@
         "#endif\n"
         "#include <string.h>\n"
         "\n"
-        "#include \"jsl_core.h\"\n"
-        "#include \"jsl_allocator.h\"\n"
+        "#include \"jsl/core.h\"\n"
+        "#include \"jsl/allocator.h\"\n"
         "\n"
         "static inline bool {{ function_prefix }}__ensure_capacity(\n"
         "    {{ array_type_name }}* array,\n"
@@ -708,7 +708,7 @@
             JSL_CSTR_EXPRESSION("// DEFAULT INCLUDED HEADERS\n")
         );
         jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("#include <stdint.h>\n"));
-        jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("#include \"jsl_hash_map_common.h\"\n\n"));
+        jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("#include \"jsl/hash_map_common.h\"\n\n"));
 
         jsl_output_sink_write(
             sink,
@@ -792,7 +792,7 @@
         );
         jsl_output_sink_write(
             sink,
-            JSL_CSTR_EXPRESSION("#include \"jsl_core.h\"\n")
+            JSL_CSTR_EXPRESSION("#include \"jsl/core.h\"\n")
         );
 
         jsl_output_sink_write(

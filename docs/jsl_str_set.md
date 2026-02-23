@@ -7,8 +7,8 @@
 
 ## Types
 
-- [`union (unnamed at src/jsl_str_set.h:78:5)`](#type-union-unnamed-at-src-jsl_str_set-h-78-5)
-- [`struct (unnamed at src/jsl_str_set.h:80:9)`](#type-struct-unnamed-at-src-jsl_str_set-h-80-9)
+- [`union (unnamed at src/jsl/str_set.h:78:5)`](#type-union-unnamed-at-src-jsl_str_set-h-78-5)
+- [`struct (unnamed at src/jsl/str_set.h:80:9)`](#type-struct-unnamed-at-src-jsl_str_set-h-80-9)
 - [`JSLStrSet`](#type-typedef-jslstrset)
 - [`JSLStrSetKeyValueIter`](#type-typedef-jslstrsetkeyvalueiter)
 
@@ -28,7 +28,7 @@
 - [`jsl_str_set_union`](#function-jsl_str_set_union)
 - [`jsl_str_set_difference`](#function-jsl_str_set_difference)
 
-## File: src/jsl_str_set.h
+## File: src/jsl/str_set.h
 
 ## JSL String to String Map
 
@@ -80,7 +80,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
 
-*Defined at*: `src/jsl_str_set.h:59`
+*Defined at*: `src/jsl/str_set.h:59`
 
 ---
 
@@ -92,29 +92,29 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
 
-*Defined at*: `src/jsl_str_set.h:67`
+*Defined at*: `src/jsl/str_set.h:67`
 
 ---
 
 <a id="type-union-unnamed-at-src-jsl_str_set-h-78-5"></a>
-### : `union (unnamed at src/jsl_str_set.h:78:5)`
+### : `union (unnamed at src/jsl/str_set.h:78:5)`
 
 - `JSLFatPtr value;`
 - `struct JSL__StrSetEntry * next;`
 
 
-*Defined at*: `src/jsl_str_set.h:78`
+*Defined at*: `src/jsl/str_set.h:78`
 
 ---
 
 <a id="type-struct-unnamed-at-src-jsl_str_set-h-80-9"></a>
-### : `struct (unnamed at src/jsl_str_set.h:80:9)`
+### : `struct (unnamed at src/jsl/str_set.h:80:9)`
 
 - `int[16] value_sso_buffer;`
 - `int64_t value_sso_buffer_len;`
 
 
-*Defined at*: `src/jsl_str_set.h:80`
+*Defined at*: `src/jsl/str_set.h:80`
 
 ---
 
@@ -163,7 +163,7 @@ typedef struct JSL__StrSet JSLStrSet;
 ```
 
 
-*Defined at*: `src/jsl_str_set.h:164`
+*Defined at*: `src/jsl/str_set.h:164`
 
 ---
 
@@ -189,7 +189,7 @@ typedef struct JSL__StrSetKeyValueIter JSLStrSetKeyValueIter;
 ```
 
 
-*Defined at*: `src/jsl_str_set.h:179`
+*Defined at*: `src/jsl/str_set.h:179`
 
 ---
 
@@ -222,7 +222,7 @@ int jsl_str_set_init(JSLStrSet *set, JSLAllocatorInterface *allocator, int seed)
 ```
 
 
-*Defined at*: `src/jsl_str_set.h:194`
+*Defined at*: `src/jsl/str_set.h:194`
 
 ---
 
@@ -262,7 +262,7 @@ int jsl_str_set_init2(JSLStrSet *set, JSLAllocatorInterface *allocator, int seed
 ```
 
 
-*Defined at*: `src/jsl_str_set.h:218`
+*Defined at*: `src/jsl/str_set.h:218`
 
 ---
 
@@ -286,7 +286,7 @@ int jsl_str_set_item_count(JSLStrSet *set);
 ```
 
 
-*Defined at*: `src/jsl_str_set.h:232`
+*Defined at*: `src/jsl/str_set.h:232`
 
 ---
 
@@ -310,7 +310,7 @@ int jsl_str_set_has(JSLStrSet *set, JSLFatPtr value);
 ```
 
 
-*Defined at*: `src/jsl_str_set.h:242`
+*Defined at*: `src/jsl/str_set.h:242`
 
 ---
 
@@ -342,7 +342,7 @@ int jsl_str_set_insert(JSLStrSet *set, JSLFatPtr value, JSLStringLifeTime value_
 ```
 
 
-*Defined at*: `src/jsl_str_set.h:257`
+*Defined at*: `src/jsl/str_set.h:257`
 
 ---
 
@@ -387,7 +387,7 @@ int jsl_str_set_iterator_init(JSLStrSet *set, JSLStrSetKeyValueIter *iterator);
 ```
 
 
-*Defined at*: `src/jsl_str_set.h:289`
+*Defined at*: `src/jsl/str_set.h:289`
 
 ---
 
@@ -435,7 +435,7 @@ int jsl_str_set_iterator_next(JSLStrSetKeyValueIter *iterator, JSLFatPtr *out_va
 ```
 
 
-*Defined at*: `src/jsl_str_set.h:322`
+*Defined at*: `src/jsl/str_set.h:322`
 
 ---
 
@@ -464,7 +464,7 @@ int jsl_str_set_delete(JSLStrSet *set, JSLFatPtr value);
 ```
 
 
-*Defined at*: `src/jsl_str_set.h:337`
+*Defined at*: `src/jsl/str_set.h:337`
 
 ---
 
@@ -487,7 +487,7 @@ void jsl_str_set_clear(JSLStrSet *set);
 ```
 
 
-*Defined at*: `src/jsl_str_set.h:352`
+*Defined at*: `src/jsl/str_set.h:352`
 
 ---
 
@@ -506,7 +506,7 @@ void jsl_str_set_free(JSLStrSet *set);
 ```
 
 
-*Defined at*: `src/jsl_str_set.h:362`
+*Defined at*: `src/jsl/str_set.h:362`
 
 ---
 
@@ -535,7 +535,7 @@ int jsl_str_set_intersection(JSLStrSet *a, JSLStrSet *b, JSLStrSet *out);
 ```
 
 
-*Defined at*: `src/jsl_str_set.h:375`
+*Defined at*: `src/jsl/str_set.h:375`
 
 ---
 
@@ -564,7 +564,7 @@ int jsl_str_set_union(JSLStrSet *a, JSLStrSet *b, JSLStrSet *out);
 ```
 
 
-*Defined at*: `src/jsl_str_set.h:390`
+*Defined at*: `src/jsl/str_set.h:390`
 
 ---
 
@@ -593,7 +593,7 @@ int jsl_str_set_difference(JSLStrSet *a, JSLStrSet *b, JSLStrSet *out);
 ```
 
 
-*Defined at*: `src/jsl_str_set.h:405`
+*Defined at*: `src/jsl/str_set.h:405`
 
 ---
 

@@ -52,16 +52,16 @@
     #include <stdbool.h>
 #endif
 
-#include "jsl_core.h"
-#include "jsl_hash_map_common.h"
-#include "jsl_allocator.h"
+#include "core.h"
+#include "hash_map_common.h"
+#include "allocator.h"
 
 /* Versioning to catch mismatches across deps */
 #ifndef JSL_STR_TO_STR_MULTIMAP_VERSION
     #define JSL_STR_TO_STR_MULTIMAP_VERSION 0x010000  /* 1.0.0 */
 #else
     #if JSL_STR_TO_STR_MULTIMAP_VERSION != 0x010000
-        #error "jsl_str_to_str_multimap.h version mismatch across includes"
+        #error "str_to_str_multimap.h version mismatch across includes"
     #endif
 #endif
 
