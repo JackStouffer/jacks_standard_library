@@ -152,7 +152,7 @@ void jsl_allocator_interface_init(
  * TODO: docs
  */
 void* jsl_allocator_interface_alloc(
-    JSLAllocatorInterface* allocator,
+    JSLAllocatorInterface allocator,
     int64_t bytes,
     int32_t alignment,
     bool zeroed
@@ -162,7 +162,7 @@ void* jsl_allocator_interface_alloc(
  * TODO: docs
  */
 void* jsl_allocator_interface_realloc(
-    JSLAllocatorInterface* allocator,
+    JSLAllocatorInterface allocator,
     void* allocation,
     int64_t new_bytes,
     int32_t alignment
@@ -172,7 +172,7 @@ void* jsl_allocator_interface_realloc(
  * TODO: docs
  */
 bool jsl_allocator_interface_free(
-    JSLAllocatorInterface* allocator,
+    JSLAllocatorInterface allocator,
     const void* allocation
 );
 
@@ -180,7 +180,7 @@ bool jsl_allocator_interface_free(
  * TODO: docs
  */
 bool jsl_allocator_interface_free_all(
-    JSLAllocatorInterface* allocator
+    JSLAllocatorInterface allocator
 );
 
 /**

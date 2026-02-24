@@ -112,7 +112,7 @@ static bool jsl__string_builder_add_chunk(JSLStringBuilder* builder)
     }
 }
 
-bool jsl_string_builder_init(JSLStringBuilder* builder, JSLAllocatorInterface* alocator)
+bool jsl_string_builder_init(JSLStringBuilder* builder, JSLAllocatorInterface alocator)
 {
     return jsl_string_builder_init2(
         builder,
@@ -124,7 +124,7 @@ bool jsl_string_builder_init(JSLStringBuilder* builder, JSLAllocatorInterface* a
 
 bool jsl_string_builder_init2(
     JSLStringBuilder* builder,
-    JSLAllocatorInterface* allocator,
+    JSLAllocatorInterface allocator,
     int32_t chunk_size,
     int32_t chunk_alignment
 )
@@ -138,7 +138,6 @@ bool jsl_string_builder_init2(
     
     if (
         builder != NULL
-        && allocator != NULL
         && chunk_size > 0
         && chunk_alignment > 0
     )

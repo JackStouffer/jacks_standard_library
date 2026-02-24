@@ -1,66 +1,4 @@
 /**
- * # Generate Hash Map Tool
- * 
- * Generate the C header and source files for a hash map before compilation.
- * 
- * The utility generates a header file and a C file for a type safe, open addressed,
- * linear probed, hash map. By generating the code rather than using macros, two
- * benefits are gained. One, the code is much easier to debug. Two, it's much more
- * obvious how much code you're generating, which means you are much less likely to
- * accidentally create the combinatoric explosion of code that's so common in C++
- * projects. Sometimes, adding friction to things is good.
- * 
- * There are two implementations of hash map that this utility can generate.
- * 
- * 1. A fixed size hash map that cannot grow. You set the max item count at
- *    init. This reduces memory fragmentation in arenas and it reduces failure
- *    modes in later parts of the program
- * 2. A standard dynamic hash map.
- * 
- * ## Usage
- * 
- * This tool is usable as both a command line tool and a C library. Use the
- * command line tool for traditional GNU make style builds and use the C
- * library for "metaprogram" style builds.
- * 
- * ### CLI Program
- * 
- * Compile the program with
- * 
- * ```
- * $ cc -o generate_hash_map tools/generate_hash_map.c
- * ```
- * 
- * or on Windows with
- * 
- * ```
- * > cl.exe /Fegenerate_hash_map tools\generate_hash_map.c
- * ```
- * 
- * Get the help message with
- * 
- * ```
- * $ ./generate_hash_map --help
- * ```
- * 
- * ### Library
- * 
- * The `generate_hash_map.h` file is a single-header-file library. In
- * every file that uses the code include the header normally.
- * 
- * ```
- * #include "generate_hash_map.h"
- * ```
- * 
- * Then in one, and only one, file define the implementation macro
- * 
- * ```
- * #define GENERATE_HASH_MAP_IMPLEMENTATION
- * #include "generate_hash_map.h"
- * ```
- * 
- * The two relevent functions are write_hash_map_header and write_hash_map_source
- * 
  * ## License
  *
  * Copyright (c) 2026 Jack Stouffer
@@ -111,12 +49,15 @@ JSLImmutableMemory help_message = JSL_CSTR_INITIALIZER(
     "This program generates both a C source and header file for a hash map with the given\n"
     "key and value types. More documentation is included in the source file.\n\n"
     "USAGE:\n\n"
-    "\tgenerate_hash_map --name TYPE_NAME --function-prefix PREFIX --key-type TYPE --value-type TYPE [--static | --dynamic] [--header | --source] [--add-header=FILE]...\n\n"
+    "\tgenerate_hash_map --name TYPE_NAME --function-prefix PREFIX [--key-type TYPE | --key-is-string] [--value-type TYPE | --value-is-string] [--static | --dynamic] [--header | --source] [--add-header=FILE]...\n\n"
     "Required arguments:\n"
     "\t--name\t\t\tThe name to give the hash map container type\n"
     "\t--function-prefix\tThe prefix added to each of the functions for the hash map\n"
     "\t--key_type\t\tThe C type name for the key\n"
+    "\t--key-is-string\t\tThe value of the hash map should be JSLImmutableMemory. This is special-cased for code gen\n\n"
     "\t--value_type\t\tThe C type name for the value\n\n"
+    "\t--value-is-string\t\tThe value of the hash map should be JSLImmutableMemory. This is special-cased for code gen\n\n"
+    "\t--key_type\t\tThe C type name for the key\n"
     "Optional arguments:\n"
     "\t--header\t\tWrite the header file to stdout\n"
     "\t--source\t\tWrite the source file to stdout\n"
@@ -126,9 +67,11 @@ JSLImmutableMemory help_message = JSL_CSTR_INITIALIZER(
     "\t--custom-hash\t\tOverride the included hash call with the given function name\n"
 );
 
-static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
+static int32_t entrypoint(JSLAllocatorInterface allocator, JSLCmdLineArgs* cmd)
 {
     bool show_help = false;
+    bool key_is_string = false;
+    bool value_is_string = false;
     JSLImmutableMemory name = {0};
     JSLImmutableMemory function_prefix = {0};
     JSLImmutableMemory key_type = {0};
@@ -145,7 +88,9 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     static JSLImmutableMemory name_flag_str = JSL_CSTR_INITIALIZER("name");
     static JSLImmutableMemory function_prefix_flag_str = JSL_CSTR_INITIALIZER("function-prefix");
     static JSLImmutableMemory key_type_flag_str = JSL_CSTR_INITIALIZER("key-type");
+    static JSLImmutableMemory key_is_string_flag_str = JSL_CSTR_INITIALIZER("key-is-string");
     static JSLImmutableMemory value_type_flag_str = JSL_CSTR_INITIALIZER("value-type");
+    static JSLImmutableMemory value_is_string_flag_str = JSL_CSTR_INITIALIZER("value-is-string");
     static JSLImmutableMemory fixed_flag_str = JSL_CSTR_INITIALIZER("fixed");
     static JSLImmutableMemory dynamic_flag_str = JSL_CSTR_INITIALIZER("dynamic");
     static JSLImmutableMemory header_flag_str = JSL_CSTR_INITIALIZER("header");
@@ -157,8 +102,9 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
     // Parsing command line
     //
 
-    show_help = jsl_cmd_line_args_has_short_flag(cmd, 'h')
-        || jsl_cmd_line_args_has_flag(cmd, help_flag_str);
+    show_help = jsl_cmd_line_args_has_short_flag(cmd, 'h') || jsl_cmd_line_args_has_flag(cmd, help_flag_str);
+    key_is_string = jsl_cmd_line_args_has_flag(cmd, key_is_string_flag_str);
+    value_is_string = jsl_cmd_line_args_has_flag(cmd, value_is_string_flag_str);
 
     jsl_cmd_line_args_pop_flag_with_value(cmd, name_flag_str, &name);
     jsl_cmd_line_args_pop_flag_with_value(cmd, function_prefix_flag_str, &function_prefix);
@@ -199,24 +145,6 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
             stderr_sink,
             JSL_CSTR_EXPRESSION("Error: --%y is required\n"),
             name_flag_str
-        );
-        return EXIT_FAILURE;
-    }
-    if (key_type.data == NULL)
-    {
-        jsl_format_sink(
-            stderr_sink,
-            JSL_CSTR_EXPRESSION("Error: --%y is required\n"),
-            key_type_flag_str
-        );
-        return EXIT_FAILURE;
-    }
-    if (value_type.data == NULL)
-    {
-        jsl_format_sink(
-            stderr_sink,
-            JSL_CSTR_EXPRESSION("Error: --%y is required\n"),
-            value_type_flag_str
         );
         return EXIT_FAILURE;
     }
@@ -270,6 +198,57 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
         return EXIT_FAILURE;
     }
 
+    if (key_is_string && key_type.data != NULL)
+    {
+        jsl_format_sink(
+            stderr_sink,
+            JSL_CSTR_EXPRESSION("Error: cannot set both --%y and --%y\n"),
+            key_is_string_flag_str,
+            key_type_flag_str
+        );
+        return EXIT_FAILURE;
+    }
+    if (value_is_string && value_type.data != NULL)
+    {
+        jsl_format_sink(
+            stderr_sink,
+            JSL_CSTR_EXPRESSION("Error: cannot set both --%y and --%y\n"),
+            value_is_string_flag_str,
+            value_type_flag_str
+        );
+        return EXIT_FAILURE;
+    }
+    if (!key_is_string && key_type.data == NULL)
+    {
+        jsl_format_sink(
+            stderr_sink,
+            JSL_CSTR_EXPRESSION("Error: either --%y or --%y must be set\n"),
+            key_is_string_flag_str,
+            key_type_flag_str
+        );
+        return EXIT_FAILURE;
+    }
+    if (!value_is_string && value_type.data == NULL)
+    {
+        jsl_format_sink(
+            stderr_sink,
+            JSL_CSTR_EXPRESSION("Error: either --%y or --%y must be set\n"),
+            value_is_string_flag_str,
+            value_type_flag_str
+        );
+        return EXIT_FAILURE;
+    }
+    if (key_is_string && value_is_string)
+    {
+        jsl_format_sink(
+            stderr_sink,
+            JSL_CSTR_EXPRESSION("Error: when both the key and value are strings, just use JSLStrToStrMap\n"),
+            value_is_string_flag_str,
+            value_type_flag_str
+        );
+        return EXIT_FAILURE;
+    }
+
     if (fixed_flag_set) impl = IMPL_FIXED;
     if (dynamic_flag_set) impl = IMPL_DYNAMIC;
 
@@ -282,8 +261,9 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
             name,
             function_prefix,
             key_type,
+            key_is_string,
             value_type,
-            hash_function_name,
+            value_is_string,
             header_includes,
             header_includes_count
         );
@@ -297,7 +277,9 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
             name,
             function_prefix,
             key_type,
+            key_is_string,
             value_type,
+            value_is_string,
             hash_function_name,
             header_includes,
             header_includes_count
@@ -334,7 +316,7 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
         jsl_infinite_arena_get_allocator_interface(&allocator, &arena);
 
         JSLCmdLineArgs cmd;
-        jsl_cmd_line_args_init(&cmd, &allocator);
+        jsl_cmd_line_args_init(&cmd, allocator);
         JSLImmutableMemory error_message = {0};
         if (!jsl_cmd_line_args_parse_wide(&cmd, argc, argv, &error_message))
         {
@@ -350,7 +332,7 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
             return EXIT_FAILURE;
         }
 
-        return entrypoint(&allocator, &cmd);
+        return entrypoint(allocator, &cmd);
     }
 
 #elif JSL_IS_POSIX
@@ -367,7 +349,7 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
         jsl_infinite_arena_get_allocator_interface(&allocator, &arena);
 
         JSLCmdLineArgs cmd;
-        if (!jsl_cmd_line_args_init(&cmd, &allocator))
+        if (!jsl_cmd_line_args_init(&cmd, allocator))
         {
             jsl_write_to_c_file(stderr, JSL_CSTR_EXPRESSION("Command line input exceeds memory limit"));
             return EXIT_FAILURE;
@@ -388,7 +370,7 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
             return EXIT_FAILURE;
         }
 
-        return entrypoint(&allocator, &cmd);
+        return entrypoint(allocator, &cmd);
     }
 
 #else

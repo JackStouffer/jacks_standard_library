@@ -1921,7 +1921,7 @@ JSL_DEF int64_t jsl_strip_whitespace(JSLImmutableMemory* str);
  * Allocate a new buffer from the arena and copy the contents of a fat pointer with
  * a null terminator.
  */
-JSL_DEF const char* jsl_memory_to_cstr(JSLAllocatorInterface* allocator, JSLImmutableMemory str);
+JSL_DEF const char* jsl_memory_to_cstr(JSLAllocatorInterface allocator, JSLImmutableMemory str);
 
 /**
  * Allocate a new buffer and copy the contents of the null terminated string into that buffer.
@@ -1929,14 +1929,14 @@ JSL_DEF const char* jsl_memory_to_cstr(JSLAllocatorInterface* allocator, JSLImmu
  *
  * @note Use `jsl_cstr_to_memory` to make a fat pointer without copying.
  */
-JSL_DEF JSLImmutableMemory jsl_duplicate_cstr(JSLAllocatorInterface* allocator, const char* str);
+JSL_DEF JSLImmutableMemory jsl_duplicate_cstr(JSLAllocatorInterface allocator, const char* str);
 
 /**
  * Allocate space for, and copy the contents of a fat pointer.
  *
  * @note Use `jsl_duplicate_cstr` to copy a c string into a memory.
  */
-JSL_DEF JSLImmutableMemory jsl_duplicate(JSLAllocatorInterface* allocator, JSLImmutableMemory str);
+JSL_DEF JSLImmutableMemory jsl_duplicate(JSLAllocatorInterface allocator, JSLImmutableMemory str);
 
 /**
  * TODO: docs
@@ -2144,7 +2144,7 @@ JSLOutputSink jsl_memory_output_sink(JSLMutableMemory* buffer);
  * you're using this function to print multiple gigabytes at a time, break it
  * into chunks.
  */
-JSL_DEF JSLImmutableMemory jsl_format(JSLAllocatorInterface* allocator, JSLImmutableMemory fmt, ...);
+JSL_DEF JSLImmutableMemory jsl_format(JSLAllocatorInterface allocator, JSLImmutableMemory fmt, ...);
 
 /**
  * See docs for jsl_format.

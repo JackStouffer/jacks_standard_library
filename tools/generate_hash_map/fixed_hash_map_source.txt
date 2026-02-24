@@ -31,7 +31,7 @@
 
 bool {{ function_prefix }}_init(
     {{ hash_map_name }}* hash_map,
-    JSLAllocatorInterface* allocator,
+    JSLAllocatorInterface allocator,
     int64_t max_item_count,
     uint64_t seed
 )
@@ -42,6 +42,7 @@ bool {{ function_prefix }}_init(
     JSL_MEMSET(hash_map, 0, sizeof({{ hash_map_name }}));
 
     hash_map->seed = seed;
+    hash_map->allocator = allocator;
     hash_map->max_item_count = max_item_count;
 
     int64_t max_with_load_factor = (int64_t) ((float) max_item_count / 0.75f);
@@ -49,21 +50,41 @@ bool {{ function_prefix }}_init(
     hash_map->arrays_length = jsl_next_power_of_two_i64(max_with_load_factor);
     hash_map->arrays_length = JSL_MAX(hash_map->arrays_length, 32);
 
+    {% if key_is_str %}
+    hash_map->keys_array = (JSLImmutableMemory*) jsl_allocator_interface_alloc(
+        allocator,
+        ((int64_t) sizeof(JSLImmutableMemory)) * hash_map->arrays_length,
+        JSL_DEFAULT_ALLOCATION_ALIGNMENT,
+        false
+    );
+    {% else %}
     hash_map->keys_array = ({{ key_type_name }}*) jsl_allocator_interface_alloc(
         allocator,
         ((int64_t) sizeof({{ key_type_name }})) * hash_map->arrays_length,
         (int32_t) _Alignof({{ key_type_name }}),
         false
     );
+    {% endif %}
+
     if (hash_map->keys_array == NULL)
         return false;
 
+    {% if value_is_str %}
+    hash_map->values_array = (JSLImmutableMemory*) jsl_allocator_interface_alloc(
+        allocator,
+        ((int64_t) sizeof(JSLImmutableMemory)) * hash_map->arrays_length,
+        JSL_DEFAULT_ALLOCATION_ALIGNMENT,
+        false
+    );
+    {% else %}
     hash_map->values_array = ({{ value_type_name }}*) jsl_allocator_interface_alloc(
         allocator,
         ((int64_t) sizeof({{ value_type_name }})) * hash_map->arrays_length,
         (int32_t) _Alignof({{ value_type_name }}),
         false
     );
+    {% endif %}
+
     if (hash_map->values_array == NULL)
         return false;
 
@@ -82,7 +103,11 @@ bool {{ function_prefix }}_init(
 
 static inline void {{ function_prefix }}_probe(
     {{ hash_map_name }}* hash_map,
+    {% if key_is_str %}
+    JSLImmutableMemory key,
+    {% else %}
     {{ key_type_name }} key,
+    {% endif %}
     int64_t* out_slot,
     uint64_t* out_hash,
     bool* out_found
@@ -174,8 +199,18 @@ static inline void {{ function_prefix }}_backshift(
 
 bool {{ function_prefix }}_insert(
     {{ hash_map_name }}* hash_map,
+    {% if key_is_str %}
+    JSLImmutableMemory key,
+    JSLStringLifeTime key_lifetime,
+    {% else %}
     {{ key_type_name }} key,
+    {% endif %}
+    {% if value_is_str %}
+    JSLImmutableMemory value,
+    JSLStringLifeTime value_lifetime
+    {% else %}
     {{ value_type_name }} value
+    {% endif %}
 )
 {
     bool insert_success = false;
@@ -183,9 +218,6 @@ bool {{ function_prefix }}_insert(
     if (
         hash_map == NULL
         || hash_map->sentinel != PRIVATE_SENTINEL_{{ hash_map_name }}
-        || hash_map->values_array == NULL
-        || hash_map->keys_array == NULL
-        || hash_map->hashes_array == NULL
         || hash_map->item_count >= hash_map->max_item_count
     )
         return insert_success;
@@ -198,8 +230,24 @@ bool {{ function_prefix }}_insert(
     // new key
     if (slot > -1 && !existing_found)
     {
+        {% if key_is_str %}
+        if (key_lifetime == JSL_STRING_LIFETIME_SHORTER)
+            hash_map->keys_array[slot] = jsl_duplicate(hash_map->allocator, key);
+        else
+            hash_map->keys_array[slot] = key;
+        {% else %}
         hash_map->keys_array[slot] = key;
+        {% endif %}
+
+        {% if value_is_str %}
+        if (value_lifetime == JSL_STRING_LIFETIME_SHORTER)
+            hash_map->keys_array[slot] = jsl_duplicate(hash_map->allocator, value);
+        else
+            hash_map->values_array[slot] = value;
+        {% else %}
         hash_map->values_array[slot] = value;
+        {% endif %}
+
         hash_map->hashes_array[slot] = hash;
         ++hash_map->item_count;
         insert_success = true;
@@ -219,12 +267,25 @@ bool {{ function_prefix }}_insert(
     return insert_success;
 }
 
+{% if value_is_str %}
+JSLImmutableMemory {{ function_prefix }}_get(
+{% else %}
 {{ value_type_name }}* {{ function_prefix }}_get(
+{% endif %}
+
     {{ hash_map_name }}* hash_map,
+    {% if key_is_str %}
+    JSLImmutableMemory key
+    {% else %}
     {{ key_type_name }} key
+    {% endif %}
 )
 {
+    {% if value_is_str %}
+    JSLImmutableMemory res = {0};
+    {% else %}
     {{ value_type_name }}* res = NULL;
+    {% endif %}
 
     if (
         hash_map == NULL
@@ -238,11 +299,16 @@ bool {{ function_prefix }}_insert(
     uint64_t hash = 0;
     int64_t slot = -1;
     bool existing_found = false;
+
     {{ function_prefix }}_probe(hash_map, key, &slot, &hash, &existing_found);
     
     if (slot > -1 && existing_found)
     {
+        {% if value_is_str %}
+        res = hash_map->values_array[slot];
+        {% else %}
         res = &hash_map->values_array[slot];
+        {% endif %}
     }
 
     return res;
@@ -250,7 +316,11 @@ bool {{ function_prefix }}_insert(
 
 bool {{ function_prefix }}_delete(
     {{ hash_map_name }}* hash_map,
+    {% if key_is_str %}
+    JSLImmutableMemory key
+    {% else %}
     {{ key_type_name }} key
+    {% endif %}
 )
 {
     bool success = false;
@@ -303,8 +373,16 @@ bool {{ function_prefix }}_iterator_start(
 
 bool {{ function_prefix }}_iterator_next(
     {{ hash_map_name }}Iterator* iterator,
+    {% if key_is_str %}
+    JSLImmutableMemory* out_key,
+    {% else %}
     {{ key_type_name }}* out_key,
+    {% endif %}
+    {% if value_is_str %}
+    JSLImmutableMemory* out_value
+    {% else %}
     {{ value_type_name }}* out_value
+    {% endif %}
 )
 {
     bool found = false;

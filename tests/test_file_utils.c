@@ -66,7 +66,7 @@ static void test_jsl_load_file_contents(void)
 
     JSLImmutableMemory contents;
     JSLLoadFileResultEnum res = jsl_load_file_contents(
-        &allocator,
+        allocator,
         jsl_cstr_to_memory(path),
         &contents,
         NULL

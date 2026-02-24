@@ -17,7 +17,7 @@
 
 JSL_STR_SET_DEF bool jsl_str_set_init(
     JSLStrSet* set,
-    JSLAllocatorInterface* allocator,
+    JSLAllocatorInterface allocator,
     uint64_t seed
 )
 {
@@ -32,7 +32,7 @@ JSL_STR_SET_DEF bool jsl_str_set_init(
 
 JSL_STR_SET_DEF bool jsl_str_set_init2(
     JSLStrSet* set,
-    JSLAllocatorInterface* allocator,
+    JSLAllocatorInterface allocator,
     uint64_t seed,
     int64_t item_count_guess,
     float load_factor
@@ -40,7 +40,6 @@ JSL_STR_SET_DEF bool jsl_str_set_init2(
 {
     bool res = (
         set != NULL
-        && allocator != NULL
         && item_count_guess > 0
         && load_factor > 0.0f
         && load_factor < 1.0f

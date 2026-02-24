@@ -4,21 +4,13 @@
  * This file contains the header for a hash map `{{ hash_map_name }}` which maps
  * `{{ key_type_name }}` keys to `{{ value_type_name }}` values.
  *
- * This file was auto generated from the hash map generation utility that's part of
- * the "Jack's Standard Library" project. The utility generates a header file and a
- * C file for a type safe, open addressed, hash map. By generating the code rather
- * than using macros, two benefits are gained. One, the code is much easier to debug.
- * Two, it's much more obvious how much code you're generating, which means you are
- * much less likely to accidentally create the combinatoric explosion of code that's
- * so common in C++ projects. Adding friction to things is actually good sometimes.
- *
- * Much like the arena allocator it uses, this hash map is designed for situations where
- * you can set an upper bound on the number of items you will have and that upper bound is
- * still a reasonable amount of memory. This represents the vast majority case, as most hash
- * maps will never have more than 100 items. Even in cases where the struct is quite large
- * e.g. over a kilobyte, and you have a large upper bound, say 100k, thats still ~100MB of
- * data. This is an incredibly rare case and you probably only have one of these in your
- * program; this hash map would still work for that case.
+ * This hash map is designed for situations where you can set an upper bound on the
+ * number of items you will have and that upper bound is still a reasonable amount of
+ * memory. This represents the vast majority case, as most hash maps will never have more
+ * than 100 items. Even in cases where the struct is quite large e.g. over a kilobyte, and
+ * you have a large upper bound, say 100k, thats still ~100MB of data. This is an incredibly
+ * rare case and you probably only have one of these in your program; this hash map would
+ * still work for that case.
  *
  * This hash map is not suited for cases where the hash map will shrink and grow quite
  * substantially or there's no known upper bound. The most common example would be user
@@ -26,6 +18,14 @@
  * refuse to open very large (+10gig) documents. If you have some hash map which is built
  * from the document file then you need some other allocation strategy (you probably don't
  * want a normal hash map either as you'd be streaming things in and out of memory).
+ *
+ * This file was auto generated from the hash map generation utility that's part of
+ * the "Jack's Standard Library" project. The utility generates a header file and a
+ * C file for a type safe, open addressed, hash map. By generating the code rather
+ * than using macros, two benefits are gained. One, the code is much easier to debug.
+ * Two, it's much more obvious how much code you're generating, which means you are
+ * much less likely to accidentally create the combinatoric explosion of code that's
+ * so common in C++ projects. Adding friction to things is actually good sometimes.
  */
 
 /**
@@ -41,11 +41,22 @@ typedef struct {{ hash_map_name }} {
     // more likely that memory bugs are caught.
     uint32_t sentinel;
     uint32_t generational_id;
+    JSLAllocatorInterface allocator;
 
+    {% if key_is_str %}
+    JSLImmutableMemory* keys_array;
+    {% else %}
     {{ key_type_name }}* keys_array;
+    {% endif %}
+    {% if value_is_str %}
+    JSLImmutableMemory* values_array;
+    {% else %}
     {{ value_type_name }}* values_array;
+    {% endif %}
+
     uint64_t* hashes_array;
     int64_t arrays_length;
+
     int64_t item_count;
     int64_t max_item_count;
     uint64_t seed;
@@ -68,10 +79,6 @@ typedef struct {{ hash_map_name }}Iterator {
  * The hash map does not save a reference to the arena, but the arena memory must have the same
  * or greater lifetime than the hash map itself.
  *
- * As this hash map does not grow, the speed of insertion and retrieval will decrease
- * exponentially as the load factor approaches 1. The true internal max item count is
- * the next highest power of two of the given parameter with a minimum value of 32.
- *
  * @warning This hash map uses a well distributed hash. But in order to properly protect against
  * hash flooding attacks you must do two things. One, provide good random data for the
  * seed value. This means using your OS's secure random number generator, not `rand`.
@@ -82,13 +89,13 @@ typedef struct {{ hash_map_name }}Iterator {
  * flooding then zero is a valid seed value.
  *
  * @param hash_map The pointer to the hash map instance to initialize
- * @param arena The arena that this hash map will use to allocate memory
+ * @param allocator The allocator that this hash map will use
  * @param max_item_count The maximum amount of items this hash map can hold
  * @param seed Seed value for the hash function to protect against hash flooding attacks
  */
 bool {{ function_prefix }}_init(
     {{ hash_map_name }}* hash_map,
-    JSLAllocatorInterface* allocator,
+    JSLAllocatorInterface allocator,
     int64_t max_item_count,
     uint64_t seed
 );
@@ -105,8 +112,18 @@ bool {{ function_prefix }}_init(
  */
 bool {{ function_prefix }}_insert(
     {{ hash_map_name }}* hash_map,
+    {% if key_is_str %}
+    JSLImmutableMemory key,
+    JSLStringLifeTime key_lifetime,
+    {% else %}
     {{ key_type_name }} key,
+    {% endif %}
+    {% if value_is_str %}
+    JSLImmutableMemory value,
+    JSLStringLifeTime value_lifetime
+    {% else %}
     {{ value_type_name }} value
+    {% endif %}
 );
 
 /**
@@ -120,9 +137,18 @@ bool {{ function_prefix }}_insert(
  * @param value Value to store
  * @returns The pointer to the value in the hash map, or null.
  */
+{% if value_is_str %}
+JSLImmutableMemory {{ function_prefix }}_get(
+{% else %}
 {{ value_type_name }}* {{ function_prefix }}_get(
+{% endif %}
+
     {{ hash_map_name }}* hash_map,
+    {% if key_is_str %}
+    JSLImmutableMemory key
+    {% else %}
     {{ key_type_name }} key
+    {% endif %}
 );
 
 /**
@@ -135,7 +161,11 @@ bool {{ function_prefix }}_insert(
  */
 bool {{ function_prefix }}_delete(
     {{ hash_map_name }}* hash_map,
+    {% if key_is_str %}
+    JSLImmutableMemory key
+    {% else %}
     {{ key_type_name }} key
+    {% endif %}
 );
 
 /**
@@ -182,6 +212,14 @@ bool {{ function_prefix }}_iterator_start(
  */
 bool {{ function_prefix }}_iterator_next(
     {{ hash_map_name }}Iterator* iterator,
-    {{ key_type_name }}* key,
-    {{ value_type_name }}* value
+    {% if key_is_str %}
+    JSLImmutableMemory* out_key,
+    {% else %}
+    {{ key_type_name }}* out_key,
+    {% endif %}
+    {% if value_is_str %}
+    JSLImmutableMemory* out_value
+    {% else %}
+    {{ value_type_name }}* out_value
+    {% endif %}
 );

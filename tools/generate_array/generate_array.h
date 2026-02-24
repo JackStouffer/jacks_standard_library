@@ -132,7 +132,7 @@
      * @param include_header_count The length of the header array
      */
     GENERATE_ARRAY_DEF void write_array_header(
-        JSLAllocatorInterface* allocator,
+        JSLAllocatorInterface allocator,
         JSLOutputSink sink,
         ArrayImplementation impl,
         JSLImmutableMemory array_type_name,
@@ -155,7 +155,7 @@
      * @param include_header_count The length of the header array
      */
     GENERATE_ARRAY_DEF void write_array_source(
-        JSLAllocatorInterface* allocator,
+        JSLAllocatorInterface allocator,
         JSLOutputSink sink,
         ArrayImplementation impl,
         JSLImmutableMemory array_type_name,
@@ -688,7 +688,7 @@
     *          allocation failures during header generation.
     */
     GENERATE_ARRAY_DEF void write_array_header(
-        JSLAllocatorInterface* allocator,
+        JSLAllocatorInterface allocator,
         JSLOutputSink sink,
         ArrayImplementation impl,
         JSLImmutableMemory array_type_name,
@@ -765,7 +765,7 @@
     }
 
     GENERATE_ARRAY_DEF void write_array_source(
-        JSLAllocatorInterface* allocator,
+        JSLAllocatorInterface allocator,
         JSLOutputSink sink,
         ArrayImplementation impl,
         JSLImmutableMemory array_type_name,

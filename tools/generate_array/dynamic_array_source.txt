@@ -69,7 +69,7 @@ static inline bool {{ function_prefix }}__ensure_capacity(
 
 bool {{ function_prefix }}_init(
     {{ array_type_name }}* array,
-    JSLAllocatorInterface* allocator,
+    JSLAllocatorInterface allocator,
     int64_t initial_capacity
 )
 {
