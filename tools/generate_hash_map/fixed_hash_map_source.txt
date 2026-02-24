@@ -103,7 +103,6 @@ bool {{ function_prefix }}_init(
         return false;
     {% endif %}
 
-
     hash_map->hashes_array = (uint64_t*) jsl_allocator_interface_alloc(
         allocator,
         ((int64_t) sizeof(uint64_t)) * hash_map->arrays_length,
@@ -276,12 +275,14 @@ bool {{ function_prefix }}_insert(
     {
         {% if value_is_str %}
         if (hash_map->value_lifetime_array[slot] == JSL_STRING_LIFETIME_SHORTER)
-            jsl_allocator_interface_free(allocator, hash_map->values_array[slot].data);
-        
+            jsl_allocator_interface_free(hash_map->allocator, hash_map->values_array[slot].data);
+
         if (value_lifetime == JSL_STRING_LIFETIME_SHORTER)
             hash_map->values_array[slot] = jsl_duplicate(hash_map->allocator, value);
         else
             hash_map->values_array[slot] = value;
+
+        hash_map->value_lifetime_array[slot] = value_lifetime;
         {% else %}
         hash_map->values_array[slot] = value;
         {% endif %}
@@ -390,26 +391,36 @@ void {{ function_prefix }}_free(
     )
         return;
 
-    int64_t current_slot = 0;
-    
     {% if key_is_str or value_is_str %}
-    while (current_slot < iterator->hash_map->arrays_length)
+    for (int64_t current_slot = 0; current_slot < hash_map->arrays_length; ++current_slot)
     {
-        uint64_t hash_value = iterator->hash_map->hashes_array[iterator->current_slot];
-
-        bool occupied = hash_value != JSL__HASHMAP_EMPTY;
-
-        if (occupied)
+        uint64_t hash_value = hash_map->hashes_array[current_slot];
+        {% if key_is_str %}
+        JSLStringLifeTime lifetime = hash_map->key_lifetime_array[current_slot];
+        if (hash_value != JSL__HASHMAP_EMPTY && lifetime == JSL_STRING_LIFETIME_SHORTER)
         {
-            found_entry = iterator->current_slot;
-            break;
+            jsl_allocator_interface_free(hash_map->allocator, hash_map->keys_array[current_slot].data);
         }
-        else
+        {% elif value_is_str %}
+        JSLStringLifeTime lifetime = hash_map->value_lifetime_array[current_slot];
+        if (hash_value != JSL__HASHMAP_EMPTY && lifetime == JSL_STRING_LIFETIME_SHORTER)
         {
-            ++iterator->current_slot;
+            jsl_allocator_interface_free(hash_map->allocator, hash_map->values_array[current_slot].data);
         }
+        {% endif %}
     }
+
+    {% if key_is_str %}
+    jsl_allocator_interface_free(hash_map->allocator, hash_map->key_lifetime_array);
+    {% elif value_is_str %}
+    jsl_allocator_interface_free(hash_map->allocator, hash_map->value_lifetime_array);
     {% endif %}
+
+    {% endif %}
+
+    jsl_allocator_interface_free(hash_map->allocator, hash_map->keys_array);
+    jsl_allocator_interface_free(hash_map->allocator, hash_map->values_array);
+    jsl_allocator_interface_free(hash_map->allocator, hash_map->hashes_array);
 }
 
 bool {{ function_prefix }}_iterator_start(

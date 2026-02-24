@@ -1476,6 +1476,221 @@ static void test_jsl_str_to_str_map_invalid_inserts(void)
     TEST_INT64_EQUAL(jsl_str_to_str_map_item_count(&map), (int64_t) 0);
 }
 
+static void test_fixed_int32_to_str_free(void)
+{
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
+    jsl_allocator_interface_free_all(allocator);
+
+    // free on empty map
+    {
+        FixedIntToStrMap hashmap;
+        fixed_int32_to_str_map_init(&hashmap, allocator, 256, 0);
+        fixed_int32_to_str_map_free(&hashmap);
+    }
+
+    jsl_allocator_interface_free_all(allocator);
+
+    // free on map with LONGER lifetime entries only
+    {
+        FixedIntToStrMap hashmap;
+        fixed_int32_to_str_map_init(&hashmap, allocator, 256, 0);
+
+        fixed_int32_to_str_map_insert(&hashmap, 1, JSL_CSTR_EXPRESSION("longer-a"), JSL_STRING_LIFETIME_LONGER);
+        fixed_int32_to_str_map_insert(&hashmap, 2, JSL_CSTR_EXPRESSION("longer-b"), JSL_STRING_LIFETIME_LONGER);
+
+        TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 2);
+        fixed_int32_to_str_map_free(&hashmap);
+    }
+
+    jsl_allocator_interface_free_all(allocator);
+
+    // free on map with SHORTER lifetime entries only
+    {
+        FixedIntToStrMap hashmap;
+        fixed_int32_to_str_map_init(&hashmap, allocator, 256, 0);
+
+        char buf_a[] = "shorter-a";
+        char buf_b[] = "shorter-b";
+        fixed_int32_to_str_map_insert(&hashmap, 1, jsl_cstr_to_memory(buf_a), JSL_STRING_LIFETIME_SHORTER);
+        fixed_int32_to_str_map_insert(&hashmap, 2, jsl_cstr_to_memory(buf_b), JSL_STRING_LIFETIME_SHORTER);
+
+        TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 2);
+        fixed_int32_to_str_map_free(&hashmap);
+    }
+
+    jsl_allocator_interface_free_all(allocator);
+
+    // free on map with mixed lifetime entries
+    {
+        FixedIntToStrMap hashmap;
+        fixed_int32_to_str_map_init(&hashmap, allocator, 256, 0);
+
+        char buf[] = "shorter-val";
+        fixed_int32_to_str_map_insert(&hashmap, 1, JSL_CSTR_EXPRESSION("longer-val"), JSL_STRING_LIFETIME_LONGER);
+        fixed_int32_to_str_map_insert(&hashmap, 2, jsl_cstr_to_memory(buf), JSL_STRING_LIFETIME_SHORTER);
+
+        TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 2);
+        fixed_int32_to_str_map_free(&hashmap);
+    }
+
+    jsl_allocator_interface_free_all(allocator);
+}
+
+static void test_fixed_str_to_int32_free(void)
+{
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
+    jsl_allocator_interface_free_all(allocator);
+
+    // free on empty map
+    {
+        FixedStrToIntMap hashmap;
+        fixed_str_to_int32_map_init(&hashmap, allocator, 256, 0);
+        fixed_str_to_int32_map_free(&hashmap);
+    }
+
+    jsl_allocator_interface_free_all(allocator);
+
+    // free on map with LONGER lifetime keys only
+    {
+        FixedStrToIntMap hashmap;
+        fixed_str_to_int32_map_init(&hashmap, allocator, 256, 0);
+
+        fixed_str_to_int32_map_insert(&hashmap, JSL_CSTR_EXPRESSION("alpha"), JSL_STRING_LIFETIME_LONGER, 1);
+        fixed_str_to_int32_map_insert(&hashmap, JSL_CSTR_EXPRESSION("beta"), JSL_STRING_LIFETIME_LONGER, 2);
+
+        TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 2);
+        fixed_str_to_int32_map_free(&hashmap);
+    }
+
+    jsl_allocator_interface_free_all(allocator);
+
+    // free on map with SHORTER lifetime keys only
+    {
+        FixedStrToIntMap hashmap;
+        fixed_str_to_int32_map_init(&hashmap, allocator, 256, 0);
+
+        char buf_a[] = "alpha";
+        char buf_b[] = "beta";
+        fixed_str_to_int32_map_insert(&hashmap, jsl_cstr_to_memory(buf_a), JSL_STRING_LIFETIME_SHORTER, 1);
+        fixed_str_to_int32_map_insert(&hashmap, jsl_cstr_to_memory(buf_b), JSL_STRING_LIFETIME_SHORTER, 2);
+
+        TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 2);
+        fixed_str_to_int32_map_free(&hashmap);
+    }
+
+    jsl_allocator_interface_free_all(allocator);
+
+    // free on map with mixed lifetime keys
+    {
+        FixedStrToIntMap hashmap;
+        fixed_str_to_int32_map_init(&hashmap, allocator, 256, 0);
+
+        char buf[] = "shorter-key";
+        fixed_str_to_int32_map_insert(&hashmap, JSL_CSTR_EXPRESSION("longer-key"), JSL_STRING_LIFETIME_LONGER, 1);
+        fixed_str_to_int32_map_insert(&hashmap, jsl_cstr_to_memory(buf), JSL_STRING_LIFETIME_SHORTER, 2);
+
+        TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 2);
+        fixed_str_to_int32_map_free(&hashmap);
+    }
+
+    jsl_allocator_interface_free_all(allocator);
+}
+
+static void test_fixed_int32_to_str_overwrite_frees_old(void)
+{
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
+    jsl_allocator_interface_free_all(allocator);
+
+    // overwrite SHORTER with SHORTER: old duplicated data should be freed
+    {
+        FixedIntToStrMap hashmap;
+        fixed_int32_to_str_map_init(&hashmap, allocator, 256, 0);
+
+        char buf1[] = "first-value";
+        char buf2[] = "second-value";
+        bool res = fixed_int32_to_str_map_insert(&hashmap, 1, jsl_cstr_to_memory(buf1), JSL_STRING_LIFETIME_SHORTER);
+        TEST_BOOL(res);
+
+        res = fixed_int32_to_str_map_insert(&hashmap, 1, jsl_cstr_to_memory(buf2), JSL_STRING_LIFETIME_SHORTER);
+        TEST_BOOL(res);
+        TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 1);
+
+        JSLImmutableMemory get_res = fixed_int32_to_str_map_get(&hashmap, 1);
+        TEST_BOOL(jsl_memory_compare(get_res, JSL_CSTR_EXPRESSION("second-value")));
+
+        fixed_int32_to_str_map_free(&hashmap);
+    }
+
+    jsl_allocator_interface_free_all(allocator);
+
+    // overwrite SHORTER with LONGER: old duplicated data should be freed
+    {
+        FixedIntToStrMap hashmap;
+        fixed_int32_to_str_map_init(&hashmap, allocator, 256, 0);
+
+        char buf[] = "first-value";
+        bool res = fixed_int32_to_str_map_insert(&hashmap, 1, jsl_cstr_to_memory(buf), JSL_STRING_LIFETIME_SHORTER);
+        TEST_BOOL(res);
+
+        res = fixed_int32_to_str_map_insert(&hashmap, 1, JSL_CSTR_EXPRESSION("second-value"), JSL_STRING_LIFETIME_LONGER);
+        TEST_BOOL(res);
+        TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 1);
+
+        JSLImmutableMemory get_res = fixed_int32_to_str_map_get(&hashmap, 1);
+        TEST_BOOL(jsl_memory_compare(get_res, JSL_CSTR_EXPRESSION("second-value")));
+
+        fixed_int32_to_str_map_free(&hashmap);
+    }
+
+    jsl_allocator_interface_free_all(allocator);
+
+    // overwrite LONGER with SHORTER: no old data to free, new data should be copied
+    {
+        FixedIntToStrMap hashmap;
+        fixed_int32_to_str_map_init(&hashmap, allocator, 256, 0);
+
+        bool res = fixed_int32_to_str_map_insert(&hashmap, 1, JSL_CSTR_EXPRESSION("first-value"), JSL_STRING_LIFETIME_LONGER);
+        TEST_BOOL(res);
+
+        char buf[] = "second-value";
+        res = fixed_int32_to_str_map_insert(&hashmap, 1, jsl_cstr_to_memory(buf), JSL_STRING_LIFETIME_SHORTER);
+        TEST_BOOL(res);
+        TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 1);
+
+        // mutate original to verify copy was made
+        buf[0] = 'X';
+        JSLImmutableMemory get_res = fixed_int32_to_str_map_get(&hashmap, 1);
+        TEST_BOOL(jsl_memory_compare(get_res, JSL_CSTR_EXPRESSION("second-value")));
+
+        fixed_int32_to_str_map_free(&hashmap);
+    }
+
+    jsl_allocator_interface_free_all(allocator);
+
+    // overwrite LONGER with LONGER: no data to free
+    {
+        FixedIntToStrMap hashmap;
+        fixed_int32_to_str_map_init(&hashmap, allocator, 256, 0);
+
+        bool res = fixed_int32_to_str_map_insert(&hashmap, 1, JSL_CSTR_EXPRESSION("first-value"), JSL_STRING_LIFETIME_LONGER);
+        TEST_BOOL(res);
+
+        res = fixed_int32_to_str_map_insert(&hashmap, 1, JSL_CSTR_EXPRESSION("second-value"), JSL_STRING_LIFETIME_LONGER);
+        TEST_BOOL(res);
+        TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 1);
+
+        JSLImmutableMemory get_res = fixed_int32_to_str_map_get(&hashmap, 1);
+        TEST_BOOL(jsl_memory_compare(get_res, JSL_CSTR_EXPRESSION("second-value")));
+
+        fixed_int32_to_str_map_free(&hashmap);
+    }
+
+    jsl_allocator_interface_free_all(allocator);
+}
+
 static void test_fixed_int32_to_str_insert_overwrites(void)
 {
     JSLAllocatorInterface allocator;
@@ -1653,6 +1868,9 @@ int main(void)
     RUN_TEST_FUNCTION("Test fixed str to int32 insert overwrites", test_fixed_str_to_int32_insert_overwrites);
     RUN_TEST_FUNCTION("Test fixed int32 to str lifetime", test_fixed_int32_to_str_lifetime);
     RUN_TEST_FUNCTION("Test fixed str to int32 lifetime", test_fixed_str_to_int32_lifetime);
+    RUN_TEST_FUNCTION("Test fixed int32 to str free", test_fixed_int32_to_str_free);
+    RUN_TEST_FUNCTION("Test fixed str to int32 free", test_fixed_str_to_int32_free);
+    RUN_TEST_FUNCTION("Test fixed int32 to str overwrite frees old", test_fixed_int32_to_str_overwrite_frees_old);
 
     RUN_TEST_FUNCTION("Test str to str map init success", test_jsl_str_to_str_map_init_success);
     RUN_TEST_FUNCTION("Test str to str map init invalid args", test_jsl_str_to_str_map_init_invalid_arguments);
