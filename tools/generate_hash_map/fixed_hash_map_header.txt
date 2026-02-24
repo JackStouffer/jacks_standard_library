@@ -26,6 +26,27 @@
  * Two, it's much more obvious how much code you're generating, which means you are
  * much less likely to accidentally create the combinatoric explosion of code that's
  * so common in C++ projects. Adding friction to things is actually good sometimes.
+ *
+ * ## LICENSE
+ *
+ * Copyright (c) 2026 Jack Stouffer
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the Software
+ * is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
 /**
@@ -45,11 +66,14 @@ typedef struct {{ hash_map_name }} {
 
     {% if key_is_str %}
     JSLImmutableMemory* keys_array;
+    JSLStringLifeTime* key_lifetime_array;
     {% else %}
     {{ key_type_name }}* keys_array;
     {% endif %}
+
     {% if value_is_str %}
     JSLImmutableMemory* values_array;
+    JSLStringLifeTime* value_lifetime_array;
     {% else %}
     {{ value_type_name }}* values_array;
     {% endif %}
@@ -169,6 +193,14 @@ bool {{ function_prefix }}_delete(
 );
 
 /**
+ * Free all the underlying memory that was allocated by this hash map on the given
+ * allocator.
+ */
+void {{ function_prefix }}_free(
+    {{ hash_map_name }}* hash_map
+);
+
+/**
  * Create a new iterator over this hash map.
  *
  * An iterator is a struct which holds enough state that it allows a loop to visit
@@ -223,3 +255,4 @@ bool {{ function_prefix }}_iterator_next(
     {{ value_type_name }}* out_value
     {% endif %}
 );
+

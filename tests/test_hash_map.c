@@ -40,6 +40,8 @@
 #include "hash_maps/fixed_comp3_to_comp2_map.h"
 #include "hash_maps/fixed_int32_to_comp1_map.h"
 #include "hash_maps/fixed_int32_to_int32_map.h"
+#include "hash_maps/fixed_int32_to_str_map.h"
+#include "hash_maps/fixed_str_to_int32_map.h"
 
 const int64_t arena_size = JSL_MEGABYTES(32);
 JSLArena global_arena;
@@ -162,6 +164,47 @@ static void test_fixed_insert(void)
     }
 
     jsl_allocator_interface_free_all(allocator);
+
+    {
+        FixedIntToStrMap hashmap;
+        fixed_int32_to_str_map_init(&hashmap, allocator, 256, 0);
+
+        bool insert_res = fixed_int32_to_str_map_insert(&hashmap, 42, JSL_CSTR_EXPRESSION("hello"), JSL_STRING_LIFETIME_LONGER);
+
+        TEST_BOOL(insert_res);
+        TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 1);
+
+        // test max item count behavior
+        for (int32_t i = 0; i < 300; i++)
+        {
+            fixed_int32_to_str_map_insert(&hashmap, i, JSL_CSTR_EXPRESSION("value"), JSL_STRING_LIFETIME_LONGER);
+        }
+
+        TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 256);
+    }
+
+    jsl_allocator_interface_free_all(allocator);
+
+    {
+        FixedStrToIntMap hashmap;
+        fixed_str_to_int32_map_init(&hashmap, allocator, 256, 0);
+
+        bool insert_res = fixed_str_to_int32_map_insert(&hashmap, JSL_CSTR_EXPRESSION("hello"), JSL_STRING_LIFETIME_LONGER, 999);
+
+        TEST_BOOL(insert_res);
+        TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 1);
+
+        // test max item count behavior
+        for (int32_t i = 0; i < 300; i++)
+        {
+            JSLImmutableMemory key = jsl_format(allocator, JSL_CSTR_EXPRESSION("key-%d"), i);
+            fixed_str_to_int32_map_insert(&hashmap, key, JSL_STRING_LIFETIME_LONGER, i);
+        }
+
+        TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 256);
+    }
+
+    jsl_allocator_interface_free_all(allocator);
 }
 
 static void test_fixed_get(void)
@@ -258,6 +301,38 @@ static void test_fixed_get(void)
 
         get_res = fixed_comp3_to_comp2_map_get(&hashmap, key);
         TEST_BOOL(memcmp(get_res, &value, sizeof(CompositeType2)) == 0);
+    }
+
+    jsl_allocator_interface_free_all(allocator);
+
+    {
+        FixedIntToStrMap hashmap;
+        fixed_int32_to_str_map_init(&hashmap, allocator, 256, 0);
+
+        bool insert_res = fixed_int32_to_str_map_insert(&hashmap, 8976, JSL_CSTR_EXPRESSION("test-value"), JSL_STRING_LIFETIME_LONGER);
+        TEST_BOOL(insert_res == true);
+
+        JSLImmutableMemory get_res = fixed_int32_to_str_map_get(&hashmap, 1112);
+        TEST_INT64_EQUAL(get_res.length, (int64_t) 0);
+
+        get_res = fixed_int32_to_str_map_get(&hashmap, 8976);
+        TEST_BOOL(jsl_memory_compare(get_res, JSL_CSTR_EXPRESSION("test-value")));
+    }
+
+    jsl_allocator_interface_free_all(allocator);
+
+    {
+        FixedStrToIntMap hashmap;
+        fixed_str_to_int32_map_init(&hashmap, allocator, 256, 0);
+
+        bool insert_res = fixed_str_to_int32_map_insert(&hashmap, JSL_CSTR_EXPRESSION("test-key"), JSL_STRING_LIFETIME_LONGER, 1111);
+        TEST_BOOL(insert_res == true);
+
+        int32_t* get_res = fixed_str_to_int32_map_get(&hashmap, JSL_CSTR_EXPRESSION("missing-key"));
+        TEST_POINTERS_EQUAL(get_res, NULL);
+
+        get_res = fixed_str_to_int32_map_get(&hashmap, JSL_CSTR_EXPRESSION("test-key"));
+        TEST_BOOL(*get_res == 1111);
     }
 
     jsl_allocator_interface_free_all(allocator);
@@ -491,6 +566,95 @@ static void test_fixed_delete(void)
     }
 
     jsl_allocator_interface_free_all(allocator);
+
+    {
+        FixedIntToStrMap hashmap;
+        fixed_int32_to_str_map_init(&hashmap, allocator, 256, 0);
+
+        bool insert_res = fixed_int32_to_str_map_insert(&hashmap, 567687, JSL_CSTR_EXPRESSION("val-a"), JSL_STRING_LIFETIME_LONGER);
+        TEST_BOOL(insert_res == true);
+
+        insert_res = fixed_int32_to_str_map_insert(&hashmap, 23940, JSL_CSTR_EXPRESSION("val-b"), JSL_STRING_LIFETIME_LONGER);
+        TEST_BOOL(insert_res == true);
+
+        insert_res = fixed_int32_to_str_map_insert(&hashmap, 48686, JSL_CSTR_EXPRESSION("val-c"), JSL_STRING_LIFETIME_LONGER);
+        TEST_BOOL(insert_res == true);
+
+        TEST_BOOL(hashmap.item_count == 3);
+
+        bool delete_res = fixed_int32_to_str_map_delete(&hashmap, 9999999);
+        TEST_BOOL(delete_res == false);
+        TEST_BOOL(hashmap.item_count == 3);
+
+        delete_res = fixed_int32_to_str_map_delete(&hashmap, 23940);
+        TEST_BOOL(delete_res == true);
+        TEST_BOOL(hashmap.item_count == 2);
+
+        int64_t count = 0;
+        FixedIntToStrMapIterator iter;
+        int32_t iter_key;
+        JSLImmutableMemory iter_value;
+        bool iter_ok = fixed_int32_to_str_map_iterator_start(&hashmap, &iter);
+        TEST_BOOL(iter_ok == true);
+
+        while (fixed_int32_to_str_map_iterator_next(&iter, &iter_key, &iter_value))
+        {
+            TEST_BOOL(iter_key != 23940);
+            ++count;
+        }
+
+        TEST_INT64_EQUAL(count, (int64_t) 2);
+        TEST_INT64_EQUAL(count, hashmap.item_count);
+    }
+
+    jsl_allocator_interface_free_all(allocator);
+
+    {
+        FixedStrToIntMap hashmap;
+        fixed_str_to_int32_map_init(&hashmap, allocator, 256, 0);
+
+        JSLImmutableMemory key1 = JSL_CSTR_INITIALIZER("alpha");
+        JSLImmutableMemory key2 = JSL_CSTR_INITIALIZER("beta");
+        JSLImmutableMemory key3 = JSL_CSTR_INITIALIZER("gamma");
+        JSLImmutableMemory key_missing = JSL_CSTR_INITIALIZER("missing");
+
+        bool insert_res = fixed_str_to_int32_map_insert(&hashmap, key1, JSL_STRING_LIFETIME_LONGER, 111);
+        TEST_BOOL(insert_res == true);
+
+        insert_res = fixed_str_to_int32_map_insert(&hashmap, key2, JSL_STRING_LIFETIME_LONGER, 222);
+        TEST_BOOL(insert_res == true);
+
+        insert_res = fixed_str_to_int32_map_insert(&hashmap, key3, JSL_STRING_LIFETIME_LONGER, 333);
+        TEST_BOOL(insert_res == true);
+
+        TEST_BOOL(hashmap.item_count == 3);
+
+        bool delete_res = fixed_str_to_int32_map_delete(&hashmap, key_missing);
+        TEST_BOOL(delete_res == false);
+        TEST_BOOL(hashmap.item_count == 3);
+
+        delete_res = fixed_str_to_int32_map_delete(&hashmap, key2);
+        TEST_BOOL(delete_res == true);
+        TEST_BOOL(hashmap.item_count == 2);
+
+        int64_t count = 0;
+        FixedStrToIntMapIterator iter;
+        JSLImmutableMemory iter_key;
+        int32_t iter_value;
+        bool iter_ok = fixed_str_to_int32_map_iterator_start(&hashmap, &iter);
+        TEST_BOOL(iter_ok == true);
+
+        while (fixed_str_to_int32_map_iterator_next(&iter, &iter_key, &iter_value))
+        {
+            TEST_BOOL(!jsl_memory_compare(iter_key, key2));
+            ++count;
+        }
+
+        TEST_INT64_EQUAL(count, (int64_t) 2);
+        TEST_INT64_EQUAL(count, hashmap.item_count);
+    }
+
+    jsl_allocator_interface_free_all(allocator);
 }
 
 static void test_fixed_iterator(void)
@@ -672,6 +836,88 @@ static void test_fixed_iterator(void)
         iter_ok = fixed_comp3_to_comp2_map_iterator_start(&hashmap, &iter);
         TEST_BOOL(iter_ok);
         while (fixed_comp3_to_comp2_map_iterator_next(&iter, &iter_key, &iter_value))
+        {
+            ++count;
+        }
+
+        TEST_INT32_EQUAL(count, 299);
+    }
+
+    jsl_allocator_interface_free_all(allocator);
+
+    {
+        FixedIntToStrMap hashmap;
+        fixed_int32_to_str_map_init(&hashmap, allocator, 500, 0);
+
+        for (int32_t i = 0; i < 300; ++i)
+        {
+            bool res = fixed_int32_to_str_map_insert(&hashmap, i, JSL_CSTR_EXPRESSION("iter-val"), JSL_STRING_LIFETIME_LONGER);
+            TEST_BOOL(res == true);
+        }
+
+        int32_t count = 0;
+        FixedIntToStrMapIterator iter;
+        int32_t iter_key;
+        JSLImmutableMemory iter_value;
+        bool iter_ok = fixed_int32_to_str_map_iterator_start(&hashmap, &iter);
+        TEST_BOOL(iter_ok == true);
+
+        while (fixed_int32_to_str_map_iterator_next(&iter, &iter_key, &iter_value))
+        {
+            ++count;
+        }
+
+        TEST_INT32_EQUAL(count, 300);
+
+        fixed_int32_to_str_map_delete(&hashmap, 100);
+
+        count = 0;
+        iter_ok = fixed_int32_to_str_map_iterator_start(&hashmap, &iter);
+        TEST_BOOL(iter_ok == true);
+
+        while (fixed_int32_to_str_map_iterator_next(&iter, &iter_key, &iter_value))
+        {
+            ++count;
+        }
+
+        TEST_INT32_EQUAL(count, 299);
+    }
+
+    jsl_allocator_interface_free_all(allocator);
+
+    {
+        FixedStrToIntMap hashmap;
+        fixed_str_to_int32_map_init(&hashmap, allocator, 500, 0);
+
+        for (int32_t i = 0; i < 300; ++i)
+        {
+            JSLImmutableMemory key = jsl_format(allocator, JSL_CSTR_EXPRESSION("iter-key-%d"), i);
+            bool res = fixed_str_to_int32_map_insert(&hashmap, key, JSL_STRING_LIFETIME_LONGER, i);
+            TEST_BOOL(res == true);
+        }
+
+        int32_t count = 0;
+        FixedStrToIntMapIterator iter;
+        bool iter_ok = fixed_str_to_int32_map_iterator_start(&hashmap, &iter);
+        TEST_BOOL(iter_ok);
+
+        JSLImmutableMemory iter_key;
+        int32_t iter_value;
+        while (fixed_str_to_int32_map_iterator_next(&iter, &iter_key, &iter_value))
+        {
+            ++count;
+        }
+
+        TEST_INT32_EQUAL(count, 300);
+
+        bool del_ok = fixed_str_to_int32_map_delete(&hashmap, JSL_CSTR_EXPRESSION("iter-key-100"));
+        TEST_BOOL(del_ok);
+
+        count = 0;
+        iter_ok = fixed_str_to_int32_map_iterator_start(&hashmap, &iter);
+        TEST_BOOL(iter_ok);
+
+        while (fixed_str_to_int32_map_iterator_next(&iter, &iter_key, &iter_value))
         {
             ++count;
         }
@@ -1230,6 +1476,165 @@ static void test_jsl_str_to_str_map_invalid_inserts(void)
     TEST_INT64_EQUAL(jsl_str_to_str_map_item_count(&map), (int64_t) 0);
 }
 
+static void test_fixed_int32_to_str_insert_overwrites(void)
+{
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
+    jsl_allocator_interface_free_all(allocator);
+
+    FixedIntToStrMap hashmap;
+    fixed_int32_to_str_map_init(&hashmap, allocator, 256, 0);
+
+    bool res = fixed_int32_to_str_map_insert(&hashmap, 42, JSL_CSTR_EXPRESSION("first"), JSL_STRING_LIFETIME_LONGER);
+    TEST_BOOL(res);
+    TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 1);
+
+    res = fixed_int32_to_str_map_insert(&hashmap, 42, JSL_CSTR_EXPRESSION("second"), JSL_STRING_LIFETIME_LONGER);
+    TEST_BOOL(res);
+    TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 1);
+
+    JSLImmutableMemory get_res = fixed_int32_to_str_map_get(&hashmap, 42);
+    TEST_BOOL(jsl_memory_compare(get_res, JSL_CSTR_EXPRESSION("second")));
+
+    jsl_allocator_interface_free_all(allocator);
+}
+
+static void test_fixed_str_to_int32_insert_overwrites(void)
+{
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
+    jsl_allocator_interface_free_all(allocator);
+
+    FixedStrToIntMap hashmap;
+    fixed_str_to_int32_map_init(&hashmap, allocator, 256, 0);
+
+    bool res = fixed_str_to_int32_map_insert(&hashmap, JSL_CSTR_EXPRESSION("key"), JSL_STRING_LIFETIME_LONGER, 111);
+    TEST_BOOL(res);
+    TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 1);
+
+    res = fixed_str_to_int32_map_insert(&hashmap, JSL_CSTR_EXPRESSION("key"), JSL_STRING_LIFETIME_LONGER, 222);
+    TEST_BOOL(res);
+    TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 1);
+
+    int32_t* get_res = fixed_str_to_int32_map_get(&hashmap, JSL_CSTR_EXPRESSION("key"));
+    TEST_BOOL(*get_res == 222);
+
+    jsl_allocator_interface_free_all(allocator);
+}
+
+static void test_fixed_int32_to_str_lifetime(void)
+{
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
+    jsl_allocator_interface_free_all(allocator);
+
+    // LONGER lifetime stores pointer directly
+    {
+        FixedIntToStrMap hashmap;
+        fixed_int32_to_str_map_init(&hashmap, allocator, 256, 0);
+
+        JSLImmutableMemory value = JSL_CSTR_INITIALIZER("longer-value");
+        const uint8_t* expected_ptr = value.data;
+
+        bool res = fixed_int32_to_str_map_insert(&hashmap, 1, value, JSL_STRING_LIFETIME_LONGER);
+        TEST_BOOL(res);
+
+        JSLImmutableMemory get_res = fixed_int32_to_str_map_get(&hashmap, 1);
+        TEST_POINTERS_EQUAL(get_res.data, expected_ptr);
+        TEST_BOOL(jsl_memory_compare(get_res, value));
+    }
+
+    jsl_allocator_interface_free_all(allocator);
+
+    // SHORTER lifetime copies data
+    {
+        FixedIntToStrMap hashmap;
+        fixed_int32_to_str_map_init(&hashmap, allocator, 256, 0);
+
+        char val_buf[] = "shorter-value";
+        JSLImmutableMemory value = jsl_cstr_to_memory(val_buf);
+
+        bool res = fixed_int32_to_str_map_insert(&hashmap, 1, value, JSL_STRING_LIFETIME_SHORTER);
+        TEST_BOOL(res);
+
+        // mutate the original buffer
+        val_buf[0] = 'X';
+
+        JSLImmutableMemory get_res = fixed_int32_to_str_map_get(&hashmap, 1);
+        TEST_BOOL(get_res.data != (const uint8_t*) val_buf);
+        TEST_BOOL(jsl_memory_compare(get_res, JSL_CSTR_EXPRESSION("shorter-value")));
+    }
+
+    jsl_allocator_interface_free_all(allocator);
+}
+
+static void test_fixed_str_to_int32_lifetime(void)
+{
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &global_arena);
+    jsl_allocator_interface_free_all(allocator);
+
+    // LONGER lifetime stores key pointer directly
+    {
+        FixedStrToIntMap hashmap;
+        fixed_str_to_int32_map_init(&hashmap, allocator, 256, 0);
+
+        JSLImmutableMemory key = JSL_CSTR_INITIALIZER("longer-key");
+        const uint8_t* expected_ptr = key.data;
+
+        bool res = fixed_str_to_int32_map_insert(&hashmap, key, JSL_STRING_LIFETIME_LONGER, 42);
+        TEST_BOOL(res);
+
+        // verify through iterator that the stored key points to original
+        FixedStrToIntMapIterator iter;
+        bool iter_ok = fixed_str_to_int32_map_iterator_start(&hashmap, &iter);
+        TEST_BOOL(iter_ok);
+
+        JSLImmutableMemory iter_key;
+        int32_t iter_value;
+        bool found = fixed_str_to_int32_map_iterator_next(&iter, &iter_key, &iter_value);
+        TEST_BOOL(found);
+        TEST_POINTERS_EQUAL(iter_key.data, expected_ptr);
+        TEST_BOOL(jsl_memory_compare(iter_key, key));
+    }
+
+    jsl_allocator_interface_free_all(allocator);
+
+    // SHORTER lifetime copies key data
+    {
+        FixedStrToIntMap hashmap;
+        fixed_str_to_int32_map_init(&hashmap, allocator, 256, 0);
+
+        char key_buf[] = "shorter-key";
+        JSLImmutableMemory key = jsl_cstr_to_memory(key_buf);
+
+        bool res = fixed_str_to_int32_map_insert(&hashmap, key, JSL_STRING_LIFETIME_SHORTER, 99);
+        TEST_BOOL(res);
+
+        // mutate the original buffer
+        key_buf[0] = 'X';
+
+        // should still find the original key
+        int32_t* get_res = fixed_str_to_int32_map_get(&hashmap, JSL_CSTR_EXPRESSION("shorter-key"));
+        TEST_BOOL(get_res != NULL);
+        TEST_BOOL(*get_res == 99);
+
+        // verify through iterator that key data was copied
+        FixedStrToIntMapIterator iter;
+        bool iter_ok = fixed_str_to_int32_map_iterator_start(&hashmap, &iter);
+        TEST_BOOL(iter_ok);
+
+        JSLImmutableMemory iter_key;
+        int32_t iter_value;
+        bool found = fixed_str_to_int32_map_iterator_next(&iter, &iter_key, &iter_value);
+        TEST_BOOL(found);
+        TEST_BOOL(iter_key.data != (const uint8_t*) key_buf);
+        TEST_BOOL(jsl_memory_compare(iter_key, JSL_CSTR_EXPRESSION("shorter-key")));
+    }
+
+    jsl_allocator_interface_free_all(allocator);
+}
+
 int main(void)
 {
     // Windows programs that crash can lose all of the terminal output.
@@ -1244,6 +1649,10 @@ int main(void)
     RUN_TEST_FUNCTION("Test fixed hashmap get", test_fixed_get);
     RUN_TEST_FUNCTION("Test fixed hashmap iterator", test_fixed_iterator);
     RUN_TEST_FUNCTION("Test fixed hashmap delete", test_fixed_delete);
+    RUN_TEST_FUNCTION("Test fixed int32 to str insert overwrites", test_fixed_int32_to_str_insert_overwrites);
+    RUN_TEST_FUNCTION("Test fixed str to int32 insert overwrites", test_fixed_str_to_int32_insert_overwrites);
+    RUN_TEST_FUNCTION("Test fixed int32 to str lifetime", test_fixed_int32_to_str_lifetime);
+    RUN_TEST_FUNCTION("Test fixed str to int32 lifetime", test_fixed_str_to_int32_lifetime);
 
     RUN_TEST_FUNCTION("Test str to str map init success", test_jsl_str_to_str_map_init_success);
     RUN_TEST_FUNCTION("Test str to str map init invalid args", test_jsl_str_to_str_map_init_invalid_arguments);
