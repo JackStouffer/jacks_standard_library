@@ -26,17 +26,17 @@
 #include <stdbool.h>
 #include <wchar.h>
 
-#include "../src/jsl_cmd_line.h"
-#include "../src/jsl_core.h"
-#include "../src/jsl_allocator.h"
-#include "../src/jsl_allocator_arena.h"
+#include "jsl/cmd_line.h"
+#include "jsl/core.h"
+#include "jsl/allocator.h"
+#include "jsl/allocator_arena.h"
 
 #include "minctest.h"
 
 #define EXPECT_SINK_OUTPUT(expected_literal, bytes_written, buffer, writer) \
     do { \
         int64_t expected_len = (int64_t)(sizeof(expected_literal) - 1); \
-        int64_t actual_len = jsl_fatptr_total_write_length((buffer), (writer)); \
+        int64_t actual_len = jsl_total_write_length((buffer), (writer)); \
         TEST_INT64_EQUAL((bytes_written), expected_len); \
         TEST_INT64_EQUAL(actual_len, expected_len); \
         TEST_BUFFERS_EQUAL((buffer).data, (expected_literal), expected_len); \
@@ -69,16 +69,16 @@ static void test_short_flags_grouping(void)
     TEST_BOOL(jsl_cmd_line_args_has_short_flag(&cmd, 'd'));
     TEST_BOOL(!jsl_cmd_line_args_has_short_flag(&cmd, 'e'));
 
-    JSLFatPtr value = {0};
+    JSLImmutableMemory value = {0};
     TEST_BOOL(jsl_cmd_line_args_pop_flag_with_value(
         &cmd,
-        JSL_FATPTR_EXPRESSION("output"),
+        JSL_CSTR_EXPRESSION("output"),
         &value
     ));
-    TEST_BOOL(jsl_fatptr_cstr_compare(value, "result.txt"));
+    TEST_BOOL(jsl_memory_cstr_compare(value, "result.txt"));
     TEST_BOOL(!jsl_cmd_line_args_pop_flag_with_value(
         &cmd,
-        JSL_FATPTR_EXPRESSION("output"),
+        JSL_CSTR_EXPRESSION("output"),
         &value
     ));
 }
@@ -100,10 +100,10 @@ static void test_short_flag_equals_is_invalid(void)
         "run"
     };
 
-    JSLFatPtr error = {0};
+    JSLImmutableMemory error = {0};
     TEST_BOOL(!jsl_cmd_line_args_parse(&cmd, 3, argv, &error));
     TEST_BOOL(error.data != NULL && error.length > 0);
-    TEST_BOOL(jsl_fatptr_index_of(error, '=') >= 0);
+    TEST_BOOL(jsl_index_of(error, '=') >= 0);
 }
 
 static void test_long_flags_and_commands(void)
@@ -128,32 +128,32 @@ static void test_long_flags_and_commands(void)
 
     TEST_BOOL(jsl_cmd_line_args_parse(&cmd, 6, argv, NULL));
 
-    TEST_BOOL(jsl_cmd_line_args_has_flag(&cmd, JSL_FATPTR_EXPRESSION("verbose")));
-    TEST_BOOL(!jsl_cmd_line_args_has_flag(&cmd, JSL_FATPTR_EXPRESSION("output")));
-    TEST_BOOL(jsl_cmd_line_args_has_command(&cmd, JSL_FATPTR_EXPRESSION("build")));
-    TEST_BOOL(jsl_cmd_line_args_has_command(&cmd, JSL_FATPTR_EXPRESSION("--not-a-flag")));
+    TEST_BOOL(jsl_cmd_line_args_has_flag(&cmd, JSL_CSTR_EXPRESSION("verbose")));
+    TEST_BOOL(!jsl_cmd_line_args_has_flag(&cmd, JSL_CSTR_EXPRESSION("output")));
+    TEST_BOOL(jsl_cmd_line_args_has_command(&cmd, JSL_CSTR_EXPRESSION("build")));
+    TEST_BOOL(jsl_cmd_line_args_has_command(&cmd, JSL_CSTR_EXPRESSION("--not-a-flag")));
 
-    JSLFatPtr value = {0};
+    JSLImmutableMemory value = {0};
     TEST_BOOL(jsl_cmd_line_args_pop_flag_with_value(
         &cmd,
-        JSL_FATPTR_EXPRESSION("output"),
+        JSL_CSTR_EXPRESSION("output"),
         &value
     ));
-    TEST_BOOL(jsl_fatptr_cstr_compare(value, "result.txt"));
+    TEST_BOOL(jsl_memory_cstr_compare(value, "result.txt"));
 
-    JSLFatPtr arg = {0};
+    JSLImmutableMemory arg = {0};
     TEST_BOOL(jsl_cmd_line_args_pop_arg_list(&cmd, &arg));
-    TEST_BOOL(jsl_fatptr_cstr_compare(arg, "build"));
+    TEST_BOOL(jsl_memory_cstr_compare(arg, "build"));
     TEST_BOOL(jsl_cmd_line_args_pop_arg_list(&cmd, &arg));
-    TEST_BOOL(jsl_fatptr_cstr_compare(arg, "--not-a-flag"));
+    TEST_BOOL(jsl_memory_cstr_compare(arg, "--not-a-flag"));
     TEST_BOOL(!jsl_cmd_line_args_pop_arg_list(&cmd, &arg));
 }
 
-static bool contains_value(JSLFatPtr* values, int32_t length, const char* needle)
+static bool contains_value(JSLImmutableMemory* values, int32_t length, const char* needle)
 {
     for (int32_t i = 0; i < length; ++i)
     {
-        if (jsl_fatptr_cstr_compare(values[i], (char*) needle))
+        if (jsl_memory_cstr_compare(values[i], (char*) needle))
             return true;
     }
     return false;
@@ -181,12 +181,12 @@ static void test_long_values_equals_and_space(void)
 
     TEST_BOOL(jsl_cmd_line_args_parse(&cmd, 7, argv, NULL));
 
-    JSLFatPtr collected[3] = {0};
+    JSLImmutableMemory collected[3] = {0};
     int32_t collected_count = 0;
-    JSLFatPtr value = {0};
+    JSLImmutableMemory value = {0};
     while (jsl_cmd_line_args_pop_flag_with_value(
         &cmd,
-        JSL_FATPTR_EXPRESSION("ignore"),
+        JSL_CSTR_EXPRESSION("ignore"),
         &value
     ))
     {
@@ -198,13 +198,13 @@ static void test_long_values_equals_and_space(void)
     TEST_BOOL(contains_value(collected, collected_count, "bar"));
     TEST_BOOL(contains_value(collected, collected_count, "baz"));
 
-    TEST_BOOL(!jsl_cmd_line_args_has_command(&cmd, JSL_FATPTR_EXPRESSION("bar")));
+    TEST_BOOL(!jsl_cmd_line_args_has_command(&cmd, JSL_CSTR_EXPRESSION("bar")));
 
-    JSLFatPtr arg = {0};
+    JSLImmutableMemory arg = {0};
     TEST_BOOL(jsl_cmd_line_args_pop_arg_list(&cmd, &arg));
-    TEST_BOOL(jsl_fatptr_cstr_compare(arg, "run"));
+    TEST_BOOL(jsl_memory_cstr_compare(arg, "run"));
     TEST_BOOL(jsl_cmd_line_args_pop_arg_list(&cmd, &arg));
-    TEST_BOOL(jsl_fatptr_cstr_compare(arg, "clean"));
+    TEST_BOOL(jsl_memory_cstr_compare(arg, "clean"));
     TEST_BOOL(!jsl_cmd_line_args_pop_arg_list(&cmd, &arg));
 }
 
@@ -233,16 +233,16 @@ static void test_wide_parsing(void)
 
     TEST_BOOL(jsl_cmd_line_args_parse_wide(&cmd, 4, argv, NULL));
 
-    JSLFatPtr value = {0};
+    JSLImmutableMemory value = {0};
     TEST_BOOL(jsl_cmd_line_args_pop_flag_with_value(
         &cmd,
-        JSL_FATPTR_EXPRESSION("name"),
+        JSL_CSTR_EXPRESSION("name"),
         &value
     ));
-    TEST_BOOL(jsl_fatptr_cstr_compare(value, "alice"));
+    TEST_BOOL(jsl_memory_cstr_compare(value, "alice"));
 
-    TEST_BOOL(jsl_cmd_line_args_has_command(&cmd, JSL_FATPTR_EXPRESSION("deploy")));
-    TEST_BOOL(!jsl_cmd_line_args_has_command(&cmd, JSL_FATPTR_EXPRESSION("alice")));
+    TEST_BOOL(jsl_cmd_line_args_has_command(&cmd, JSL_CSTR_EXPRESSION("deploy")));
+    TEST_BOOL(!jsl_cmd_line_args_has_command(&cmd, JSL_CSTR_EXPRESSION("alice")));
 }
 
 static void test_cmd_line_color_conversions(void)
@@ -275,15 +275,15 @@ static void test_cmd_line_write_style_no_color(void)
     jsl_cmd_line_style_with_foreground(&style, fg, JSL_CMD_LINE_STYLE_BOLD);
 
     uint8_t raw[64] = {0};
-    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(raw);
-    JSLFatPtr writer = buffer;
-    JSLOutputSink sink = jsl_fatptr_output_sink(&writer);
+    JSLMutableMemory buffer = JSL_MEMORY_FROM_STACK(raw);
+    JSLMutableMemory writer = buffer;
+    JSLOutputSink sink = jsl_memory_output_sink(&writer);
 
     int64_t result = jsl_cmd_line_write_style(sink, &info, &style);
     EXPECT_SINK_OUTPUT("", result, buffer, writer);
 
-    JSLFatPtr reset_writer = buffer;
-    JSLOutputSink reset_sink = jsl_fatptr_output_sink(&reset_writer);
+    JSLMutableMemory reset_writer = buffer;
+    JSLOutputSink reset_sink = jsl_memory_output_sink(&reset_writer);
     result = jsl_cmd_line_write_reset(reset_sink, &info);
     EXPECT_SINK_OUTPUT("", result, buffer, reset_writer);
 }
@@ -307,9 +307,9 @@ static void test_cmd_line_write_style_ansi16(void)
     );
 
     uint8_t raw[128] = {0};
-    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(raw);
-    JSLFatPtr writer = buffer;
-    JSLOutputSink sink = jsl_fatptr_output_sink(&writer);
+    JSLMutableMemory buffer = JSL_MEMORY_FROM_STACK(raw);
+    JSLMutableMemory writer = buffer;
+    JSLOutputSink sink = jsl_memory_output_sink(&writer);
 
     int64_t result = jsl_cmd_line_write_style(sink, &info, &style);
     EXPECT_SINK_OUTPUT("\x1b[1m\x1b[4m\x1b[9m\x1b[31m\x1b[104m", result, buffer, writer);
@@ -329,9 +329,9 @@ static void test_cmd_line_write_style_ansi16_converts_color_types(void)
     jsl_cmd_line_style_with_foreground_and_background(&style, fg, bg, 0);
 
     uint8_t raw[128] = {0};
-    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(raw);
-    JSLFatPtr writer = buffer;
-    JSLOutputSink sink = jsl_fatptr_output_sink(&writer);
+    JSLMutableMemory buffer = JSL_MEMORY_FROM_STACK(raw);
+    JSLMutableMemory writer = buffer;
+    JSLOutputSink sink = jsl_memory_output_sink(&writer);
 
     int64_t result = jsl_cmd_line_write_style(sink, &info, &style);
     EXPECT_SINK_OUTPUT("\x1b[92m\x1b[101m", result, buffer, writer);
@@ -351,9 +351,9 @@ static void test_cmd_line_write_style_ansi256(void)
     jsl_cmd_line_style_with_foreground_and_background(&style, fg, bg, JSL_CMD_LINE_STYLE_DIM);
 
     uint8_t raw[128] = {0};
-    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(raw);
-    JSLFatPtr writer = buffer;
-    JSLOutputSink sink = jsl_fatptr_output_sink(&writer);
+    JSLMutableMemory buffer = JSL_MEMORY_FROM_STACK(raw);
+    JSLMutableMemory writer = buffer;
+    JSLOutputSink sink = jsl_memory_output_sink(&writer);
 
     int64_t result = jsl_cmd_line_write_style(sink, &info, &style);
     EXPECT_SINK_OUTPUT("\x1b[2m\x1b[38;5;67m\x1b[43m", result, buffer, writer);
@@ -378,9 +378,9 @@ static void test_cmd_line_write_style_truecolor(void)
     );
 
     uint8_t raw[128] = {0};
-    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(raw);
-    JSLFatPtr writer = buffer;
-    JSLOutputSink sink = jsl_fatptr_output_sink(&writer);
+    JSLMutableMemory buffer = JSL_MEMORY_FROM_STACK(raw);
+    JSLMutableMemory writer = buffer;
+    JSLOutputSink sink = jsl_memory_output_sink(&writer);
 
     int64_t result = jsl_cmd_line_write_style(sink, &info, &style);
     EXPECT_SINK_OUTPUT("\x1b[3m\x1b[7m\x1b[38;2;12;34;56m\x1b[48;5;200m", result, buffer, writer);
@@ -398,15 +398,15 @@ static void test_cmd_line_write_style_and_reset_invalid(void)
     JSLCmdLineStyle style = {0};
 
     uint8_t raw[32] = {0};
-    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(raw);
-    JSLFatPtr writer = buffer;
-    JSLOutputSink sink = jsl_fatptr_output_sink(&writer);
+    JSLMutableMemory buffer = JSL_MEMORY_FROM_STACK(raw);
+    JSLMutableMemory writer = buffer;
+    JSLOutputSink sink = jsl_memory_output_sink(&writer);
 
     TEST_INT64_EQUAL(jsl_cmd_line_write_style(sink, &info, &style), -1);
     EXPECT_SINK_OUTPUT("", 0, buffer, writer);
 
-    JSLFatPtr reset_writer = buffer;
-    JSLOutputSink reset_sink = jsl_fatptr_output_sink(&reset_writer);
+    JSLMutableMemory reset_writer = buffer;
+    JSLOutputSink reset_sink = jsl_memory_output_sink(&reset_writer);
     TEST_INT64_EQUAL(jsl_cmd_line_write_reset(reset_sink, &info), -1);
     EXPECT_SINK_OUTPUT("", 0, buffer, reset_writer);
 }
@@ -417,9 +417,9 @@ static void test_cmd_line_write_reset_ansi_modes(void)
     TEST_BOOL(jsl_cmd_line_get_terminal_info(&info, JSL_GET_TERMINAL_INFO_FORCE_16_COLOR_MODE));
 
     uint8_t raw[16] = {0};
-    JSLFatPtr buffer = JSL_FATPTR_FROM_STACK(raw);
-    JSLFatPtr writer = buffer;
-    JSLOutputSink sink = jsl_fatptr_output_sink(&writer);
+    JSLMutableMemory buffer = JSL_MEMORY_FROM_STACK(raw);
+    JSLMutableMemory writer = buffer;
+    JSLOutputSink sink = jsl_memory_output_sink(&writer);
 
     int64_t result = jsl_cmd_line_write_reset(sink, &info);
     EXPECT_SINK_OUTPUT("\x1b[0m", result, buffer, writer);

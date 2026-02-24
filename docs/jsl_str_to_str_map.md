@@ -8,8 +8,8 @@
 ## Types
 
 - [`JSLStrToStrMapKeyState`](#type-jslstrtostrmapkeystate)
-- [`union (unnamed at src/jsl_str_to_str_map.h:86:5)`](#type-union-unnamed-at-src-jsl_str_to_str_map-h-86-5)
-- [`struct (unnamed at src/jsl_str_to_str_map.h:88:9)`](#type-struct-unnamed-at-src-jsl_str_to_str_map-h-88-9)
+- [`union (unnamed at src/jsl/str_to_str_map.h:86:5)`](#type-union-unnamed-at-src-jsl_str_to_str_map-h-86-5)
+- [`struct (unnamed at src/jsl/str_to_str_map.h:88:9)`](#type-struct-unnamed-at-src-jsl_str_to_str_map-h-88-9)
 - [`JSLStrToStrMap`](#type-typedef-jslstrtostrmap)
 - [`JSLStrToStrMapKeyValueIter`](#type-typedef-jslstrtostrmapkeyvalueiter)
 
@@ -27,7 +27,7 @@
 - [`jsl_str_to_str_map_clear`](#function-jsl_str_to_str_map_clear)
 - [`jsl_str_to_str_map_free`](#function-jsl_str_to_str_map_free)
 
-## File: src/jsl_str_to_str_map.h
+## File: src/jsl/str_to_str_map.h
 
 ## JSL String to String Map
 
@@ -81,7 +81,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_map.h:61`
+*Defined at*: `src/jsl/str_to_str_map.h:61`
 
 ---
 
@@ -93,7 +93,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_map.h:69`
+*Defined at*: `src/jsl/str_to_str_map.h:69`
 
 ---
 
@@ -104,29 +104,29 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - `JSL__MAP_TOMBSTONE = 1`
 
 
-*Defined at*: `src/jsl_str_to_str_map.h:77`
+*Defined at*: `src/jsl/str_to_str_map.h:77`
 
 ---
 
 <a id="type-union-unnamed-at-src-jsl_str_to_str_map-h-86-5"></a>
-### : `union (unnamed at src/jsl_str_to_str_map.h:86:5)`
+### : `union (unnamed at src/jsl/str_to_str_map.h:86:5)`
 
 - `JSLFatPtr key;`
 - `struct JSL__StrToStrMapEntry * next;`
 
 
-*Defined at*: `src/jsl_str_to_str_map.h:86`
+*Defined at*: `src/jsl/str_to_str_map.h:86`
 
 ---
 
 <a id="type-struct-unnamed-at-src-jsl_str_to_str_map-h-88-9"></a>
-### : `struct (unnamed at src/jsl_str_to_str_map.h:88:9)`
+### : `struct (unnamed at src/jsl/str_to_str_map.h:88:9)`
 
 - `int[8] key_sso_buffer;`
 - `int64_t key_sso_buffer_length;`
 
 
-*Defined at*: `src/jsl_str_to_str_map.h:88`
+*Defined at*: `src/jsl/str_to_str_map.h:88`
 
 ---
 
@@ -179,7 +179,7 @@ typedef struct JSL__StrToStrMap JSLStrToStrMap;
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_map.h:185`
+*Defined at*: `src/jsl/str_to_str_map.h:185`
 
 ---
 
@@ -205,7 +205,7 @@ typedef struct JSL__StrToStrMapKeyValueIter JSLStrToStrMapKeyValueIter;
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_map.h:200`
+*Defined at*: `src/jsl/str_to_str_map.h:200`
 
 ---
 
@@ -238,7 +238,7 @@ int jsl_str_to_str_map_init(JSLStrToStrMap *map, JSLAllocatorInterface *allocato
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_map.h:215`
+*Defined at*: `src/jsl/str_to_str_map.h:215`
 
 ---
 
@@ -278,7 +278,7 @@ int jsl_str_to_str_map_init2(JSLStrToStrMap *map, JSLAllocatorInterface *allocat
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_map.h:239`
+*Defined at*: `src/jsl/str_to_str_map.h:239`
 
 ---
 
@@ -302,7 +302,7 @@ int jsl_str_to_str_map_item_count(JSLStrToStrMap *map);
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_map.h:253`
+*Defined at*: `src/jsl/str_to_str_map.h:253`
 
 ---
 
@@ -326,7 +326,7 @@ int jsl_str_to_str_map_has_key(JSLStrToStrMap *map, JSLFatPtr key);
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_map.h:263`
+*Defined at*: `src/jsl/str_to_str_map.h:263`
 
 ---
 
@@ -358,7 +358,7 @@ int jsl_str_to_str_map_insert(JSLStrToStrMap *map, JSLFatPtr key, JSLStringLifeT
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_map.h:278`
+*Defined at*: `src/jsl/str_to_str_map.h:278`
 
 ---
 
@@ -386,7 +386,7 @@ int jsl_str_to_str_map_get(JSLStrToStrMap *map, JSLFatPtr key, JSLFatPtr *out_va
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_map.h:294`
+*Defined at*: `src/jsl/str_to_str_map.h:294`
 
 ---
 
@@ -431,7 +431,7 @@ int jsl_str_to_str_map_key_value_iterator_init(JSLStrToStrMap *map, JSLStrToStrM
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_map.h:326`
+*Defined at*: `src/jsl/str_to_str_map.h:326`
 
 ---
 
@@ -479,7 +479,7 @@ int jsl_str_to_str_map_key_value_iterator_next(JSLStrToStrMapKeyValueIter *itera
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_map.h:359`
+*Defined at*: `src/jsl/str_to_str_map.h:359`
 
 ---
 
@@ -508,7 +508,7 @@ int jsl_str_to_str_map_delete(JSLStrToStrMap *map, JSLFatPtr key);
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_map.h:375`
+*Defined at*: `src/jsl/str_to_str_map.h:375`
 
 ---
 
@@ -528,7 +528,7 @@ void jsl_str_to_str_map_clear(JSLStrToStrMap *map);
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_map.h:387`
+*Defined at*: `src/jsl/str_to_str_map.h:387`
 
 ---
 
@@ -548,7 +548,7 @@ void jsl_str_to_str_map_free(JSLStrToStrMap *map);
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_map.h:398`
+*Defined at*: `src/jsl/str_to_str_map.h:398`
 
 ---
 

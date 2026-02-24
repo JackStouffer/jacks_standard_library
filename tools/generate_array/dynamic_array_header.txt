@@ -1,0 +1,159 @@
+/**
+ * AUTO GENERATED FILE
+ *
+ * This file contains the header for a dynamic array `{{ array_type_name }}` of
+ * `{{ value_type_name }}` values.
+ *
+ * This file was auto generated from the array code generation utility that's part of
+ * the "Jack's Standard Library" project. The utility generates a header file and a
+ * C file for a type safe dynamic array . By generating the code rather than using macros,
+ * two benefits are gained. One, the code is much easier to debug. Two, it's much more
+ * obvious how much code you're generating, which means you are much less likely to accidentally
+ * create the combinatoric explosion of code that's so common in C++ projects. Adding friction 
+ * to things is actually good sometimes.
+ */
+
+
+#pragma once
+
+#include <stdint.h>
+#include <stddef.h>
+#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L
+    #include <stdbool.h>
+#endif
+
+#include "jsl/core.h"
+#include "jsl/allocator.h"
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/**
+ * Dynamic array of {{ value_type_name }}.
+ * 
+ * Example:
+ *
+ * ```
+ * {{ array_type_name }} array;
+ * {{ function_prefix }}_init(&array, &arena);
+ *
+ * {{ function_prefix }}_insert(&array, ... );
+ *
+ * for (int64_t i = 0; i < array.length; ++i)
+ * {
+ *      {{ value_type_name }}* value = &array.data[i];
+ *      ...
+ * }
+ * ```
+ * 
+ * ## Functions
+ *
+ *  * {{ function_prefix }}_init
+ *  * {{ function_prefix }}_insert
+ *  * {{ function_prefix }}_insert_at
+ *  * {{ function_prefix }}_delete_at
+ *  * {{ function_prefix }}_clear
+ *
+ */
+typedef struct {{ array_type_name }} {
+    // putting the sentinel first means it's much more likely to get
+    // corrupted from accidental overwrites, therefore making it
+    // more likely that memory bugs are caught.
+    uint64_t sentinel;
+    JSLAllocatorInterface* allocator;
+    {{ value_type_name }}* data;
+    int64_t length;
+    int64_t capacity;
+} {{ array_type_name }};
+
+/**
+ * Initialize an instance of {{ array_type_name }}. Enough room will be allocated
+ * for `initial_capacity` elements.
+ *
+ * @param array The pointer to the array instance to initialize
+ * @param arena The arena that this array will use to allocate memory
+ * @param initial_capacity Allocate enough space to hold this many elements 
+ * @returns If the allocation succeed
+ */
+bool {{ function_prefix }}_init(
+    {{ array_type_name }}* array,
+    JSLAllocatorInterface* allocator,
+    int64_t initial_capacity
+);
+
+/**
+ * Insert an `{{ value_type_name }}` at the end of the array.
+ *
+ * @param array The pointer to the array
+ * @param value The value to add
+ * @returns If the insertion succeed
+ */
+bool {{ function_prefix }}_insert(
+    {{ array_type_name }}* array,
+    {{ value_type_name }} value
+);
+
+/**
+ * Insert multiple `{{ value_type_name }}` at once at the end of the array.
+ *
+ * @param array The pointer to the array
+ * @param value The pointer to the start of the values
+ * @returns If the insertion succeed
+ */
+bool {{ function_prefix }}_insert_multiple(
+    {{ array_type_name }}* array,
+    {{ value_type_name }}* values,
+    int64_t value_count
+);
+
+/**
+ * Insert an `{{ value_type_name }}` at the specified index, moving everything after
+ * that index to its index plus one.
+ *
+ * @param array The pointer to the array
+ * @param value The value to add
+ * @param index The index to place the element
+ * @returns If the insertion succeed
+ */
+bool {{ function_prefix }}_insert_at(
+    {{ array_type_name }}* array,
+    {{ value_type_name }} value,
+    int64_t index
+);
+
+/**
+ * Delete the element at the specified index, moving everything after
+ * that index to its index minus one.
+ *
+ * @param array The pointer to the array
+ * @param index The index to delete
+ * @returns if deletion succeed
+ */
+bool {{ function_prefix }}_delete_at(
+    {{ array_type_name }}* array,
+    int64_t index
+);
+
+/**
+ * Set the length of the array back to zero. Does not shrink the underlying capacity.
+ *
+ * @param array The pointer to the array
+ */
+void {{ function_prefix }}_clear(
+    {{ array_type_name }}* array
+);
+
+/**
+ * Free the underlying memory of the array. This sets the array into an invalid state.
+ * You will have to call init again if you wish to use this array instance.
+ *
+ * @param array The pointer to the array
+ */
+void {{ function_prefix }}_free(
+    {{ array_type_name }}* array
+);
+
+#ifdef __cplusplus
+}
+#endif

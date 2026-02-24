@@ -28,9 +28,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../src/jsl_core.h"
-#include "../src/jsl_allocator.h"
-#include "../src/jsl_allocator_pool.h"
+#include "jsl/core.h"
+#include "jsl/allocator.h"
+#include "jsl/allocator_pool.h"
 
 #include "minctest.h"
 
@@ -58,7 +58,7 @@ static void test_pool_init2_sets_counts(void)
 {
     uint8_t buffer[256];
     JSLPoolAllocator pool = {0};
-    JSLFatPtr memory = JSL_FATPTR_FROM_STACK(buffer);
+    JSLImmutableMemory memory = JSL_MEMORY_FROM_STACK(buffer);
 
     jsl_pool_init2(&pool, memory, 24);
 
@@ -196,7 +196,7 @@ static void test_pool_alignment_large_alloc(void)
     if (!aligned) return;
 
     int64_t aligned_length = (int64_t) (raw_buffer + sizeof(raw_buffer) - aligned);
-    JSLFatPtr memory = {aligned, aligned_length};
+    JSLImmutableMemory memory = {aligned, aligned_length};
     JSLPoolAllocator pool = {0};
 
     jsl_pool_init2(&pool, memory, JSL_KILOBYTES(2));

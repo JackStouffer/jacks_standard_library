@@ -20,7 +20,7 @@
 - [`jsl_string_builder_iterator_init`](#function-jsl_string_builder_iterator_init)
 - [`jsl_string_builder_iterator_next`](#function-jsl_string_builder_iterator_next)
 
-## File: src/jsl_string_builder.h
+## File: src/jsl/string_builder.h
 
 ## JSL String Builder
 
@@ -91,7 +91,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
 
-*Defined at*: `src/jsl_string_builder.h:76`
+*Defined at*: `src/jsl/string_builder.h:76`
 
 ---
 
@@ -103,7 +103,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
 
-*Defined at*: `src/jsl_string_builder.h:84`
+*Defined at*: `src/jsl/string_builder.h:84`
 
 ---
 
@@ -129,7 +129,7 @@ typedef struct JSL__StringBuilder JSLStringBuilder;
 ```
 
 
-*Defined at*: `src/jsl_string_builder.h:129`
+*Defined at*: `src/jsl/string_builder.h:129`
 
 ---
 
@@ -151,7 +151,7 @@ Functions:
 - `struct JSL__StringBuilderChunk * current;`
 
 
-*Defined at*: `src/jsl_string_builder.h:142`
+*Defined at*: `src/jsl/string_builder.h:142`
 
 ---
 
@@ -179,7 +179,7 @@ int jsl_string_builder_init(JSLStringBuilder *builder, JSLAllocatorInterface *al
 ```
 
 
-*Defined at*: `src/jsl_string_builder.h:156`
+*Defined at*: `src/jsl/string_builder.h:156`
 
 ---
 
@@ -211,7 +211,7 @@ int jsl_string_builder_init2(JSLStringBuilder *builder, JSLAllocatorInterface *a
 ```
 
 
-*Defined at*: `src/jsl_string_builder.h:169`
+*Defined at*: `src/jsl/string_builder.h:169`
 
 ---
 
@@ -238,7 +238,7 @@ int jsl_string_builder_insert_fatptr(JSLStringBuilder *builder, JSLFatPtr data);
 ```
 
 
-*Defined at*: `src/jsl_string_builder.h:184`
+*Defined at*: `src/jsl/string_builder.h:184`
 
 ---
 
@@ -252,7 +252,7 @@ JSLOutputSink jsl_string_builder_output_sink(JSLStringBuilder *builder);
 ```
 
 
-*Defined at*: `src/jsl_string_builder.h:189`
+*Defined at*: `src/jsl/string_builder.h:189`
 
 ---
 
@@ -266,7 +266,7 @@ void jsl_string_builder_free(JSLStringBuilder *builder);
 ```
 
 
-*Defined at*: `src/jsl_string_builder.h:194`
+*Defined at*: `src/jsl/string_builder.h:194`
 
 ---
 
@@ -295,7 +295,7 @@ void jsl_string_builder_iterator_init(JSLStringBuilder *builder, JSLStringBuilde
 ```
 
 
-*Defined at*: `src/jsl_string_builder.h:213`
+*Defined at*: `src/jsl/string_builder.h:213`
 
 ---
 
@@ -334,7 +334,7 @@ int jsl_string_builder_iterator_next(JSLStringBuilderIterator *iterator, JSLFatP
 ```
 
 
-*Defined at*: `src/jsl_string_builder.h:236`
+*Defined at*: `src/jsl/string_builder.h:236`
 
 ---
 

@@ -19,7 +19,7 @@
 - [`jsl_infinite_arena_reset`](#function-jsl_infinite_arena_reset)
 - [`jsl_infinite_arena_release`](#function-jsl_infinite_arena_release)
 
-## File: src/jsl_allocator_infinite_arena.h
+## File: src/jsl/allocator_infinite_arena.h
 
 <a id="macro-jsl_infinite_arena_typed_allocate"></a>
 ### Macro: `JSL_INFINITE_ARENA_TYPED_ALLOCATE`
@@ -48,7 +48,7 @@ struct MyStruct* thing = JSL_INFINITE_ARENA_TYPED_ALLOCATE(struct MyStruct, aren
 ```
 
 
-*Defined at*: `src/jsl_allocator_infinite_arena.h:143`
+*Defined at*: `src/jsl/allocator_infinite_arena.h:143`
 
 ---
 
@@ -96,7 +96,7 @@ typedef struct JSL__InfiniteArena JSLInfiniteArena;
 ```
 
 
-*Defined at*: `src/jsl_allocator_infinite_arena.h:72`
+*Defined at*: `src/jsl/allocator_infinite_arena.h:72`
 
 ---
 
@@ -116,7 +116,7 @@ int jsl_infinite_arena_init(JSLInfiniteArena *arena);
 ```
 
 
-*Defined at*: `src/jsl_allocator_infinite_arena.h:81`
+*Defined at*: `src/jsl/allocator_infinite_arena.h:81`
 
 ---
 
@@ -142,7 +142,7 @@ JSLAllocatorInterface jsl_infinite_arena_get_allocator_interface(JSLInfiniteAren
 ```
 
 
-*Defined at*: `src/jsl_allocator_infinite_arena.h:91`
+*Defined at*: `src/jsl/allocator_infinite_arena.h:91`
 
 ---
 
@@ -173,7 +173,7 @@ void * jsl_infinite_arena_allocate(JSLInfiniteArena *arena, int64_t bytes, bool 
 ```
 
 
-*Defined at*: `src/jsl_allocator_infinite_arena.h:106`
+*Defined at*: `src/jsl/allocator_infinite_arena.h:106`
 
 ---
 
@@ -206,7 +206,7 @@ void * jsl_infinite_arena_allocate_aligned(JSLInfiniteArena *arena, int64_t byte
 ```
 
 
-*Defined at*: `src/jsl_allocator_infinite_arena.h:124`
+*Defined at*: `src/jsl/allocator_infinite_arena.h:124`
 
 ---
 
@@ -232,7 +232,7 @@ void * jsl_infinite_arena_reallocate(JSLInfiniteArena *arena, void *original_all
 ```
 
 
-*Defined at*: `src/jsl_allocator_infinite_arena.h:160`
+*Defined at*: `src/jsl/allocator_infinite_arena.h:160`
 
 ---
 
@@ -258,7 +258,7 @@ void * jsl_infinite_arena_reallocate_aligned(JSLInfiniteArena *arena, void *orig
 ```
 
 
-*Defined at*: `src/jsl_allocator_infinite_arena.h:181`
+*Defined at*: `src/jsl/allocator_infinite_arena.h:181`
 
 ---
 
@@ -279,7 +279,7 @@ void jsl_infinite_arena_reset(JSLInfiniteArena *arena);
 ```
 
 
-*Defined at*: `src/jsl_allocator_infinite_arena.h:196`
+*Defined at*: `src/jsl/allocator_infinite_arena.h:196`
 
 ---
 
@@ -305,7 +305,7 @@ void jsl_infinite_arena_release(JSLInfiniteArena *arena);
 ```
 
 
-*Defined at*: `src/jsl_allocator_infinite_arena.h:211`
+*Defined at*: `src/jsl/allocator_infinite_arena.h:211`
 
 ---
 

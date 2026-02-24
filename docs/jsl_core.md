@@ -117,7 +117,7 @@
 - [`jsl_format_sink`](#function-jsl_format_sink)
 - [`jsl_format_set_separators`](#function-jsl_format_set_separators)
 
-## File: src/jsl_core.h
+## File: src/jsl/core.h
 
 ## Jack's Standard Library
 
@@ -169,7 +169,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
 
-*Defined at*: `src/jsl_core.h:505`
+*Defined at*: `src/jsl/core.h:505`
 
 ---
 
@@ -190,7 +190,7 @@ Define this as a macro before importing the library to override this.
 ```
 
 
-*Defined at*: `src/jsl_core.h:532`
+*Defined at*: `src/jsl/core.h:532`
 
 ---
 
@@ -212,7 +212,7 @@ void your_memcpy(void*, const void*, size_t);
 ```
 
 
-*Defined at*: `src/jsl_core.h:549`
+*Defined at*: `src/jsl/core.h:549`
 
 ---
 
@@ -234,7 +234,7 @@ int your_memcmp(const void*, const void*, size_t);
 ```
 
 
-*Defined at*: `src/jsl_core.h:566`
+*Defined at*: `src/jsl/core.h:566`
 
 ---
 
@@ -256,7 +256,7 @@ void your_memset(void*, int, size_t);
 ```
 
 
-*Defined at*: `src/jsl_core.h:583`
+*Defined at*: `src/jsl/core.h:583`
 
 ---
 
@@ -278,7 +278,7 @@ void your_memmove(void*, const void*, size_t);
 ```
 
 
-*Defined at*: `src/jsl_core.h:600`
+*Defined at*: `src/jsl/core.h:600`
 
 ---
 
@@ -300,7 +300,7 @@ size_t your_strlen(const char*);
 ```
 
 
-*Defined at*: `src/jsl_core.h:617`
+*Defined at*: `src/jsl/core.h:617`
 
 ---
 
@@ -314,7 +314,7 @@ If the target platform is Windows OS, then 1, else 0.
 ```
 
 
-*Defined at*: `src/jsl_core.h:629`
+*Defined at*: `src/jsl/core.h:629`
 
 ---
 
@@ -328,7 +328,7 @@ If the target platform is a POSIX, then 1, else 0.
 ```
 
 
-*Defined at*: `src/jsl_core.h:634`
+*Defined at*: `src/jsl/core.h:634`
 
 ---
 
@@ -342,7 +342,7 @@ If the target platform is in WebAssembly, then 1, else 0.
 ```
 
 
-*Defined at*: `src/jsl_core.h:639`
+*Defined at*: `src/jsl/core.h:639`
 
 ---
 
@@ -356,7 +356,7 @@ If the target platform is in x86, then 1, else 0.
 ```
 
 
-*Defined at*: `src/jsl_core.h:644`
+*Defined at*: `src/jsl/core.h:644`
 
 ---
 
@@ -370,7 +370,7 @@ If the target platform is in ARM, then 1, else 0.
 ```
 
 
-*Defined at*: `src/jsl_core.h:649`
+*Defined at*: `src/jsl/core.h:649`
 
 ---
 
@@ -384,7 +384,7 @@ If the host compiler is GCC, then 1, else 0.
 ```
 
 
-*Defined at*: `src/jsl_core.h:654`
+*Defined at*: `src/jsl/core.h:654`
 
 ---
 
@@ -398,7 +398,7 @@ If the host compiler is clang, then 1, else 0.
 ```
 
 
-*Defined at*: `src/jsl_core.h:659`
+*Defined at*: `src/jsl/core.h:659`
 
 ---
 
@@ -412,7 +412,7 @@ If the host compiler is MSVC, then 1, else 0.
 ```
 
 
-*Defined at*: `src/jsl_core.h:664`
+*Defined at*: `src/jsl/core.h:664`
 
 ---
 
@@ -426,7 +426,7 @@ If the target executable uses 32 bit pointers, then 1, else 0.
 ```
 
 
-*Defined at*: `src/jsl_core.h:669`
+*Defined at*: `src/jsl/core.h:669`
 
 ---
 
@@ -440,7 +440,7 @@ If the target executable uses 64 bit pointers, then 1, else 0.
 ```
 
 
-*Defined at*: `src/jsl_core.h:674`
+*Defined at*: `src/jsl/core.h:674`
 
 ---
 
@@ -458,7 +458,7 @@ empty string.
 ```
 
 
-*Defined at*: `src/jsl_core.h:686`
+*Defined at*: `src/jsl/core.h:686`
 
 ---
 
@@ -475,7 +475,7 @@ Define this as a macro before importing the library to override this.
 ```
 
 
-*Defined at*: `src/jsl_core.h:700`
+*Defined at*: `src/jsl/core.h:700`
 
 ---
 
@@ -491,7 +491,7 @@ Define this as a macro before importing the library to override this.
 ```
 
 
-*Defined at*: `src/jsl_core.h:709`
+*Defined at*: `src/jsl/core.h:709`
 
 ---
 
@@ -512,7 +512,7 @@ with zero is undefined for GCC and clang while MSVC will give 32.
 ```
 
 
-*Defined at*: `src/jsl_core.h:722`
+*Defined at*: `src/jsl/core.h:722`
 
 ---
 
@@ -533,7 +533,7 @@ with zero is undefined for GCC and clang while MSVC will give 32.
 ```
 
 
-*Defined at*: `src/jsl_core.h:734`
+*Defined at*: `src/jsl/core.h:734`
 
 ---
 
@@ -554,7 +554,7 @@ with zero is undefined for GCC and clang while MSVC will give 32.
 ```
 
 
-*Defined at*: `src/jsl_core.h:746`
+*Defined at*: `src/jsl/core.h:746`
 
 ---
 
@@ -575,7 +575,7 @@ with zero is undefined for GCC and clang while MSVC will give 32.
 ```
 
 
-*Defined at*: `src/jsl_core.h:758`
+*Defined at*: `src/jsl/core.h:758`
 
 ---
 
@@ -595,7 +595,7 @@ On GCC and clang, this is replaced with `__builtin_popcount`. On MSVC
 ```
 
 
-*Defined at*: `src/jsl_core.h:769`
+*Defined at*: `src/jsl/core.h:769`
 
 ---
 
@@ -615,7 +615,7 @@ On GCC and clang, this is replaced with `__builtin_popcountll`. On MSVC
 ```
 
 
-*Defined at*: `src/jsl_core.h:780`
+*Defined at*: `src/jsl/core.h:780`
 
 ---
 
@@ -636,7 +636,7 @@ with zero is undefined for GCC and clang while MSVC will give 32.
 ```
 
 
-*Defined at*: `src/jsl_core.h:792`
+*Defined at*: `src/jsl/core.h:792`
 
 ---
 
@@ -657,7 +657,7 @@ with zero is undefined for GCC and clang while MSVC will give 32.
 ```
 
 
-*Defined at*: `src/jsl_core.h:804`
+*Defined at*: `src/jsl/core.h:804`
 
 ---
 
@@ -686,7 +686,7 @@ double max_d = JSL_MAX(3.14, 2.71);   // Returns 3.14
 ```
 
 
-*Defined at*: `src/jsl_core.h:822`
+*Defined at*: `src/jsl/core.h:822`
 
 ---
 
@@ -715,7 +715,7 @@ double max_d = JSL_MAX(3.14, 2.71);   // Returns 3.14
 ```
 
 
-*Defined at*: `src/jsl_core.h:840`
+*Defined at*: `src/jsl/core.h:840`
 
 ---
 
@@ -744,7 +744,7 @@ double max_d = JSL_BETWEEN(1.2, 0.1, 3.14);   // Returns 1.2
 ```
 
 
-*Defined at*: `src/jsl_core.h:858`
+*Defined at*: `src/jsl/core.h:858`
 
 ---
 
@@ -787,7 +787,7 @@ JSL_SET_BITFLAG(&permissions, FLAG_WRITE);
 ```
 
 
-*Defined at*: `src/jsl_core.h:885`
+*Defined at*: `src/jsl/core.h:885`
 
 ---
 
@@ -809,7 +809,7 @@ JSL_UNSET_BITFLAG(&permissions, FLAG_WRITE);
 ```
 
 
-*Defined at*: `src/jsl_core.h:898`
+*Defined at*: `src/jsl/core.h:898`
 
 ---
 
@@ -832,7 +832,7 @@ if (JSL_IS_BITFLAG_SET(permissions, FLAG_READ)) {
 ```
 
 
-*Defined at*: `src/jsl_core.h:912`
+*Defined at*: `src/jsl/core.h:912`
 
 ---
 
@@ -855,7 +855,7 @@ if (JSL_IS_BITFLAG_NOT_SET(permissions, FLAG_WRITE)) {
 ```
 
 
-*Defined at*: `src/jsl_core.h:926`
+*Defined at*: `src/jsl/core.h:926`
 
 ---
 
@@ -879,7 +879,7 @@ uint32_t permissions = FLAG_READ | FLAG_WRITE;
 ```
 
 
-*Defined at*: `src/jsl_core.h:941`
+*Defined at*: `src/jsl/core.h:941`
 
 ---
 
@@ -893,7 +893,7 @@ Macro to simply mark a value as representing a size in bytes. Does nothing with 
 ```
 
 
-*Defined at*: `src/jsl_core.h:946`
+*Defined at*: `src/jsl/core.h:946`
 
 ---
 
@@ -917,7 +917,7 @@ jsl_arena_init(&arena, buffer, JSL_KILOBYTES(16));
 ```
 
 
-*Defined at*: `src/jsl_core.h:961`
+*Defined at*: `src/jsl/core.h:961`
 
 ---
 
@@ -941,7 +941,7 @@ jsl_arena_init(&arena, buffer, JSL_MEGABYTES(16));
 ```
 
 
-*Defined at*: `src/jsl_core.h:976`
+*Defined at*: `src/jsl/core.h:976`
 
 ---
 
@@ -965,7 +965,7 @@ jsl_arena_init(&arena, buffer, JSL_GIGABYTES(2));
 ```
 
 
-*Defined at*: `src/jsl_core.h:992`
+*Defined at*: `src/jsl/core.h:992`
 
 ---
 
@@ -993,7 +993,7 @@ jsl_arena_init(&arena, buffer, JSL_GIGABYTES(2));
 ```
 
 
-*Defined at*: `src/jsl_core.h:1011`
+*Defined at*: `src/jsl/core.h:1011`
 
 ---
 
@@ -1007,7 +1007,7 @@ TODO: docs
 ```
 
 
-*Defined at*: `src/jsl_core.h:1026`
+*Defined at*: `src/jsl/core.h:1026`
 
 ---
 
@@ -1036,7 +1036,7 @@ JSLFatPtr empty = JSL_FATPTR_INITIALIZER("");
 ```
 
 
-*Defined at*: `src/jsl_core.h:1253`
+*Defined at*: `src/jsl/core.h:1253`
 
 ---
 
@@ -1064,7 +1064,7 @@ my_function(JSL_FATPTR_EXPRESSION("my data"));
 ```
 
 
-*Defined at*: `src/jsl_core.h:1291`
+*Defined at*: `src/jsl/core.h:1291`
 
 ---
 
@@ -1080,7 +1080,7 @@ Only use this in cases where you've already checked the length.
 ```
 
 
-*Defined at*: `src/jsl_core.h:1301`
+*Defined at*: `src/jsl/core.h:1301`
 
 ---
 
@@ -1109,7 +1109,7 @@ normal rvalue.
 ```
 
 
-*Defined at*: `src/jsl_core.h:1322`
+*Defined at*: `src/jsl/core.h:1322`
 
 ---
 
@@ -1118,7 +1118,7 @@ normal rvalue.
 
 
 
-*Defined at*: `src/jsl_core.h:72`
+*Defined at*: `src/jsl/core.h:72`
 
 ---
 
@@ -1131,7 +1131,7 @@ TODO: docs
 - `JSL_STRING_LIFETIME_LONGER = 1`
 
 
-*Defined at*: `src/jsl_core.h:1016`
+*Defined at*: `src/jsl/core.h:1016`
 
 ---
 
@@ -1145,7 +1145,7 @@ int jsl_is_power_of_two(int x);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1031`
+*Defined at*: `src/jsl/core.h:1031`
 
 ---
 
@@ -1182,7 +1182,7 @@ int jsl_next_power_of_two_i32(int x);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1052`
+*Defined at*: `src/jsl/core.h:1052`
 
 ---
 
@@ -1219,7 +1219,7 @@ int jsl_next_power_of_two_u32(int x);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1073`
+*Defined at*: `src/jsl/core.h:1073`
 
 ---
 
@@ -1231,7 +1231,7 @@ int jsl_next_power_of_two_i64(int x);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1076`
+*Defined at*: `src/jsl/core.h:1076`
 
 ---
 
@@ -1268,7 +1268,7 @@ int jsl_next_power_of_two_u64(int x);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1097`
+*Defined at*: `src/jsl/core.h:1097`
 
 ---
 
@@ -1304,7 +1304,7 @@ int jsl_previous_power_of_two_u32(int x);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1117`
+*Defined at*: `src/jsl/core.h:1117`
 
 ---
 
@@ -1340,7 +1340,7 @@ int jsl_previous_power_of_two_u64(int x);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1137`
+*Defined at*: `src/jsl/core.h:1137`
 
 ---
 
@@ -1366,7 +1366,7 @@ int jsl_round_up_i32(int num, int multiple_of);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1146`
+*Defined at*: `src/jsl/core.h:1146`
 
 ---
 
@@ -1392,7 +1392,7 @@ int jsl_round_up_u32(int num, int multiple_of);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1155`
+*Defined at*: `src/jsl/core.h:1155`
 
 ---
 
@@ -1418,7 +1418,7 @@ int jsl_round_up_i64(int num, int multiple_of);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1164`
+*Defined at*: `src/jsl/core.h:1164`
 
 ---
 
@@ -1444,7 +1444,7 @@ int jsl_round_up_u64(int num, int multiple_of);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1173`
+*Defined at*: `src/jsl/core.h:1173`
 
 ---
 
@@ -1475,7 +1475,7 @@ int jsl_round_up_pow2_i64(int num, int pow2);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1187`
+*Defined at*: `src/jsl/core.h:1187`
 
 ---
 
@@ -1506,7 +1506,7 @@ int jsl_round_up_pow2_u64(int num, int pow2);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1201`
+*Defined at*: `src/jsl/core.h:1201`
 
 ---
 
@@ -1528,7 +1528,7 @@ cost benefit analysis to be in the negative.
 - `int length;`
 
 
-*Defined at*: `src/jsl_core.h:1215`
+*Defined at*: `src/jsl/core.h:1215`
 
 ---
 
@@ -1544,7 +1544,7 @@ JSLFatPtr jsl_fatptr_init(int *ptr, int length);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1329`
+*Defined at*: `src/jsl/core.h:1329`
 
 ---
 
@@ -1561,7 +1561,7 @@ JSLFatPtr jsl_fatptr_slice(JSLFatPtr fatptr, int start, int end);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1337`
+*Defined at*: `src/jsl/core.h:1337`
 
 ---
 
@@ -1578,7 +1578,7 @@ JSLFatPtr jsl_fatptr_slice_to_end(JSLFatPtr fatptr, int start);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1345`
+*Defined at*: `src/jsl/core.h:1345`
 
 ---
 
@@ -1620,7 +1620,7 @@ int jsl_fatptr_total_write_length(JSLFatPtr original_fatptr, JSLFatPtr writer_fa
 ```
 
 
-*Defined at*: `src/jsl_core.h:1370`
+*Defined at*: `src/jsl/core.h:1370`
 
 ---
 
@@ -1664,7 +1664,7 @@ JSLFatPtr jsl_fatptr_auto_slice(JSLFatPtr original_fatptr, JSLFatPtr writer_fatp
 ```
 
 
-*Defined at*: `src/jsl_core.h:1397`
+*Defined at*: `src/jsl/core.h:1397`
 
 ---
 
@@ -1690,7 +1690,7 @@ JSLFatPtr jsl_fatptr_from_cstr(const char *str);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1407`
+*Defined at*: `src/jsl/core.h:1407`
 
 ---
 
@@ -1725,7 +1725,7 @@ int jsl_fatptr_memory_copy(JSLFatPtr *destination, JSLFatPtr source);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1431`
+*Defined at*: `src/jsl/core.h:1431`
 
 ---
 
@@ -1753,7 +1753,7 @@ int jsl_fatptr_cstr_memory_copy(JSLFatPtr *destination, const char *cstring, int
 ```
 
 
-*Defined at*: `src/jsl_core.h:1448`
+*Defined at*: `src/jsl/core.h:1448`
 
 ---
 
@@ -1802,7 +1802,7 @@ int jsl_fatptr_substring_search(JSLFatPtr string, JSLFatPtr substring);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1482`
+*Defined at*: `src/jsl/core.h:1482`
 
 ---
 
@@ -1836,7 +1836,7 @@ int jsl_fatptr_index_of(JSLFatPtr data, int item);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1497`
+*Defined at*: `src/jsl/core.h:1497`
 
 ---
 
@@ -1869,7 +1869,7 @@ int jsl_fatptr_count(JSLFatPtr str, int item);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1511`
+*Defined at*: `src/jsl/core.h:1511`
 
 ---
 
@@ -1902,7 +1902,7 @@ int jsl_fatptr_index_of_reverse(JSLFatPtr str, int character);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1525`
+*Defined at*: `src/jsl/core.h:1525`
 
 ---
 
@@ -1938,7 +1938,7 @@ int jsl_fatptr_starts_with(JSLFatPtr str, JSLFatPtr prefix);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1542`
+*Defined at*: `src/jsl/core.h:1542`
 
 ---
 
@@ -1973,7 +1973,7 @@ int jsl_fatptr_ends_with(JSLFatPtr str, JSLFatPtr postfix);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1558`
+*Defined at*: `src/jsl/core.h:1558`
 
 ---
 
@@ -2014,7 +2014,7 @@ JSLFatPtr jsl_fatptr_basename(JSLFatPtr filename);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1583`
+*Defined at*: `src/jsl/core.h:1583`
 
 ---
 
@@ -2054,7 +2054,7 @@ JSLFatPtr jsl_fatptr_get_file_extension(JSLFatPtr filename);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1607`
+*Defined at*: `src/jsl/core.h:1607`
 
 ---
 
@@ -2086,7 +2086,7 @@ int jsl_fatptr_memory_compare(JSLFatPtr a, JSLFatPtr b);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1624`
+*Defined at*: `src/jsl/core.h:1624`
 
 ---
 
@@ -2117,7 +2117,7 @@ int jsl_fatptr_cstr_compare(JSLFatPtr a, char *cstr);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1639`
+*Defined at*: `src/jsl/core.h:1639`
 
 ---
 
@@ -2136,7 +2136,7 @@ int jsl_fatptr_compare_ascii_insensitive(JSLFatPtr a, JSLFatPtr b);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1647`
+*Defined at*: `src/jsl/core.h:1647`
 
 ---
 
@@ -2151,7 +2151,7 @@ void jsl_fatptr_to_lowercase_ascii(JSLFatPtr str);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1653`
+*Defined at*: `src/jsl/core.h:1653`
 
 ---
 
@@ -2182,7 +2182,7 @@ int jsl_fatptr_to_int32(JSLFatPtr str, int *result);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1667`
+*Defined at*: `src/jsl/core.h:1667`
 
 ---
 
@@ -2208,7 +2208,7 @@ int jsl_fatptr_strip_whitespace_left(JSLFatPtr *str);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1677`
+*Defined at*: `src/jsl/core.h:1677`
 
 ---
 
@@ -2234,7 +2234,7 @@ int jsl_fatptr_strip_whitespace_right(JSLFatPtr *str);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1687`
+*Defined at*: `src/jsl/core.h:1687`
 
 ---
 
@@ -2260,7 +2260,7 @@ int jsl_fatptr_strip_whitespace(JSLFatPtr *str);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1697`
+*Defined at*: `src/jsl/core.h:1697`
 
 ---
 
@@ -2275,7 +2275,7 @@ char * jsl_fatptr_to_cstr(JSLAllocatorInterface *allocator, JSLFatPtr str);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1703`
+*Defined at*: `src/jsl/core.h:1703`
 
 ---
 
@@ -2293,7 +2293,7 @@ JSLFatPtr jsl_cstr_to_fatptr(JSLAllocatorInterface *allocator, char *str);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1710`
+*Defined at*: `src/jsl/core.h:1710`
 
 ---
 
@@ -2311,7 +2311,7 @@ JSLFatPtr jsl_fatptr_duplicate(JSLAllocatorInterface *allocator, JSLFatPtr str);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1717`
+*Defined at*: `src/jsl/core.h:1717`
 
 ---
 
@@ -2332,7 +2332,7 @@ this format.
 - `void * user_data;`
 
 
-*Defined at*: `src/jsl_core.h:1751`
+*Defined at*: `src/jsl/core.h:1751`
 
 ---
 
@@ -2348,7 +2348,7 @@ int jsl_output_sink_write_fatptr(JSLOutputSink sink, JSLFatPtr data);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1761`
+*Defined at*: `src/jsl/core.h:1761`
 
 ---
 
@@ -2364,7 +2364,7 @@ int jsl_output_sink_write_i8(JSLOutputSink builder, int data);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1772`
+*Defined at*: `src/jsl/core.h:1772`
 
 ---
 
@@ -2380,7 +2380,7 @@ int jsl_output_sink_write_u8(JSLOutputSink builder, int data);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1783`
+*Defined at*: `src/jsl/core.h:1783`
 
 ---
 
@@ -2396,7 +2396,7 @@ int jsl_output_sink_write_bool(JSLOutputSink builder, int data);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1794`
+*Defined at*: `src/jsl/core.h:1794`
 
 ---
 
@@ -2412,7 +2412,7 @@ int jsl_output_sink_write_i16(JSLOutputSink builder, int data);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1804`
+*Defined at*: `src/jsl/core.h:1804`
 
 ---
 
@@ -2428,7 +2428,7 @@ int jsl_output_sink_write_u16(JSLOutputSink builder, int data);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1815`
+*Defined at*: `src/jsl/core.h:1815`
 
 ---
 
@@ -2444,7 +2444,7 @@ int jsl_output_sink_write_i32(JSLOutputSink builder, int data);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1826`
+*Defined at*: `src/jsl/core.h:1826`
 
 ---
 
@@ -2460,7 +2460,7 @@ int jsl_output_sink_write_u32(JSLOutputSink builder, int data);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1837`
+*Defined at*: `src/jsl/core.h:1837`
 
 ---
 
@@ -2476,7 +2476,7 @@ int jsl_output_sink_write_i64(JSLOutputSink builder, int64_t data);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1848`
+*Defined at*: `src/jsl/core.h:1848`
 
 ---
 
@@ -2492,7 +2492,7 @@ int jsl_output_sink_write_u64(JSLOutputSink builder, int data);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1859`
+*Defined at*: `src/jsl/core.h:1859`
 
 ---
 
@@ -2508,7 +2508,7 @@ int jsl_output_sink_write_f32(JSLOutputSink builder, float data);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1870`
+*Defined at*: `src/jsl/core.h:1870`
 
 ---
 
@@ -2524,7 +2524,7 @@ int jsl_output_sink_write_f64(JSLOutputSink builder, double data);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1881`
+*Defined at*: `src/jsl/core.h:1881`
 
 ---
 
@@ -2540,7 +2540,7 @@ int jsl_output_sink_write_cstr(JSLOutputSink builder, const char *data);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1892`
+*Defined at*: `src/jsl/core.h:1892`
 
 ---
 
@@ -2554,7 +2554,7 @@ JSLOutputSink jsl_fatptr_output_sink(JSLFatPtr *buffer);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1901`
+*Defined at*: `src/jsl/core.h:1901`
 
 ---
 
@@ -2624,7 +2624,7 @@ JSLFatPtr jsl_format(JSLAllocatorInterface *allocator, JSLFatPtr fmt, ...);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1962`
+*Defined at*: `src/jsl/core.h:1962`
 
 ---
 
@@ -2640,7 +2640,7 @@ int jsl_format_sink_valist(JSLOutputSink sink, JSLFatPtr fmt, int va);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1969`
+*Defined at*: `src/jsl/core.h:1969`
 
 ---
 
@@ -2656,7 +2656,7 @@ int jsl_format_sink(JSLOutputSink sink, JSLFatPtr fmt, ...);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1980`
+*Defined at*: `src/jsl/core.h:1980`
 
 ---
 
@@ -2670,7 +2670,7 @@ void jsl_format_set_separators(char comma, char period);
 ```
 
 
-*Defined at*: `src/jsl_core.h:1990`
+*Defined at*: `src/jsl/core.h:1990`
 
 ---
 

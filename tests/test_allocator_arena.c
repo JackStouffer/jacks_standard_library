@@ -28,10 +28,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "../src/jsl_core.h"
-#include "../src/jsl_allocator.h"
-#include "../src/jsl_allocator_arena.h"
-#include "../src/jsl_allocator_infinite_arena.h"
+#include "jsl/core.h"
+#include "jsl/allocator.h"
+#include "jsl/allocator_arena.h"
+#include "jsl/allocator_infinite_arena.h"
 
 #include "minctest.h"
 
@@ -61,9 +61,9 @@ static void test_arena_init_sets_pointers(void)
 static void test_arena_init2_sets_pointers(void)
 {
     uint8_t buffer[96];
-    JSLArena arena = {0};
-    JSLFatPtr memory = jsl_fatptr_init(buffer, (int64_t) sizeof(buffer));
+    JSLMutableMemory memory = JSL_MEMORY_FROM_STACK(buffer);
 
+    JSLArena arena = {0};
     jsl_arena_init2(&arena, memory);
 
     TEST_POINTERS_EQUAL(arena.start, buffer);

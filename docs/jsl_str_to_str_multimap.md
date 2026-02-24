@@ -8,10 +8,10 @@
 ## Types
 
 - [`JSLStrToStrMultimapKeyState`](#type-jslstrtostrmultimapkeystate)
-- [`union (unnamed at src/jsl_str_to_str_multimap.h:86:5)`](#type-union-unnamed-at-src-jsl_str_to_str_multimap-h-86-5)
-- [`struct (unnamed at src/jsl_str_to_str_multimap.h:88:9)`](#type-struct-unnamed-at-src-jsl_str_to_str_multimap-h-88-9)
-- [`union (unnamed at src/jsl_str_to_str_multimap.h:101:5)`](#type-union-unnamed-at-src-jsl_str_to_str_multimap-h-101-5)
-- [`struct (unnamed at src/jsl_str_to_str_multimap.h:103:9)`](#type-struct-unnamed-at-src-jsl_str_to_str_multimap-h-103-9)
+- [`union (unnamed at src/jsl/str_to_str_multimap.h:86:5)`](#type-union-unnamed-at-src-jsl_str_to_str_multimap-h-86-5)
+- [`struct (unnamed at src/jsl/str_to_str_multimap.h:88:9)`](#type-struct-unnamed-at-src-jsl_str_to_str_multimap-h-88-9)
+- [`union (unnamed at src/jsl/str_to_str_multimap.h:101:5)`](#type-union-unnamed-at-src-jsl_str_to_str_multimap-h-101-5)
+- [`struct (unnamed at src/jsl/str_to_str_multimap.h:103:9)`](#type-struct-unnamed-at-src-jsl_str_to_str_multimap-h-103-9)
 - [`JSLStrToStrMultimap`](#type-typedef-jslstrtostrmultimap)
 - [`JSLStrToStrMultimapKeyValueIter`](#type-typedef-jslstrtostrmultimapkeyvalueiter)
 - [`JSLStrToStrMultimapValueIter`](#type-typedef-jslstrtostrmultimapvalueiter)
@@ -33,7 +33,7 @@
 - [`jsl_str_to_str_multimap_delete_value`](#function-jsl_str_to_str_multimap_delete_value)
 - [`jsl_str_to_str_multimap_clear`](#function-jsl_str_to_str_multimap_clear)
 
-## File: src/jsl_str_to_str_multimap.h
+## File: src/jsl/str_to_str_multimap.h
 
 ## JSL String to String Multimap
 
@@ -87,7 +87,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:61`
+*Defined at*: `src/jsl/str_to_str_multimap.h:61`
 
 ---
 
@@ -99,7 +99,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:69`
+*Defined at*: `src/jsl/str_to_str_multimap.h:69`
 
 ---
 
@@ -110,50 +110,50 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - `JSL__MULTIMAP_TOMBSTONE = 2`
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:76`
+*Defined at*: `src/jsl/str_to_str_multimap.h:76`
 
 ---
 
 <a id="type-union-unnamed-at-src-jsl_str_to_str_multimap-h-86-5"></a>
-### : `union (unnamed at src/jsl_str_to_str_multimap.h:86:5)`
+### : `union (unnamed at src/jsl/str_to_str_multimap.h:86:5)`
 
 - `JSLFatPtr value;`
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:86`
+*Defined at*: `src/jsl/str_to_str_multimap.h:86`
 
 ---
 
 <a id="type-struct-unnamed-at-src-jsl_str_to_str_multimap-h-88-9"></a>
-### : `struct (unnamed at src/jsl_str_to_str_multimap.h:88:9)`
+### : `struct (unnamed at src/jsl/str_to_str_multimap.h:88:9)`
 
 - `int64_t sso_len;`
 - `int[32] small_string_buffer;`
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:88`
+*Defined at*: `src/jsl/str_to_str_multimap.h:88`
 
 ---
 
 <a id="type-union-unnamed-at-src-jsl_str_to_str_multimap-h-101-5"></a>
-### : `union (unnamed at src/jsl_str_to_str_multimap.h:101:5)`
+### : `union (unnamed at src/jsl/str_to_str_multimap.h:101:5)`
 
 - `JSLFatPtr key;`
 - `struct JSL__StrToStrMultimapEntry * next;`
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:101`
+*Defined at*: `src/jsl/str_to_str_multimap.h:101`
 
 ---
 
 <a id="type-struct-unnamed-at-src-jsl_str_to_str_multimap-h-103-9"></a>
-### : `struct (unnamed at src/jsl_str_to_str_multimap.h:103:9)`
+### : `struct (unnamed at src/jsl/str_to_str_multimap.h:103:9)`
 
 - `int[24] small_string_buffer;`
 - `int64_t sso_len;`
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:103`
+*Defined at*: `src/jsl/str_to_str_multimap.h:103`
 
 ---
 
@@ -215,7 +215,7 @@ typedef struct JSL__StrToStrMultimap JSLStrToStrMultimap;
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:216`
+*Defined at*: `src/jsl/str_to_str_multimap.h:216`
 
 ---
 
@@ -241,7 +241,7 @@ typedef struct JSL__StrToStrMultimapKeyValueIter JSLStrToStrMultimapKeyValueIter
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:231`
+*Defined at*: `src/jsl/str_to_str_multimap.h:231`
 
 ---
 
@@ -267,7 +267,7 @@ typedef struct JSL__StrToStrMultimapValueIter JSLStrToStrMultimapValueIter;
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:246`
+*Defined at*: `src/jsl/str_to_str_multimap.h:246`
 
 ---
 
@@ -300,7 +300,7 @@ int jsl_str_to_str_multimap_init(JSLStrToStrMultimap *map, JSLAllocatorInterface
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:261`
+*Defined at*: `src/jsl/str_to_str_multimap.h:261`
 
 ---
 
@@ -340,7 +340,7 @@ int jsl_str_to_str_multimap_init2(JSLStrToStrMultimap *map, JSLAllocatorInterfac
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:285`
+*Defined at*: `src/jsl/str_to_str_multimap.h:285`
 
 ---
 
@@ -364,7 +364,7 @@ int jsl_str_to_str_multimap_get_key_count(JSLStrToStrMultimap *map);
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:299`
+*Defined at*: `src/jsl/str_to_str_multimap.h:299`
 
 ---
 
@@ -388,7 +388,7 @@ int jsl_str_to_str_multimap_get_value_count(JSLStrToStrMultimap *map);
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:309`
+*Defined at*: `src/jsl/str_to_str_multimap.h:309`
 
 ---
 
@@ -412,7 +412,7 @@ int jsl_str_to_str_multimap_has_key(JSLStrToStrMultimap *map, JSLFatPtr key);
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:319`
+*Defined at*: `src/jsl/str_to_str_multimap.h:319`
 
 ---
 
@@ -451,7 +451,7 @@ int jsl_str_to_str_multimap_insert(JSLStrToStrMultimap *map, JSLFatPtr key, JSLS
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:341`
+*Defined at*: `src/jsl/str_to_str_multimap.h:341`
 
 ---
 
@@ -477,7 +477,7 @@ int jsl_str_to_str_multimap_get_value_count_for_key(JSLStrToStrMultimap *map, JS
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:356`
+*Defined at*: `src/jsl/str_to_str_multimap.h:356`
 
 ---
 
@@ -523,7 +523,7 @@ int jsl_str_to_str_multimap_key_value_iterator_init(JSLStrToStrMultimap *map, JS
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:388`
+*Defined at*: `src/jsl/str_to_str_multimap.h:388`
 
 ---
 
@@ -571,7 +571,7 @@ int jsl_str_to_str_multimap_key_value_iterator_next(JSLStrToStrMultimapKeyValueI
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:421`
+*Defined at*: `src/jsl/str_to_str_multimap.h:421`
 
 ---
 
@@ -619,7 +619,7 @@ int jsl_str_to_str_multimap_get_values_for_key_iterator_init(JSLStrToStrMultimap
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:455`
+*Defined at*: `src/jsl/str_to_str_multimap.h:455`
 
 ---
 
@@ -666,7 +666,7 @@ int jsl_str_to_str_multimap_get_values_for_key_iterator_next(JSLStrToStrMultimap
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:489`
+*Defined at*: `src/jsl/str_to_str_multimap.h:489`
 
 ---
 
@@ -695,7 +695,7 @@ int jsl_str_to_str_multimap_delete_key(JSLStrToStrMultimap *map, JSLFatPtr key);
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:504`
+*Defined at*: `src/jsl/str_to_str_multimap.h:504`
 
 ---
 
@@ -728,7 +728,7 @@ int jsl_str_to_str_multimap_delete_value(JSLStrToStrMultimap *map, JSLFatPtr key
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:522`
+*Defined at*: `src/jsl/str_to_str_multimap.h:522`
 
 ---
 
@@ -746,7 +746,7 @@ void jsl_str_to_str_multimap_clear(JSLStrToStrMultimap *map);
 ```
 
 
-*Defined at*: `src/jsl_str_to_str_multimap.h:533`
+*Defined at*: `src/jsl/str_to_str_multimap.h:533`
 
 ---
 

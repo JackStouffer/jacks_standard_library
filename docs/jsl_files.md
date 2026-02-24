@@ -19,7 +19,7 @@
 - [`jsl_write_file_contents`](#function-jsl_write_file_contents)
 - [`jsl_format_file`](#function-jsl_format_file)
 
-## File: src/jsl_files.h
+## File: src/jsl/files.h
 
 ## Jack's Standard Library File Utilities
 
@@ -72,7 +72,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - `JSL_GET_FILE_SIZE_ENUM_COUNT = 4`
 
 
-*Defined at*: `src/jsl_files.h:85`
+*Defined at*: `src/jsl/files.h:85`
 
 ---
 
@@ -90,7 +90,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - `JSL_FILE_LOAD_ENUM_COUNT = 8`
 
 
-*Defined at*: `src/jsl_files.h:95`
+*Defined at*: `src/jsl/files.h:95`
 
 ---
 
@@ -105,7 +105,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - `JSL_FILE_WRITE_ENUM_COUNT = 5`
 
 
-*Defined at*: `src/jsl_files.h:109`
+*Defined at*: `src/jsl/files.h:109`
 
 ---
 
@@ -123,7 +123,7 @@ CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 - `JSL_FILE_TYPE_COUNT = 8`
 
 
-*Defined at*: `src/jsl_files.h:120`
+*Defined at*: `src/jsl/files.h:120`
 
 ---
 
@@ -151,7 +151,7 @@ JSLGetFileSizeResultEnum jsl_get_file_size(JSLFatPtr path, int *out_size, int *o
 ```
 
 
-*Defined at*: `src/jsl_files.h:141`
+*Defined at*: `src/jsl/files.h:141`
 
 ---
 
@@ -168,7 +168,7 @@ JSLLoadFileResultEnum jsl_load_file_contents(JSLArena *arena, JSLFatPtr path, JS
 ```
 
 
-*Defined at*: `src/jsl_files.h:153`
+*Defined at*: `src/jsl/files.h:153`
 
 ---
 
@@ -201,7 +201,7 @@ JSLLoadFileResultEnum jsl_load_file_contents_buffer(JSLFatPtr *buffer, JSLFatPtr
 ```
 
 
-*Defined at*: `src/jsl_files.h:173`
+*Defined at*: `src/jsl/files.h:173`
 
 ---
 
@@ -236,7 +236,7 @@ JSLWriteFileResultEnum jsl_write_file_contents(JSLFatPtr contents, JSLFatPtr pat
 ```
 
 
-*Defined at*: `src/jsl_files.h:193`
+*Defined at*: `src/jsl/files.h:193`
 
 ---
 
@@ -269,7 +269,7 @@ int jsl_format_file(int *out, JSLFatPtr fmt, ...);
 ```
 
 
-*Defined at*: `src/jsl_files.h:213`
+*Defined at*: `src/jsl/files.h:213`
 
 ---
 

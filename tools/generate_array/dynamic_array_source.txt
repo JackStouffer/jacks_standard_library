@@ -1,0 +1,244 @@
+/**
+ * AUTO GENERATED FILE
+ *
+ * This file contains the header for a dynamic array `{{ array_type_name }}` of
+ * `{{ value_type_name }}` values.
+ *
+ * This file was auto generated from the array code generation utility that's part of
+ * the "Jack's Standard Library" project. The utility generates a header file and a
+ * C file for a type safe dynamic array . By generating the code rather than using macros,
+ * two benefits are gained. One, the code is much easier to debug. Two, it's much more
+ * obvious how much code you're generating, which means you are much less likely to accidentally
+ * create the combinatoric explosion of code that's so common in C++ projects. Adding friction 
+ * to things is actually good sometimes.
+ */
+
+
+#include <stdint.h>
+#include <stddef.h>
+#if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L
+    #include <stdbool.h>
+#endif
+#include <string.h>
+
+#include "jsl/core.h"
+#include "jsl/allocator.h"
+
+static inline bool {{ function_prefix }}__ensure_capacity(
+    {{ array_type_name }}* array,
+    int64_t needed_capacity
+)
+{
+    if (JSL__LIKELY(needed_capacity <= array->capacity))
+        return true;
+
+    bool res = false;
+    int64_t target_capacity = jsl_next_power_of_two_i64(needed_capacity);
+    int64_t new_bytes = ((int64_t) sizeof({{ value_type_name }})) * target_capacity;
+
+    void* new_mem = NULL;
+
+    if (array->data != NULL && array->capacity > 0)
+    {
+        new_mem = jsl_allocator_interface_realloc(
+            array->allocator,
+            array->data,
+            new_bytes,
+            _Alignof({{ value_type_name }})
+        );
+    }
+    else
+    {
+        new_mem = jsl_allocator_interface_alloc(
+            array->allocator,
+            new_bytes,
+            _Alignof({{ value_type_name }}),
+            false
+        );
+    }
+
+    if (new_mem != NULL)
+    {
+        array->data = ({{ value_type_name }}*) new_mem;
+        array->capacity = target_capacity;
+        res = true;
+    }
+
+    return res;
+}
+
+bool {{ function_prefix }}_init(
+    {{ array_type_name }}* array,
+    JSLAllocatorInterface* allocator,
+    int64_t initial_capacity
+)
+{
+    bool res = array != NULL && allocator != NULL && initial_capacity > -1;
+
+    if (res)
+    {
+        JSL_MEMSET(array, 0, sizeof({{ array_type_name }}));
+        array->allocator = allocator;
+        array->sentinel = PRIVATE_SENTINEL_{{ array_type_name }};
+
+        int64_t target_capacity = jsl_next_power_of_two_i64(JSL_MAX(32L, initial_capacity));
+        res = {{ function_prefix }}__ensure_capacity(array, target_capacity);
+    }
+
+    return res;
+}
+
+bool {{ function_prefix }}_insert(
+    {{ array_type_name }}* array,
+    {{ value_type_name }} value
+)
+{
+    bool res = (
+        array != NULL
+        && array->sentinel == PRIVATE_SENTINEL_{{ array_type_name }}
+    );
+
+    if (res)
+    {
+        res = {{ function_prefix }}__ensure_capacity(array, array->length + 1);
+    }
+
+    if (res)
+    {
+        array->data[array->length] = value;
+        ++array->length;
+    }
+
+    return res;
+}
+
+bool {{ function_prefix }}_insert_multiple(
+    {{ array_type_name }}* array,
+    {{ value_type_name }}* values,
+    int64_t value_count
+)
+{
+    bool res = (
+        array != NULL
+        && array->sentinel == PRIVATE_SENTINEL_{{ array_type_name }}
+    );
+
+    if (res)
+    {
+        res = {{ function_prefix }}__ensure_capacity(array, array->length + value_count);
+    }
+
+    if (res)
+    {
+        for (int64_t i = 0; i < value_count; ++i)
+        {
+            array->data[array->length] = values[i];
+            ++array->length;    
+        }
+    }
+
+    return res;
+}
+
+bool {{ function_prefix }}_insert_at(
+    {{ array_type_name }}* array,
+    {{ value_type_name }} value,
+    int64_t index
+)
+{
+    bool res = (
+        array != NULL
+        && array->sentinel == PRIVATE_SENTINEL_{{ array_type_name }}
+        && index > -1
+        && index <= array->length
+    );
+
+    if (res)
+        res = {{ function_prefix }}__ensure_capacity(array, array->length + 1);
+
+    int64_t items_to_move = res ? array->length - index : -1;
+
+    if (items_to_move > 0)
+    {
+        size_t move_bytes = (size_t) items_to_move * sizeof({{ value_type_name }});
+        JSL_MEMMOVE(
+            array->data + index + 1,
+            array->data + index,
+            move_bytes
+        );
+
+        array->data[index] = value;
+        ++array->length;
+    }
+    else if (items_to_move == 0)
+    {
+        array->data[array->length] = value;
+        ++array->length;
+    }
+
+    return res;
+}
+
+bool {{ function_prefix }}_delete_at(
+    {{ array_type_name }}* array,
+    int64_t index
+)
+{
+    bool res = (
+        array != NULL
+        && array->sentinel == PRIVATE_SENTINEL_{{ array_type_name }}
+        && index > -1
+        && index < array->length
+    );
+
+    int64_t items_to_move = res ? array->length - index - 1 : -1;
+
+    if (items_to_move > 0)
+    {
+        size_t move_bytes = (size_t) items_to_move * sizeof({{ value_type_name }});
+        JSL_MEMMOVE(
+            array->data + index,
+            array->data + index + 1,
+            move_bytes
+        );
+        --array->length;
+    }
+    else if (items_to_move == 0)
+    {
+        --array->length;
+    }
+
+    return res;
+}
+
+void {{ function_prefix }}_clear(
+    {{ array_type_name }}* array
+)
+{
+    if (
+        array != NULL
+        && array->sentinel == PRIVATE_SENTINEL_{{ array_type_name }}
+    )
+    {
+        array->length = 0;
+    }
+}
+
+void {{ function_prefix }}_free(
+    {{ array_type_name }}* array
+)
+{
+    if (
+        array != NULL
+        && array->sentinel == PRIVATE_SENTINEL_{{ array_type_name }}
+    )
+    {
+        jsl_allocator_interface_free(
+            array->allocator,
+            array->data
+        );
+        array->length = 0;
+        array->capacity = 0;
+        array->sentinel = 0;
+    }
+}
