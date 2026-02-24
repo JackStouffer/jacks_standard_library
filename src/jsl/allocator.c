@@ -41,59 +41,11 @@ void jsl_allocator_interface_init(
     if (allocator == NULL)
         return;
 
-    allocator->sentinel = JSL__ALLOCATOR_PRIVATE_SENTINEL;
     allocator->allocate = allocate_fp;
     allocator->reallocate = reallocate_fp;
     allocator->free = free_fp;
     allocator->free_all = free_all_fp;
     allocator->context = context;
-}
-
-void* jsl_allocator_interface_alloc(
-    JSLAllocatorInterface allocator,
-    int64_t bytes,
-    int32_t alignment,
-    bool zeroed
-)
-{
-    if (allocator.sentinel != JSL__ALLOCATOR_PRIVATE_SENTINEL)
-        return NULL;
-
-    return allocator.allocate(allocator.context, bytes, alignment, zeroed);
-}
-
-void* jsl_allocator_interface_realloc(
-    JSLAllocatorInterface allocator,
-    void* allocation,
-    int64_t new_bytes,
-    int32_t alignment
-)
-{
-    if (allocator.sentinel != JSL__ALLOCATOR_PRIVATE_SENTINEL)
-        return NULL;
-
-    return allocator.reallocate(allocator.context, allocation, new_bytes, alignment);
-}
-
-bool jsl_allocator_interface_free(
-    JSLAllocatorInterface allocator,
-    const void* allocation
-)
-{
-    if (allocator.sentinel != JSL__ALLOCATOR_PRIVATE_SENTINEL)
-        return false;
-
-    return allocator.free(allocator.context, allocation);
-}
-
-bool jsl_allocator_interface_free_all(
-    JSLAllocatorInterface allocator
-)
-{
-    if (allocator.sentinel != JSL__ALLOCATOR_PRIVATE_SENTINEL)
-        return false;
-
-    return allocator.free_all(allocator.context);
 }
 
 void* jsl_align_ptr_upwards(void* ptr, int32_t alignment)

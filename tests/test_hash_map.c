@@ -48,11 +48,11 @@ static void test_fixed_insert(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     {
         FixedIntToIntMap hashmap;
-        fixed_int32_to_int32_map_init(&hashmap, &allocator, 256, 0);
+        fixed_int32_to_int32_map_init(&hashmap, allocator, 256, 0);
 
         int32_t insert_res = fixed_int32_to_int32_map_insert(&hashmap, 42, 999);
 
@@ -68,11 +68,11 @@ static void test_fixed_insert(void)
         TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 256);
     }
 
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     {
         FixedIntToCompositeType1Map hashmap;
-        fixed_int32_to_comp1_map_init(&hashmap, &allocator, 256, 0);
+        fixed_int32_to_comp1_map_init(&hashmap, allocator, 256, 0);
 
         CompositeType1 value;
         value.a = 887;
@@ -91,11 +91,11 @@ static void test_fixed_insert(void)
         TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 256);
     }
 
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     {
         FixedCompositeType2ToIntMap hashmap;
-        fixed_comp2_to_int_map_init(&hashmap, &allocator, 256, 0);
+        fixed_comp2_to_int_map_init(&hashmap, allocator, 256, 0);
 
         CompositeType2 key;
         key.a = 5497684;
@@ -119,11 +119,11 @@ static void test_fixed_insert(void)
         TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 256);
     }
 
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     {
         FixedCompositeType3ToCompositeType2Map hashmap;
-        fixed_comp3_to_comp2_map_init(&hashmap, &allocator, 256, 0);
+        fixed_comp3_to_comp2_map_init(&hashmap, allocator, 256, 0);
 
         CompositeType3 key = {
             82154,
@@ -161,18 +161,18 @@ static void test_fixed_insert(void)
         TEST_INT64_EQUAL(hashmap.item_count, (int64_t) 256);
     }
 
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 }
 
 static void test_fixed_get(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     {
         FixedIntToIntMap hashmap;
-        fixed_int32_to_int32_map_init(&hashmap, &allocator, 256, 0);
+        fixed_int32_to_int32_map_init(&hashmap, allocator, 256, 0);
 
         int32_t insert_res = fixed_int32_to_int32_map_insert(&hashmap, 8976, 1111);
         TEST_BOOL(insert_res == true);
@@ -184,11 +184,11 @@ static void test_fixed_get(void)
         TEST_BOOL(*get_res == 1111);
     }
 
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     {
         FixedIntToCompositeType1Map hashmap;
-        fixed_int32_to_comp1_map_init(&hashmap, &allocator, 256, 0);
+        fixed_int32_to_comp1_map_init(&hashmap, allocator, 256, 0);
 
         CompositeType1 value = {0};
         value.a = 887;
@@ -204,11 +204,11 @@ static void test_fixed_get(void)
         TEST_BOOL(memcmp(get_res, &value, sizeof(CompositeType1)) == 0);
     }
 
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     {
         FixedCompositeType2ToIntMap hashmap;
-        fixed_comp2_to_int_map_init(&hashmap, &allocator, 256, 0);
+        fixed_comp2_to_int_map_init(&hashmap, allocator, 256, 0);
 
         CompositeType2 key = {0};
         key.a = 36463453;
@@ -227,11 +227,11 @@ static void test_fixed_get(void)
         TEST_BOOL(*get_res == 777777);
     }
 
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     {
         FixedCompositeType3ToCompositeType2Map hashmap;
-        fixed_comp3_to_comp2_map_init(&hashmap, &allocator, 256, 0);
+        fixed_comp3_to_comp2_map_init(&hashmap, allocator, 256, 0);
 
         CompositeType3 key = {
             82154,
@@ -260,18 +260,18 @@ static void test_fixed_get(void)
         TEST_BOOL(memcmp(get_res, &value, sizeof(CompositeType2)) == 0);
     }
 
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 }
 
 static void test_fixed_delete(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     {
         FixedIntToIntMap hashmap;
-        fixed_int32_to_int32_map_init(&hashmap, &allocator, 256, 0);
+        fixed_int32_to_int32_map_init(&hashmap, allocator, 256, 0);
 
         bool insert_res = fixed_int32_to_int32_map_insert(&hashmap, 567687, 3546757);
         TEST_BOOL(insert_res == true);
@@ -309,11 +309,11 @@ static void test_fixed_delete(void)
         TEST_INT64_EQUAL(count, hashmap.item_count);
     }
 
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     {
         FixedIntToCompositeType1Map hashmap;
-        fixed_int32_to_comp1_map_init(&hashmap, &allocator, 256, 0);
+        fixed_int32_to_comp1_map_init(&hashmap, allocator, 256, 0);
 
         CompositeType1 value;
         value.a = 887;
@@ -358,11 +358,11 @@ static void test_fixed_delete(void)
         TEST_INT64_EQUAL(count, hashmap.item_count);
     }
 
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     {
         FixedCompositeType2ToIntMap hashmap;
-        fixed_comp2_to_int_map_init(&hashmap, &allocator, 256, 0);
+        fixed_comp2_to_int_map_init(&hashmap, allocator, 256, 0);
 
         CompositeType2 key1 = { .a = 67, .b = false };
         CompositeType2 key2 = { .a = 67, .b = true };
@@ -406,11 +406,11 @@ static void test_fixed_delete(void)
         TEST_INT64_EQUAL(count, hashmap.item_count);
     }
 
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     {
         FixedCompositeType3ToCompositeType2Map hashmap;
-        fixed_comp3_to_comp2_map_init(&hashmap, &allocator, 256, 0);
+        fixed_comp3_to_comp2_map_init(&hashmap, allocator, 256, 0);
 
         CompositeType3 key1 = {
             82154,
@@ -490,18 +490,18 @@ static void test_fixed_delete(void)
         TEST_INT64_EQUAL(count, hashmap.item_count);
     }
 
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 }
 
 static void test_fixed_iterator(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     {
         FixedIntToIntMap hashmap;
-        fixed_int32_to_int32_map_init(&hashmap, &allocator, 500, 0);
+        fixed_int32_to_int32_map_init(&hashmap, allocator, 500, 0);
 
         for (int32_t i = 0; i < 300; ++i)
         {
@@ -538,11 +538,11 @@ static void test_fixed_iterator(void)
         TEST_INT32_EQUAL(count, 299);
     }
 
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     {
         FixedIntToCompositeType1Map hashmap;
-        fixed_int32_to_comp1_map_init(&hashmap, &allocator, 500, 0);
+        fixed_int32_to_comp1_map_init(&hashmap, allocator, 500, 0);
 
         for (int32_t i = 0; i < 300; ++i)
         {
@@ -581,11 +581,11 @@ static void test_fixed_iterator(void)
         TEST_INT32_EQUAL(count, 299);
     }
 
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     {
         FixedCompositeType2ToIntMap hashmap;
-        fixed_comp2_to_int_map_init(&hashmap, &allocator, 500, 0);
+        fixed_comp2_to_int_map_init(&hashmap, allocator, 500, 0);
 
         for (int32_t i = 0; i < 300; ++i)
         {
@@ -630,11 +630,11 @@ static void test_fixed_iterator(void)
         TEST_INT32_EQUAL(count, 299);
     }
 
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     {
         FixedCompositeType3ToCompositeType2Map hashmap;
-        fixed_comp3_to_comp2_map_init(&hashmap, &allocator, 500, 0);
+        fixed_comp3_to_comp2_map_init(&hashmap, allocator, 500, 0);
 
         for (int32_t i = 0; i < 300; ++i)
         {
@@ -679,7 +679,7 @@ static void test_fixed_iterator(void)
         TEST_INT32_EQUAL(count, 299);
     }
 
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 }
 
 typedef struct ExpectedPair {
@@ -692,14 +692,13 @@ static void test_jsl_str_to_str_map_init_success(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     JSLStrToStrMap map = {0};
-    bool ok = jsl_str_to_str_map_init2(&map, &allocator, 0xBEEF, 64, 0.5f);
+    bool ok = jsl_str_to_str_map_init2(&map, allocator, 0xBEEF, 64, 0.5f);
     TEST_BOOL(ok);
     if (!ok) return;
 
-    TEST_POINTERS_EQUAL(map.allocator, &allocator);
     TEST_BOOL(map.entry_lookup_table != NULL);
     int64_t expected_length = JSL_MAX(32L, jsl_next_power_of_two_i64(65));
     TEST_INT64_EQUAL(map.entry_lookup_table_length, expected_length);
@@ -711,27 +710,26 @@ static void test_jsl_str_to_str_map_init_invalid_arguments(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     JSLStrToStrMap map = {0};
 
-    TEST_BOOL(!jsl_str_to_str_map_init2(NULL, &allocator, 0, 8, 0.5f));
-    TEST_BOOL(!jsl_str_to_str_map_init2(&map, NULL, 0, 8, 0.5f));
-    TEST_BOOL(!jsl_str_to_str_map_init2(&map, &allocator, 0, 0, 0.5f));
-    TEST_BOOL(!jsl_str_to_str_map_init2(&map, &allocator, 0, -4, 0.5f));
-    TEST_BOOL(!jsl_str_to_str_map_init2(&map, &allocator, 0, 4, 0.0f));
-    TEST_BOOL(!jsl_str_to_str_map_init2(&map, &allocator, 0, 4, 1.0f));
-    TEST_BOOL(!jsl_str_to_str_map_init2(&map, &allocator, 0, 4, 1.5f));
+    TEST_BOOL(!jsl_str_to_str_map_init2(NULL, allocator, 0, 8, 0.5f));
+    TEST_BOOL(!jsl_str_to_str_map_init2(&map, allocator, 0, 0, 0.5f));
+    TEST_BOOL(!jsl_str_to_str_map_init2(&map, allocator, 0, -4, 0.5f));
+    TEST_BOOL(!jsl_str_to_str_map_init2(&map, allocator, 0, 4, 0.0f));
+    TEST_BOOL(!jsl_str_to_str_map_init2(&map, allocator, 0, 4, 1.0f));
+    TEST_BOOL(!jsl_str_to_str_map_init2(&map, allocator, 0, 4, 1.5f));
 }
 
 static void test_jsl_str_to_str_map_item_count_and_has_key(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     JSLStrToStrMap map = {0};
-    bool ok = jsl_str_to_str_map_init(&map, &allocator, 1234);
+    bool ok = jsl_str_to_str_map_init(&map, allocator, 1234);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -758,10 +756,10 @@ static void test_jsl_str_to_str_map_get(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     JSLStrToStrMap map = {0};
-    bool ok = jsl_str_to_str_map_init2(&map, &allocator, 2468, 8, 0.6f);
+    bool ok = jsl_str_to_str_map_init2(&map, allocator, 2468, 8, 0.6f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -793,10 +791,10 @@ static void test_jsl_str_to_str_map_insert_overwrites_value(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     JSLStrToStrMap map = {0};
-    bool ok = jsl_str_to_str_map_init2(&map, &allocator, 42, 8, 0.7f);
+    bool ok = jsl_str_to_str_map_init2(&map, allocator, 42, 8, 0.7f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -831,10 +829,10 @@ static void test_jsl_str_to_str_map_transient_lifetime_copies_data(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     JSLStrToStrMap map = {0};
-    bool ok = jsl_str_to_str_map_init2(&map, &allocator, 555, 8, 0.6f);
+    bool ok = jsl_str_to_str_map_init2(&map, allocator, 555, 8, 0.6f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -894,10 +892,10 @@ static void test_jsl_str_to_str_map_fixed_lifetime_uses_original_pointers(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     JSLStrToStrMap map = {0};
-    bool ok = jsl_str_to_str_map_init2(&map, &allocator, 777, 8, 0.65f);
+    bool ok = jsl_str_to_str_map_init2(&map, allocator, 777, 8, 0.65f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -928,10 +926,10 @@ static void test_jsl_str_to_str_map_handles_empty_and_binary_strings(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     JSLStrToStrMap map = {0};
-    bool ok = jsl_str_to_str_map_init2(&map, &allocator, 888, 8, 0.5f);
+    bool ok = jsl_str_to_str_map_init2(&map, allocator, 888, 8, 0.5f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -998,10 +996,10 @@ static void test_jsl_str_to_str_map_iterator_covers_all_pairs(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     JSLStrToStrMap map = {0};
-    bool ok = jsl_str_to_str_map_init2(&map, &allocator, 999, 10, 0.6f);
+    bool ok = jsl_str_to_str_map_init2(&map, allocator, 999, 10, 0.6f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -1058,10 +1056,10 @@ static void test_jsl_str_to_str_map_iterator_invalidated_on_mutation(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     JSLStrToStrMap map = {0};
-    bool ok = jsl_str_to_str_map_init(&map, &allocator, 1111);
+    bool ok = jsl_str_to_str_map_init(&map, allocator, 1111);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -1082,10 +1080,10 @@ static void test_jsl_str_to_str_map_delete(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     JSLStrToStrMap map = {0};
-    bool ok = jsl_str_to_str_map_init2(&map, &allocator, 2222, 12, 0.7f);
+    bool ok = jsl_str_to_str_map_init2(&map, allocator, 2222, 12, 0.7f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -1113,10 +1111,10 @@ static void test_jsl_str_to_str_map_clear(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     JSLStrToStrMap map = {0};
-    bool ok = jsl_str_to_str_map_init(&map, &allocator, 3333);
+    bool ok = jsl_str_to_str_map_init(&map, allocator, 3333);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -1144,10 +1142,10 @@ static void test_jsl_str_to_str_map_rehash(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     JSLStrToStrMap map = {0};
-    bool ok = jsl_str_to_str_map_init2(&map, &allocator, 4444, 4, 0.5f);
+    bool ok = jsl_str_to_str_map_init2(&map, allocator, 4444, 4, 0.5f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -1159,8 +1157,8 @@ static void test_jsl_str_to_str_map_rehash(void)
 
     for (int i = 0; i < key_count; ++i)
     {
-        keys[i] = jsl_format(&allocator, JSL_CSTR_EXPRESSION("key-%d"), i);
-        values[i] = jsl_format(&allocator, JSL_CSTR_EXPRESSION("val-%d"), i);
+        keys[i] = jsl_format(allocator, JSL_CSTR_EXPRESSION("key-%d"), i);
+        values[i] = jsl_format(allocator, JSL_CSTR_EXPRESSION("val-%d"), i);
 
         bool insert_res = jsl_str_to_str_map_insert(
             &map,
@@ -1208,10 +1206,10 @@ static void test_jsl_str_to_str_map_invalid_inserts(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
-    jsl_allocator_interface_free_all(&allocator);
+    jsl_allocator_interface_free_all(allocator);
 
     JSLStrToStrMap map = {0};
-    bool ok = jsl_str_to_str_map_init(&map, &allocator, 5555);
+    bool ok = jsl_str_to_str_map_init(&map, allocator, 5555);
     TEST_BOOL(ok);
     if (!ok) return;
 

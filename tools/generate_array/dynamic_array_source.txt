@@ -73,7 +73,7 @@ bool {{ function_prefix }}_init(
     int64_t initial_capacity
 )
 {
-    bool res = array != NULL && allocator != NULL && initial_capacity > -1;
+    bool res = array != NULL && initial_capacity > -1;
 
     if (res)
     {
