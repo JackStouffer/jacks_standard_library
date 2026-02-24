@@ -204,10 +204,10 @@ void* jsl_infinite_arena_allocate_aligned(
     bool zeroed
 )
 {
-    JSL_ASSERT(alignment > 0 && jsl_is_power_of_two(alignment));
+    JSL_ASSERT(alignment > 0 && jsl_is_power_of_two_i32(alignment));
 
     #ifdef NDEBUG
-        bool params_ok = (bytes > 0 && alignment > 0 && jsl_is_power_of_two(alignment));
+        bool params_ok = (bytes > 0 && alignment > 0 && jsl_is_power_of_two_i32(alignment));
     #else
         bool params_ok = (bytes > 0);
     #endif
@@ -348,10 +348,10 @@ void* jsl_infinite_arena_reallocate_aligned(
 )
 {
     
-    JSL_ASSERT(align > 0 && jsl_is_power_of_two(align));
+    JSL_ASSERT(align > 0 && jsl_is_power_of_two_i32(align));
 
     #ifdef NDEBUG
-        if (new_num_bytes < 1 || align < 1 || !jsl_is_power_of_two(align))
+        if (new_num_bytes < 1 || align < 1 || !jsl_is_power_of_two_i32(align))
             return NULL;
     #else
         if (new_num_bytes < 1)

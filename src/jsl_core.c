@@ -82,7 +82,7 @@
     }
 #endif
 
-bool jsl_is_power_of_two(int32_t x)
+bool jsl_is_power_of_two_i32(int32_t x)
 {
     return (x & (x-1)) == 0;
 }

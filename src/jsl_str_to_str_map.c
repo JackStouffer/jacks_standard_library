@@ -237,7 +237,7 @@ static JSL__FORCE_INLINE void jsl__str_to_str_map_store_key(
 )
 {
     if (
-        key_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+        key_lifetime == JSL_STRING_LIFETIME_SHORTER
         && key.length <= JSL__MAP_SSO_LENGTH
     )
     {
@@ -246,7 +246,7 @@ static JSL__FORCE_INLINE void jsl__str_to_str_map_store_key(
         entry->key_lifetime = JSL__MAP_LIFETIME_SSO;
     }
     else if (
-        key_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+        key_lifetime == JSL_STRING_LIFETIME_SHORTER
         && key.length > JSL__MAP_SSO_LENGTH
     )
     {
@@ -304,7 +304,7 @@ static JSL__FORCE_INLINE void jsl__str_to_str_map_store_value(
 )
 {
     if (
-        value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+        value_lifetime == JSL_STRING_LIFETIME_SHORTER
         && value.length <= JSL__MAP_SSO_LENGTH
     )
     {
@@ -313,7 +313,7 @@ static JSL__FORCE_INLINE void jsl__str_to_str_map_store_value(
         entry->value_lifetime = JSL__MAP_LIFETIME_SSO;
     }
     else if (
-        value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+        value_lifetime == JSL_STRING_LIFETIME_SHORTER
         && value.length > JSL__MAP_SSO_LENGTH
     )
     {

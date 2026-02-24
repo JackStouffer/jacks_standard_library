@@ -49,7 +49,7 @@ static bool insert_values(JSLStrSet* set, const char** values, size_t count)
     for (size_t i = 0; i < count; i++)
     {
         JSLFatPtr value = jsl_fatptr_from_cstr(values[i]);
-        if (!jsl_str_set_insert(set, value, JSL_STRING_LIFETIME_STATIC))
+        if (!jsl_str_set_insert(set, value, JSL_STRING_LIFETIME_LONGER))
         {
             return false;
         }
@@ -109,15 +109,15 @@ static void test_jsl_str_set_insert_and_has(void)
     TEST_BOOL(!jsl_str_set_has(&set, alpha));
     TEST_INT64_EQUAL(jsl_str_set_item_count(&set), (int64_t) 0);
 
-    TEST_BOOL(jsl_str_set_insert(&set, alpha, JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_set_insert(&set, alpha, JSL_STRING_LIFETIME_LONGER));
     TEST_INT64_EQUAL(jsl_str_set_item_count(&set), (int64_t) 1);
     TEST_BOOL(jsl_str_set_has(&set, alpha));
 
-    TEST_BOOL(jsl_str_set_insert(&set, beta, JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_set_insert(&set, beta, JSL_STRING_LIFETIME_LONGER));
     TEST_INT64_EQUAL(jsl_str_set_item_count(&set), (int64_t) 2);
     TEST_BOOL(jsl_str_set_has(&set, beta));
 
-    TEST_BOOL(jsl_str_set_insert(&set, alpha, JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_set_insert(&set, alpha, JSL_STRING_LIFETIME_LONGER));
     TEST_INT64_EQUAL(jsl_str_set_item_count(&set), (int64_t) 2);
 
     TEST_BOOL(!jsl_str_set_has(&set, missing));
@@ -143,9 +143,9 @@ static void test_jsl_str_set_respects_lifetime_rules(void)
     JSLFatPtr long_value = jsl_fatptr_from_cstr(long_buffer);
     JSLFatPtr literal_value = JSL_FATPTR_INITIALIZER("literal-static");
 
-    TEST_BOOL(jsl_str_set_insert(&set, small_value, JSL_STRING_LIFETIME_TRANSIENT));
-    TEST_BOOL(jsl_str_set_insert(&set, long_value, JSL_STRING_LIFETIME_TRANSIENT));
-    TEST_BOOL(jsl_str_set_insert(&set, literal_value, JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_set_insert(&set, small_value, JSL_STRING_LIFETIME_SHORTER));
+    TEST_BOOL(jsl_str_set_insert(&set, long_value, JSL_STRING_LIFETIME_SHORTER));
+    TEST_BOOL(jsl_str_set_insert(&set, literal_value, JSL_STRING_LIFETIME_LONGER));
 
     small_buffer[0] = 'Z';
     long_buffer[0] = 'Y';
@@ -200,7 +200,7 @@ static void test_jsl_str_set_iterator_covers_all_values(void)
 
     for (size_t i = 0; i < sizeof(expected) / sizeof(expected[0]); i++)
     {
-        TEST_BOOL(jsl_str_set_insert(&set, expected[i].value, JSL_STRING_LIFETIME_STATIC));
+        TEST_BOOL(jsl_str_set_insert(&set, expected[i].value, JSL_STRING_LIFETIME_LONGER));
     }
 
     JSLStrSetKeyValueIter iter;
@@ -243,12 +243,12 @@ static void test_jsl_str_set_iterator_invalidated_on_mutation(void)
     TEST_BOOL(ok);
     if (!ok) return;
 
-    TEST_BOOL(jsl_str_set_insert(&set, JSL_FATPTR_EXPRESSION("first"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_set_insert(&set, JSL_FATPTR_EXPRESSION("first"), JSL_STRING_LIFETIME_LONGER));
 
     JSLStrSetKeyValueIter iter;
     TEST_BOOL(jsl_str_set_iterator_init(&set, &iter));
 
-    TEST_BOOL(jsl_str_set_insert(&set, JSL_FATPTR_EXPRESSION("second"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_set_insert(&set, JSL_FATPTR_EXPRESSION("second"), JSL_STRING_LIFETIME_LONGER));
 
     JSLFatPtr out_value = {0};
     TEST_BOOL(!jsl_str_set_iterator_next(&iter, &out_value));
@@ -268,9 +268,9 @@ static void test_jsl_str_set_delete(void)
     JSLFatPtr drop = JSL_FATPTR_INITIALIZER("drop");
     JSLFatPtr other = JSL_FATPTR_INITIALIZER("other");
 
-    TEST_BOOL(jsl_str_set_insert(&set, keep, JSL_STRING_LIFETIME_STATIC));
-    TEST_BOOL(jsl_str_set_insert(&set, drop, JSL_STRING_LIFETIME_STATIC));
-    TEST_BOOL(jsl_str_set_insert(&set, other, JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_set_insert(&set, keep, JSL_STRING_LIFETIME_LONGER));
+    TEST_BOOL(jsl_str_set_insert(&set, drop, JSL_STRING_LIFETIME_LONGER));
+    TEST_BOOL(jsl_str_set_insert(&set, other, JSL_STRING_LIFETIME_LONGER));
 
     TEST_BOOL(!jsl_str_set_delete(&set, JSL_FATPTR_EXPRESSION("missing")));
 
@@ -278,7 +278,7 @@ static void test_jsl_str_set_delete(void)
     TEST_BOOL(!jsl_str_set_has(&set, drop));
     TEST_INT64_EQUAL(jsl_str_set_item_count(&set), (int64_t) 2);
 
-    TEST_BOOL(jsl_str_set_insert(&set, JSL_FATPTR_EXPRESSION("new"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_set_insert(&set, JSL_FATPTR_EXPRESSION("new"), JSL_STRING_LIFETIME_LONGER));
     TEST_BOOL(jsl_str_set_has(&set, JSL_FATPTR_EXPRESSION("new")));
 }
 
@@ -292,9 +292,9 @@ static void test_jsl_str_set_clear(void)
     TEST_BOOL(ok);
     if (!ok) return;
 
-    TEST_BOOL(jsl_str_set_insert(&set, JSL_FATPTR_EXPRESSION("x"), JSL_STRING_LIFETIME_STATIC));
-    TEST_BOOL(jsl_str_set_insert(&set, JSL_FATPTR_EXPRESSION("y"), JSL_STRING_LIFETIME_STATIC));
-    TEST_BOOL(jsl_str_set_insert(&set, JSL_FATPTR_EXPRESSION("z"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_set_insert(&set, JSL_FATPTR_EXPRESSION("x"), JSL_STRING_LIFETIME_LONGER));
+    TEST_BOOL(jsl_str_set_insert(&set, JSL_FATPTR_EXPRESSION("y"), JSL_STRING_LIFETIME_LONGER));
+    TEST_BOOL(jsl_str_set_insert(&set, JSL_FATPTR_EXPRESSION("z"), JSL_STRING_LIFETIME_LONGER));
 
     jsl_str_set_clear(&set);
 
@@ -309,7 +309,7 @@ static void test_jsl_str_set_clear(void)
     JSLFatPtr out_value = {0};
     TEST_BOOL(!jsl_str_set_iterator_next(&iter, &out_value));
 
-    TEST_BOOL(jsl_str_set_insert(&set, JSL_FATPTR_EXPRESSION("reused"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_set_insert(&set, JSL_FATPTR_EXPRESSION("reused"), JSL_STRING_LIFETIME_LONGER));
     TEST_INT64_EQUAL(jsl_str_set_item_count(&set), (int64_t) 1);
     TEST_BOOL(jsl_str_set_has(&set, JSL_FATPTR_EXPRESSION("reused")));
 }
@@ -328,8 +328,8 @@ static void test_jsl_str_set_handles_empty_and_binary_values(void)
     uint8_t binary_buf[] = { 'A', 0x00, 'B', 0x7F };
     JSLFatPtr binary_value = jsl_fatptr_init(binary_buf, 4);
 
-    TEST_BOOL(jsl_str_set_insert(&set, empty_value, JSL_STRING_LIFETIME_STATIC));
-    TEST_BOOL(jsl_str_set_insert(&set, binary_value, JSL_STRING_LIFETIME_TRANSIENT));
+    TEST_BOOL(jsl_str_set_insert(&set, empty_value, JSL_STRING_LIFETIME_LONGER));
+    TEST_BOOL(jsl_str_set_insert(&set, binary_value, JSL_STRING_LIFETIME_SHORTER));
 
     TEST_BOOL(jsl_str_set_has(&set, empty_value));
     TEST_BOOL(jsl_str_set_has(&set, binary_value));
@@ -625,7 +625,7 @@ static void test_jsl_str_set_rehash_preserves_entries(void)
         int len = snprintf(buffer, sizeof(buffer), "value-%d", i);
         (void) len;
         JSLFatPtr value = jsl_fatptr_from_cstr(buffer);
-        TEST_BOOL(jsl_str_set_insert(&set, value, JSL_STRING_LIFETIME_TRANSIENT));
+        TEST_BOOL(jsl_str_set_insert(&set, value, JSL_STRING_LIFETIME_SHORTER));
     }
 
     TEST_INT64_EQUAL(jsl_str_set_item_count(&set), (int64_t) insert_count);
@@ -655,20 +655,20 @@ static void test_jsl_str_set_rejects_invalid_parameters(void)
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
     JSLFatPtr value = JSL_FATPTR_INITIALIZER("value");
-    TEST_BOOL(!jsl_str_set_insert(NULL, value, JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(!jsl_str_set_insert(NULL, value, JSL_STRING_LIFETIME_LONGER));
 
     JSLStrSet set = (JSLStrSet) {0};
-    TEST_BOOL(!jsl_str_set_insert(&set, value, JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(!jsl_str_set_insert(&set, value, JSL_STRING_LIFETIME_LONGER));
 
     bool ok = jsl_str_set_init(&set, &allocator, 0);
     TEST_BOOL(ok);
     if (!ok) return;
 
     JSLFatPtr null_value = {0};
-    TEST_BOOL(!jsl_str_set_insert(&set, null_value, JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(!jsl_str_set_insert(&set, null_value, JSL_STRING_LIFETIME_LONGER));
 
     JSLFatPtr negative_length = { (uint8_t*) "bad", -1 };
-    TEST_BOOL(!jsl_str_set_insert(&set, negative_length, JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(!jsl_str_set_insert(&set, negative_length, JSL_STRING_LIFETIME_LONGER));
 
     TEST_INT64_EQUAL(jsl_str_set_item_count(&set), (int64_t) 0);
 }

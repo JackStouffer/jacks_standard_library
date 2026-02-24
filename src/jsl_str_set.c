@@ -93,7 +93,7 @@ static JSL__FORCE_INLINE void jsl__str_set_entry_free_value(
 
     bool should_free = (
         status == JSL__STATE_VALUE_IS_SET
-        && lifetime == JSL_STRING_LIFETIME_TRANSIENT
+        && lifetime == JSL_STRING_LIFETIME_SHORTER
         && entry->value.data != NULL
         && entry->value.length > 0
     );
@@ -394,7 +394,7 @@ static JSL__FORCE_INLINE bool jsl__str_set_add(
     // Copy the value
     // 
 
-    if (entry != NULL && value_lifetime == JSL_STRING_LIFETIME_STATIC)
+    if (entry != NULL && value_lifetime == JSL_STRING_LIFETIME_LONGER)
     {
         entry->value = value;
         entry->status = JSL__STATE_VALUE_IS_SET;
@@ -402,7 +402,7 @@ static JSL__FORCE_INLINE bool jsl__str_set_add(
     }
     else if (
         entry != NULL
-        && value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+        && value_lifetime == JSL_STRING_LIFETIME_SHORTER
         && value.length <= JSL__STR_SET_SSO_LENGTH
     )
     {
@@ -413,7 +413,7 @@ static JSL__FORCE_INLINE bool jsl__str_set_add(
     }
     else if (
         entry != NULL
-        && value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+        && value_lifetime == JSL_STRING_LIFETIME_SHORTER
         && value.length > JSL__STR_SET_SSO_LENGTH
     )
     {
@@ -599,7 +599,7 @@ JSL_STR_SET_DEF bool jsl_str_set_delete(
         jsl__str_set_entry_free_value(set, entry);
         entry->next = set->entry_free_list;
         entry->status = JSL__STATE_IN_FREE_LIST;
-        entry->lifetime = JSL_STRING_LIFETIME_TRANSIENT;
+        entry->lifetime = JSL_STRING_LIFETIME_SHORTER;
         set->entry_free_list = entry;
 
         --set->item_count;
@@ -636,7 +636,7 @@ JSL_STR_SET_DEF void jsl_str_set_clear(
             jsl__str_set_entry_free_value(set, entry);
             entry->next = set->entry_free_list;
             entry->status = JSL__STATE_IN_FREE_LIST;
-            entry->lifetime = JSL_STRING_LIFETIME_TRANSIENT;
+            entry->lifetime = JSL_STRING_LIFETIME_SHORTER;
             set->entry_free_list = entry;
             set->entry_lookup_table[index] = JSL__HASHMAP_EMPTY;
         }
@@ -731,7 +731,7 @@ JSL_STR_SET_DEF bool jsl_str_set_intersection(
     JSLFatPtr out_value = {0};
     while (success && jsl_str_set_iterator_next(&iterator, &out_value))
     {
-        if (jsl_str_set_has(larger, out_value) && !jsl_str_set_insert(out, out_value, JSL_STRING_LIFETIME_TRANSIENT))
+        if (jsl_str_set_has(larger, out_value) && !jsl_str_set_insert(out, out_value, JSL_STRING_LIFETIME_SHORTER))
         {
             success = false;
         }
@@ -768,7 +768,7 @@ JSL_STR_SET_DEF bool jsl_str_set_union(
     JSLFatPtr out_value = {0};
     while (success && jsl_str_set_iterator_next(&a_iterator, &out_value))
     {
-        if (!jsl_str_set_insert(out, out_value, JSL_STRING_LIFETIME_TRANSIENT))
+        if (!jsl_str_set_insert(out, out_value, JSL_STRING_LIFETIME_SHORTER))
         {
             success = false;
         }
@@ -776,7 +776,7 @@ JSL_STR_SET_DEF bool jsl_str_set_union(
 
     while (success && jsl_str_set_iterator_next(&b_iterator, &out_value))
     {
-        if (!jsl_str_set_insert(out, out_value, JSL_STRING_LIFETIME_TRANSIENT))
+        if (!jsl_str_set_insert(out, out_value, JSL_STRING_LIFETIME_SHORTER))
         {
             success = false;
         }
@@ -812,7 +812,7 @@ JSL_STR_SET_DEF bool jsl_str_set_difference(
     while (success && jsl_str_set_iterator_next(&iterator, &out_value))
     {
         bool do_insert = jsl_str_set_has(b, out_value) == false;
-        if (do_insert && !jsl_str_set_insert(out, out_value, JSL_STRING_LIFETIME_TRANSIENT))
+        if (do_insert && !jsl_str_set_insert(out, out_value, JSL_STRING_LIFETIME_SHORTER))
         {
             success = false;
         }

@@ -741,8 +741,8 @@ static void test_jsl_str_to_str_map_item_count_and_has_key(void)
     JSLFatPtr key2 = JSL_FATPTR_INITIALIZER("beta");
     JSLFatPtr missing = JSL_FATPTR_INITIALIZER("missing");
 
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, key1, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("one"), JSL_STRING_LIFETIME_STATIC));
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, key2, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("two"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, key1, JSL_STRING_LIFETIME_LONGER, JSL_FATPTR_EXPRESSION("one"), JSL_STRING_LIFETIME_LONGER));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, key2, JSL_STRING_LIFETIME_LONGER, JSL_FATPTR_EXPRESSION("two"), JSL_STRING_LIFETIME_LONGER));
 
     TEST_INT64_EQUAL(jsl_str_to_str_map_item_count(&map), (int64_t) 2);
     TEST_BOOL(jsl_str_to_str_map_has_key(&map, key1));
@@ -774,8 +774,8 @@ static void test_jsl_str_to_str_map_get(void)
 
     TEST_BOOL(jsl_str_to_str_map_insert(
         &map,
-        key, JSL_STRING_LIFETIME_STATIC,
-        value, JSL_STRING_LIFETIME_STATIC
+        key, JSL_STRING_LIFETIME_LONGER,
+        value, JSL_STRING_LIFETIME_LONGER
     ));
 
     TEST_BOOL(jsl_str_to_str_map_get(&map, key, &out_value));
@@ -802,10 +802,10 @@ static void test_jsl_str_to_str_map_insert_overwrites_value(void)
 
     JSLFatPtr key = JSL_FATPTR_INITIALIZER("dup-key");
 
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, key, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("first"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, key, JSL_STRING_LIFETIME_LONGER, JSL_FATPTR_EXPRESSION("first"), JSL_STRING_LIFETIME_LONGER));
     TEST_INT64_EQUAL(jsl_str_to_str_map_item_count(&map), (int64_t) 1);
 
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, key, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("second"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, key, JSL_STRING_LIFETIME_LONGER, JSL_FATPTR_EXPRESSION("second"), JSL_STRING_LIFETIME_LONGER));
     TEST_INT64_EQUAL(jsl_str_to_str_map_item_count(&map), (int64_t) 1);
 
     JSLStrToStrMapKeyValueIter iter;
@@ -848,8 +848,8 @@ static void test_jsl_str_to_str_map_transient_lifetime_copies_data(void)
     JSLFatPtr key_long = jsl_fatptr_from_cstr(key_long_buf);
     JSLFatPtr val_long = jsl_fatptr_from_cstr(val_long_buf);
 
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, key_small, JSL_STRING_LIFETIME_TRANSIENT, val_small, JSL_STRING_LIFETIME_TRANSIENT));
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, key_long, JSL_STRING_LIFETIME_TRANSIENT, val_long, JSL_STRING_LIFETIME_TRANSIENT));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, key_small, JSL_STRING_LIFETIME_SHORTER, val_small, JSL_STRING_LIFETIME_SHORTER));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, key_long, JSL_STRING_LIFETIME_SHORTER, val_long, JSL_STRING_LIFETIME_SHORTER));
 
     key_small_buf[0] = 'X';
     val_small_buf[0] = 'Z';
@@ -907,7 +907,7 @@ static void test_jsl_str_to_str_map_fixed_lifetime_uses_original_pointers(void)
     const uint8_t* expected_key_ptr = key.data;
     const uint8_t* expected_val_ptr = value.data;
 
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, key, JSL_STRING_LIFETIME_STATIC, value, JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, key, JSL_STRING_LIFETIME_LONGER, value, JSL_STRING_LIFETIME_LONGER));
 
     JSLStrToStrMapKeyValueIter iter;
     jsl_str_to_str_map_key_value_iterator_init(&map, &iter);
@@ -943,9 +943,9 @@ static void test_jsl_str_to_str_map_handles_empty_and_binary_strings(void)
     JSLFatPtr binary_value = jsl_fatptr_init(binary_value_buf, 4);
     JSLFatPtr empty_value = JSL_FATPTR_INITIALIZER("");
 
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, empty_key, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("empty-key-value"), JSL_STRING_LIFETIME_STATIC));
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, binary_key, JSL_STRING_LIFETIME_STATIC, binary_value, JSL_STRING_LIFETIME_TRANSIENT));
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, empty_value_key, JSL_STRING_LIFETIME_STATIC, empty_value, JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, empty_key, JSL_STRING_LIFETIME_LONGER, JSL_FATPTR_EXPRESSION("empty-key-value"), JSL_STRING_LIFETIME_LONGER));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, binary_key, JSL_STRING_LIFETIME_LONGER, binary_value, JSL_STRING_LIFETIME_SHORTER));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, empty_value_key, JSL_STRING_LIFETIME_LONGER, empty_value, JSL_STRING_LIFETIME_LONGER));
 
     TEST_BOOL(jsl_str_to_str_map_has_key(&map, empty_key));
     TEST_BOOL(jsl_str_to_str_map_has_key(&map, binary_key));
@@ -1017,9 +1017,9 @@ static void test_jsl_str_to_str_map_iterator_covers_all_pairs(void)
         TEST_BOOL(jsl_str_to_str_map_insert(
             &map,
             expected[i].key,
-            JSL_STRING_LIFETIME_STATIC,
+            JSL_STRING_LIFETIME_LONGER,
             expected[i].value,
-            JSL_STRING_LIFETIME_STATIC
+            JSL_STRING_LIFETIME_LONGER
         ));
     }
 
@@ -1065,12 +1065,12 @@ static void test_jsl_str_to_str_map_iterator_invalidated_on_mutation(void)
     TEST_BOOL(ok);
     if (!ok) return;
 
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, JSL_FATPTR_EXPRESSION("key1"), JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("value1"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, JSL_FATPTR_EXPRESSION("key1"), JSL_STRING_LIFETIME_LONGER, JSL_FATPTR_EXPRESSION("value1"), JSL_STRING_LIFETIME_LONGER));
 
     JSLStrToStrMapKeyValueIter iter;
     jsl_str_to_str_map_key_value_iterator_init(&map, &iter);
 
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, JSL_FATPTR_EXPRESSION("key2"), JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("value2"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, JSL_FATPTR_EXPRESSION("key2"), JSL_STRING_LIFETIME_LONGER, JSL_FATPTR_EXPRESSION("value2"), JSL_STRING_LIFETIME_LONGER));
 
     JSLFatPtr out_key = (JSLFatPtr) {0};
     JSLFatPtr out_value = (JSLFatPtr) {0};
@@ -1093,9 +1093,9 @@ static void test_jsl_str_to_str_map_delete(void)
     JSLFatPtr drop = JSL_FATPTR_INITIALIZER("drop");
     JSLFatPtr other = JSL_FATPTR_INITIALIZER("other");
 
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, keep, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("1"), JSL_STRING_LIFETIME_STATIC));
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, drop, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("2"), JSL_STRING_LIFETIME_STATIC));
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, other, JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("3"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, keep, JSL_STRING_LIFETIME_LONGER, JSL_FATPTR_EXPRESSION("1"), JSL_STRING_LIFETIME_LONGER));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, drop, JSL_STRING_LIFETIME_LONGER, JSL_FATPTR_EXPRESSION("2"), JSL_STRING_LIFETIME_LONGER));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, other, JSL_STRING_LIFETIME_LONGER, JSL_FATPTR_EXPRESSION("3"), JSL_STRING_LIFETIME_LONGER));
 
     TEST_BOOL(!jsl_str_to_str_map_delete(&map, JSL_FATPTR_EXPRESSION("missing")));
 
@@ -1120,8 +1120,8 @@ static void test_jsl_str_to_str_map_clear(void)
     TEST_BOOL(ok);
     if (!ok) return;
 
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, JSL_FATPTR_EXPRESSION("a"), JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("1"), JSL_STRING_LIFETIME_STATIC));
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, JSL_FATPTR_EXPRESSION("b"), JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("2"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, JSL_FATPTR_EXPRESSION("a"), JSL_STRING_LIFETIME_LONGER, JSL_FATPTR_EXPRESSION("1"), JSL_STRING_LIFETIME_LONGER));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, JSL_FATPTR_EXPRESSION("b"), JSL_STRING_LIFETIME_LONGER, JSL_FATPTR_EXPRESSION("2"), JSL_STRING_LIFETIME_LONGER));
 
     jsl_str_to_str_map_clear(&map);
 
@@ -1135,7 +1135,7 @@ static void test_jsl_str_to_str_map_clear(void)
     JSLFatPtr out_value = (JSLFatPtr) {0};
     TEST_BOOL(!jsl_str_to_str_map_key_value_iterator_next(&iter, &out_key, &out_value));
 
-    TEST_BOOL(jsl_str_to_str_map_insert(&map, JSL_FATPTR_EXPRESSION("c"), JSL_STRING_LIFETIME_STATIC, JSL_FATPTR_EXPRESSION("3"), JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(jsl_str_to_str_map_insert(&map, JSL_FATPTR_EXPRESSION("c"), JSL_STRING_LIFETIME_LONGER, JSL_FATPTR_EXPRESSION("3"), JSL_STRING_LIFETIME_LONGER));
     TEST_INT64_EQUAL(jsl_str_to_str_map_item_count(&map), (int64_t) 1);
     TEST_BOOL(jsl_str_to_str_map_has_key(&map, JSL_FATPTR_EXPRESSION("c")));
 }
@@ -1164,8 +1164,8 @@ static void test_jsl_str_to_str_map_rehash(void)
 
         bool insert_res = jsl_str_to_str_map_insert(
             &map,
-            keys[i], JSL_STRING_LIFETIME_STATIC,
-            values[i], JSL_STRING_LIFETIME_STATIC
+            keys[i], JSL_STRING_LIFETIME_LONGER,
+            values[i], JSL_STRING_LIFETIME_LONGER
         );
         TEST_BOOL(insert_res);
     }
@@ -1218,16 +1218,16 @@ static void test_jsl_str_to_str_map_invalid_inserts(void)
     JSLFatPtr key = JSL_FATPTR_INITIALIZER("key");
     JSLFatPtr value = JSL_FATPTR_INITIALIZER("value");
 
-    TEST_BOOL(!jsl_str_to_str_map_insert(NULL, key, JSL_STRING_LIFETIME_STATIC, value, JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(!jsl_str_to_str_map_insert(NULL, key, JSL_STRING_LIFETIME_LONGER, value, JSL_STRING_LIFETIME_LONGER));
 
     JSLFatPtr null_key = {0};
-    TEST_BOOL(!jsl_str_to_str_map_insert(&map, null_key, JSL_STRING_LIFETIME_STATIC, value, JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(!jsl_str_to_str_map_insert(&map, null_key, JSL_STRING_LIFETIME_LONGER, value, JSL_STRING_LIFETIME_LONGER));
 
     JSLFatPtr null_value = {0};
-    TEST_BOOL(!jsl_str_to_str_map_insert(&map, key, JSL_STRING_LIFETIME_STATIC, null_value, JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(!jsl_str_to_str_map_insert(&map, key, JSL_STRING_LIFETIME_LONGER, null_value, JSL_STRING_LIFETIME_LONGER));
 
     JSLFatPtr negative_len = jsl_fatptr_init((uint8_t*)"neg", -1);
-    TEST_BOOL(!jsl_str_to_str_map_insert(&map, negative_len, JSL_STRING_LIFETIME_STATIC, value, JSL_STRING_LIFETIME_STATIC));
+    TEST_BOOL(!jsl_str_to_str_map_insert(&map, negative_len, JSL_STRING_LIFETIME_LONGER, value, JSL_STRING_LIFETIME_LONGER));
 
     TEST_INT64_EQUAL(jsl_str_to_str_map_item_count(&map), (int64_t) 0);
 }

@@ -59,9 +59,9 @@ typedef struct {{ hash_map_name }}KeyValueIter {
  * jsl_str_to_str_multimap_insert(
  *     &map,
  *     key,
- *     JSL_STRING_LIFETIME_STATIC,
+ *     JSL_STRING_LIFETIME_LONGER,
  *     JSL_FATPTR_EXPRESSION("hello-value"),
- *     JSL_STRING_LIFETIME_STATIC
+ *     JSL_STRING_LIFETIME_LONGER
  * );
  * 
  * {{ value_type_name }} value;

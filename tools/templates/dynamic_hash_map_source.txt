@@ -239,12 +239,12 @@ static JSL__FORCE_INLINE void jsl__str_to_str_map_update_value(
     uintptr_t lut_res = map->entry_lookup_table[lut_index];
     struct JSL__StrToStrMapEntry* entry = (struct JSL__StrToStrMapEntry*) lut_res;
 
-    if (value_lifetime == JSL_STRING_LIFETIME_STATIC)
+    if (value_lifetime == JSL_STRING_LIFETIME_LONGER)
     {
         entry->value = value;
     }
     else if (
-        value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+        value_lifetime == JSL_STRING_LIFETIME_SHORTER
         && value.length <= JSL__MAP_SSO_LENGTH
     )
     {
@@ -253,7 +253,7 @@ static JSL__FORCE_INLINE void jsl__str_to_str_map_update_value(
         entry->value.length = value.length;
     }
     else if (
-        value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+        value_lifetime == JSL_STRING_LIFETIME_SHORTER
         && value.length > JSL__MAP_SSO_LENGTH
     )
     {
@@ -302,13 +302,13 @@ static JSL__FORCE_INLINE bool jsl__str_to_str_map_add(
     // Copy the key
     // 
 
-    if (entry != NULL && key_lifetime == JSL_STRING_LIFETIME_STATIC)
+    if (entry != NULL && key_lifetime == JSL_STRING_LIFETIME_LONGER)
     {
         entry->key = key;
     }
     else if (
         entry != NULL
-        && key_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+        && key_lifetime == JSL_STRING_LIFETIME_SHORTER
         && key.length <= JSL__MAP_SSO_LENGTH
     )
     {
@@ -318,7 +318,7 @@ static JSL__FORCE_INLINE bool jsl__str_to_str_map_add(
     }
     else if (
         entry != NULL
-        && key_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+        && key_lifetime == JSL_STRING_LIFETIME_SHORTER
         && key.length > JSL__MAP_SSO_LENGTH
     )
     {
@@ -329,13 +329,13 @@ static JSL__FORCE_INLINE bool jsl__str_to_str_map_add(
     // Copy the value
     // 
 
-    if (entry != NULL && value_lifetime == JSL_STRING_LIFETIME_STATIC)
+    if (entry != NULL && value_lifetime == JSL_STRING_LIFETIME_LONGER)
     {
         entry->value = value;
     }
     else if (
         entry != NULL
-        && value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+        && value_lifetime == JSL_STRING_LIFETIME_SHORTER
         && value.length <= JSL__MAP_SSO_LENGTH
     )
     {
@@ -345,7 +345,7 @@ static JSL__FORCE_INLINE bool jsl__str_to_str_map_add(
     }
     else if (
         entry != NULL
-        && value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+        && value_lifetime == JSL_STRING_LIFETIME_SHORTER
         && value.length > JSL__MAP_SSO_LENGTH
     )
     {

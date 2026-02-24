@@ -146,11 +146,11 @@ void* jsl_arena_allocate_aligned(JSLArena* arena, int64_t bytes, int32_t alignme
 {
     JSL_ASSERT(
         alignment > 0
-        && jsl_is_power_of_two(alignment)
+        && jsl_is_power_of_two_i32(alignment)
     );
 
     #ifdef NDEBUG
-        if (alignment < 1 || !jsl_is_power_of_two(alignment))
+        if (alignment < 1 || !jsl_is_power_of_two_i32(alignment))
             return NULL;
     #endif
 
@@ -226,10 +226,10 @@ void* jsl_arena_reallocate_aligned(
     int32_t align
 )
 {
-    JSL_ASSERT(align > 0 && jsl_is_power_of_two(align));
+    JSL_ASSERT(align > 0 && jsl_is_power_of_two_i32(align));
 
     #ifdef NDEBUG
-        if (align < 1 || !jsl_is_power_of_two(align))
+        if (align < 1 || !jsl_is_power_of_two_i32(align))
             return NULL;
     #endif
 

@@ -477,7 +477,7 @@ static bool jsl__cmd_line_args_add_command(
         && jsl_str_set_insert(
             &args->commands,
             command,
-            JSL_STRING_LIFETIME_STATIC
+            JSL_STRING_LIFETIME_LONGER
         );
 
     if (params_valid && !inserted && out_error != NULL)
@@ -576,9 +576,9 @@ static bool jsl__cmd_line_args_handle_long_option(
             bool inserted = jsl_str_to_str_map_insert(
                 &args->long_flags,
                 flag_body,
-                JSL_STRING_LIFETIME_STATIC,
+                JSL_STRING_LIFETIME_LONGER,
                 JSL__CMD_LINE_EMPTY_VALUE,
-                JSL_STRING_LIFETIME_STATIC
+                JSL_STRING_LIFETIME_LONGER
             );
 
             if (out_error != NULL && !inserted)
@@ -640,9 +640,9 @@ static bool jsl__cmd_line_args_handle_long_option(
             && jsl_str_to_str_multimap_insert(
                 &args->flags_with_values,
                 key,
-                JSL_STRING_LIFETIME_STATIC,
+                JSL_STRING_LIFETIME_LONGER,
                 value,
-                JSL_STRING_LIFETIME_STATIC
+                JSL_STRING_LIFETIME_LONGER
             );
 
         if (out_error != NULL && key_valid && !inserted)

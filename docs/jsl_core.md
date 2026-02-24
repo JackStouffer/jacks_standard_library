@@ -1127,8 +1127,8 @@ normal rvalue.
 
 TODO: docs
 
-- `JSL_STRING_LIFETIME_TRANSIENT = 0`
-- `JSL_STRING_LIFETIME_STATIC = 1`
+- `JSL_STRING_LIFETIME_SHORTER = 0`
+- `JSL_STRING_LIFETIME_LONGER = 1`
 
 
 *Defined at*: `src/jsl_core.h:1016`

@@ -177,17 +177,17 @@ JSLFatPtr key = JSL_FATPTR_INITIALIZER("hello-key");
 jsl_str_to_str_multimap_insert(
 &map,
 key,
-JSL_STRING_LIFETIME_STATIC,
+JSL_STRING_LIFETIME_LONGER,
 JSL_FATPTR_EXPRESSION("hello-value"),
-JSL_STRING_LIFETIME_STATIC
+JSL_STRING_LIFETIME_LONGER
 );
 
 jsl_str_to_str_multimap_insert(
 &map,
 key,
-JSL_STRING_LIFETIME_STATIC,
+JSL_STRING_LIFETIME_LONGER,
 JSL_FATPTR_EXPRESSION("hello-value2"),
-JSL_STRING_LIFETIME_STATIC
+JSL_STRING_LIFETIME_LONGER
 );
 
 jsl_str_to_str_multimap_get_value_count_for_key(&map, key); // 2
@@ -424,8 +424,8 @@ Insert a key/value pair.
 If the key already exists, the value is appended to that key's value list;
 otherwise a new key entry is created. Values are not deduplicated. The
 `*_lifetime` parameters control whether the data is referenced directly
-(`JSL_STRING_LIFETIME_STATIC`) or copied into the map
-(`JSL_STRING_LIFETIME_TRANSIENT`). Use the transient lifetime if the string's
+(`JSL_STRING_LIFETIME_LONGER`) or copied into the map
+(`JSL_STRING_LIFETIME_SHORTER`). Use the transient lifetime if the string's
 lifetime is less than that of the map.
 
 #### Parameters

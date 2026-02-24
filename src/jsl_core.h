@@ -1048,38 +1048,57 @@ static JSL__FORCE_INLINE JSL__UNUSED int32_t jsl__find_first_set_u64(uint64_t x)
 #define JSL_TERABYTES(x) ((int64_t) x * 1024L * 1024L * 1024L * 1024L)
 
 /**
- * TODO: docs
- */
-typedef enum JSLStringLifeTime {
-    /// @brief The string's lifetime is less than the container
-    JSL_STRING_LIFETIME_TRANSIENT = 0,
-    /// @brief The string is in static storage or can be assumed to be longer than the container
-    JSL_STRING_LIFETIME_STATIC = 1
-} JSLStringLifeTime;
-
-/**
- * TODO: docs
+ * Attempt to force the compiler not to optimize away the given stack variable.
+ * 
+ * Even in `-O0` mode, modern compilers will still optimize control variables
+ * out of existence. This is very annoying when debugging, as the variable no
+ * longer shows up in the locals or watch windows. 
+ * 
+ * On GCC and clang this macro attempts to use volatile ASM to trick the compiler
+ * optimizer into thinking that some other function will use the passed in variable.
+ * On MSVC this marco calls a forced no-line function with a read barrier, which is
+ * less reliable but it's the only way to sort of achieve the same effect.
  */
 #define JSL_DEBUG_DONT_OPTIMIZE_AWAY(x) JSL__DONT_OPTIMIZE_AWAY_IMPL(x)
 
 /**
- * TODO: docs
+ * An enum which signifies the expected lifetime of the given string value when
+ * it's used in a container. In most cases, this controls if the container itself
+ * will make a copy of the string with its own allocator and take ownership over
+ * the copy.
  */
-bool jsl_is_power_of_two(int32_t x);
+typedef enum JSLStringLifeTime {
+    /// @brief The string's lifetime is less than the container
+    JSL_STRING_LIFETIME_SHORTER = 0,
+    /// @brief The string is in static storage or can be assumed to be longer than the container
+    JSL_STRING_LIFETIME_LONGER = 1
+} JSLStringLifeTime;
+
+/**
+ * Is the given value a positive power of two.
+ *
+ * This function is designed to be used in tight loops and other performance
+ * critical areas. Therefore, both zero, one, and negative values are not special
+ * cased.
+ *
+ * @param x The value to check
+ * @returns is power of two or not
+ */
+bool jsl_is_power_of_two_i32(int32_t x);
 
 /**
  * Round x up to the next power of two. If x is a power of two it returns
  * the same value.
  *
  * This function is designed to be used in tight loops and other performance
- * critical areas. Therefore, both zero, one, and values greater than 2^31 not special
- * cased. The return values for these cases are compiler, OS, and ISA specific.
- * If you need consistent behavior, then you can easily call this function like
- * so:
+ * critical areas. Therefore, both zero, one, and values greater than 2^31 are 
+ * not special cased. The return values for these cases are compiler, OS, and
+ * ISA specific. If you need consistent behavior, then you can easily call this
+ * function like so:
  *
  * ```
  * jsl_next_power_of_two_i32(
- *      JSL_BETWEEN(2, x, 0x8000000u)
+ *      JSL_BETWEEN(2, x, 0x4000000)
  * );
  * ```
  *
@@ -1093,10 +1112,10 @@ int32_t jsl_next_power_of_two_i32(int32_t x);
  * the same value.
  *
  * This function is designed to be used in tight loops and other performance
- * critical areas. Therefore, both zero, one, and values greater than 2^31 not special
- * cased. The return values for these cases are compiler, OS, and ISA specific.
- * If you need consistent behavior, then you can easily call this function like
- * so:
+ * critical areas. Therefore, both zero, one, and values greater than 2^31 are 
+ * not special cased. The return values for these cases are compiler, OS, and
+ * ISA specific. If you need consistent behavior, then you can easily call this
+ * function like so:
  *
  * ```
  * jsl_next_power_of_two_u32(
@@ -1109,7 +1128,25 @@ int32_t jsl_next_power_of_two_i32(int32_t x);
  */
 uint32_t jsl_next_power_of_two_u32(uint32_t x);
 
-// TODO: docs
+/**
+ * Round x up to the next power of two. If x is a power of two it returns
+ * the same value.
+ *
+ * This function is designed to be used in tight loops and other performance
+ * critical areas. Therefore, both zero, one, and values greater than 2^63 are 
+ * not special cased. The return values for these cases are compiler, OS, and
+ * ISA specific. If you need consistent behavior, then you can easily call this
+ * function like so:
+ *
+ * ```
+ * jsl_next_power_of_two_i64(
+ *      JSL_BETWEEN(2ll, x, 0x4000000000000000ll)
+ * );
+ * ```
+ *
+ * @param x The value to round up
+ * @returns the next power of two
+ */
 int64_t jsl_next_power_of_two_i64(int64_t x);
 
 /**
@@ -1117,10 +1154,10 @@ int64_t jsl_next_power_of_two_i64(int64_t x);
  * the same value.
  *
  * This function is designed to be used in tight loops and other performance
- * critical areas. Therefore, both zero and values greater than 2^63 not special
- * cased. The return values for these cases are compiler, OS, and ISA specific.
- * If you need consistent behavior, then you can easily call this function like
- * so:
+ * critical areas. Therefore, both zero, one, and values greater than 2^63 are 
+ * not special cased. The return values for these cases are compiler, OS, and
+ * ISA specific. If you need consistent behavior, then you can easily call this
+ * function like so:
  *
  * ```
  * jsl_next_power_of_two_u64(

@@ -142,7 +142,7 @@ struct JSL__StrSet {
  * jsl_str_to_str_multimap_insert(
  *     &set,
  *     value,
- *     JSL_STRING_LIFETIME_STATIC
+ *     JSL_STRING_LIFETIME_LONGER
  * );
  * 
  * jsl_str_set_get(&set, value);
@@ -341,7 +341,7 @@ JSL_STR_SET_DEF bool jsl_str_set_delete(
 
 /**
  * Remove all values from the set. Each stored value is checked and if was
- * stored in the set using `JSL_STRING_LIFETIME_TRANSIENT`, the  the memory
+ * stored in the set using `JSL_STRING_LIFETIME_SHORTER`, the  the memory
  * is freed. The set will keep the memory it used for it's internal value
  * bookkeeping and it will not shrink. Iterators become invalid.
  * 
@@ -365,7 +365,7 @@ JSL_STR_SET_DEF void jsl_str_set_free(
 
 /**
  * Fill a set `out` with only the values which exist in both sets `a` and `b`.
- * All of the values inserted into out are copied with `JSL_STRING_LIFETIME_TRANSIENT`.
+ * All of the values inserted into out are copied with `JSL_STRING_LIFETIME_SHORTER`.
  * 
  * @param a A string set
  * @param b A string set
@@ -380,7 +380,7 @@ JSL_STR_SET_DEF bool jsl_str_set_intersection(
 
 /**
  * Fill a set `out` with all of the values from `a` and `b`.
- * All of the values inserted into out are copied with `JSL_STRING_LIFETIME_TRANSIENT`.
+ * All of the values inserted into out are copied with `JSL_STRING_LIFETIME_SHORTER`.
  * 
  * @param a A string set
  * @param b A string set
@@ -395,7 +395,7 @@ JSL_STR_SET_DEF bool jsl_str_set_union(
 
 /**
  * Fill a set `out` with all of the values in `a` that are not in `b`.
- * All of the values inserted into out are copied with `JSL_STRING_LIFETIME_TRANSIENT`.
+ * All of the values inserted into out are copied with `JSL_STRING_LIFETIME_SHORTER`.
  * 
  * @param a A string set
  * @param b A string set

@@ -259,7 +259,7 @@ static JSL__FORCE_INLINE void jsl__str_to_str_multimap_store_key(
 )
 {
     if (
-        key_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+        key_lifetime == JSL_STRING_LIFETIME_SHORTER
         && key.length <= JSL__MULTIMAP_KEY_SSO_LENGTH
     )
     {
@@ -268,7 +268,7 @@ static JSL__FORCE_INLINE void jsl__str_to_str_multimap_store_key(
         entry->key_state = JSL__SSO;
     }
     else if (
-        key_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+        key_lifetime == JSL_STRING_LIFETIME_SHORTER
         && key.length > JSL__MULTIMAP_KEY_SSO_LENGTH
     )
     {
@@ -309,7 +309,7 @@ static JSL__FORCE_INLINE void jsl__str_to_str_multimap_store_value(
 )
 {
     if (
-        value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+        value_lifetime == JSL_STRING_LIFETIME_SHORTER
         && value.length <= JSL__MULTIMAP_VALUE_SSO_LENGTH
     )
     {
@@ -318,7 +318,7 @@ static JSL__FORCE_INLINE void jsl__str_to_str_multimap_store_value(
         value_record->value_state = JSL__SSO;
     }
     else if (
-        value_lifetime == JSL_STRING_LIFETIME_TRANSIENT
+        value_lifetime == JSL_STRING_LIFETIME_SHORTER
         && value.length > JSL__MULTIMAP_VALUE_SSO_LENGTH
     )
     {
