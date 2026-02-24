@@ -797,9 +797,9 @@
         " * jsl_str_to_str_multimap_insert(\n"
         " *     &map,\n"
         " *     key,\n"
-        " *     JSL_STRING_LIFETIME_STATIC,\n"
+        " *     JSL_STRING_LIFETIME_LONGER,\n"
         " *     JSL_FATPTR_EXPRESSION(\"hello-value\"),\n"
-        " *     JSL_STRING_LIFETIME_STATIC\n"
+        " *     JSL_STRING_LIFETIME_LONGER\n"
         " * );\n"
         " * \n"
         " * {{ value_type_name }} value;\n"
@@ -1260,7 +1260,7 @@
         "    uintptr_t lut_res = map->entry_lookup_table[lut_index];\n"
         "    struct JSL__StrToStrMapEntry* entry = (struct JSL__StrToStrMapEntry*) lut_res;\n"
         "\n"
-        "    if (value_lifetime == JSL_STRING_LIFETIME_STATIC)\n"
+        "    if (value_lifetime == JSL_STRING_LIFETIME_LONGER)\n"
         "    {\n"
         "        entry->value = value;\n"
         "    }\n"
@@ -1323,7 +1323,7 @@
         "    // Copy the key\n"
         "    // \n"
         "\n"
-        "    if (entry != NULL && key_lifetime == JSL_STRING_LIFETIME_STATIC)\n"
+        "    if (entry != NULL && key_lifetime == JSL_STRING_LIFETIME_LONGER)\n"
         "    {\n"
         "        entry->key = key;\n"
         "    }\n"
@@ -1350,7 +1350,7 @@
         "    // Copy the value\n"
         "    // \n"
         "\n"
-        "    if (entry != NULL && value_lifetime == JSL_STRING_LIFETIME_STATIC)\n"
+        "    if (entry != NULL && value_lifetime == JSL_STRING_LIFETIME_LONGER)\n"
         "    {\n"
         "        entry->value = value;\n"
         "    }\n"
@@ -1946,30 +1946,30 @@
         jsl_str_to_str_map_insert(
             &map,
             hash_map_name_key,
-            JSL_STRING_LIFETIME_STATIC,
+            JSL_STRING_LIFETIME_LONGER,
             hash_map_name,
-            JSL_STRING_LIFETIME_STATIC
+            JSL_STRING_LIFETIME_LONGER
         );
         jsl_str_to_str_map_insert(
             &map,
             key_type_name_key,
-            JSL_STRING_LIFETIME_STATIC,
+            JSL_STRING_LIFETIME_LONGER,
             key_type_name,
-            JSL_STRING_LIFETIME_STATIC
+            JSL_STRING_LIFETIME_LONGER
         );
         jsl_str_to_str_map_insert(
             &map,
             value_type_name_key,
-            JSL_STRING_LIFETIME_STATIC,
+            JSL_STRING_LIFETIME_LONGER,
             value_type_name,
-            JSL_STRING_LIFETIME_STATIC
+            JSL_STRING_LIFETIME_LONGER
         );
         jsl_str_to_str_map_insert(
             &map,
             function_prefix_key,
-            JSL_STRING_LIFETIME_STATIC,
+            JSL_STRING_LIFETIME_LONGER,
             function_prefix,
-            JSL_STRING_LIFETIME_STATIC
+            JSL_STRING_LIFETIME_LONGER
         );
 
         if (impl == IMPL_FIXED)
@@ -2037,30 +2037,30 @@
         jsl_str_to_str_map_insert(
             &map,
             hash_map_name_key,
-            JSL_STRING_LIFETIME_STATIC,
+            JSL_STRING_LIFETIME_LONGER,
             hash_map_name,
-            JSL_STRING_LIFETIME_STATIC
+            JSL_STRING_LIFETIME_LONGER
         );
         jsl_str_to_str_map_insert(
             &map,
             key_type_name_key,
-            JSL_STRING_LIFETIME_STATIC,
+            JSL_STRING_LIFETIME_LONGER,
             key_type_name,
-            JSL_STRING_LIFETIME_STATIC
+            JSL_STRING_LIFETIME_LONGER
         );
         jsl_str_to_str_map_insert(
             &map,
             value_type_name_key,
-            JSL_STRING_LIFETIME_STATIC,
+            JSL_STRING_LIFETIME_LONGER,
             value_type_name,
-            JSL_STRING_LIFETIME_STATIC
+            JSL_STRING_LIFETIME_LONGER
         );
         jsl_str_to_str_map_insert(
             &map,
             function_prefix_key,
-            JSL_STRING_LIFETIME_STATIC,
+            JSL_STRING_LIFETIME_LONGER,
             function_prefix,
-            JSL_STRING_LIFETIME_STATIC
+            JSL_STRING_LIFETIME_LONGER
         );
 
         // hash and find slot
@@ -2116,9 +2116,9 @@
             jsl_str_to_str_map_insert(
                 &map,
                 hash_function_key,
-                JSL_STRING_LIFETIME_STATIC,
+                JSL_STRING_LIFETIME_LONGER,
                 resolved_hash_function_call,
-                JSL_STRING_LIFETIME_STATIC
+                JSL_STRING_LIFETIME_LONGER
             );
         }
 
@@ -2167,9 +2167,9 @@
             jsl_str_to_str_map_insert(
                 &map,
                 key_compare_key,
-                JSL_STRING_LIFETIME_STATIC,
+                JSL_STRING_LIFETIME_LONGER,
                 resolved_key_compare,
-                JSL_STRING_LIFETIME_STATIC
+                JSL_STRING_LIFETIME_LONGER
             );
         }
 

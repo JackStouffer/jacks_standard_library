@@ -1226,7 +1226,7 @@ static void test_jsl_str_to_str_map_invalid_inserts(void)
     JSLImmutableMemory null_value = {0};
     TEST_BOOL(!jsl_str_to_str_map_insert(&map, key, JSL_STRING_LIFETIME_LONGER, null_value, JSL_STRING_LIFETIME_LONGER));
 
-    JSLImmutableMemory negative_len = jsl_fatptr_init((uint8_t*)"neg", -1);
+    JSLImmutableMemory negative_len = jsl_immutable_memory((const uint8_t*) "neg", -1);
     TEST_BOOL(!jsl_str_to_str_map_insert(&map, negative_len, JSL_STRING_LIFETIME_LONGER, value, JSL_STRING_LIFETIME_LONGER));
 
     TEST_INT64_EQUAL(jsl_str_to_str_map_item_count(&map), (int64_t) 0);

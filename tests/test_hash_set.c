@@ -47,7 +47,7 @@ typedef struct ExpectedValue {
 static bool insert_values(JSLStrSet* set, const char** values, size_t count)
 {
     for (size_t i = 0; i < count; i++)
-    
+    {
         JSLImmutableMemory value = jsl_cstr_to_memory(values[i]);
         if (!jsl_str_set_insert(set, value, JSL_STRING_LIFETIME_LONGER))
         {

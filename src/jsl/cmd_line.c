@@ -42,6 +42,8 @@
 
 #if JSL_IS_WINDOWS
     #include <windows.h>
+    #include <consoleapi.h>
+    #include <wincon.h>
     #include <io.h>
 #elif JSL_IS_POSIX
     #include <unistd.h>
