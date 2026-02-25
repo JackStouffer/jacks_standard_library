@@ -16,7 +16,7 @@
  * but the specifics of how that memory is acquired are irrelevant or unknowable. 
  * 
  * The downside to any abstraction is that removing knowledge about the specifics
- * can make code more complicated, or slower, or both. For example, with the
+ * can make code more complicated, slower, or both. For example, with the
  * knowledge that you're writing your data container for an arena, you don't need
  * to worry about freeing individual pieces of data once they become invalid. Your
  * code is a lot simpler. The inverse problem is also true, in that an abstraction
@@ -103,17 +103,6 @@ typedef bool (*JSLFreeFP)(void* ctx, const void* allocation);
  */
 typedef bool (*JSLFreeAllFP)(void* ctx);
 
-// Private structure, subject to change!
-struct JSL__AllocatorInterface
-{
-    uint64_t sentinel;
-    JSLAllocateFP allocate;
-    JSLReallocateFP reallocate;
-    JSLFreeFP free;
-    JSLFreeAllFP free_all;
-    void* context;
-};
-
 /**
  * The structure makes the following assumptions:
  * 
@@ -122,7 +111,15 @@ struct JSL__AllocatorInterface
  *      - Library code can freely store a pointer to this structure
  *      - It is not valid for library code to make a copy of this structure
  */
-typedef struct JSL__AllocatorInterface JSLAllocatorInterface;
+typedef struct JSL__AllocatorInterface
+{
+    uint64_t sentinel;
+    JSLAllocateFP allocate;
+    JSLReallocateFP reallocate;
+    JSLFreeFP free;
+    JSLFreeAllFP free_all;
+    void* context;
+} JSLAllocatorInterface;
 
 /**
  * TODO: docs

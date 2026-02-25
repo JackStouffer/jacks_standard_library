@@ -84,6 +84,9 @@ extern "C" {
 
 #endif
 
+/**
+* TODO: docs
+*/
 typedef enum
 {
     JSL_GET_FILE_SIZE_BAD_PARAMETERS = 0,
@@ -94,6 +97,9 @@ typedef enum
     JSL_GET_FILE_SIZE_ENUM_COUNT
 } JSLGetFileSizeResultEnum;
 
+/**
+* TODO: docs
+*/
 typedef enum
 {
     JSL_FILE_LOAD_BAD_PARAMETERS,
@@ -108,6 +114,9 @@ typedef enum
     JSL_FILE_LOAD_ENUM_COUNT
 } JSLLoadFileResultEnum;
 
+/**
+* TODO: docs
+*/
 typedef enum
 {
     JSL_FILE_WRITE_BAD_PARAMETERS = 0,
@@ -119,6 +128,9 @@ typedef enum
     JSL_FILE_WRITE_ENUM_COUNT
 } JSLWriteFileResultEnum;
 
+/**
+* TODO: docs
+*/
 typedef enum {
     JSL_FILE_TYPE_UNKNOWN = 0,
     JSL_FILE_TYPE_REG,

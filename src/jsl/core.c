@@ -1,27 +1,4 @@
 /**
- * # Jack's Standard Library
- *
- * A collection of utilities which are designed to replace much of the C standard
- * library.
- *
- * See README.md for a detailed intro.
- *
- * See DESIGN.md for background on the design decisions.
- *
- * See DOCUMENTATION.md for a single markdown file containing all of the docstrings
- * from this file. It's more nicely formatted and contains hyperlinks.
- *
- * The convention of this library is that all symbols prefixed with either `jsl__`
- * or `JSL__` (with two underscores) are meant to be private to this library. They
- * are not a stable part of the API.
- *
- * ## External Preprocessor Definitions
- *
- * `JSL_DEBUG` - turns on some debugging features, like overwriting stale memory with
- * `0xfeefee`.
- *
- * ## License
- *
  * Copyright (c) 2026 Jack Stouffer
  *
  * Permission is hereby granted, free of charge, to any person obtaining a

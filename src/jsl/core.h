@@ -1275,16 +1275,16 @@ int64_t jsl_round_up_pow2_i64(int64_t num, int64_t pow2);
 uint64_t jsl_round_up_pow2_u64(uint64_t num, uint64_t pow2);
 
 /**
- * A fat pointer is a representation of a chunk of memory. It **is not** a container
+ * JSLImmutableMemory is a representation of a chunk of memory. It **is not** a container
  * or an abstract data type.
  *
- * A fat pointer is very similar to D or Go's slices. This provides several useful
+ * A JSLImmutableMemory is very similar to D or Go's slices. This provides several useful
  * functions like bounds checked reads/writes.
  *
- * One very important thing to note is that the fat pointer is always defined as mutable.
- * In my opinion, const in C provides very little protection and a world a headaches during
- * refactors, especially since C does not have generics or function overloading. I find the
- * cost benefit analysis to be in the negative.
+ * One very important thing to note is that the data pointer here is const. All operations
+ * in JSL use memory, even those which accept a `JSLMutableMemory`, produce JSLImmutableMemory
+ * instances. In this way, strings and byte sequences are immutable, and modifying
+ * operations create copies.
  */
 typedef struct JSLImmutableMemory
 {
@@ -1413,7 +1413,7 @@ typedef struct JSLOutputSink {
 } JSLOutputSink;
 
 /**
-* Creates a JSLImmutableMemory from a string literal at compile time. The resulting fat pointer
+* Creates a JSLImmutableMemory from a string literal at compile time. The resulting memory
 * points directly to the string literal's memory, so no copying occurs.
 *
 * @warning With MSVC this will only work during variable initialization as MSVC
@@ -1430,49 +1430,31 @@ typedef struct JSLOutputSink {
 */
 #define JSL_CSTR_INITIALIZER(s) { (const uint8_t*)(s), (int64_t)(sizeof(s) - 1) }
 
-#if defined(_MSC_VER) && !defined(__clang__)
-
-    /**
-     * Creates a JSLImmutableMemory from a string literal for usage as an rvalue. The resulting fat pointer
-     * points directly to the string literal's memory, so no copying occurs.
-     *
-     * @warning On MSVC this will be a function call as MSVC does not support compound literals.
-     * On all other compilers this will be a zero cost compound literal.
-     *
-     * Example:
-     *
-     * ```c
-     * void my_function(JSLImmutableMemory data);
-     *
-     * my_function(JSL_CSTR_EXPRESSION("my data"));
-     * ```
-     */
-    #define JSL_CSTR_EXPRESSION(s) jsl_immutable_memory((const uint8_t*) (s), (int64_t)(sizeof(s) - 1))
-
+#if JSL_IS_MSVC
+    #define JSL__CSTR_EXPRESSION_IMPL(s) jsl_immutable_memory((const uint8_t*) (s), (int64_t)(sizeof(s) - 1))
 #else
-
-    /**
-     * Creates a JSLImmutableMemory from a string literal for usage as an rvalue. The resulting fat pointer
-     * points directly to the string literal's memory, so no copying occurs.
-     *
-     * @warning On MSVC this will be a function call as MSVC does not support compound literals.
-     * On all other compilers this will be a zero cost compound literal
-     *
-     * Example:
-     *
-     * ```c
-     * void my_function(JSLImmutableMemory data);
-     *
-     * my_function(JSL_CSTR_EXPRESSION("my data"));
-     * ```
-     */
-    #define JSL_CSTR_EXPRESSION(s) ((JSLImmutableMemory){ (const uint8_t*)(s), (int64_t)(sizeof(s) - 1) })
-
+    #define JSL__CSTR_EXPRESSION_IMPL(s) ((JSLImmutableMemory){ (const uint8_t*)(s), (int64_t)(sizeof(s) - 1) })
 #endif
 
+/**
+ * Creates a JSLImmutableMemory from a string literal for usage as an rvalue. The resulting memory
+ * points directly to the string literal's memory, so no copying occurs.
+ *
+ * @warning On MSVC this will be a function call as MSVC does not support compound literals.
+ * On all other compilers this will be a zero cost compound literal
+ *
+ * Example:
+ *
+ * ```c
+ * void my_function(JSLImmutableMemory data);
+ *
+ * my_function(JSL_CSTR_EXPRESSION("my data"));
+ * ```
+ */
+#define JSL_CSTR_EXPRESSION(s) JSL__CSTR_EXPRESSION_IMPL(s)
 
 /**
- * Advances a fat pointer forward by `n`. This macro does not bounds check
+ * Advances a memory forward by `n`. This macro does not bounds check
  * and is intentionally tiny so it can live in hot loops without adding overhead.
  * Only use this in cases where you've already checked the length.
  */
@@ -1506,13 +1488,6 @@ typedef struct JSLOutputSink {
  */
 #define JSL_MEMORY_FROM_STACK(buf) { (uint8_t *)(buf), (int64_t)(sizeof(buf)) }
 
-/// TODO: docs
-static inline JSLImmutableMemory jsl_cast_immutable_memory(JSLMutableMemory memory)
-{
-    JSLImmutableMemory res = { memory.data, memory.length };
-    return res;
-}
-
 #if JSL_IS_MSVC
     #define JSL__AS_IMMUTABLE_IMPL(x) \
         jsl_immutable_memory((const uint8_t*)(x).data, (x).length)
@@ -1525,7 +1500,7 @@ static inline JSLImmutableMemory jsl_cast_immutable_memory(JSLMutableMemory memo
 #define JSL_AS_IMMUTABLE(x) JSL__AS_IMMUTABLE_IMPL(x)
 
 /**
- * Constructor utility function to make a fat pointer out of a pointer and a length.
+ * Constructor utility function to make a memory out of a pointer and a length.
  * Useful in cases where you can't use C's struct init syntax, like as a parameter
  * to a function.
  */
@@ -1538,7 +1513,7 @@ JSLMutableMemory jsl_mutable_memory(uint8_t* ptr, int64_t length);
 JSLImmutableMemory jsl__slice(JSLImmutableMemory memory, int64_t start, int64_t end);
 
 /**
- * Create a new fat pointer that points to the given parameter's data but
+ * Create a new memory that points to the given parameter's data but
  * with a view of [start, end).
  *
  * This function is bounds checked. Out of bounds slices will assert.
@@ -1546,7 +1521,7 @@ JSLImmutableMemory jsl__slice(JSLImmutableMemory memory, int64_t start, int64_t 
 #define jsl_slice(memory, start, end) jsl__slice(JSL_AS_IMMUTABLE(memory), start, end)
 
 /**
- * Create a new fat pointer that points to the given parameter's data but
+ * Create a new memory that points to the given parameter's data but
  * with a view of [start, length).
  *
  * This function is bounds checked. Out of bounds slices will assert.
@@ -1558,7 +1533,7 @@ int64_t jsl__total_write_length(JSLImmutableMemory original_memory, JSLImmutable
 
 /**
  * Utility function to get the total amount of bytes written to the original
- * fat pointer when compared to a writer fat pointer. See jsl_auto_slice
+ * memory when compared to a writer memory. See jsl_auto_slice
  * to get a slice of the written portion.
  * 
  * This function asserts on the following conditions
@@ -1606,13 +1581,13 @@ JSLImmutableMemory jsl__auto_slice(JSLImmutableMemory original_memory, JSLImmuta
  *
  * @param original_memory The pointer to the originally allocated buffer
  * @param writer_memory The pointer that has been advanced during writing operations
- * @returns A new fat pointer pointing to the written portion of the original buffer.
+ * @returns A new memory pointing to the written portion of the original buffer.
  * It will be `NULL` if there was an issue.
  */
 #define jsl_auto_slice(original_memory, writer_memory) jsl__auto_slice(JSL_AS_IMMUTABLE(original_memory), JSL_AS_IMMUTABLE(writer_memory))
 
 /**
- * Build a fat pointer from a null terminated string. **DOES NOT** copy the data.
+ * Build a memory from a null terminated string. **DOES NOT** copy the data.
  * It simply sets the data pointer to `str` and the length value to the result of
  * JSL_STRLEN.
  *
@@ -1661,7 +1636,7 @@ int64_t jsl__memory_copy(JSLMutableMemory* destination, JSLImmutableMemory sourc
  * `destination` is modified to point to the remaining data in the buffer. I.E.
  * if the entire buffer was used then `destination->length` will be `0`.
  *
- * @returns Number of bytes written or `-1` if `string` or the fat pointer was null.
+ * @returns Number of bytes written or `-1` if `string` or the memory was null.
  */
 JSL_DEF int64_t jsl_cstr_memory_copy(
     JSLMutableMemory* destination,
@@ -1700,7 +1675,7 @@ JSL_DEF int64_t jsl_cstr_memory_copy(
 JSL_DEF int64_t jsl_substring_search(JSLImmutableMemory string, JSLImmutableMemory substring);
 
 /**
- * Locate the first byte equal to `item` in a fat pointer. This is roughly equivalent to C's
+ * Locate the first byte equal to `item` in a memory. This is roughly equivalent to C's
  * `strchr` function for fat pointers.
  *
  * @note The comparison operates on raw code units. In UTF encodings, multiple code units can
@@ -1708,35 +1683,35 @@ JSL_DEF int64_t jsl_substring_search(JSLImmutableMemory string, JSLImmutableMemo
  * characters. No Unicode normalization is performed; normalize inputs first if combining mark
  * equivalence is required.
  *
- * @param data Fat pointer to inspect.
+ * @param data memory to inspect.
  * @param item Byte value to search for.
  * @returns index of the first match, or -1 if none is found.
  */
 JSL_DEF int64_t jsl_index_of(JSLImmutableMemory data, uint8_t item);
 
 /**
- * Count the number of occurrences of `item` within a fat pointer.
+ * Count the number of occurrences of `item` within a memory.
  *
  * @note The comparison operates on raw code units. In UTF encodings, multiple code units can
  * form a single grapheme cluster, so the index does not necessarily map to user-perceived
  * characters. No Unicode normalization is performed; normalize inputs first if combining mark
  * equivalence is required.
  *
- * @param str Fat pointer to scan.
+ * @param str memory to scan.
  * @param item Byte value to count.
  * @returns Total number of matches, or 0 when the sequence is empty.
  */
 JSL_DEF int64_t jsl_count(JSLImmutableMemory str, uint8_t item);
 
 /**
- * Locate the final occurrence of `character` within a fat pointer.
+ * Locate the final occurrence of `character` within a memory.
  *
  * @note The comparison operates on raw code units. In UTF encodings, multiple code units can
  * form a single grapheme cluster, so the index does not necessarily map to user-perceived
  * characters. No Unicode normalization is performed; normalize inputs first if combining mark
  * equivalence is required.
  *
- * @param str Fat pointer to inspect.
+ * @param str memory to inspect.
  * @param character Byte value to search for.
  * @returns index of the last match, or -1 when no match exists.
  */
@@ -1745,7 +1720,7 @@ JSL_DEF int64_t jsl_index_of_reverse(JSLImmutableMemory str, uint8_t character);
 /**
  * Check whether `str` begins with the bytes stored in `prefix`.
  *
- * Returns `false` when either fat pointer is null or when `prefix` exceeds `str` in length.
+ * Returns `false` when either memory pointer is null or when `prefix` exceeds `str` in length.
  * An empty `prefix` yields `true`.
  *
  * @note The comparison operates on raw code units. In UTF encodings, multiple code units can
@@ -1762,7 +1737,7 @@ JSL_DEF bool jsl_starts_with(JSLImmutableMemory str, JSLImmutableMemory prefix);
 /**
  * Check whether `str` ends with the bytes stored in `postfix`.
  *
- * Returns `false` when either fat pointer is null or when `postfix` exceeds `str` in length.
+ * Returns `false` when either memory pointer is null or when `postfix` exceeds `str` in length.
  *
  * @note The comparison operates on raw code units. In UTF encodings, multiple code units can
  * form a single grapheme cluster, so the index does not necessarily map to user-perceived
@@ -1779,7 +1754,7 @@ JSL_DEF bool jsl_ends_with(JSLImmutableMemory str, JSLImmutableMemory postfix);
  * Get the file name from a filepath.
  *
  * Returns a view over the final path component that follows the last `/` byte in `filename`.
- * The resulting fat pointer aliases the original buffer; the data is neither copied nor
+ * The resulting memory aliases the original buffer; the data is neither copied nor
  * reallocated. If no `/` byte is present, or the suffix after the final `/` is fewer than two
  * code units (for example, a trailing `/` or a single-character basename), the original fat
  * pointer is returned unchanged.
@@ -1789,8 +1764,8 @@ JSL_DEF bool jsl_ends_with(JSLImmutableMemory str, JSLImmutableMemory postfix);
  * Normalize the input first if grapheme-aware behavior or Unicode canonical equivalence is
  * required.
  *
- * @param filename Fat pointer referencing the path or filename to inspect.
- * @returns Fat pointer referencing the basename or, in the fallback cases described above, the
+ * @param filename memory referencing the path or filename to inspect.
+ * @returns memory referencing the basename or, in the fallback cases described above, the
  * original input pointer.
  *
  * @code
@@ -1804,7 +1779,7 @@ JSL_DEF JSLImmutableMemory jsl_basename(JSLImmutableMemory filename);
  * Get the file extension from a file name or file path.
  *
  * Returns a view over the substring that follows the final `.` in `filename`.
- * The returned fat pointer reuses the original buffer; no allocations or copies
+ * The returned memory reuses the original buffer; no allocations or copies
  * are performed. If `filename` does not contain a `.` byte, the result has a
  * `NULL` data pointer and a length of `0`.
  *
@@ -1813,8 +1788,8 @@ JSL_DEF JSLImmutableMemory jsl_basename(JSLImmutableMemory filename);
  * and no normalization is performed. Normalize beforehand when grapheme-aware
  * behavior is required.
  *
- * @param filename Fat pointer referencing the path or filename to inspect.
- * @returns Fat pointer to the extension (excluding the dot) or an empty fat pointer
+ * @param filename memory referencing the path or filename to inspect.
+ * @returns memory to the extension (excluding the dot) or an empty memory
  * when no extension exists.
  *
  * @code
@@ -1845,8 +1820,8 @@ bool jsl__memory_compare(JSLImmutableMemory a, JSLImmutableMemory b);
 #define jsl_memory_compare(a, b) jsl__memory_compare(JSL_AS_IMMUTABLE(a), JSL_AS_IMMUTABLE(b))
 
 /**
- * Element by element comparison of the contents of a fat pointer and a null terminated
- * string. If the fat pointer has a null data value or a zero length, or if cstr is null,
+ * Element by element comparison of the contents of memory and a null terminated
+ * string. If the memory has a null data value or a zero length, or if cstr is null,
  * then this function will return false. This is true even when both pointers are
  * NULL.
  *
@@ -1888,37 +1863,37 @@ JSL_DEF int64_t jsl_to_lowercase_ascii(JSLOutputSink sink, JSLImmutableMemory st
 JSL_DEF int32_t jsl_memory_to_int32(JSLImmutableMemory str, int32_t* result);
 
 /**
- * Advance the fat pointer until the first non-whitespace character is
- * reached. If the fat pointer is null or has a negative length, -1 is
+ * Advance the memory until the first non-whitespace character is
+ * reached. If the memory is null or has a negative length, -1 is
  * returned.
  *
- * @param str a fat pointer
+ * @param str memory
  * @return The number of bytes that were advanced or -1
  */
 JSL_DEF int64_t jsl_strip_whitespace_left(JSLImmutableMemory* str);
 
 /**
- * Reduce the fat pointer's length until the first non-whitespace character is
- * reached. If the fat pointer is null or has a negative length, -1 is
+ * Reduce the memory's length until the first non-whitespace character is
+ * reached. If the memory is null or has a negative length, -1 is
  * returned.
  *
- * @param str a fat pointer
+ * @param str memory
  * @return The number of bytes that were advanced or -1
  */
 JSL_DEF int64_t jsl_strip_whitespace_right(JSLImmutableMemory* str);
 
 /**
- * Modify the fat pointer such that it points to the part of the string
+ * Modify the memory such that it points to the part of the string
  * without any whitespace characters at the begining or the end. If the
- * fat pointer is null or has a negative length, -1 is returned.
+ * memory is null or has a negative length, -1 is returned.
  *
- * @param str a fat pointer
+ * @param str memory
  * @return The number of bytes that were advanced or -1
  */
 JSL_DEF int64_t jsl_strip_whitespace(JSLImmutableMemory* str);
 
 /**
- * Allocate a new buffer from the arena and copy the contents of a fat pointer with
+ * Allocate a new buffer from the arena and copy the contents of a memory with
  * a null terminator.
  */
 JSL_DEF const char* jsl_memory_to_cstr(JSLAllocatorInterface* allocator, JSLImmutableMemory str);
@@ -1927,12 +1902,12 @@ JSL_DEF const char* jsl_memory_to_cstr(JSLAllocatorInterface* allocator, JSLImmu
  * Allocate a new buffer and copy the contents of the null terminated string into that buffer.
  * Returns the written to memory.
  *
- * @note Use `jsl_cstr_to_memory` to make a fat pointer without copying.
+ * @note Use `jsl_cstr_to_memory` to make memory without copying.
  */
 JSL_DEF JSLImmutableMemory jsl_duplicate_cstr(JSLAllocatorInterface* allocator, const char* str);
 
 /**
- * Allocate space for, and copy the contents of a fat pointer.
+ * Allocate space for, and copy the contents of a memory.
  *
  * @note Use `jsl_duplicate_cstr` to copy a c string into a memory.
  */
