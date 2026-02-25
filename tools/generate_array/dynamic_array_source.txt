@@ -88,25 +88,24 @@ bool {{ function_prefix }}_init(
     return res;
 }
 
-bool {{ function_prefix }}_insert(
+{{ value_type_name }}* {{ function_prefix }}_insert(
     {{ array_type_name }}* array,
     {{ value_type_name }} value
 )
 {
-    bool res = (
-        array != NULL
-        && array->sentinel == PRIVATE_SENTINEL_{{ array_type_name }}
-    );
+    {{ value_type_name }}* res = NULL;
 
-    if (res)
+    bool has_capacity = false;
+    if (array != NULL && array->sentinel == PRIVATE_SENTINEL_{{ array_type_name }})
     {
-        res = {{ function_prefix }}__ensure_capacity(array, array->length + 1);
+        has_capacity = {{ function_prefix }}__ensure_capacity(array, array->length + 1);
     }
 
-    if (res)
+    if (has_capacity)
     {
         array->data[array->length] = value;
         ++array->length;
+        res = &array->data[array->length];
     }
 
     return res;

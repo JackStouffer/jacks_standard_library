@@ -87,9 +87,9 @@ bool {{ function_prefix }}_init(
  *
  * @param array The pointer to the array
  * @param value The value to add
- * @returns If the insertion succeed
+ * @returns If the insertion succeed then the pointer to the item in the array, NULL otherwise
  */
-bool {{ function_prefix }}_insert(
+{{ value_type_name }}* {{ function_prefix }}_insert(
     {{ array_type_name }}* array,
     {{ value_type_name }} value
 );

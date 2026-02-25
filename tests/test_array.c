@@ -228,7 +228,7 @@ static void test_dynamic_array_insert_appends_and_grows(void)
         for (int32_t i = 0; i < 40; ++i)
         {
             CompositeType1 value = make_comp1(i, i * 10);
-            TEST_BOOL(dynamic_comp1_array_insert(&array, value));
+            TEST_BOOL(dynamic_comp1_array_insert(&array, value) != NULL);
         }
 
         TEST_INT64_EQUAL(array.length, (int64_t) 40);
@@ -251,7 +251,7 @@ static void test_dynamic_array_insert_appends_and_grows(void)
         for (int32_t i = 0; i < 35; ++i)
         {
             CompositeType2 value = make_comp2(i, i + 1, (i % 2) == 0);
-            TEST_BOOL(dynamic_comp2_array_insert(&array, value));
+            TEST_BOOL(dynamic_comp2_array_insert(&array, value) != NULL);
         }
 
         TEST_INT64_EQUAL(array.length, (int64_t) 35);
@@ -274,7 +274,7 @@ static void test_dynamic_array_insert_appends_and_grows(void)
         for (int32_t i = 0; i < 30; ++i)
         {
             CompositeType3 value = make_comp3(i, i + 1, i + 2, i + 3, i + 4, i + 5, i + 6);
-            TEST_BOOL(dynamic_comp3_array_insert(&array, value));
+            TEST_BOOL(dynamic_comp3_array_insert(&array, value) != NULL);
         }
 
         TEST_INT64_EQUAL(array.length, (int64_t) 30);
@@ -301,9 +301,9 @@ static void test_dynamic_array_insert_at_inserts_and_shifts(void)
         TEST_BOOL(ok);
         if (!ok) return;
 
-        TEST_BOOL(dynamic_int32_array_insert(&array, 1));
-        TEST_BOOL(dynamic_int32_array_insert(&array, 3));
-        TEST_BOOL(dynamic_int32_array_insert(&array, 4));
+        TEST_BOOL(dynamic_int32_array_insert(&array, 1) != NULL);
+        TEST_BOOL(dynamic_int32_array_insert(&array, 3) != NULL);
+        TEST_BOOL(dynamic_int32_array_insert(&array, 4) != NULL);
 
         TEST_BOOL(dynamic_int32_array_insert_at(&array, 2, 1));
         TEST_INT64_EQUAL(array.length, (int64_t) 4);
@@ -334,9 +334,9 @@ static void test_dynamic_array_insert_at_inserts_and_shifts(void)
         CompositeType1 v3 = make_comp1(3, 30);
         CompositeType1 v4 = make_comp1(4, 40);
 
-        TEST_BOOL(dynamic_comp1_array_insert(&array, v1));
-        TEST_BOOL(dynamic_comp1_array_insert(&array, v3));
-        TEST_BOOL(dynamic_comp1_array_insert(&array, v4));
+        TEST_BOOL(dynamic_comp1_array_insert(&array, v1) != NULL);
+        TEST_BOOL(dynamic_comp1_array_insert(&array, v3) != NULL);
+        TEST_BOOL(dynamic_comp1_array_insert(&array, v4) != NULL);
 
         CompositeType1 v2 = make_comp1(2, 20);
         TEST_BOOL(dynamic_comp1_array_insert_at(&array, v2, 1));
@@ -370,9 +370,9 @@ static void test_dynamic_array_insert_at_inserts_and_shifts(void)
         CompositeType2 v3 = make_comp2(3, 30, true);
         CompositeType2 v4 = make_comp2(4, 40, false);
 
-        TEST_BOOL(dynamic_comp2_array_insert(&array, v1));
-        TEST_BOOL(dynamic_comp2_array_insert(&array, v3));
-        TEST_BOOL(dynamic_comp2_array_insert(&array, v4));
+        TEST_BOOL(dynamic_comp2_array_insert(&array, v1) != NULL);
+        TEST_BOOL(dynamic_comp2_array_insert(&array, v3) != NULL);
+        TEST_BOOL(dynamic_comp2_array_insert(&array, v4) != NULL);
 
         CompositeType2 v2 = make_comp2(2, 20, true);
         TEST_BOOL(dynamic_comp2_array_insert_at(&array, v2, 1));
@@ -406,9 +406,9 @@ static void test_dynamic_array_insert_at_inserts_and_shifts(void)
         CompositeType3 v3 = make_comp3(8, 9, 10, 11, 12, 13, 14);
         CompositeType3 v4 = make_comp3(15, 16, 17, 18, 19, 20, 21);
 
-        TEST_BOOL(dynamic_comp3_array_insert(&array, v1));
-        TEST_BOOL(dynamic_comp3_array_insert(&array, v3));
-        TEST_BOOL(dynamic_comp3_array_insert(&array, v4));
+        TEST_BOOL(dynamic_comp3_array_insert(&array, v1) != NULL);
+        TEST_BOOL(dynamic_comp3_array_insert(&array, v3) != NULL);
+        TEST_BOOL(dynamic_comp3_array_insert(&array, v4) != NULL);
 
         CompositeType3 v2 = make_comp3(22, 23, 24, 25, 26, 27, 28);
         TEST_BOOL(dynamic_comp3_array_insert_at(&array, v2, 1));
@@ -448,7 +448,7 @@ static void test_dynamic_array_delete_at_removes_and_shifts(void)
         int32_t values[] = {10, 20, 30, 40};
         for (size_t i = 0; i < sizeof(values) / sizeof(values[0]); ++i)
         {
-            TEST_BOOL(dynamic_int32_array_insert(&array, values[i]));
+            TEST_BOOL(dynamic_int32_array_insert(&array, values[i]) != NULL);
         }
 
         TEST_BOOL(!dynamic_int32_array_delete_at(&array, -1));
@@ -488,7 +488,7 @@ static void test_dynamic_array_delete_at_removes_and_shifts(void)
 
         for (size_t i = 0; i < sizeof(values) / sizeof(values[0]); ++i)
         {
-            TEST_BOOL(dynamic_comp1_array_insert(&array, values[i]));
+            TEST_BOOL(dynamic_comp1_array_insert(&array, values[i]) != NULL);
         }
 
         TEST_BOOL(!dynamic_comp1_array_delete_at(&array, -1));
@@ -528,7 +528,7 @@ static void test_dynamic_array_delete_at_removes_and_shifts(void)
 
         for (size_t i = 0; i < sizeof(values) / sizeof(values[0]); ++i)
         {
-            TEST_BOOL(dynamic_comp2_array_insert(&array, values[i]));
+            TEST_BOOL(dynamic_comp2_array_insert(&array, values[i]) != NULL);
         }
 
         TEST_BOOL(!dynamic_comp2_array_delete_at(&array, -5));
@@ -568,7 +568,7 @@ static void test_dynamic_array_delete_at_removes_and_shifts(void)
 
         for (size_t i = 0; i < sizeof(values) / sizeof(values[0]); ++i)
         {
-            TEST_BOOL(dynamic_comp3_array_insert(&array, values[i]));
+            TEST_BOOL(dynamic_comp3_array_insert(&array, values[i]) != NULL);
         }
 
         TEST_BOOL(!dynamic_comp3_array_delete_at(&array, -2));
@@ -606,8 +606,8 @@ static void test_dynamic_array_clear_resets_length(void)
         TEST_BOOL(ok);
         if (!ok) return;
 
-        TEST_BOOL(dynamic_int32_array_insert(&array, 1));
-        TEST_BOOL(dynamic_int32_array_insert(&array, 2));
+        TEST_BOOL(dynamic_int32_array_insert(&array, 1) != NULL);
+        TEST_BOOL(dynamic_int32_array_insert(&array, 2) != NULL);
 
         int64_t initial_capacity = array.capacity;
         int32_t* data_ptr = array.data;
@@ -627,8 +627,8 @@ static void test_dynamic_array_clear_resets_length(void)
         TEST_BOOL(ok);
         if (!ok) return;
 
-        TEST_BOOL(dynamic_comp1_array_insert(&array, make_comp1(1, 2)));
-        TEST_BOOL(dynamic_comp1_array_insert(&array, make_comp1(3, 4)));
+        TEST_BOOL(dynamic_comp1_array_insert(&array, make_comp1(1, 2)) != NULL);
+        TEST_BOOL(dynamic_comp1_array_insert(&array, make_comp1(3, 4)) != NULL);
 
         int64_t initial_capacity = array.capacity;
         CompositeType1* data_ptr = array.data;
@@ -648,8 +648,8 @@ static void test_dynamic_array_clear_resets_length(void)
         TEST_BOOL(ok);
         if (!ok) return;
 
-        TEST_BOOL(dynamic_comp2_array_insert(&array, make_comp2(1, 2, true)));
-        TEST_BOOL(dynamic_comp2_array_insert(&array, make_comp2(3, 4, false)));
+        TEST_BOOL(dynamic_comp2_array_insert(&array, make_comp2(1, 2, true)) != NULL);
+        TEST_BOOL(dynamic_comp2_array_insert(&array, make_comp2(3, 4, false)) != NULL);
 
         int64_t initial_capacity = array.capacity;
         CompositeType2* data_ptr = array.data;
@@ -669,8 +669,8 @@ static void test_dynamic_array_clear_resets_length(void)
         TEST_BOOL(ok);
         if (!ok) return;
 
-        TEST_BOOL(dynamic_comp3_array_insert(&array, make_comp3(1, 2, 3, 4, 5, 6, 7)));
-        TEST_BOOL(dynamic_comp3_array_insert(&array, make_comp3(8, 9, 10, 11, 12, 13, 14)));
+        TEST_BOOL(dynamic_comp3_array_insert(&array, make_comp3(1, 2, 3, 4, 5, 6, 7)) != NULL);
+        TEST_BOOL(dynamic_comp3_array_insert(&array, make_comp3(8, 9, 10, 11, 12, 13, 14)) != NULL);
 
         int64_t initial_capacity = array.capacity;
         CompositeType3* data_ptr = array.data;
@@ -698,7 +698,7 @@ static void test_dynamic_array_checks_sentinel(void)
 
     array.sentinel = 0;
 
-    TEST_BOOL(!dynamic_int32_array_insert(&array, 1));
+    TEST_BOOL(dynamic_int32_array_insert(&array, 1) == NULL);
     TEST_BOOL(!dynamic_int32_array_insert_at(&array, 2, 0));
     TEST_BOOL(!dynamic_int32_array_delete_at(&array, 0));
 

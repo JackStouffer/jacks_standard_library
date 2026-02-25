@@ -1,8 +1,16 @@
 /**
  * AUTO GENERATED FILE
  *
+{% if key_is_str %}
+ * This file contains the header for a hash map `{{ hash_map_name }}` which maps
+ * `JSLImmutableMemory` keys to `{{ value_type_name }}` values.
+{% elif value_is_str %}
+ * This file contains the header for a hash map `{{ hash_map_name }}` which maps
+ * `{{ key_type_name }}` keys to `JSLImmutableMemory` values.
+{% else %}
  * This file contains the header for a hash map `{{ hash_map_name }}` which maps
  * `{{ key_type_name }}` keys to `{{ value_type_name }}` values.
+{% endif %}
  *
  * This hash map is designed for situations where you can set an upper bound on the
  * number of items you will have and that upper bound is still a reasonable amount of
