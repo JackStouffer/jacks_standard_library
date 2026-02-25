@@ -1,68 +1,6 @@
 /**
  * TODO: docs
  * 
- * # Generate Hash Map Tool
- * 
- * Generate the C header and source files for a hash map before compilation.
- * 
- * The utility generates a header file and a C file for a type safe, open addressed,
- * linear probed, hash map. By generating the code rather than using macros, two
- * benefits are gained. One, the code is much easier to debug. Two, it's much more
- * obvious how much code you're generating, which means you are much less likely to
- * accidentally create the combinatoric explosion of code that's so common in C++
- * projects. Sometimes, adding friction to things is good.
- * 
- * There are two implementations of hash map that this utility can generate.
- * 
- * 1. A fixed size hash map that cannot grow. You set the max item count at
- *    init. This reduces memory fragmentation in arenas and it reduces failure
- *    modes in later parts of the program
- * 2. A standard dynamic hash map.
- * 
- * ## Usage
- * 
- * This tool is usable as both a command line tool and a C library. Use the
- * command line tool for traditional GNU make style builds and use the C
- * library for "metaprogram" style builds.
- * 
- * ### CLI Program
- * 
- * Compile the program with
- * 
- * ```
- * $ cc -o generate_hash_map tools/generate_hash_map.c
- * ```
- * 
- * or on Windows with
- * 
- * ```
- * > cl.exe /Fegenerate_hash_map tools\generate_hash_map.c
- * ```
- * 
- * Get the help message with
- * 
- * ```
- * $ ./generate_hash_map --help
- * ```
- * 
- * ### Library
- * 
- * The `generate_hash_map.h` file is a single-header-file library. In
- * every file that uses the code include the header normally.
- * 
- * ```
- * #include "generate_hash_map.h"
- * ```
- * 
- * Then in one, and only one, file define the implementation macro
- * 
- * ```
- * #define GENERATE_HASH_MAP_IMPLEMENTATION
- * #include "generate_hash_map.h"
- * ```
- * 
- * The two relevent functions are write_hash_map_header and write_hash_map_source
- * 
  * ## License
  *
  * Copyright (c) 2026 Jack Stouffer
@@ -127,7 +65,7 @@ JSLImmutableMemory help_message = JSL_CSTR_INITIALIZER(
     "\t--custom-hash\t\tOverride the included hash call with the given function name\n"
 );
 
-static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
+static int32_t entrypoint(JSLAllocatorInterface allocator, JSLCmdLineArgs* cmd)
 {
     bool show_help = false;
     JSLImmutableMemory name = {0};
@@ -331,7 +269,7 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
             return EXIT_FAILURE;
         }
 
-        return entrypoint(&allocator, &cmd);
+        return entrypoint(allocator, &cmd);
     }
 
 #elif JSL_IS_POSIX
@@ -348,7 +286,7 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
         jsl_infinite_arena_get_allocator_interface(&allocator, &arena);
 
         JSLCmdLineArgs cmd;
-        if (!jsl_cmd_line_args_init(&cmd, &allocator))
+        if (!jsl_cmd_line_args_init(&cmd, allocator))
         {
             jsl_write_to_c_file(stderr, JSL_CSTR_EXPRESSION("Command line input exceeds memory limit"));
             return EXIT_FAILURE;
@@ -369,7 +307,7 @@ static int32_t entrypoint(JSLAllocatorInterface* allocator, JSLCmdLineArgs* cmd)
             return EXIT_FAILURE;
         }
 
-        return entrypoint(&allocator, &cmd);
+        return entrypoint(allocator, &cmd);
     }
 
 #else

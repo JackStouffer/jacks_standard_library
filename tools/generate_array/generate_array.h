@@ -132,7 +132,7 @@
      * @param include_header_count The length of the header array
      */
     GENERATE_ARRAY_DEF void write_array_header(
-        JSLAllocatorInterface* allocator,
+        JSLAllocatorInterface allocator,
         JSLOutputSink sink,
         ArrayImplementation impl,
         JSLImmutableMemory array_type_name,
@@ -155,7 +155,7 @@
      * @param include_header_count The length of the header array
      */
     GENERATE_ARRAY_DEF void write_array_source(
-        JSLAllocatorInterface* allocator,
+        JSLAllocatorInterface allocator,
         JSLOutputSink sink,
         ArrayImplementation impl,
         JSLImmutableMemory array_type_name,
@@ -241,7 +241,7 @@
         "    // corrupted from accidental overwrites, therefore making it\n"
         "    // more likely that memory bugs are caught.\n"
         "    uint64_t sentinel;\n"
-        "    JSLAllocatorInterface* allocator;\n"
+        "    JSLAllocatorInterface allocator;\n"
         "    {{ value_type_name }}* data;\n"
         "    int64_t length;\n"
         "    int64_t capacity;\n"
@@ -258,7 +258,7 @@
         " */\n"
         "bool {{ function_prefix }}_init(\n"
         "    {{ array_type_name }}* array,\n"
-        "    JSLAllocatorInterface* allocator,\n"
+        "    JSLAllocatorInterface allocator,\n"
         "    int64_t initial_capacity\n"
         ");\n"
         "\n"
@@ -411,11 +411,11 @@
         "\n"
         "bool {{ function_prefix }}_init(\n"
         "    {{ array_type_name }}* array,\n"
-        "    JSLAllocatorInterface* allocator,\n"
+        "    JSLAllocatorInterface allocator,\n"
         "    int64_t initial_capacity\n"
         ")\n"
         "{\n"
-        "    bool res = array != NULL && allocator != NULL && initial_capacity > -1;\n"
+        "    bool res = array != NULL && initial_capacity > -1;\n"
         "\n"
         "    if (res)\n"
         "    {\n"
@@ -688,7 +688,7 @@
     *          allocation failures during header generation.
     */
     GENERATE_ARRAY_DEF void write_array_header(
-        JSLAllocatorInterface* allocator,
+        JSLAllocatorInterface allocator,
         JSLOutputSink sink,
         ArrayImplementation impl,
         JSLImmutableMemory array_type_name,
@@ -765,7 +765,7 @@
     }
 
     GENERATE_ARRAY_DEF void write_array_source(
-        JSLAllocatorInterface* allocator,
+        JSLAllocatorInterface allocator,
         JSLOutputSink sink,
         ArrayImplementation impl,
         JSLImmutableMemory array_type_name,

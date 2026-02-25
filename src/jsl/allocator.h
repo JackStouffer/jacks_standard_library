@@ -106,14 +106,12 @@ typedef bool (*JSLFreeAllFP)(void* ctx);
 /**
  * The structure makes the following assumptions:
  * 
- *      - This structure has been initalized using `jsl_allocator_interface_init`
  *      - A given instance of `JSLAllocatorInterface` must have the same or shorter lifetime of the underlying allocator
  *      - Library code can freely store a pointer to this structure
  *      - It is not valid for library code to make a copy of this structure
  */
-typedef struct JSL__AllocatorInterface
+typedef struct JSLAllocatorInterface
 {
-    uint64_t sentinel;
     JSLAllocateFP allocate;
     JSLReallocateFP reallocate;
     JSLFreeFP free;
@@ -148,37 +146,49 @@ void jsl_allocator_interface_init(
 /**
  * TODO: docs
  */
-void* jsl_allocator_interface_alloc(
-    JSLAllocatorInterface* allocator,
+static inline void* jsl_allocator_interface_alloc(
+    JSLAllocatorInterface allocator,
     int64_t bytes,
     int32_t alignment,
     bool zeroed
-);
+)
+{
+    return allocator.allocate(allocator.context, bytes, alignment, zeroed);
+}
 
 /**
  * TODO: docs
  */
-void* jsl_allocator_interface_realloc(
-    JSLAllocatorInterface* allocator,
+static inline void* jsl_allocator_interface_realloc(
+    JSLAllocatorInterface allocator,
     void* allocation,
     int64_t new_bytes,
     int32_t alignment
-);
+)
+{
+    return allocator.reallocate(allocator.context, allocation, new_bytes, alignment);
+}
 
 /**
  * TODO: docs
  */
-bool jsl_allocator_interface_free(
-    JSLAllocatorInterface* allocator,
+static inline bool jsl_allocator_interface_free(
+    JSLAllocatorInterface allocator,
     const void* allocation
-);
+)
+{
+    return allocator.free(allocator.context, allocation);
+}
 
 /**
  * TODO: docs
  */
-bool jsl_allocator_interface_free_all(
-    JSLAllocatorInterface* allocator
-);
+static inline bool jsl_allocator_interface_free_all(
+    JSLAllocatorInterface allocator
+)
+{
+    return allocator.free_all(allocator.context);
+}
 
 /**
  * Macro to make it easier to allocate an instance of `T`.

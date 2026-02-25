@@ -1,5 +1,11 @@
 .vscode/
 .zed/
+.cursor/
+.openai/
+.claude/
+.anthropic/
+.claude/
+CLAUDE.md
 *.exe
 *.exp
 *.ilk

@@ -5,6 +5,27 @@
  * it in binary. Unfortunately it took until C23 for this to be standardized
  * in the language. This program takes the binary representation of a
  * file and generates the text of a C header with that info as a fat pointer.
+ * 
+ * ## License
+ * 
+ * Copyright (c) 2026 Jack Stouffer
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the “Software”),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the Software
+ * is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+ * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+ * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
  */
 
@@ -40,7 +61,7 @@ static JSLImmutableMemory var_name_flag_str = JSL_CSTR_INITIALIZER("var-name");
 
 static int32_t entrypoint(
     JSLCmdLineArgs* cmd,
-    JSLAllocatorInterface* allocator,
+    JSLAllocatorInterface allocator,
     bool stdin_has_data
 )
 {
@@ -200,7 +221,7 @@ static int32_t entrypoint(
         jsl_infinite_arena_get_allocator_interface(&allocator, &arena);
 
         JSLCmdLineArgs cmd;
-        jsl_cmd_line_args_init(&cmd, &allocator);
+        jsl_cmd_line_args_init(&cmd, allocator);
         JSLImmutableMemory error_message = {0};
         if (!jsl_cmd_line_args_parse_wide(&cmd, argc, argv, &error_message))
         {
@@ -232,7 +253,7 @@ static int32_t entrypoint(
             stdin_has_data = true;
         }
 
-        return entrypoint(&cmd, &allocator, stdin_has_data);
+        return entrypoint(&cmd, allocator, stdin_has_data);
     }
 
 #elif JSL_IS_POSIX
@@ -251,7 +272,7 @@ static int32_t entrypoint(
         jsl_infinite_arena_get_allocator_interface(&allocator, &arena);
 
         JSLCmdLineArgs cmd;
-        if (!jsl_cmd_line_args_init(&cmd, &allocator))
+        if (!jsl_cmd_line_args_init(&cmd, allocator))
         {
             jsl_write_to_c_file(stderr, JSL_CSTR_EXPRESSION("Command line input exceeds memory limit"));
             return EXIT_FAILURE;
@@ -280,7 +301,7 @@ static int32_t entrypoint(
         int stdin_poll_result = poll(&stdin_poll, 1, 0);
         bool stdin_has_data = stdin_poll_result > 0 && (stdin_poll.revents & POLLIN);
 
-        return entrypoint(&cmd, &allocator, stdin_has_data);
+        return entrypoint(&cmd, allocator, stdin_has_data);
     }
 
 #else

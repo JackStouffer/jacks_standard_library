@@ -184,15 +184,10 @@ static bool jsl__cmd_line_args_validate_utf8(JSLImmutableMemory str)
     return res;
 }
 
-static bool jsl__cmd_line_args_utf16_to_utf8(JSLAllocatorInterface* allocator, wchar_t* wide, JSLImmutableMemory* out_utf8)
+static bool jsl__cmd_line_args_utf16_to_utf8(JSLAllocatorInterface allocator, wchar_t* wide, JSLImmutableMemory* out_utf8)
 {
     bool res = false;
-
-    bool params_valid = (
-        allocator != NULL
-        && out_utf8 != NULL
-        && wide != NULL
-    );
+    bool params_valid = out_utf8 != NULL && wide != NULL;
 
     int64_t total_bytes = 0;
     size_t wide_length = 0;
@@ -369,12 +364,7 @@ static void jsl__cmd_line_args_reset(struct JSLCmdLineArgs* args)
 static bool jsl__cmd_line_args_ensure_arg_capacity(struct JSLCmdLineArgs* args, int64_t capacity_needed)
 {
     bool res = false;
-
-    bool params_valid = (
-        args != NULL
-        && args->_allocator != NULL
-        && capacity_needed > -1
-    );
+    bool params_valid = args != NULL && capacity_needed > -1;
 
     bool enough = params_valid && capacity_needed <= args->_arg_list_capacity;
     if (enough)
@@ -414,7 +404,6 @@ static bool jsl__cmd_line_args_copy_arg(struct JSLCmdLineArgs* args, JSLImmutabl
 
     bool params_valid = (
         args != NULL
-        && args->_allocator != NULL
         && out_copy != NULL
         && raw.length > -1
         && (raw.data != NULL || raw.length == 0)
@@ -768,7 +757,7 @@ static bool jsl__cmd_line_args_process_arg(
         && stored_arg.length > -1
     );
 
-    if (!params_valid && out_error != NULL && args != NULL && args->_allocator != NULL)
+    if (!params_valid && out_error != NULL && args != NULL)
     {
         jsl__cmd_line_args_set_error(
             args,
@@ -1939,7 +1928,7 @@ int64_t jsl_cmd_line_write_reset(JSLOutputSink sink, JSLTerminalInfo* terminal_i
     return 0;
 }
 
-bool jsl_cmd_line_args_init(JSLCmdLineArgs* cmd_args, JSLAllocatorInterface* allocator)
+bool jsl_cmd_line_args_init(JSLCmdLineArgs* cmd_args, JSLAllocatorInterface allocator)
 {
     struct JSLCmdLineArgs* args = (struct JSLCmdLineArgs*) cmd_args;
 
@@ -1949,7 +1938,7 @@ bool jsl_cmd_line_args_init(JSLCmdLineArgs* cmd_args, JSLAllocatorInterface* all
     bool multimap_init = false;
     bool commands_init = false;
 
-    if (args != NULL && allocator != NULL)
+    if (args != NULL)
     {
         JSL_MEMSET(args, 0, sizeof(JSLCmdLineArgs));
         args->_allocator = allocator;

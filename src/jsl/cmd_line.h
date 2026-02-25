@@ -397,9 +397,8 @@ int64_t jsl_cmd_line_write_reset(JSLOutputSink sink, JSLTerminalInfo* terminal_i
 typedef struct JSLCmdLineArgs {
     uint64_t _sentinel;
 
-    JSLAllocatorInterface* _allocator;
-
     uint64_t _short_flag_bitset[JSL__CMD_LINE_SHORT_FLAG_BUCKETS];
+    JSLAllocatorInterface _allocator;
 
     JSLStrToStrMap _long_flags;
     JSLStrToStrMultimap _flags_with_values;
@@ -419,7 +418,7 @@ typedef struct JSLCmdLineArgs {
  * @param allocator The allocator to use for all memory needs
  * @returns bool for success or failure
  */
-bool jsl_cmd_line_args_init(JSLCmdLineArgs* args, JSLAllocatorInterface* allocator);
+bool jsl_cmd_line_args_init(JSLCmdLineArgs* args, JSLAllocatorInterface allocator);
 
 /**
  * Parse the given command line arguments that are in the POSIX style. The inputs must

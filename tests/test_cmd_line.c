@@ -51,7 +51,7 @@ static void test_short_flags_grouping(void)
 
     JSLCmdLineArgs cmd = {0};
 
-    TEST_BOOL(jsl_cmd_line_args_init(&cmd, &allocator));
+    TEST_BOOL(jsl_cmd_line_args_init(&cmd, allocator));
 
     char* argv[] = {
         "prog",
@@ -92,7 +92,7 @@ static void test_short_flag_equals_is_invalid(void)
 
     JSLCmdLineArgs cmd = {0};
 
-    TEST_BOOL(jsl_cmd_line_args_init(&cmd, &allocator));
+    TEST_BOOL(jsl_cmd_line_args_init(&cmd, allocator));
 
     char* argv[] = {
         "prog",
@@ -115,7 +115,7 @@ static void test_long_flags_and_commands(void)
 
     JSLCmdLineArgs cmd = {0};
 
-    TEST_BOOL(jsl_cmd_line_args_init(&cmd, &allocator));
+    TEST_BOOL(jsl_cmd_line_args_init(&cmd, allocator));
 
     char* argv[] = {
         "prog",
@@ -168,7 +168,7 @@ static void test_long_values_equals_and_space(void)
 
     JSLCmdLineArgs cmd = {0};
 
-    TEST_BOOL(jsl_cmd_line_args_init(&cmd, &allocator));
+    TEST_BOOL(jsl_cmd_line_args_init(&cmd, allocator));
 
     char* argv[] = {
         "prog",
@@ -217,7 +217,7 @@ static void test_wide_parsing(void)
 
     JSLCmdLineArgs cmd = {0};
 
-    TEST_BOOL(jsl_cmd_line_args_init(&cmd, &allocator));
+    TEST_BOOL(jsl_cmd_line_args_init(&cmd, allocator));
 
     wchar_t arg0[] = L"prog";
     wchar_t arg1[] = L"--name";

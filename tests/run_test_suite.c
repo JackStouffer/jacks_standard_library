@@ -54,6 +54,8 @@
 
 typedef struct HashMapDecl {
     char *name, *prefix, *key_type, *value_type, *impl_type;
+    bool key_is_str;
+    bool value_is_str;
     char** headers;
 } HashMapDecl;
 
@@ -391,14 +393,16 @@ static UnitTestDecl unit_test_declarations[] = {
             NULL
         }
     },
-    { "test_file_utils", (char*[]) {
-        "tests/test_file_utils.c",
-        "src/jsl/core.c",
-        "src/jsl/allocator.c",
-        "src/jsl/allocator_arena.c",
-        "src/jsl/os.c",
-        NULL
-    } },
+    {
+        "test_file_utils", (char*[]) {
+            "tests/test_file_utils.c",
+            "src/jsl/core.c",
+            "src/jsl/allocator.c",
+            "src/jsl/allocator_arena.c",
+            "src/jsl/os.c",
+            NULL
+        }
+    },
     {
         "test_str_to_str_multimap",
         (char*[]) {
@@ -447,6 +451,8 @@ static UnitTestDecl unit_test_declarations[] = {
             "tests/hash_maps/fixed_comp3_to_comp2_map.c",
             "tests/hash_maps/fixed_int32_to_comp1_map.c",
             "tests/hash_maps/fixed_int32_to_int32_map.c",
+            "tests/hash_maps/fixed_int32_to_str_map.c",
+            "tests/hash_maps/fixed_str_to_int32_map.c",
             NULL
         }
     }
@@ -459,6 +465,8 @@ static HashMapDecl hash_map_declarations[] = {
         "int32_t",
         "int32_t",
         "--fixed",
+        false,
+        false,
         (char*[]) {
             "../tests/hash_maps/fixed_int32_to_int32_map.h",
             "../tests/test_hash_map_types.h", NULL
@@ -470,6 +478,8 @@ static HashMapDecl hash_map_declarations[] = {
         "int32_t",
         "CompositeType1",
         "--fixed",
+        false,
+        false,
         (char*[]) {
             "../tests/hash_maps/fixed_int32_to_comp1_map.h",
             "../tests/test_hash_map_types.h", NULL
@@ -481,6 +491,8 @@ static HashMapDecl hash_map_declarations[] = {
         "CompositeType2",
         "int32_t",
         "--fixed",
+        false,
+        false,
         (char*[]) {
             "../tests/hash_maps/fixed_comp2_to_int_map.h",
             "../tests/test_hash_map_types.h", NULL
@@ -492,8 +504,36 @@ static HashMapDecl hash_map_declarations[] = {
         "CompositeType3",
         "CompositeType2",
         "--fixed",
+        false,
+        false,
         (char*[]) {
             "../tests/hash_maps/fixed_comp3_to_comp2_map.h",
+            "../tests/test_hash_map_types.h", NULL
+        }
+    },
+    {
+        "FixedStrToIntMap",
+        "fixed_str_to_int32_map",
+        NULL,
+        "int32_t",
+        "--fixed",
+        true,
+        false,
+        (char*[]) {
+            "../tests/hash_maps/fixed_str_to_int32_map.h",
+            "../tests/test_hash_map_types.h", NULL
+        }
+    },
+    {
+        "FixedIntToStrMap",
+        "fixed_int32_to_str_map",
+        "int32_t",
+        NULL,
+        "--fixed",
+        false,
+        true,
+        (char*[]) {
+            "../tests/hash_maps/fixed_int32_to_str_map.h",
             "../tests/test_hash_map_types.h", NULL
         }
     }
@@ -894,16 +934,40 @@ int32_t main(int32_t argc, char **argv)
             HashMapDecl* decl = &hash_map_declarations[i];
 
             Nob_Cmd write_hash_map_header = {0};
-            nob_cmd_append(
-                &write_hash_map_header,
-                generate_hash_map_run_exe_command,
-                "--name", decl->name,
-                "--function-prefix", decl->prefix,
-                "--key-type", decl->key_type,
-                "--value-type", decl->value_type,
-                decl->impl_type,
-                "--header"
-            );
+
+            if (decl->key_is_str)
+                nob_cmd_append(
+                    &write_hash_map_header,
+                    generate_hash_map_run_exe_command,
+                    "--name", decl->name,
+                    "--function-prefix", decl->prefix,
+                    "--key-is-string",
+                    "--value-type", decl->value_type,
+                    decl->impl_type,
+                    "--header"
+                );
+            else if (decl->value_is_str)
+                nob_cmd_append(
+                    &write_hash_map_header,
+                    generate_hash_map_run_exe_command,
+                    "--name", decl->name,
+                    "--function-prefix", decl->prefix,
+                    "--key-type", decl->key_type,
+                    "--value-is-string",
+                    decl->impl_type,
+                    "--header"
+                );
+            else
+                nob_cmd_append(
+                    &write_hash_map_header,
+                    generate_hash_map_run_exe_command,
+                    "--name", decl->name,
+                    "--function-prefix", decl->prefix,
+                    "--key-type", decl->key_type,
+                    "--value-type", decl->value_type,
+                    decl->impl_type,
+                    "--header"
+                );
 
             for (int32_t header_idx = 0;;++header_idx)
             {
@@ -930,16 +994,40 @@ int32_t main(int32_t argc, char **argv)
             )) return 1;
 
             Nob_Cmd write_hash_map_source = {0};
-            nob_cmd_append(
-                &write_hash_map_source,
-                generate_hash_map_run_exe_command,
-                "--name", decl->name,
-                "--function-prefix", decl->prefix,
-                "--key-type", decl->key_type,
-                "--value-type", decl->value_type,
-                decl->impl_type,
-                "--source"
-            );
+
+            if (decl->key_is_str)
+                nob_cmd_append(
+                    &write_hash_map_source,
+                    generate_hash_map_run_exe_command,
+                    "--name", decl->name,
+                    "--function-prefix", decl->prefix,
+                    "--key-is-string",
+                    "--value-type", decl->value_type,
+                    decl->impl_type,
+                    "--source"
+                );
+            else if (decl->value_is_str)
+                nob_cmd_append(
+                    &write_hash_map_source,
+                    generate_hash_map_run_exe_command,
+                    "--name", decl->name,
+                    "--function-prefix", decl->prefix,
+                    "--key-type", decl->key_type,
+                    "--value-is-string",
+                    decl->impl_type,
+                    "--source"
+                );
+            else
+                nob_cmd_append(
+                    &write_hash_map_source,
+                    generate_hash_map_run_exe_command,
+                    "--name", decl->name,
+                    "--function-prefix", decl->prefix,
+                    "--key-type", decl->key_type,
+                    "--value-type", decl->value_type,
+                    decl->impl_type,
+                    "--source"
+                );
 
             for (int32_t header_idx = 0;;++header_idx)
             {

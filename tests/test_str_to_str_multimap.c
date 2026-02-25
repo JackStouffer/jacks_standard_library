@@ -66,9 +66,8 @@ static void test_jsl_str_to_str_multimap_init_success(void)
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
-    bool ok = jsl_str_to_str_multimap_init2(&map, &allocator, 0xDEADBEEFUL, 8, 0.5f);
+    bool ok = jsl_str_to_str_multimap_init2(&map, allocator, 0xDEADBEEFUL, 8, 0.5f);
     TEST_BOOL(ok);
-    TEST_POINTERS_EQUAL(map.allocator, &allocator);
 }
 
 static void test_jsl_str_to_str_multimap_init_invalid_arguments(void)
@@ -77,13 +76,12 @@ static void test_jsl_str_to_str_multimap_init_invalid_arguments(void)
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
-    TEST_BOOL(!jsl_str_to_str_multimap_init2(NULL, &allocator, 0, 4, 0.5f));
-    TEST_BOOL(!jsl_str_to_str_multimap_init2(&map, NULL, 0, 4, 0.5f));
-    TEST_BOOL(!jsl_str_to_str_multimap_init2(&map, &allocator, 0, 0, 0.5f));
-    TEST_BOOL(!jsl_str_to_str_multimap_init2(&map, &allocator, 0, -4, 0.5f));
-    TEST_BOOL(!jsl_str_to_str_multimap_init2(&map, &allocator, 0, 4, 0.0f));
-    TEST_BOOL(!jsl_str_to_str_multimap_init2(&map, &allocator, 0, 4, 1.1f));
-    TEST_BOOL(!jsl_str_to_str_multimap_init2(&map, &allocator, 0, 4, -0.5f));
+    TEST_BOOL(!jsl_str_to_str_multimap_init2(NULL, allocator, 0, 4, 0.5f));
+    TEST_BOOL(!jsl_str_to_str_multimap_init2(&map, allocator, 0, 0, 0.5f));
+    TEST_BOOL(!jsl_str_to_str_multimap_init2(&map, allocator, 0, -4, 0.5f));
+    TEST_BOOL(!jsl_str_to_str_multimap_init2(&map, allocator, 0, 4, 0.0f));
+    TEST_BOOL(!jsl_str_to_str_multimap_init2(&map, allocator, 0, 4, 1.1f));
+    TEST_BOOL(!jsl_str_to_str_multimap_init2(&map, allocator, 0, 4, -0.5f));
 }
 
 static void test_jsl_str_to_str_multimap_insert_and_get_value_count(void)
@@ -92,7 +90,7 @@ static void test_jsl_str_to_str_multimap_insert_and_get_value_count(void)
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
-    bool ok = jsl_str_to_str_multimap_init2(&map, &allocator, 42, 8, 0.65f);
+    bool ok = jsl_str_to_str_multimap_init2(&map, allocator, 42, 8, 0.65f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -119,7 +117,7 @@ static void test_jsl_str_to_str_multimap_duplicate_values_allowed(void)
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
-    bool ok = jsl_str_to_str_multimap_init2(&map, &allocator, 7, 4, 0.5f);
+    bool ok = jsl_str_to_str_multimap_init2(&map, allocator, 7, 4, 0.5f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -156,7 +154,7 @@ static void test_jsl_str_to_str_multimap_transient_lifetime_copies(void)
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
-    bool ok = jsl_str_to_str_multimap_init2(&map, &allocator, 123, 4, 0.75f);
+    bool ok = jsl_str_to_str_multimap_init2(&map, allocator, 123, 4, 0.75f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -197,7 +195,7 @@ static void test_jsl_str_to_str_multimap_static_lifetime_no_copy(void)
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
-    bool ok = jsl_str_to_str_multimap_init2(&map, &allocator, 789, 4, 0.5f);
+    bool ok = jsl_str_to_str_multimap_init2(&map, allocator, 789, 4, 0.5f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -227,7 +225,7 @@ static void test_jsl_str_to_str_multimap_key_value_iterator_covers_all_pairs(voi
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
-    bool ok = jsl_str_to_str_multimap_init2(&map, &allocator, 555, 8, 0.5f);
+    bool ok = jsl_str_to_str_multimap_init2(&map, allocator, 555, 8, 0.5f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -286,7 +284,7 @@ static void test_jsl_str_to_str_multimap_get_key_iterator_filters_by_key(void)
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
-    bool ok = jsl_str_to_str_multimap_init2(&map, &allocator, 1010, 6, 0.6f);
+    bool ok = jsl_str_to_str_multimap_init2(&map, allocator, 1010, 6, 0.6f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -327,7 +325,7 @@ static void test_jsl_str_to_str_multimap_handles_empty_and_binary_values(void)
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
-    bool ok = jsl_str_to_str_multimap_init2(&map, &allocator, 2020, 4, 0.5f);
+    bool ok = jsl_str_to_str_multimap_init2(&map, allocator, 2020, 4, 0.5f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -375,7 +373,7 @@ static void test_jsl_str_to_str_multimap_delete_value(void)
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
-    bool ok = jsl_str_to_str_multimap_init2(&map, &allocator, 3030, 8, 0.55f);
+    bool ok = jsl_str_to_str_multimap_init2(&map, allocator, 3030, 8, 0.55f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -408,7 +406,7 @@ static void test_jsl_str_to_str_multimap_delete_value_removes_empty_key(void)
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
-    bool ok = jsl_str_to_str_multimap_init2(&map, &allocator, 6060, 6, 0.5f);
+    bool ok = jsl_str_to_str_multimap_init2(&map, allocator, 6060, 6, 0.5f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -452,7 +450,7 @@ static void test_jsl_str_to_str_multimap_delete_key(void)
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
-    bool ok = jsl_str_to_str_multimap_init2(&map, &allocator, 4040, 6, 0.5f);
+    bool ok = jsl_str_to_str_multimap_init2(&map, allocator, 4040, 6, 0.5f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -489,7 +487,7 @@ static void test_jsl_str_to_str_multimap_clear(void)
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
-    bool ok = jsl_str_to_str_multimap_init2(&map, &allocator, 5050, 10, 0.5f);
+    bool ok = jsl_str_to_str_multimap_init2(&map, allocator, 5050, 10, 0.5f);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -518,7 +516,7 @@ static void test_stress_test(void)
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
 
-    bool ok = jsl_str_to_str_multimap_init(&map, &allocator, 0);
+    bool ok = jsl_str_to_str_multimap_init(&map, allocator, 0);
     TEST_BOOL(ok);
     if (!ok) return;
 
@@ -527,7 +525,7 @@ static void test_stress_test(void)
 
     for (int32_t i = 0; i < key_count; ++i)
     {
-        JSLImmutableMemory key = jsl_format(&allocator, JSL_CSTR_EXPRESSION("%d"), i);
+        JSLImmutableMemory key = jsl_format(allocator, JSL_CSTR_EXPRESSION("%d"), i);
         
         for (int64_t j = 0; j < value_per_key; ++j)
         {

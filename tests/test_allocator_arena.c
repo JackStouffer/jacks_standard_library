@@ -251,7 +251,7 @@ static void test_arena_allocator_interface_basic(void)
 
     jsl_arena_get_allocator_interface(&allocator, &arena);
 
-    uint8_t* allocation = (uint8_t*) jsl_allocator_interface_alloc(&allocator, 32, 8, true);
+    uint8_t* allocation = (uint8_t*) jsl_allocator_interface_alloc(allocator, 32, 8, true);
     TEST_BOOL(allocation != NULL);
     if (!allocation) return;
 
@@ -260,10 +260,10 @@ static void test_arena_allocator_interface_basic(void)
         TEST_BOOL(allocation[i] == 0);
     }
 
-    TEST_BOOL(jsl_allocator_interface_free(&allocator, allocation));
-    TEST_BOOL(jsl_allocator_interface_free_all(&allocator));
+    TEST_BOOL(jsl_allocator_interface_free(allocator, allocation));
+    TEST_BOOL(jsl_allocator_interface_free_all(allocator));
 
-    void* second = jsl_allocator_interface_alloc(&allocator, 32, 8, false);
+    void* second = jsl_allocator_interface_alloc(allocator, 32, 8, false);
     TEST_POINTERS_EQUAL(second, allocation);
 }
 
@@ -624,7 +624,7 @@ static void test_infinite_arena_allocator_interface_basic(void)
     JSLAllocatorInterface allocator;
     jsl_infinite_arena_get_allocator_interface(&allocator, &arena);
 
-    uint8_t* allocation = (uint8_t*) jsl_allocator_interface_alloc(&allocator, 32, 8, true);
+    uint8_t* allocation = (uint8_t*) jsl_allocator_interface_alloc(allocator, 32, 8, true);
     TEST_BOOL(allocation != NULL);
     if (!allocation) return;
 
@@ -633,10 +633,10 @@ static void test_infinite_arena_allocator_interface_basic(void)
         TEST_BOOL(allocation[i] == 0);
     }
 
-    TEST_BOOL(jsl_allocator_interface_free(&allocator, allocation));
-    TEST_BOOL(jsl_allocator_interface_free_all(&allocator));
+    TEST_BOOL(jsl_allocator_interface_free(allocator, allocation));
+    TEST_BOOL(jsl_allocator_interface_free_all(allocator));
 
-    void* second = jsl_allocator_interface_alloc(&allocator, 32, 8, false);
+    void* second = jsl_allocator_interface_alloc(allocator, 32, 8, false);
     TEST_BOOL(second != NULL);
 
     jsl_infinite_arena_release(&arena);

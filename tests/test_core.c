@@ -998,7 +998,7 @@ static void test_jsl_to_cstr(void)
 
     {
         JSLImmutableMemory memory = {0};
-        const char* cstr = jsl_memory_to_cstr(&allocator, memory);
+        const char* cstr = jsl_memory_to_cstr(allocator, memory);
         TEST_POINTERS_EQUAL(cstr, NULL);
     }
 
@@ -1006,7 +1006,7 @@ static void test_jsl_to_cstr(void)
 
     {
         JSLImmutableMemory memory = JSL_CSTR_INITIALIZER("10023");
-        const char* cstr = jsl_memory_to_cstr(&allocator, memory);
+        const char* cstr = jsl_memory_to_cstr(allocator, memory);
         TEST_BOOL(jsl_memory_cstr_compare(memory, cstr));
     }
 
@@ -1014,7 +1014,7 @@ static void test_jsl_to_cstr(void)
 
     {
         JSLImmutableMemory memory = JSL_CSTR_INITIALIZER(u8"Ω≈ç√∫");
-        const char* cstr = jsl_memory_to_cstr(&allocator, memory);
+        const char* cstr = jsl_memory_to_cstr(allocator, memory);
         TEST_BOOL(jsl_memory_cstr_compare(memory, cstr));
     }
 }

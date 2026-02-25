@@ -152,7 +152,7 @@ static inline int64_t jsl__get_file_size_from_fileno(int32_t file_descriptor)
 }
 
 JSLLoadFileResultEnum jsl_load_file_contents(
-    JSLAllocatorInterface* allocator,
+    JSLAllocatorInterface allocator,
     JSLImmutableMemory path,
     JSLImmutableMemory* out_contents,
     int32_t* out_errno
@@ -165,7 +165,6 @@ JSLLoadFileResultEnum jsl_load_file_contents(
     if (path.data != NULL
         && path.length > 0
         && path.length < FILENAME_MAX
-        && allocator != NULL
         && out_contents != NULL
     )
     {

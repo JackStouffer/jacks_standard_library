@@ -135,14 +135,15 @@
      * @param include_header_count The length of the header array
      */
     GENERATE_HASH_MAP_DEF void write_hash_map_header(
-        JSLAllocatorInterface* allocator,
+        JSLAllocatorInterface allocator,
         JSLOutputSink sink,
         HashMapImplementation impl,
         JSLImmutableMemory hash_map_name,
         JSLImmutableMemory function_prefix,
         JSLImmutableMemory key_type_name,
+        bool key_is_str,
         JSLImmutableMemory value_type_name,
-        JSLImmutableMemory hash_function_name,
+        bool value_is_str,
         JSLImmutableMemory* include_header_array,
         int32_t include_header_count
     );
@@ -162,13 +163,15 @@
      * @param include_header_count The length of the header array
      */
     GENERATE_HASH_MAP_DEF void write_hash_map_source(
-        JSLAllocatorInterface* allocator,
+        JSLAllocatorInterface allocator,
         JSLOutputSink sink,
         HashMapImplementation impl,
         JSLImmutableMemory hash_map_name,
         JSLImmutableMemory function_prefix,
         JSLImmutableMemory key_type_name,
+        bool key_is_str,
         JSLImmutableMemory value_type_name,
+        bool value_is_str,
         JSLImmutableMemory hash_function_name,
         JSLImmutableMemory* include_header_array,
         int32_t include_header_count
@@ -193,6 +196,21 @@
         " * This file contains the header for a hash map `{{ hash_map_name }}` which maps\n"
         " * `{{ key_type_name }}` keys to `{{ value_type_name }}` values.\n"
         " *\n"
+        " * This hash map is designed for situations where you can set an upper bound on the\n"
+        " * number of items you will have and that upper bound is still a reasonable amount of\n"
+        " * memory. This represents the vast majority case, as most hash maps will never have more\n"
+        " * than 100 items. Even in cases where the struct is quite large e.g. over a kilobyte, and\n"
+        " * you have a large upper bound, say 100k, thats still ~100MB of data. This is an incredibly\n"
+        " * rare case and you probably only have one of these in your program; this hash map would\n"
+        " * still work for that case.\n"
+        " *\n"
+        " * This hash map is not suited for cases where the hash map will shrink and grow quite\n"
+        " * substantially or there's no known upper bound. The most common example would be user\n"
+        " * input that cannot reasonably be limited, e.g. a word processing application cannot simply\n"
+        " * refuse to open very large (+10gig) documents. If you have some hash map which is built\n"
+        " * from the document file then you need some other allocation strategy (you probably don't\n"
+        " * want a normal hash map either as you'd be streaming things in and out of memory).\n"
+        " *\n"
         " * This file was auto generated from the hash map generation utility that's part of\n"
         " * the \"Jack's Standard Library\" project. The utility generates a header file and a\n"
         " * C file for a type safe, open addressed, hash map. By generating the code rather\n"
@@ -201,20 +219,26 @@
         " * much less likely to accidentally create the combinatoric explosion of code that's\n"
         " * so common in C++ projects. Adding friction to things is actually good sometimes.\n"
         " *\n"
-        " * Much like the arena allocator it uses, this hash map is designed for situations where\n"
-        " * you can set an upper bound on the number of items you will have and that upper bound is\n"
-        " * still a reasonable amount of memory. This represents the vast majority case, as most hash\n"
-        " * maps will never have more than 100 items. Even in cases where the struct is quite large\n"
-        " * e.g. over a kilobyte, and you have a large upper bound, say 100k, thats still ~100MB of\n"
-        " * data. This is an incredibly rare case and you probably only have one of these in your\n"
-        " * program; this hash map would still work for that case.\n"
+        " * ## LICENSE\n"
         " *\n"
-        " * This hash map is not suited for cases where the hash map will shrink and grow quite\n"
-        " * substantially or there's no known upper bound. The most common example would be user\n"
-        " * input that cannot reasonably be limited, e.g. a word processing application cannot simply\n"
-        " * refuse to open very large (+10gig) documents. If you have some hash map which is built\n"
-        " * from the document file then you need some other allocation strategy (you probably don't\n"
-        " * want a normal hash map either as you'd be streaming things in and out of memory).\n"
+        " * Copyright (c) 2026 Jack Stouffer\n"
+        " *\n"
+        " * Permission is hereby granted, free of charge, to any person obtaining a\n"
+        " * copy of this software and associated documentation files (the \"Software\"),\n"
+        " * to deal in the Software without restriction, including without limitation\n"
+        " * the rights to use, copy, modify, merge, publish, distribute, sublicense,\n"
+        " * and/or sell copies of the Software, and to permit persons to whom the Software\n"
+        " * is furnished to do so, subject to the following conditions:\n"
+        " *\n"
+        " * The above copyright notice and this permission notice shall be included in all\n"
+        " * copies or substantial portions of the Software.\n"
+        " *\n"
+        " * THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n"
+        " * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n"
+        " * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n"
+        " * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,\n"
+        " * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN\n"
+        " * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n"
         " */\n"
         "\n"
         "/**\n"
@@ -230,11 +254,25 @@
         "    // more likely that memory bugs are caught.\n"
         "    uint32_t sentinel;\n"
         "    uint32_t generational_id;\n"
+        "    JSLAllocatorInterface allocator;\n"
         "\n"
+        "    {% if key_is_str %}\n"
+        "    JSLImmutableMemory* keys_array;\n"
+        "    JSLStringLifeTime* key_lifetime_array;\n"
+        "    {% else %}\n"
         "    {{ key_type_name }}* keys_array;\n"
+        "    {% endif %}\n"
+        "\n"
+        "    {% if value_is_str %}\n"
+        "    JSLImmutableMemory* values_array;\n"
+        "    JSLStringLifeTime* value_lifetime_array;\n"
+        "    {% else %}\n"
         "    {{ value_type_name }}* values_array;\n"
+        "    {% endif %}\n"
+        "\n"
         "    uint64_t* hashes_array;\n"
         "    int64_t arrays_length;\n"
+        "\n"
         "    int64_t item_count;\n"
         "    int64_t max_item_count;\n"
         "    uint64_t seed;\n"
@@ -257,10 +295,6 @@
         " * The hash map does not save a reference to the arena, but the arena memory must have the same\n"
         " * or greater lifetime than the hash map itself.\n"
         " *\n"
-        " * As this hash map does not grow, the speed of insertion and retrieval will decrease\n"
-        " * exponentially as the load factor approaches 1. The true internal max item count is\n"
-        " * the next highest power of two of the given parameter with a minimum value of 32.\n"
-        " *\n"
         " * @warning This hash map uses a well distributed hash. But in order to properly protect against\n"
         " * hash flooding attacks you must do two things. One, provide good random data for the\n"
         " * seed value. This means using your OS's secure random number generator, not `rand`.\n"
@@ -271,13 +305,13 @@
         " * flooding then zero is a valid seed value.\n"
         " *\n"
         " * @param hash_map The pointer to the hash map instance to initialize\n"
-        " * @param arena The arena that this hash map will use to allocate memory\n"
+        " * @param allocator The allocator that this hash map will use\n"
         " * @param max_item_count The maximum amount of items this hash map can hold\n"
         " * @param seed Seed value for the hash function to protect against hash flooding attacks\n"
         " */\n"
         "bool {{ function_prefix }}_init(\n"
         "    {{ hash_map_name }}* hash_map,\n"
-        "    JSLAllocatorInterface* allocator,\n"
+        "    JSLAllocatorInterface allocator,\n"
         "    int64_t max_item_count,\n"
         "    uint64_t seed\n"
         ");\n"
@@ -294,8 +328,18 @@
         " */\n"
         "bool {{ function_prefix }}_insert(\n"
         "    {{ hash_map_name }}* hash_map,\n"
+        "    {% if key_is_str %}\n"
+        "    JSLImmutableMemory key,\n"
+        "    JSLStringLifeTime key_lifetime,\n"
+        "    {% else %}\n"
         "    {{ key_type_name }} key,\n"
+        "    {% endif %}\n"
+        "    {% if value_is_str %}\n"
+        "    JSLImmutableMemory value,\n"
+        "    JSLStringLifeTime value_lifetime\n"
+        "    {% else %}\n"
         "    {{ value_type_name }} value\n"
+        "    {% endif %}\n"
         ");\n"
         "\n"
         "/**\n"
@@ -309,9 +353,18 @@
         " * @param value Value to store\n"
         " * @returns The pointer to the value in the hash map, or null.\n"
         " */\n"
+        "{% if value_is_str %}\n"
+        "JSLImmutableMemory {{ function_prefix }}_get(\n"
+        "{% else %}\n"
         "{{ value_type_name }}* {{ function_prefix }}_get(\n"
+        "{% endif %}\n"
+        "\n"
         "    {{ hash_map_name }}* hash_map,\n"
+        "    {% if key_is_str %}\n"
+        "    JSLImmutableMemory key\n"
+        "    {% else %}\n"
         "    {{ key_type_name }} key\n"
+        "    {% endif %}\n"
         ");\n"
         "\n"
         "/**\n"
@@ -324,7 +377,19 @@
         " */\n"
         "bool {{ function_prefix }}_delete(\n"
         "    {{ hash_map_name }}* hash_map,\n"
+        "    {% if key_is_str %}\n"
+        "    JSLImmutableMemory key\n"
+        "    {% else %}\n"
         "    {{ key_type_name }} key\n"
+        "    {% endif %}\n"
+        ");\n"
+        "\n"
+        "/**\n"
+        " * Free all the underlying memory that was allocated by this hash map on the given\n"
+        " * allocator.\n"
+        " */\n"
+        "void {{ function_prefix }}_free(\n"
+        "    {{ hash_map_name }}* hash_map\n"
         ");\n"
         "\n"
         "/**\n"
@@ -371,56 +436,62 @@
         " */\n"
         "bool {{ function_prefix }}_iterator_next(\n"
         "    {{ hash_map_name }}Iterator* iterator,\n"
-        "    {{ key_type_name }}* key,\n"
-        "    {{ value_type_name }}* value\n"
+        "    {% if key_is_str %}\n"
+        "    JSLImmutableMemory* out_key,\n"
+        "    {% else %}\n"
+        "    {{ key_type_name }}* out_key,\n"
+        "    {% endif %}\n"
+        "    {% if value_is_str %}\n"
+        "    JSLImmutableMemory* out_value\n"
+        "    {% else %}\n"
+        "    {{ value_type_name }}* out_value\n"
+        "    {% endif %}\n"
         ");\n"
+        "\n"
     );
 
     static JSLImmutableMemory fixed_source_template = JSL_CSTR_INITIALIZER(
         "/**\n"
         " * AUTO GENERATED FILE\n"
         " *\n"
-        " * This file contains the source for a hash map `{{ hash_map_name }}` which maps\n"
-        " * `{{ key_type_name }}` keys to `{{ value_type_name }}` values.\n"
+        " * See the header for more information.\n"
         " *\n"
-        " * This file was auto generated from the hash map generation utility that's part of\n"
-        " * the \"Jack's Standard Library\" project. The utility generates a header file and a\n"
-        " * C file for a type safe, open addressed, linear probed, hash map. By generating\n"
-        " * the code rather than using macros, two benefits are gained. One, the code is much\n"
-        " * easier to debug. Two, it's much more obvious how much code you're generating,\n"
-        " * which means you are much less likely to accidentally create the combinatoric\n"
-        " * explosion of code that's so common in C++ projects. Sometimes, adding friction\n"
-        " * to things is good.\n"
+        " * ## LICENSE\n"
         " *\n"
-        " * Much like the arena allocator it uses, this hash map is designed for situations where\n"
-        " * you can set an upper bound on the number of items you will have and that upper bound is\n"
-        " * still a reasonable amount of memory. This represents the vast majority case, as most hash\n"
-        " * maps will never have more than 100 items. Even in cases where the struct is quite large\n"
-        " * e.g. over a kilobyte, and you have a large upper bound, say 100k, thats still ~100MB of\n"
-        " * data. This is an incredibly rare case and you probably only have one of these in your\n"
-        " * program; this hash map would still work for that case.\n"
+        " * Copyright (c) 2026 Jack Stouffer\n"
         " *\n"
-        " * This hash map is not suited for cases where the hash map will shrink and grow quite\n"
-        " * substantially or there's no known upper bound. The most common example would be user\n"
-        " * input that cannot reasonably be limited, e.g. a word processing application cannot simply\n"
-        " * refuse to open very large (+10gig) documents. If you have some hash map which is built\n"
-        " * from the document file then you need some other allocation strategy (you probably don't\n"
-        " * want a normal hash map either as you'd be streaming things in and out of memory).\n"
+        " * Permission is hereby granted, free of charge, to any person obtaining a\n"
+        " * copy of this software and associated documentation files (the \"Software\"),\n"
+        " * to deal in the Software without restriction, including without limitation\n"
+        " * the rights to use, copy, modify, merge, publish, distribute, sublicense,\n"
+        " * and/or sell copies of the Software, and to permit persons to whom the Software\n"
+        " * is furnished to do so, subject to the following conditions:\n"
+        " *\n"
+        " * The above copyright notice and this permission notice shall be included in all\n"
+        " * copies or substantial portions of the Software.\n"
+        " *\n"
+        " * THE SOFTWARE IS PROVIDED \"AS IS\", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR\n"
+        " * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,\n"
+        " * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE\n"
+        " * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,\n"
+        " * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN\n"
+        " * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.\n"
         " */\n"
         "\n"
         "bool {{ function_prefix }}_init(\n"
         "    {{ hash_map_name }}* hash_map,\n"
-        "    JSLAllocatorInterface* allocator,\n"
+        "    JSLAllocatorInterface allocator,\n"
         "    int64_t max_item_count,\n"
         "    uint64_t seed\n"
         ")\n"
         "{\n"
-        "    if (hash_map == NULL || allocator == NULL || max_item_count < 0)\n"
+        "    if (hash_map == NULL || max_item_count < 0)\n"
         "        return false;\n"
         "\n"
         "    JSL_MEMSET(hash_map, 0, sizeof({{ hash_map_name }}));\n"
         "\n"
         "    hash_map->seed = seed;\n"
+        "    hash_map->allocator = allocator;\n"
         "    hash_map->max_item_count = max_item_count;\n"
         "\n"
         "    int64_t max_with_load_factor = (int64_t) ((float) max_item_count / 0.75f);\n"
@@ -428,6 +499,24 @@
         "    hash_map->arrays_length = jsl_next_power_of_two_i64(max_with_load_factor);\n"
         "    hash_map->arrays_length = JSL_MAX(hash_map->arrays_length, 32);\n"
         "\n"
+        "    {% if key_is_str %}\n"
+        "    hash_map->keys_array = (JSLImmutableMemory*) jsl_allocator_interface_alloc(\n"
+        "        allocator,\n"
+        "        ((int64_t) sizeof(JSLImmutableMemory)) * hash_map->arrays_length,\n"
+        "        JSL_DEFAULT_ALLOCATION_ALIGNMENT,\n"
+        "        false\n"
+        "    );\n"
+        "    if (hash_map->keys_array == NULL)\n"
+        "        return false;\n"
+        "    hash_map->key_lifetime_array = (JSLStringLifeTime*) jsl_allocator_interface_alloc(\n"
+        "        allocator,\n"
+        "        ((int64_t) sizeof(JSLStringLifeTime)) * hash_map->arrays_length,\n"
+        "        JSL_DEFAULT_ALLOCATION_ALIGNMENT,\n"
+        "        false\n"
+        "    );\n"
+        "    if (hash_map->key_lifetime_array == NULL)\n"
+        "        return false;\n"
+        "    {% else %}\n"
         "    hash_map->keys_array = ({{ key_type_name }}*) jsl_allocator_interface_alloc(\n"
         "        allocator,\n"
         "        ((int64_t) sizeof({{ key_type_name }})) * hash_map->arrays_length,\n"
@@ -436,7 +525,27 @@
         "    );\n"
         "    if (hash_map->keys_array == NULL)\n"
         "        return false;\n"
+        "    {% endif %}\n"
         "\n"
+        "\n"
+        "    {% if value_is_str %}\n"
+        "    hash_map->values_array = (JSLImmutableMemory*) jsl_allocator_interface_alloc(\n"
+        "        allocator,\n"
+        "        ((int64_t) sizeof(JSLImmutableMemory)) * hash_map->arrays_length,\n"
+        "        JSL_DEFAULT_ALLOCATION_ALIGNMENT,\n"
+        "        false\n"
+        "    );\n"
+        "    if (hash_map->values_array == NULL)\n"
+        "        return false;\n"
+        "    hash_map->value_lifetime_array = (JSLStringLifeTime*) jsl_allocator_interface_alloc(\n"
+        "        allocator,\n"
+        "        ((int64_t) sizeof(JSLStringLifeTime)) * hash_map->arrays_length,\n"
+        "        JSL_DEFAULT_ALLOCATION_ALIGNMENT,\n"
+        "        false\n"
+        "    );\n"
+        "    if (hash_map->value_lifetime_array == NULL)\n"
+        "        return false;\n"
+        "    {% else %}\n"
         "    hash_map->values_array = ({{ value_type_name }}*) jsl_allocator_interface_alloc(\n"
         "        allocator,\n"
         "        ((int64_t) sizeof({{ value_type_name }})) * hash_map->arrays_length,\n"
@@ -445,6 +554,7 @@
         "    );\n"
         "    if (hash_map->values_array == NULL)\n"
         "        return false;\n"
+        "    {% endif %}\n"
         "\n"
         "    hash_map->hashes_array = (uint64_t*) jsl_allocator_interface_alloc(\n"
         "        allocator,\n"
@@ -461,7 +571,11 @@
         "\n"
         "static inline void {{ function_prefix }}_probe(\n"
         "    {{ hash_map_name }}* hash_map,\n"
+        "    {% if key_is_str %}\n"
+        "    JSLImmutableMemory key,\n"
+        "    {% else %}\n"
         "    {{ key_type_name }} key,\n"
+        "    {% endif %}\n"
         "    int64_t* out_slot,\n"
         "    uint64_t* out_hash,\n"
         "    bool* out_found\n"
@@ -469,7 +583,6 @@
         "{\n"
         "    *out_slot = -1;\n"
         "    *out_found = false;\n"
-        "\n"
         "    {{ hash_function }};\n"
         "\n"
         "    // Avoid clashing with sentinel values\n"
@@ -553,8 +666,18 @@
         "\n"
         "bool {{ function_prefix }}_insert(\n"
         "    {{ hash_map_name }}* hash_map,\n"
+        "    {% if key_is_str %}\n"
+        "    JSLImmutableMemory key,\n"
+        "    JSLStringLifeTime key_lifetime,\n"
+        "    {% else %}\n"
         "    {{ key_type_name }} key,\n"
+        "    {% endif %}\n"
+        "    {% if value_is_str %}\n"
+        "    JSLImmutableMemory value,\n"
+        "    JSLStringLifeTime value_lifetime\n"
+        "    {% else %}\n"
         "    {{ value_type_name }} value\n"
+        "    {% endif %}\n"
         ")\n"
         "{\n"
         "    bool insert_success = false;\n"
@@ -562,9 +685,6 @@
         "    if (\n"
         "        hash_map == NULL\n"
         "        || hash_map->sentinel != PRIVATE_SENTINEL_{{ hash_map_name }}\n"
-        "        || hash_map->values_array == NULL\n"
-        "        || hash_map->keys_array == NULL\n"
-        "        || hash_map->hashes_array == NULL\n"
         "        || hash_map->item_count >= hash_map->max_item_count\n"
         "    )\n"
         "        return insert_success;\n"
@@ -577,8 +697,28 @@
         "    // new key\n"
         "    if (slot > -1 && !existing_found)\n"
         "    {\n"
+        "        {% if key_is_str %}\n"
+        "        if (key_lifetime == JSL_STRING_LIFETIME_SHORTER)\n"
+        "            hash_map->keys_array[slot] = jsl_duplicate(hash_map->allocator, key);\n"
+        "        else\n"
+        "            hash_map->keys_array[slot] = key;\n"
+        "\n"
+        "        hash_map->key_lifetime_array[slot] = key_lifetime;\n"
+        "        {% else %}\n"
         "        hash_map->keys_array[slot] = key;\n"
+        "        {% endif %}\n"
+        "\n"
+        "        {% if value_is_str %}\n"
+        "        if (value_lifetime == JSL_STRING_LIFETIME_SHORTER)\n"
+        "            hash_map->values_array[slot] = jsl_duplicate(hash_map->allocator, value);\n"
+        "        else\n"
+        "            hash_map->values_array[slot] = value;\n"
+        "\n"
+        "        hash_map->value_lifetime_array[slot] = value_lifetime;\n"
+        "        {% else %}\n"
         "        hash_map->values_array[slot] = value;\n"
+        "        {% endif %}\n"
+        "\n"
         "        hash_map->hashes_array[slot] = hash;\n"
         "        ++hash_map->item_count;\n"
         "        insert_success = true;\n"
@@ -586,7 +726,20 @@
         "    // update\n"
         "    else if (slot > -1 && existing_found)\n"
         "    {\n"
+        "        {% if value_is_str %}\n"
+        "        if (hash_map->value_lifetime_array[slot] == JSL_STRING_LIFETIME_SHORTER)\n"
+        "            jsl_allocator_interface_free(hash_map->allocator, hash_map->values_array[slot].data);\n"
+        "\n"
+        "        if (value_lifetime == JSL_STRING_LIFETIME_SHORTER)\n"
+        "            hash_map->values_array[slot] = jsl_duplicate(hash_map->allocator, value);\n"
+        "        else\n"
+        "            hash_map->values_array[slot] = value;\n"
+        "\n"
+        "        hash_map->value_lifetime_array[slot] = value_lifetime;\n"
+        "        {% else %}\n"
         "        hash_map->values_array[slot] = value;\n"
+        "        {% endif %}\n"
+        "\n"
         "        insert_success = true;\n"
         "    }\n"
         "\n"
@@ -598,12 +751,25 @@
         "    return insert_success;\n"
         "}\n"
         "\n"
+        "{% if value_is_str %}\n"
+        "JSLImmutableMemory {{ function_prefix }}_get(\n"
+        "{% else %}\n"
         "{{ value_type_name }}* {{ function_prefix }}_get(\n"
+        "{% endif %}\n"
+        "\n"
         "    {{ hash_map_name }}* hash_map,\n"
+        "    {% if key_is_str %}\n"
+        "    JSLImmutableMemory key\n"
+        "    {% else %}\n"
         "    {{ key_type_name }} key\n"
+        "    {% endif %}\n"
         ")\n"
         "{\n"
+        "    {% if value_is_str %}\n"
+        "    JSLImmutableMemory res = {0};\n"
+        "    {% else %}\n"
         "    {{ value_type_name }}* res = NULL;\n"
+        "    {% endif %}\n"
         "\n"
         "    if (\n"
         "        hash_map == NULL\n"
@@ -617,11 +783,16 @@
         "    uint64_t hash = 0;\n"
         "    int64_t slot = -1;\n"
         "    bool existing_found = false;\n"
+        "\n"
         "    {{ function_prefix }}_probe(hash_map, key, &slot, &hash, &existing_found);\n"
         "    \n"
         "    if (slot > -1 && existing_found)\n"
         "    {\n"
+        "        {% if value_is_str %}\n"
+        "        res = hash_map->values_array[slot];\n"
+        "        {% else %}\n"
         "        res = &hash_map->values_array[slot];\n"
+        "        {% endif %}\n"
         "    }\n"
         "\n"
         "    return res;\n"
@@ -629,7 +800,11 @@
         "\n"
         "bool {{ function_prefix }}_delete(\n"
         "    {{ hash_map_name }}* hash_map,\n"
+        "    {% if key_is_str %}\n"
+        "    JSLImmutableMemory key\n"
+        "    {% else %}\n"
         "    {{ key_type_name }} key\n"
+        "    {% endif %}\n"
         ")\n"
         "{\n"
         "    bool success = false;\n"
@@ -659,6 +834,48 @@
         "    return success;\n"
         "}\n"
         "\n"
+        "void {{ function_prefix }}_free(\n"
+        "    {{ hash_map_name }}* hash_map\n"
+        ")\n"
+        "{\n"
+        "    if (\n"
+        "        hash_map == NULL\n"
+        "        || hash_map->sentinel != PRIVATE_SENTINEL_{{ hash_map_name }}\n"
+        "    )\n"
+        "        return;\n"
+        "\n"
+        "    {% if key_is_str or value_is_str %}\n"
+        "    for (int64_t current_slot = 0; current_slot < hash_map->arrays_length; ++current_slot)\n"
+        "    {\n"
+        "        uint64_t hash_value = hash_map->hashes_array[current_slot];\n"
+        "        {% if key_is_str %}\n"
+        "        JSLStringLifeTime lifetime = hash_map->key_lifetime_array[current_slot];\n"
+        "        if (hash_value != JSL__HASHMAP_EMPTY && lifetime == JSL_STRING_LIFETIME_SHORTER)\n"
+        "        {\n"
+        "            jsl_allocator_interface_free(hash_map->allocator, hash_map->keys_array[current_slot].data);\n"
+        "        }\n"
+        "        {% elif value_is_str %}\n"
+        "        JSLStringLifeTime lifetime = hash_map->value_lifetime_array[current_slot];\n"
+        "        if (hash_value != JSL__HASHMAP_EMPTY && lifetime == JSL_STRING_LIFETIME_SHORTER)\n"
+        "        {\n"
+        "            jsl_allocator_interface_free(hash_map->allocator, hash_map->values_array[current_slot].data);\n"
+        "        }\n"
+        "        {% endif %}\n"
+        "    }\n"
+        "\n"
+        "    {% if key_is_str %}\n"
+        "    jsl_allocator_interface_free(hash_map->allocator, hash_map->key_lifetime_array);\n"
+        "    {% elif value_is_str %}\n"
+        "    jsl_allocator_interface_free(hash_map->allocator, hash_map->value_lifetime_array);\n"
+        "    {% endif %}\n"
+        "\n"
+        "    {% endif %}\n"
+        "\n"
+        "    jsl_allocator_interface_free(hash_map->allocator, hash_map->keys_array);\n"
+        "    jsl_allocator_interface_free(hash_map->allocator, hash_map->values_array);\n"
+        "    jsl_allocator_interface_free(hash_map->allocator, hash_map->hashes_array);\n"
+        "}\n"
+        "\n"
         "bool {{ function_prefix }}_iterator_start(\n"
         "    {{ hash_map_name }}* hash_map,\n"
         "    {{ hash_map_name }}Iterator* iterator\n"
@@ -667,9 +884,6 @@
         "    if (\n"
         "        hash_map == NULL\n"
         "        || hash_map->sentinel != PRIVATE_SENTINEL_{{ hash_map_name }}\n"
-        "        || hash_map->values_array == NULL\n"
-        "        || hash_map->keys_array == NULL\n"
-        "        || hash_map->hashes_array == NULL\n"
         "    )\n"
         "        return false;\n"
         "\n"
@@ -682,8 +896,16 @@
         "\n"
         "bool {{ function_prefix }}_iterator_next(\n"
         "    {{ hash_map_name }}Iterator* iterator,\n"
+        "    {% if key_is_str %}\n"
+        "    JSLImmutableMemory* out_key,\n"
+        "    {% else %}\n"
         "    {{ key_type_name }}* out_key,\n"
+        "    {% endif %}\n"
+        "    {% if value_is_str %}\n"
+        "    JSLImmutableMemory* out_value\n"
+        "    {% else %}\n"
         "    {{ value_type_name }}* out_value\n"
+        "    {% endif %}\n"
         ")\n"
         "{\n"
         "    bool found = false;\n"
@@ -1265,7 +1487,7 @@
         "        entry->value = value;\n"
         "    }\n"
         "    else if (\n"
-        "        value_lifetime == JSL_STRING_LIFETIME_TRANSIENT\n"
+        "        value_lifetime == JSL_STRING_LIFETIME_SHORTER\n"
         "        && value.length <= JSL__MAP_SSO_LENGTH\n"
         "    )\n"
         "    {\n"
@@ -1274,7 +1496,7 @@
         "        entry->value.length = value.length;\n"
         "    }\n"
         "    else if (\n"
-        "        value_lifetime == JSL_STRING_LIFETIME_TRANSIENT\n"
+        "        value_lifetime == JSL_STRING_LIFETIME_SHORTER\n"
         "        && value.length > JSL__MAP_SSO_LENGTH\n"
         "    )\n"
         "    {\n"
@@ -1329,7 +1551,7 @@
         "    }\n"
         "    else if (\n"
         "        entry != NULL\n"
-        "        && key_lifetime == JSL_STRING_LIFETIME_TRANSIENT\n"
+        "        && key_lifetime == JSL_STRING_LIFETIME_SHORTER\n"
         "        && key.length <= JSL__MAP_SSO_LENGTH\n"
         "    )\n"
         "    {\n"
@@ -1339,7 +1561,7 @@
         "    }\n"
         "    else if (\n"
         "        entry != NULL\n"
-        "        && key_lifetime == JSL_STRING_LIFETIME_TRANSIENT\n"
+        "        && key_lifetime == JSL_STRING_LIFETIME_SHORTER\n"
         "        && key.length > JSL__MAP_SSO_LENGTH\n"
         "    )\n"
         "    {\n"
@@ -1356,7 +1578,7 @@
         "    }\n"
         "    else if (\n"
         "        entry != NULL\n"
-        "        && value_lifetime == JSL_STRING_LIFETIME_TRANSIENT\n"
+        "        && value_lifetime == JSL_STRING_LIFETIME_SHORTER\n"
         "        && value.length <= JSL__MAP_SSO_LENGTH\n"
         "    )\n"
         "    {\n"
@@ -1366,7 +1588,7 @@
         "    }\n"
         "    else if (\n"
         "        entry != NULL\n"
-        "        && value_lifetime == JSL_STRING_LIFETIME_TRANSIENT\n"
+        "        && value_lifetime == JSL_STRING_LIFETIME_SHORTER\n"
         "        && value.length > JSL__MAP_SSO_LENGTH\n"
         "    )\n"
         "    {\n"
@@ -1775,7 +1997,9 @@
 
     static JSLImmutableMemory hash_map_name_key = JSL_CSTR_INITIALIZER("hash_map_name");
     static JSLImmutableMemory key_type_name_key = JSL_CSTR_INITIALIZER("key_type_name");
+    static JSLImmutableMemory key_is_str_key = JSL_CSTR_INITIALIZER("key_is_str");
     static JSLImmutableMemory value_type_name_key = JSL_CSTR_INITIALIZER("value_type_name");
+    static JSLImmutableMemory value_is_str_key = JSL_CSTR_INITIALIZER("value_is_str");
     static JSLImmutableMemory function_prefix_key = JSL_CSTR_INITIALIZER("function_prefix");
     static JSLImmutableMemory hash_function_key = JSL_CSTR_INITIALIZER("hash_function");
     static JSLImmutableMemory key_compare_key = JSL_CSTR_INITIALIZER("key_compare");
@@ -1808,55 +2032,335 @@
         return value;
     }
 
+    typedef struct TemplateCondFrame {
+        bool parent_active;
+        bool branch_taken;
+        bool currently_active;
+    } TemplateCondFrame;
+
+    // Evaluate a template condition expression. Supports `and` and `or`
+    // operators with standard precedence (and > or). Each operand is a
+    // variable name checked for existence in the variables map.
+    // Examples: "key_is_str", "key_is_str and value_is_str",
+    //           "a or b", "a and b or c and d"
+    // Maximum 16 tokens (8 variables + 7 operators).
+    static bool evaluate_template_condition(
+        JSLImmutableMemory argument,
+        JSLStrToStrMap* variables
+    )
+    {
+        static JSLImmutableMemory kw_and = JSL_CSTR_INITIALIZER("and");
+        static JSLImmutableMemory kw_or = JSL_CSTR_INITIALIZER("or");
+
+        bool and_accum = true;
+        bool or_accum = false;
+        bool seen_var = false;
+
+        JSLImmutableMemory remaining = argument;
+
+        while (remaining.length > 0)
+        {
+            // Skip leading whitespace
+            int64_t start = 0;
+            while (start < remaining.length
+                && (remaining.data[start] == ' '
+                    || remaining.data[start] == '\t'))
+            {
+                ++start;
+            }
+            JSL_MEMORY_ADVANCE(remaining, start);
+
+            // Find end of current token
+            int64_t end = 0;
+            while (end < remaining.length
+                && remaining.data[end] != ' '
+                && remaining.data[end] != '\t')
+            {
+                ++end;
+            }
+
+            bool has_token = end > 0;
+            JSLImmutableMemory token = {0};
+            bool is_and = false;
+            bool is_or = false;
+            bool is_var = false;
+
+            if (has_token)
+            {
+                token = jsl_slice(remaining, 0, end);
+                is_and = jsl_memory_compare(token, kw_and);
+                is_or = jsl_memory_compare(token, kw_or);
+                is_var = !is_and && !is_or;
+            }
+
+            if (is_or)
+            {
+                or_accum = or_accum || and_accum;
+                and_accum = true;
+            }
+
+            if (is_var)
+            {
+                bool exists = jsl_str_to_str_map_has_key(variables, token);
+                and_accum = and_accum && exists;
+                seen_var = true;
+            }
+
+            JSL_MEMORY_ADVANCE(remaining, end);
+        }
+
+        bool result = seen_var && (or_accum || and_accum);
+        return result;
+    }
+
     static void render_template(
         JSLOutputSink sink,
         JSLImmutableMemory template,
         JSLStrToStrMap* variables
     )
     {
-        static JSLImmutableMemory open_param = JSL_CSTR_INITIALIZER("{{");
-        static JSLImmutableMemory close_param = JSL_CSTR_INITIALIZER("}}");
-        JSLImmutableMemory template_reader = template;
-        
-        while (template_reader.length > 0)
+        static JSLImmutableMemory open_var = JSL_CSTR_INITIALIZER("{{");
+        static JSLImmutableMemory close_var = JSL_CSTR_INITIALIZER("}}");
+        static JSLImmutableMemory open_tag = JSL_CSTR_INITIALIZER("{%");
+        static JSLImmutableMemory close_tag = JSL_CSTR_INITIALIZER("%}");
+
+        static JSLImmutableMemory kw_if = JSL_CSTR_INITIALIZER("if");
+        static JSLImmutableMemory kw_elif = JSL_CSTR_INITIALIZER("elif");
+        static JSLImmutableMemory kw_else = JSL_CSTR_INITIALIZER("else");
+        static JSLImmutableMemory kw_endif = JSL_CSTR_INITIALIZER("endif");
+
+        TemplateCondFrame cond_stack[32];
+        int64_t cond_depth = 0;
+
+        JSLImmutableMemory reader = template;
+
+        while (reader.length > 0)
         {
-            int64_t index_of_open = jsl_substring_search(template_reader, open_param);
+            int64_t idx_var = jsl_substring_search(reader, open_var);
+            int64_t idx_tag = jsl_substring_search(reader, open_tag);
 
-            // No more variables, write everything
-            if (index_of_open == -1)
+            bool no_markers = idx_var == -1 && idx_tag == -1;
+            if (no_markers)
             {
-                jsl_output_sink_write(sink, template_reader);
+                bool active = cond_depth == 0
+                    || cond_stack[cond_depth - 1].currently_active;
+                if (active)
+                {
+                    jsl_output_sink_write(sink, reader);
+                }
                 break;
             }
 
-            if (index_of_open > 0)
+            // Determine which marker comes first
+            bool tag_first = idx_tag != -1
+                && (idx_var == -1 || idx_tag < idx_var);
+
+            //
+            // Process {% %} conditional tag
+            //
+            if (tag_first)
             {
-                JSLImmutableMemory slice = jsl_slice(template_reader, 0, index_of_open);
-                jsl_output_sink_write(sink, slice);
+                bool active = cond_depth == 0
+                    || cond_stack[cond_depth - 1].currently_active;
+
+                // Write text before the tag, stripping the whitespace-only
+                // prefix on the tag's line so that {% %} lines on their own
+                // don't inject extra indentation into the output.
+                if (idx_tag > 0 && active)
+                {
+                    int64_t last_nl = -1;
+                    for (int64_t i = idx_tag - 1; i >= 0; --i)
+                    {
+                        if (reader.data[i] == '\n')
+                        {
+                            last_nl = i;
+                            break;
+                        }
+                    }
+
+                    int64_t line_start = last_nl + 1;
+                    bool ws_only = true;
+                    for (int64_t i = line_start; i < idx_tag; ++i)
+                    {
+                        bool is_ws = reader.data[i] == ' '
+                            || reader.data[i] == '\t';
+                        if (!is_ws)
+                        {
+                            ws_only = false;
+                            break;
+                        }
+                    }
+
+                    int64_t write_end = ws_only ? line_start : idx_tag;
+                    if (write_end > 0)
+                    {
+                        JSLImmutableMemory before = jsl_slice(
+                            reader, 0, write_end
+                        );
+                        jsl_output_sink_write(sink, before);
+                    }
+                }
+
+                JSL_MEMORY_ADVANCE(reader, idx_tag + open_tag.length);
+
+                int64_t idx_close = jsl_substring_search(reader, close_tag);
+                bool malformed = idx_close == -1;
+                if (malformed)
+                {
+                    if (active)
+                    {
+                        jsl_output_sink_write(sink, open_tag);
+                        jsl_output_sink_write(sink, reader);
+                    }
+                    break;
+                }
+
+                JSLImmutableMemory tag_content = jsl_slice(reader, 0, idx_close);
+                jsl_strip_whitespace(&tag_content);
+
+                JSL_MEMORY_ADVANCE(reader, idx_close + close_tag.length);
+
+                // Consume one trailing newline after the tag
+                bool has_lf = reader.length >= 2
+                    && reader.data[0] == '\r'
+                    && reader.data[1] == '\n';
+                if (has_lf)
+                {
+                    JSL_MEMORY_ADVANCE(reader, 2);
+                }
+                bool has_nl = !has_lf
+                    && reader.length >= 1
+                    && reader.data[0] == '\n';
+                if (has_nl)
+                {
+                    JSL_MEMORY_ADVANCE(reader, 1);
+                }
+
+                // Parse directive: split on first whitespace
+                JSLImmutableMemory directive = tag_content;
+                JSLImmutableMemory argument = {0};
+
+                int64_t space_pos = -1;
+                for (int64_t i = 0; i < tag_content.length; ++i)
+                {
+                    bool is_ws = tag_content.data[i] == ' '
+                        || tag_content.data[i] == '\t';
+                    if (is_ws)
+                    {
+                        space_pos = i;
+                        break;
+                    }
+                }
+
+                bool has_argument = space_pos != -1;
+                if (has_argument)
+                {
+                    directive = jsl_slice(tag_content, 0, space_pos);
+                    argument = jsl_slice(
+                        tag_content, space_pos + 1, tag_content.length
+                    );
+                    jsl_strip_whitespace(&argument);
+                }
+
+                bool is_if = jsl_memory_compare(directive, kw_if);
+                bool is_elif = jsl_memory_compare(directive, kw_elif);
+                bool is_else = jsl_memory_compare(directive, kw_else);
+                bool is_endif = jsl_memory_compare(directive, kw_endif);
+
+                if (is_if && cond_depth < 32)
+                {
+                    bool parent = cond_depth == 0
+                        || cond_stack[cond_depth - 1].currently_active;
+                    bool truthy = parent
+                        && evaluate_template_condition(argument, variables);
+
+                    cond_stack[cond_depth].parent_active = parent;
+                    cond_stack[cond_depth].branch_taken = truthy;
+                    cond_stack[cond_depth].currently_active = truthy;
+                    ++cond_depth;
+                }
+
+                if (is_elif && cond_depth > 0)
+                {
+                    TemplateCondFrame* frame = &cond_stack[cond_depth - 1];
+                    bool truthy = frame->parent_active
+                        && !frame->branch_taken
+                        && evaluate_template_condition(argument, variables);
+
+                    frame->currently_active = truthy;
+                    if (truthy)
+                    {
+                        frame->branch_taken = true;
+                    }
+                }
+
+                if (is_else && cond_depth > 0)
+                {
+                    TemplateCondFrame* frame = &cond_stack[cond_depth - 1];
+                    bool should_activate = frame->parent_active
+                        && !frame->branch_taken;
+
+                    frame->currently_active = should_activate;
+                    if (should_activate)
+                    {
+                        frame->branch_taken = true;
+                    }
+                }
+
+                if (is_endif && cond_depth > 0)
+                {
+                    --cond_depth;
+                }
             }
 
-            JSL_MEMORY_ADVANCE(template_reader, index_of_open + open_param.length);
-
-            int64_t index_of_close = jsl_substring_search(template_reader, close_param);
-
-            // Improperly closed template param, write everything including the open marker
-            if (index_of_close == -1)
+            //
+            // Process {{ }} variable substitution
+            //
+            bool var_first = !tag_first;
+            if (var_first)
             {
-                jsl_output_sink_write(sink, open_param);
-                jsl_output_sink_write(sink, template_reader);
-                break;
+                bool active = cond_depth == 0
+                    || cond_stack[cond_depth - 1].currently_active;
+
+                // Write text before the variable
+                if (idx_var > 0 && active)
+                {
+                    JSLImmutableMemory before = jsl_slice(reader, 0, idx_var);
+                    jsl_output_sink_write(sink, before);
+                }
+                if (idx_var > 0 && !active)
+                {
+                    // skip text silently
+                }
+
+                JSL_MEMORY_ADVANCE(reader, idx_var + open_var.length);
+
+                int64_t idx_close = jsl_substring_search(reader, close_var);
+                bool malformed = idx_close == -1;
+                if (malformed)
+                {
+                    if (active)
+                    {
+                        jsl_output_sink_write(sink, open_var);
+                        jsl_output_sink_write(sink, reader);
+                    }
+                    break;
+                }
+
+                JSLImmutableMemory var_name = jsl_slice(reader, 0, idx_close);
+                jsl_strip_whitespace(&var_name);
+
+                JSLImmutableMemory var_value;
+                bool found = jsl_str_to_str_map_get(
+                    variables, var_name, &var_value
+                );
+                if (active && found)
+                {
+                    jsl_output_sink_write(sink, var_value);
+                }
+
+                JSL_MEMORY_ADVANCE(reader, idx_close + close_var.length);
             }
-
-            JSLImmutableMemory var_name = jsl_slice(template_reader, 0, index_of_close);
-            jsl_strip_whitespace(&var_name);
-
-            JSLImmutableMemory var_value;
-            if (jsl_str_to_str_map_get(variables, var_name, &var_value))
-            {
-                jsl_output_sink_write(sink, var_value);
-            }
-
-            JSL_MEMORY_ADVANCE(template_reader, index_of_close + close_param.length);
         }
     }
 
@@ -1889,19 +2393,25 @@
     *          allocation failures during header generation.
     */
     GENERATE_HASH_MAP_DEF void write_hash_map_header(
-        JSLAllocatorInterface* allocator,
+        JSLAllocatorInterface allocator,
         JSLOutputSink sink,
         HashMapImplementation impl,
         JSLImmutableMemory hash_map_name,
         JSLImmutableMemory function_prefix,
         JSLImmutableMemory key_type_name,
+        bool key_is_str,
         JSLImmutableMemory value_type_name,
-        JSLImmutableMemory hash_function_name,
+        bool value_is_str,
         JSLImmutableMemory* include_header_array,
         int32_t include_header_count
     )
     {
-        (void) hash_function_name;
+        assert(hash_map_name.data != NULL && hash_map_name.length > 0);
+        assert(function_prefix.data != NULL && function_prefix.length > 0);
+        assert(!(include_header_array != NULL && include_header_count < 1));
+        assert(!(key_type_name.data == NULL && !key_is_str));
+        assert(!(value_type_name.data == NULL && !value_is_str));
+        assert(!(key_is_str && value_is_str));
 
         srand((uint32_t) (time(NULL) % UINT32_MAX));
 
@@ -1950,20 +2460,41 @@
             hash_map_name,
             JSL_STRING_LIFETIME_LONGER
         );
-        jsl_str_to_str_map_insert(
-            &map,
-            key_type_name_key,
-            JSL_STRING_LIFETIME_LONGER,
-            key_type_name,
-            JSL_STRING_LIFETIME_LONGER
-        );
-        jsl_str_to_str_map_insert(
-            &map,
-            value_type_name_key,
-            JSL_STRING_LIFETIME_LONGER,
-            value_type_name,
-            JSL_STRING_LIFETIME_LONGER
-        );
+
+        if (key_is_str)
+            jsl_str_to_str_map_insert(
+                &map,
+                key_is_str_key,
+                JSL_STRING_LIFETIME_LONGER,
+                JSL_CSTR_EXPRESSION(""),
+                JSL_STRING_LIFETIME_LONGER
+            );
+        else
+            jsl_str_to_str_map_insert(
+                &map,
+                key_type_name_key,
+                JSL_STRING_LIFETIME_LONGER,
+                key_type_name,
+                JSL_STRING_LIFETIME_LONGER
+            );
+
+        if (value_is_str)
+            jsl_str_to_str_map_insert(
+                &map,
+                value_is_str_key,
+                JSL_STRING_LIFETIME_LONGER,
+                JSL_CSTR_EXPRESSION(""),
+                JSL_STRING_LIFETIME_LONGER
+            );
+        else
+            jsl_str_to_str_map_insert(
+                &map,
+                value_type_name_key,
+                JSL_STRING_LIFETIME_LONGER,
+                value_type_name,
+                JSL_STRING_LIFETIME_LONGER
+            );
+
         jsl_str_to_str_map_insert(
             &map,
             function_prefix_key,
@@ -1981,13 +2512,15 @@
     }
 
     GENERATE_HASH_MAP_DEF void write_hash_map_source(
-        JSLAllocatorInterface* allocator,
+        JSLAllocatorInterface allocator,
         JSLOutputSink sink,
         HashMapImplementation impl,
         JSLImmutableMemory hash_map_name,
         JSLImmutableMemory function_prefix,
         JSLImmutableMemory key_type_name,
+        bool key_is_str,
         JSLImmutableMemory value_type_name,
+        bool value_is_str,
         JSLImmutableMemory hash_function_name,
         JSLImmutableMemory* include_header_array,
         int32_t include_header_count
@@ -2041,20 +2574,41 @@
             hash_map_name,
             JSL_STRING_LIFETIME_LONGER
         );
-        jsl_str_to_str_map_insert(
-            &map,
-            key_type_name_key,
-            JSL_STRING_LIFETIME_LONGER,
-            key_type_name,
-            JSL_STRING_LIFETIME_LONGER
-        );
-        jsl_str_to_str_map_insert(
-            &map,
-            value_type_name_key,
-            JSL_STRING_LIFETIME_LONGER,
-            value_type_name,
-            JSL_STRING_LIFETIME_LONGER
-        );
+
+        if (key_is_str)
+            jsl_str_to_str_map_insert(
+                &map,
+                key_is_str_key,
+                JSL_STRING_LIFETIME_LONGER,
+                JSL_CSTR_EXPRESSION(""),
+                JSL_STRING_LIFETIME_LONGER
+            );
+        else
+            jsl_str_to_str_map_insert(
+                &map,
+                key_type_name_key,
+                JSL_STRING_LIFETIME_LONGER,
+                key_type_name,
+                JSL_STRING_LIFETIME_LONGER
+            );
+
+        if (value_is_str)
+            jsl_str_to_str_map_insert(
+                &map,
+                value_is_str_key,
+                JSL_STRING_LIFETIME_LONGER,
+                JSL_CSTR_EXPRESSION(""),
+                JSL_STRING_LIFETIME_LONGER
+            );
+        else
+            jsl_str_to_str_map_insert(
+                &map,
+                value_type_name_key,
+                JSL_STRING_LIFETIME_LONGER,
+                value_type_name,
+                JSL_STRING_LIFETIME_LONGER
+            );
+
         jsl_str_to_str_map_insert(
             &map,
             function_prefix_key,
@@ -2074,14 +2628,19 @@
             if (hash_function_name.data != NULL && hash_function_name.length > 0)
             {
                 resolved_hash_function_call = jsl_format(
-                    &scratch_interface,
+                    scratch_interface,
                     JSL_CSTR_EXPRESSION("uint64_t hash = %y(&key, sizeof(%y), hash_map->seed)"),
                     hash_function_name,
                     key_type_name
                 );
             }
+            else if (key_is_str)
+            {
+                resolved_hash_function_call = JSL_CSTR_EXPRESSION("*out_hash = jsl__rapidhash_withSeed(key.data, (size_t) key.length, hash_map->seed)");
+            }
             else if (
-                jsl_memory_compare(key_type_name, int32_t_str)
+                key_type_name.data != NULL
+                && (jsl_memory_compare(key_type_name, int32_t_str)
                 || jsl_memory_compare(key_type_name, int_str)
                 || jsl_memory_compare(key_type_name, unsigned_str)
                 || jsl_memory_compare(key_type_name, unsigned_int_str)
@@ -2095,11 +2654,11 @@
                 || jsl_memory_compare(key_type_name, long_long_int_str)
                 || jsl_memory_compare(key_type_name, unsigned_long_long_str)
                 || jsl_memory_compare(key_type_name, unsigned_long_long_int_str)
-                || key_type_name.data[key_type_name.length - 1] == '*'
+                || key_type_name.data[key_type_name.length - 1] == '*')
             )
             {
                 resolved_hash_function_call = jsl_format(
-                    &scratch_interface,
+                    scratch_interface,
                     JSL_CSTR_EXPRESSION("*out_hash = jsl__murmur3_fmix_u64((uint64_t) key, hash_map->seed)"),
                     key_type_name
                 );
@@ -2107,7 +2666,7 @@
             else
             {
                 resolved_hash_function_call = jsl_format(
-                    &scratch_interface,
+                    scratch_interface,
                     JSL_CSTR_EXPRESSION("*out_hash = jsl__rapidhash_withSeed(&key, sizeof(%y), hash_map->seed)"),
                     key_type_name
                 );
@@ -2132,33 +2691,40 @@
             JSLImmutableMemory resolved_key_compare;
 
             if (
-                jsl_memory_compare(key_type_name, int32_t_str)
-                || jsl_memory_compare(key_type_name, int_str)
-                || jsl_memory_compare(key_type_name, unsigned_str)
-                || jsl_memory_compare(key_type_name, unsigned_int_str)
-                || jsl_memory_compare(key_type_name, uint32_t_str)
-                || jsl_memory_compare(key_type_name, int64_t_str)
-                || jsl_memory_compare(key_type_name, long_str)
-                || jsl_memory_compare(key_type_name, uint64_t_str)
-                || jsl_memory_compare(key_type_name, unsigned_long_str)
-                || jsl_memory_compare(key_type_name, long_int_str)
-                || jsl_memory_compare(key_type_name, long_long_str)
-                || jsl_memory_compare(key_type_name, long_long_int_str)
-                || jsl_memory_compare(key_type_name, unsigned_long_long_str)
-                || jsl_memory_compare(key_type_name, unsigned_long_long_int_str)
-                || key_type_name.data[key_type_name.length - 1] == '*'
+                key_type_name.data != NULL
+                && (
+                    jsl_memory_compare(key_type_name, int32_t_str)
+                    || jsl_memory_compare(key_type_name, int_str)
+                    || jsl_memory_compare(key_type_name, unsigned_str)
+                    || jsl_memory_compare(key_type_name, unsigned_int_str)
+                    || jsl_memory_compare(key_type_name, uint32_t_str)
+                    || jsl_memory_compare(key_type_name, int64_t_str)
+                    || jsl_memory_compare(key_type_name, long_str)
+                    || jsl_memory_compare(key_type_name, uint64_t_str)
+                    || jsl_memory_compare(key_type_name, unsigned_long_str)
+                    || jsl_memory_compare(key_type_name, long_int_str)
+                    || jsl_memory_compare(key_type_name, long_long_str)
+                    || jsl_memory_compare(key_type_name, long_long_int_str)
+                    || jsl_memory_compare(key_type_name, unsigned_long_long_str)
+                    || jsl_memory_compare(key_type_name, unsigned_long_long_int_str)
+                    || key_type_name.data[key_type_name.length - 1] == '*'
+                )
             )
             {
                 resolved_key_compare = jsl_format(
-                    &scratch_interface,
+                    scratch_interface,
                     JSL_CSTR_EXPRESSION("key == hash_map->keys_array[slot]"),
                     key_type_name
                 );
             }
+            else if (key_is_str)
+            {
+                resolved_key_compare = JSL_CSTR_EXPRESSION("jsl_memory_compare(key, hash_map->keys_array[slot])");
+            }
             else
             {
                 resolved_key_compare = jsl_format(
-                    &scratch_interface,
+                    scratch_interface,
                     JSL_CSTR_EXPRESSION("JSL_MEMCMP(&key, &hash_map->keys_array[slot], sizeof(%y)) == 0"),
                     key_type_name
                 );

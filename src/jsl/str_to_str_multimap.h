@@ -145,7 +145,7 @@ struct JSL__StrToStrMultimap {
     // more likely that memory bugs are caught.
     uint64_t sentinel;
 
-    JSLAllocatorInterface* allocator;
+    JSLAllocatorInterface allocator;
 
     uintptr_t* entry_lookup_table;
     int64_t entry_lookup_table_length;
@@ -260,7 +260,7 @@ typedef struct JSL__StrToStrMultimapValueIter JSLStrToStrMultimapValueIter;
  */
 JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_init(
     JSLStrToStrMultimap* map,
-    JSLAllocatorInterface* allocator,
+    JSLAllocatorInterface allocator,
     uint64_t seed
 );
 
@@ -284,7 +284,7 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_init(
  */
 JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_init2(
     JSLStrToStrMultimap* map,
-    JSLAllocatorInterface* allocator,
+    JSLAllocatorInterface allocator,
     uint64_t seed,
     int64_t item_count_guess,
     float load_factor

@@ -104,7 +104,7 @@ struct JSL__StringBuilder
     // more likely that memory bugs are caught.
     uint64_t sentinel;
 
-    JSLAllocatorInterface* allocator;
+    JSLAllocatorInterface allocator;
     struct JSL__StringBuilderChunk* head;
     struct JSL__StringBuilderChunk* tail;
     int32_t chunk_alignment;
@@ -153,7 +153,7 @@ typedef struct JSLStringBuilderIterator
  * @param allocator The allocator that backs all allocations made by the builder; must not be NULL.
  * @return `true` if the builder was initialized successfully, otherwise `false`.
  */
-JSL_STRING_BUILDER_DEF bool jsl_string_builder_init(JSLStringBuilder* builder, JSLAllocatorInterface* allocator);
+JSL_STRING_BUILDER_DEF bool jsl_string_builder_init(JSLStringBuilder* builder, JSLAllocatorInterface allocator);
 
 /**
  * Initialize a JSLStringBuilder with a custom chunk size and chunk allocation alignment.
@@ -168,7 +168,7 @@ JSL_STRING_BUILDER_DEF bool jsl_string_builder_init(JSLStringBuilder* builder, J
  */
 JSL_STRING_BUILDER_DEF bool jsl_string_builder_init2(
     JSLStringBuilder* builder,
-    JSLAllocatorInterface* allocator,
+    JSLAllocatorInterface allocator,
     int32_t chunk_size,
     int32_t chunk_alignment
 );

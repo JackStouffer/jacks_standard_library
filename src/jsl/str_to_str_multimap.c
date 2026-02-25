@@ -62,7 +62,7 @@
 
 JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_init(
     JSLStrToStrMultimap* map,
-    JSLAllocatorInterface* allocator,
+    JSLAllocatorInterface allocator,
     uint64_t seed
 )
 {
@@ -77,7 +77,7 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_init(
 
 JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_init2(
     JSLStrToStrMultimap* map,
-    JSLAllocatorInterface* allocator,
+    JSLAllocatorInterface allocator,
     uint64_t seed,
     int64_t item_count_guess,
     float load_factor
@@ -87,7 +87,6 @@ JSL_STR_TO_STR_MULTIMAP_DEF bool jsl_str_to_str_multimap_init2(
 
     if (
         map == NULL
-        || allocator == NULL
         || item_count_guess <= 0
         || load_factor <= 0.0f
         || load_factor >= 1.0f

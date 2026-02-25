@@ -1070,9 +1070,9 @@ JSLImmutableMemory jsl_basename(JSLImmutableMemory filename)
     return ret;
 }
 
-const char* jsl_memory_to_cstr(JSLAllocatorInterface* allocator, JSLImmutableMemory str)
+const char* jsl_memory_to_cstr(JSLAllocatorInterface allocator, JSLImmutableMemory str)
 {
-    if (allocator == NULL || str.data == NULL || str.length < 1)
+    if (str.data == NULL || str.length < 1)
         return NULL;
 
     int64_t allocation_size = str.length + 1;
@@ -1093,10 +1093,10 @@ const char* jsl_memory_to_cstr(JSLAllocatorInterface* allocator, JSLImmutableMem
     return ret;
 }
 
-JSLImmutableMemory jsl_duplicate_cstr(JSLAllocatorInterface* allocator, const char* str)
+JSLImmutableMemory jsl_duplicate_cstr(JSLAllocatorInterface allocator, const char* str)
 {
     JSLImmutableMemory ret = {0};
-    if (allocator == NULL || str == NULL)
+    if (str == NULL)
         return ret;
 
     int64_t length = (int64_t) JSL_STRLEN(str);
@@ -1119,10 +1119,10 @@ JSLImmutableMemory jsl_duplicate_cstr(JSLAllocatorInterface* allocator, const ch
     return ret;
 }
 
-JSLImmutableMemory jsl_duplicate(JSLAllocatorInterface* allocator, JSLImmutableMemory str)
+JSLImmutableMemory jsl_duplicate(JSLAllocatorInterface allocator, JSLImmutableMemory str)
 {
     JSLImmutableMemory res = {0};
-    if (allocator == NULL || str.data == NULL || str.length < 1)
+    if (str.data == NULL || str.length < 1)
         return res;
 
     void* allocation = jsl_allocator_interface_alloc(
@@ -2724,7 +2724,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink(
 
 struct JSL__FormatAllocatorContext
 {
-    JSLAllocatorInterface* allocator;
+    JSLAllocatorInterface allocator;
     void* current_allocation;
     int64_t current_allocation_length;
 };
@@ -2755,12 +2755,9 @@ static int64_t jsl__format_allocator_callback(void *user, JSLImmutableMemory dat
     return data.length;
 }
 
-JSL__ASAN_OFF JSLImmutableMemory jsl_format(JSLAllocatorInterface* allocator, JSLImmutableMemory fmt, ...)
+JSL__ASAN_OFF JSLImmutableMemory jsl_format(JSLAllocatorInterface allocator, JSLImmutableMemory fmt, ...)
 {
     JSLImmutableMemory ret = {0};
-
-    if (allocator == NULL)
-        return ret;
 
     va_list va;
     va_start(va, fmt);
