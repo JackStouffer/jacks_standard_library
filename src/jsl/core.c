@@ -1427,7 +1427,6 @@ JSL__ASAN_OFF void jsl_format_set_separators(char pcomma, char pperiod)
 #define JSL__METRIC_NOSPACE 1024
 #define JSL__METRIC_1024 2048
 #define JSL__METRIC_JEDEC 4096
-#define JSL__FORMAT_BUFFER_SIZE JSL_KILOBYTES(4)
 
 static void jsl__lead_sign(uint32_t formatting_flags, char *sign)
 {
@@ -1541,8 +1540,6 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
     static char hexu[] = "0123456789ABCDEFXP";
     static JSLImmutableMemory err_string = JSL_CSTR_INITIALIZER("(ERROR)");
 
-    uint8_t buffer[JSL__FORMAT_BUFFER_SIZE];
-    uint8_t* buffer_cursor = buffer;
     JSLImmutableMemory f = fmt;
     int64_t bytes_written_to_sink = 0;
     int64_t sink_err_res = 0;
@@ -1558,40 +1555,43 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
         int32_t field_width, precision, trailing_zeros;
         uint32_t formatting_flags;
 
-        // macros for the sink buffering stuff
-        #define FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(bytes)                               \
+        // write a block of bytes directly to the sink
+        #define WRITE_TO_SINK(ptr, len)                                                     \
             {                                                                               \
-                int64_t len = (int64_t)(buffer_cursor - buffer);                            \
-                if ((len + (bytes)) >= JSL__FORMAT_BUFFER_SIZE)                             \
+                int64_t wts_len = (int64_t)(len);                                           \
+                if (wts_len > 0)                                                            \
                 {                                                                           \
-                    JSLImmutableMemory data_to_write = { buffer, len };                              \
-                    int64_t sink_res = sink.write_fp(sink.user_data, data_to_write);        \
-                    if (sink_res > -1)                                                      \
-                    {                                                                       \
-                        bytes_written_to_sink += sink_res;                                  \
-                        buffer_cursor = buffer;                                             \
-                    }                                                                       \
+                    JSLImmutableMemory wts_data = { (const uint8_t*)(ptr), wts_len };       \
+                    int64_t wts_res = sink.write_fp(sink.user_data, wts_data);              \
+                    if (wts_res > -1)                                                       \
+                        bytes_written_to_sink += wts_res;                                   \
                     else                                                                    \
                     {                                                                       \
-                        sink_err_res = sink_res;                                            \
+                        sink_err_res = wts_res;                                             \
                         goto L_DONE;                                                        \
                     }                                                                       \
                 }                                                                           \
             }
 
-        // flush if there is even one byte in the buffer
-        #define FLUSH_BUFFER()                                                              \
+        // fill the sink with count copies of ch
+        #define FILL_SINK(ch, count)                                                        \
             {                                                                               \
-                FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(JSL__FORMAT_BUFFER_SIZE - 1);        \
-            } 
-
-        #define CLAMP_VALUE_TO_BUFFER_SIZE_THEN_ASSIGN(cl, v)                               \
-            {                                                                               \
-                cl = v;                                                                     \
-                int32_t lg = JSL__FORMAT_BUFFER_SIZE - (int32_t)(buffer_cursor - buffer);   \
-                if (cl > lg)                                                                \
-                    cl = lg;                                                                \
+                int32_t fill_remaining = (count);                                           \
+                if (fill_remaining > 0)                                                     \
+                {                                                                           \
+                    uint8_t fill_buf[64];                                                   \
+                    JSL_MEMSET(fill_buf, (ch), sizeof(fill_buf));                           \
+                    while (fill_remaining > 0)                                              \
+                    {                                                                       \
+                        int32_t fill_chunk = fill_remaining > 64                            \
+                            ? 64 : fill_remaining;                                          \
+                        WRITE_TO_SINK(fill_buf, fill_chunk);                                \
+                        fill_remaining -= fill_chunk;                                       \
+                    }                                                                       \
+                }                                                                           \
             }
+
+        const uint8_t* literal_start = f.data;
 
         #if defined(__AVX2__)
 
@@ -1605,18 +1605,17 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
             {
                 schk1:
                 if (f.data[0] == '%')
+                {
+                    WRITE_TO_SINK(literal_start, f.data - literal_start);
                     goto L_PROCESS_PERCENT;
+                }
 
-                FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
-                *buffer_cursor = f.data[0];
-                ++buffer_cursor;
                 JSL_MEMORY_ADVANCE(f, 1);
             }
 
             while (f.length > 31)
             {
                 const __m256i* source_wide = (const __m256i*) f.data;
-                __m256i* wide_dest = (__m256i*) buffer_cursor;
 
                 __m256i data = _mm256_load_si256(source_wide);
                 __m256i percent_mask = _mm256_cmpeq_epi8(data, percent_wide);
@@ -1624,27 +1623,23 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
 
                 if (mask == 0)
                 {
-                    // No special characters found, store entire block
-                    FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(32);
-                    _mm256_storeu_si256(wide_dest, data);
                     JSL_MEMORY_ADVANCE(f, 32);
-                    buffer_cursor += 32;
                 }
                 else
                 {
                     int special_pos = JSL_PLATFORM_COUNT_TRAILING_ZEROS(mask);
-                    FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(special_pos);
-
-                    JSL_MEMCPY(buffer_cursor, f.data, (size_t) special_pos);
                     JSL_MEMORY_ADVANCE(f, special_pos);
-                    buffer_cursor += special_pos;
 
+                    WRITE_TO_SINK(literal_start, f.data - literal_start);
                     goto L_PROCESS_PERCENT;
                 }
             }
 
             if (f.length == 0)
+            {
+                WRITE_TO_SINK(literal_start, f.data - literal_start);
                 goto L_END_FORMAT;
+            }
             else
                 goto schk1;
 
@@ -1660,11 +1655,11 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
             {
                 schk1:
                 if (f.data[0] == '%')
+                {
+                    WRITE_TO_SINK(literal_start, f.data - literal_start);
                     goto L_PROCESS_PERCENT;
+                }
 
-                FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
-                *buffer_cursor = f.data[0];
-                ++buffer_cursor;
                 JSL_MEMORY_ADVANCE(f, 1);
             }
 
@@ -1681,11 +1676,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 const uint32_t combined_presence = horizontal_maximum0 | horizontal_maximum1;
                 if (combined_presence == 0)
                 {
-                    FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(32);
-                    vst1q_u8(buffer_cursor, data0);
-                    vst1q_u8(buffer_cursor + 16, data1);
                     JSL_MEMORY_ADVANCE(f, 32);
-                    buffer_cursor += 32;
                 }
                 else
                 {
@@ -1694,18 +1685,18 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                     const uint32_t mask  = mask0 | (mask1 << 16);
 
                     const int32_t special_pos = (int32_t) JSL_PLATFORM_COUNT_TRAILING_ZEROS(mask);
-                    FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(special_pos);
-                    JSL_MEMCPY(buffer_cursor, f.data, (size_t) special_pos);
-
                     JSL_MEMORY_ADVANCE(f, special_pos);
-                    buffer_cursor += special_pos;
 
+                    WRITE_TO_SINK(literal_start, f.data - literal_start);
                     goto L_PROCESS_PERCENT;
                 }
             }
 
             if (f.length == 0)
+            {
+                WRITE_TO_SINK(literal_start, f.data - literal_start);
                 goto L_END_FORMAT;
+            }
             else
                 goto schk1;
 
@@ -1716,15 +1707,15 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
             {
                 schk1:
                 if (f.data[0] == '%')
+                {
+                    WRITE_TO_SINK(literal_start, f.data - literal_start);
                     goto L_PROCESS_PERCENT;
+                }
 
-                FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
-                *buffer_cursor = f.data[0];
-                ++buffer_cursor;
                 JSL_MEMORY_ADVANCE(f, 1);
             }
 
-            // fast copy everything up to the next %
+            // fast scan everything up to the next %
             while (f.length > 3)
             {
                 // Check if the next 4 bytes contain %
@@ -1737,27 +1728,14 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                 if (((v ^ 0x25252525) - 0x01010101) & c)
                     goto schk1;
 
-                if ((JSL__FORMAT_BUFFER_SIZE - (int32_t)(buffer_cursor - buffer)) < 4)
-                    goto schk1;
-
-                if(((uintptr_t) buffer_cursor) & 3)
-                {
-                    buffer_cursor[0] = f.data[0];
-                    buffer_cursor[1] = f.data[1];
-                    buffer_cursor[2] = f.data[2];
-                    buffer_cursor[3] = f.data[3];
-                }
-                else
-                {
-                    *((uint32_t*) buffer_cursor) = v;
-                }
-
-                buffer_cursor += 4;
                 JSL_MEMORY_ADVANCE(f, 4);
             }
 
             if (f.length == 0)
+            {
+                WRITE_TO_SINK(literal_start, f.data - literal_start);
                 goto L_END_FORMAT;
+            }
             else
                 goto schk1;
 
@@ -1986,8 +1964,6 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
 
             case 'n': // weird write-bytes specifier
             {
-                FLUSH_BUFFER();
-
                 int32_t* d = va_arg(va, int32_t *);
                 *d = (int32_t) bytes_written_to_sink;
             } break;
@@ -2509,158 +2485,67 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
                     }
                 }
 
-                // copy the spaces and/or zeros
-                if (field_width + precision)
+                // write leading spaces (right-justify, no leading zeros)
+                if ((formatting_flags & JSL__LEFTJUST) == 0)
+                    FILL_SINK(' ', field_width);
+
+                // write leader (sign, 0x prefix)
+                WRITE_TO_SINK(lead + 1, lead[0]);
+
+                // write leading zeros
+                if (precision > 0)
                 {
-                    int32_t i;
-                    uint32_t c;
-
-                    // copy leading spaces (or when doing %8.4d stuff)
-                    if ((formatting_flags & JSL__LEFTJUST) == 0)
-                    {
-                        while (field_width > 0)
-                        {
-                            CLAMP_VALUE_TO_BUFFER_SIZE_THEN_ASSIGN(i, field_width);
-
-                            field_width -= i;
-                            JSL_MEMSET(buffer_cursor, ' ', (size_t) i);
-                            buffer_cursor += i;
-
-                            FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
-                        }
-                    }
-
-                    // copy leader
-                    source_ptr = lead + 1;
-                    while (lead[0])
-                    {
-                        CLAMP_VALUE_TO_BUFFER_SIZE_THEN_ASSIGN(i, lead[0]);
-
-                        lead[0] -= (char) i;
-                        JSL_MEMCPY(buffer_cursor, source_ptr, (size_t) i);
-                        buffer_cursor += i;
-                        source_ptr += i;
-
-                        FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
-                    }
-
-                    // copy leading zeros
-                    c = comma_spacing >> 24;
-                    comma_spacing &= 0xffffff;
-                    comma_spacing = (formatting_flags & JSL__TRIPLET_COMMA) ? ((uint32_t)(c - ((((uint32_t) precision) + comma_spacing) % (c + 1u)))) : 0;
-
-                    while (precision > 0)
-                    {
-                    CLAMP_VALUE_TO_BUFFER_SIZE_THEN_ASSIGN(i, precision);
-                    precision -= i;
-
                     if (JSL_IS_BITFLAG_NOT_SET(formatting_flags, JSL__TRIPLET_COMMA))
                     {
-                        JSL_MEMSET(buffer_cursor, '0', (size_t) i);
-                        buffer_cursor += i;
+                        FILL_SINK('0', precision);
                     }
                     else
                     {
-                        while (i)
+                        uint32_t c = comma_spacing >> 24;
+                        comma_spacing &= 0xffffff;
+                        comma_spacing = (uint32_t)(c - ((((uint32_t) precision) + comma_spacing) % (c + 1u)));
+
+                        uint8_t comma_buf[64];
+                        int32_t buf_pos = 0;
+                        int32_t remaining = precision;
+                        while (remaining > 0)
                         {
                             if (comma_spacing == c)
                             {
                                 comma_spacing = 0;
-                                *buffer_cursor = (uint8_t) jsl__comma;
+                                comma_buf[buf_pos] = (uint8_t) jsl__comma;
                             }
                             else
                             {
-                                *buffer_cursor = '0';
+                                comma_buf[buf_pos] = '0';
                             }
 
-                            ++buffer_cursor;
+                            ++buf_pos;
                             ++comma_spacing;
-                            --i;
+                            --remaining;
+
+                            if (buf_pos >= 64)
+                            {
+                                WRITE_TO_SINK(comma_buf, buf_pos);
+                                buf_pos = 0;
+                            }
                         }
+                        WRITE_TO_SINK(comma_buf, buf_pos);
                     }
-
-                    FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
-                    }
-
                 }
 
-                // copy leader if there is still one
-                source_ptr = lead + 1;
-                while (lead[0])
-                {
-                    int32_t i;
-                    CLAMP_VALUE_TO_BUFFER_SIZE_THEN_ASSIGN(i, lead[0]);
+                // write the string
+                WRITE_TO_SINK(string, l);
 
-                    lead[0] -= (char) i;
-                    JSL_MEMCPY(buffer_cursor, source_ptr, (size_t) i);
-                    buffer_cursor += i;
-                    source_ptr += i;
+                // write trailing zeros
+                FILL_SINK('0', trailing_zeros);
 
-                    FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
-                }
+                // write tail (exponent, metric suffix)
+                WRITE_TO_SINK(tail + 1, tail[0]);
 
-                // copy the string
-                n = l;
-                while (n)
-                {
-                    int32_t i;
-                    CLAMP_VALUE_TO_BUFFER_SIZE_THEN_ASSIGN(i, (int32_t) n);
-
-                    JSL_MEMCPY(buffer_cursor, string, (size_t) i);
-
-                    n -= (uint32_t) i;
-                    buffer_cursor += i;
-                    string += i;
-
-                    FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
-                }
-
-                // copy trailing zeros
-                while (trailing_zeros)
-                {
-                    int32_t i;
-                    CLAMP_VALUE_TO_BUFFER_SIZE_THEN_ASSIGN(i, trailing_zeros);
-
-                    trailing_zeros -= i;
-                    JSL_MEMSET(buffer_cursor, '0', (size_t) i);
-                    buffer_cursor += i;
-
-                    FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
-                }
-
-                // copy tail if there is one
-                source_ptr = tail + 1;
-                while (tail[0])
-                {
-                    int32_t i;
-                    CLAMP_VALUE_TO_BUFFER_SIZE_THEN_ASSIGN(i, tail[0]);
-
-                    tail[0] -= (char)i;
-                    JSL_MEMCPY(buffer_cursor, source_ptr, (size_t) i);
-                    buffer_cursor += i;
-                    source_ptr += i;
-
-                    FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
-                }
-
-                // handle the left justify
+                // write trailing spaces (left-justify)
                 if (formatting_flags & JSL__LEFTJUST)
-                {
-                    if (field_width > 0)
-                    {
-                    while (field_width)
-                    {
-                        int32_t i;
-                        CLAMP_VALUE_TO_BUFFER_SIZE_THEN_ASSIGN(i, field_width);
-
-                        field_width -= i;
-                        JSL_MEMSET(buffer_cursor, ' ', (size_t) i);
-                        buffer_cursor += i;
-
-                        FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE(1);
-                    }
-                    }
-                }
+                    FILL_SINK(' ', field_width);
 
                 break;
 
@@ -2682,8 +2567,6 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
 
 
     L_END_FORMAT:
-    FLUSH_BUFFER();
-
     L_DONE:
     return sink_err_res < 0 ? sink_err_res : bytes_written_to_sink;
 }
@@ -2699,9 +2582,8 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
 #undef JSL__NEGATIVE
 #undef JSL__METRIC_SUFFIX
 #undef JSL__NUMSZ
-#undef FLUSH_BUFFER_IF_LESS_THAN_N_BYTES_FREE
-#undef FLUSH_BUFFER
-#undef CLAMP_VALUE_TO_BUFFER_SIZE_THEN_ASSIGN
+#undef WRITE_TO_SINK
+#undef FILL_SINK
 
 // ============================================================================
 //   wrapper functions

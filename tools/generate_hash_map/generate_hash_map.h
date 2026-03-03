@@ -23,6 +23,17 @@
  * command line tool for traditional GNU make style builds and use the C
  * library for "metaprogram" style builds.
  * 
+ * The largest benefit from using this as a library is that it's way faster
+ * than using it as a program. The vast majority of the time spent by the
+ * program is 1. waiting for memory from the OS 2. writing to stdout. This
+ * problem is exacerbated if you're running the program multiple times for
+ * multiple hash map instantiations. When using the library with your
+ * provided allocator and output mechanism this cost is paid once and
+ * amortized over each invocation.
+ * 
+ * The benefit to using the program instead of the library is that it is
+ * very, very easy to multiprocess.
+ * 
  * ### CLI Program
  * 
  * Compile the program with
