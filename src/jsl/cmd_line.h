@@ -240,6 +240,21 @@ void jsl_cmd_line_color_from_ansi256(JSLCmdLineColor* color, uint8_t color256);
 void jsl_cmd_line_color_from_rgb(JSLCmdLineColor* color, uint8_t r, uint8_t g, uint8_t b);
 
 /**
+ * Construct a command line text style struct color with the default terminal colors for the
+ * foreground and background. The value of `style_flags` is set from bitwise OR-ing any of the
+ * flags in the `JSLCmdLineStyleAttribute` enum. 
+ *
+ * All relevent fields are initalized so `style` can be uninitialized memory.
+ * 
+ * @param style The style struct to initialize
+ * @param style_flags Styles to apply to the text
+ */
+void jsl_cmd_line_style(
+    JSLCmdLineStyle* style,
+    uint32_t style_flags
+);
+
+/**
  * Construct a command line text style struct color with a given foreground color. The
  * background color will be set to the terminal default. The value of `style_flags` is set from
  * bitwise OR-ing any of the flags in the `JSLCmdLineStyleAttribute` enum. 

@@ -1653,6 +1653,16 @@ void jsl_cmd_line_color_from_rgb(JSLCmdLineColor* color, uint8_t r, uint8_t g, u
     color->_rgb._b = b;
 }
 
+void jsl_cmd_line_style(
+    JSLCmdLineStyle* style,
+    uint32_t style_flags
+)
+{
+    style->_foreground._color_type = JSL__CMD_LINE_COLOR_DEFAULT;
+    style->_background._color_type = JSL__CMD_LINE_COLOR_DEFAULT;
+    style->_style_attributes = style_flags;
+}
+
 void jsl_cmd_line_style_with_foreground(
     JSLCmdLineStyle* style,
     JSLCmdLineColor foreground,

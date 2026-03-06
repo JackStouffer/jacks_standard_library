@@ -1915,8 +1915,168 @@ JSL_DEF JSLImmutableMemory jsl_duplicate(JSLAllocatorInterface allocator, JSLImm
 
 /**
  * TODO: docs
- * 
- * one line convenience function 
+ */
+static inline int8_t jsl_take_i8(JSLImmutableMemory* data)
+{
+    JSL_ASSERT(data->data != NULL && data->length > 0);
+    int8_t res = (int8_t) data->data[0];
+    ++data->data;
+    --data->length;
+    return res;
+}
+
+/**
+ * TODO: docs
+ */
+static inline uint8_t jsl_take_u8(JSLImmutableMemory* data)
+{
+    JSL_ASSERT(data->data != NULL && data->length > 0);
+    uint8_t res = data->data[0];
+    ++data->data;
+    --data->length;
+    return res;
+}
+
+/**
+ * TODO: docs
+ */
+static inline int16_t jsl_take_i16(JSLImmutableMemory* data)
+{
+    JSL_ASSERT(data->data != NULL && data->length >= 2);
+    int16_t res = (int16_t) (
+        (int16_t) data->data[0]
+        | ((int16_t) data->data[1] << 8)
+    );
+    data->data += 2;
+    data->length -= 2;
+    return res;
+}
+
+/**
+ * TODO: docs
+ */
+static inline uint16_t jsl_take_u16(JSLImmutableMemory* data)
+{
+    JSL_ASSERT(data->data != NULL && data->length >= 2);
+    uint16_t res = (uint16_t) (
+        (uint16_t) data->data[0]
+        | ((uint16_t) data->data[1] << 8)
+    );
+    data->data += 2;
+    data->length -= 2;
+    return res;
+}
+
+/**
+ * TODO: docs
+ */
+static inline int32_t jsl_take_i32(JSLImmutableMemory* data)
+{
+    JSL_ASSERT(data->data != NULL && data->length >= 4);
+    int32_t res = (int32_t) (
+        (uint32_t) data->data[0]
+        | ((uint32_t) data->data[1] << 8)
+        | ((uint32_t) data->data[2] << 16)
+        | ((uint32_t) data->data[3] << 24)
+    );
+    data->data += 4;
+    data->length -= 4;
+    return res;
+}
+
+/**
+ * TODO: docs
+ */
+static inline uint32_t jsl_take_u32(JSLImmutableMemory* data)
+{
+    JSL_ASSERT(data->data != NULL && data->length >= 4);
+    uint32_t res = (uint32_t) data->data[0]
+        | ((uint32_t) data->data[1] << 8)
+        | ((uint32_t) data->data[2] << 16)
+        | ((uint32_t) data->data[3] << 24);
+    data->data += 4;
+    data->length -= 4;
+    return res;
+}
+
+/**
+ * TODO: docs
+ */
+static inline int64_t jsl_take_i64(JSLImmutableMemory* data)
+{
+    JSL_ASSERT(data->data != NULL && data->length >= 8);
+    int64_t res = (int64_t) (
+        (uint64_t) data->data[0]
+        | ((uint64_t) data->data[1] << 8)
+        | ((uint64_t) data->data[2] << 16)
+        | ((uint64_t) data->data[3] << 24)
+        | ((uint64_t) data->data[4] << 32)
+        | ((uint64_t) data->data[5] << 40)
+        | ((uint64_t) data->data[6] << 48)
+        | ((uint64_t) data->data[7] << 56)
+    );
+    data->data += 8;
+    data->length -= 8;
+    return res;
+}
+
+/**
+ * TODO: docs
+ */
+static inline uint64_t jsl_take_u64(JSLImmutableMemory* data)
+{
+    JSL_ASSERT(data->data != NULL && data->length >= 8);
+    uint64_t res = (uint64_t) data->data[0]
+        | ((uint64_t) data->data[1] << 8)
+        | ((uint64_t) data->data[2] << 16)
+        | ((uint64_t) data->data[3] << 24)
+        | ((uint64_t) data->data[4] << 32)
+        | ((uint64_t) data->data[5] << 40)
+        | ((uint64_t) data->data[6] << 48)
+        | ((uint64_t) data->data[7] << 56);
+    data->data += 8;
+    data->length -= 8;
+    return res;
+}
+
+/**
+ * TODO: docs
+ */
+static inline float jsl_take_f32(JSLImmutableMemory* data)
+{
+    uint32_t bits = jsl_take_u32(data);
+    float res;
+    JSL_MEMCPY(&res, &bits, sizeof(float));
+    return res;
+}
+
+/**
+ * TODO: docs
+ */
+static inline double jsl_take_f64(JSLImmutableMemory* data)
+{
+    uint64_t bits = jsl_take_u64(data);
+    double res;
+    JSL_MEMCPY(&res, &bits, sizeof(double));
+    return res;
+}
+
+/**
+ * TODO: docs
+ */
+static inline JSLImmutableMemory jsl_take_memory(JSLImmutableMemory* data, int64_t bytes)
+{
+    JSL_ASSERT(data->data != NULL && data->length >= bytes);
+    JSLImmutableMemory res = {data->data, bytes};
+    data->data += bytes;
+    data->length -= bytes;
+    return res;
+}
+
+/**
+ * TODO: docs
+ *
+ * one line convenience function
  */
 static inline int64_t jsl_output_sink_write(JSLOutputSink sink, JSLImmutableMemory data)
 {

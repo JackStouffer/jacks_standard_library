@@ -158,27 +158,24 @@ JSLLoadFileResultEnum jsl_load_file_contents(
     int32_t* out_errno
 )
 {
-    JSLLoadFileResultEnum res = JSL_FILE_LOAD_BAD_PARAMETERS;
     char path_buffer[FILENAME_MAX + 1];
+    bool proceed = false;
 
-    bool got_path = false;
-    if (path.data != NULL
+    proceed = (path.data != NULL
         && path.length > 0
         && path.length < FILENAME_MAX
-        && out_contents != NULL
-    )
-    {
-        // File system APIs require a null terminated string
-
-        JSL_MEMCPY(path_buffer, path.data, (size_t) path.length);
-        path_buffer[path.length] = '\0';
-        got_path = true;
-    }
+        && out_contents != NULL);
+    JSLLoadFileResultEnum res = proceed ? JSL_FILE_LOAD_SUCCESS : JSL_FILE_LOAD_BAD_PARAMETERS;
 
     int32_t file_descriptor = -1;
     bool opened_file = false;
-    if (got_path)
+
+    if (proceed)
     {
+        // File system APIs require a null terminated string
+        JSL_MEMCPY(path_buffer, path.data, (size_t) path.length);
+        path_buffer[path.length] = '\0';
+
         #if JSL_IS_WINDOWS
             errno_t open_err = _sopen_s(
                 &file_descriptor,
@@ -194,74 +191,84 @@ JSLLoadFileResultEnum jsl_load_file_contents(
         #else
             #error "Unsupported platform"
         #endif
+
+        proceed = opened_file;
+        res = proceed ? JSL_FILE_LOAD_SUCCESS : JSL_FILE_LOAD_COULD_NOT_OPEN;
+        if (!proceed && out_errno != NULL)
+            *out_errno = errno;
     }
 
     int64_t file_size = -1;
     bool got_file_size = false;
-    if (opened_file)
+
+    if (proceed)
     {
         file_size = jsl__get_file_size_from_fileno(file_descriptor);
         got_file_size = file_size > -1;
-    }
-    else
-    {
-        res = JSL_FILE_LOAD_COULD_NOT_OPEN;
-        if (out_errno != NULL)
+        proceed = got_file_size;
+        res = proceed ? JSL_FILE_LOAD_SUCCESS : JSL_FILE_LOAD_COULD_NOT_GET_FILE_SIZE;
+        if (!proceed && out_errno != NULL)
             *out_errno = errno;
     }
 
     JSLMutableMemory allocation = {0};
     bool got_memory = false;
-    if (got_file_size)
+
+    if (proceed)
     {
-        allocation.data = jsl_allocator_interface_alloc(
-            allocator,
-            file_size,
-            JSL_DEFAULT_ALLOCATION_ALIGNMENT,
-            false
-        );
-        allocation.length = file_size;
-        got_memory = allocation.data != NULL && allocation.length >= file_size;
-    }
-    else
-    {
-        res = JSL_FILE_LOAD_COULD_NOT_GET_FILE_SIZE;
-        if (out_errno != NULL)
-            *out_errno = errno;
+        if (file_size == 0)
+        {
+            got_memory = true;
+        }
+        else
+        {
+            allocation.data = jsl_allocator_interface_alloc(
+                allocator,
+                file_size,
+                JSL_DEFAULT_ALLOCATION_ALIGNMENT,
+                false
+            );
+            allocation.length = file_size;
+            got_memory = allocation.data != NULL && allocation.length >= file_size;
+        }
+        proceed = got_memory;
+        res = proceed ? JSL_FILE_LOAD_SUCCESS : JSL_FILE_LOAD_COULD_NOT_GET_MEMORY;
     }
 
     int64_t read_res = -1;
     bool did_read_data = false;
-    if (got_memory)
-    {
-        #if JSL_IS_WINDOWS
-            read_res = (int64_t) _read(file_descriptor, allocation.data, (unsigned int) file_size);
-        #elif JSL_IS_POSIX
-            read_res = (int64_t) read(file_descriptor, allocation.data, (size_t) file_size);
-        #else
-            #error "Unsupported platform"
-        #endif
 
-        did_read_data = read_res > -1;
-    }
-    else
+    if (proceed)
     {
-        res = JSL_FILE_LOAD_COULD_NOT_GET_MEMORY;
-    }
+        if (file_size == 0)
+        {
+            did_read_data = true;
+            out_contents->data = NULL;
+            out_contents->length = 0;
+        }
+        else
+        {
+            #if JSL_IS_WINDOWS
+                read_res = (int64_t) _read(file_descriptor, allocation.data, (unsigned int) file_size);
+            #elif JSL_IS_POSIX
+                read_res = (int64_t) read(file_descriptor, allocation.data, (size_t) file_size);
+            #else
+                #error "Unsupported platform"
+            #endif
 
-    if (did_read_data)
-    {
-        out_contents->data = allocation.data;
-        out_contents->length = read_res;
-    }
-    else
-    {
-        res = JSL_FILE_LOAD_READ_FAILED;
-        if (out_errno != NULL)
+            did_read_data = read_res > -1;
+            if (did_read_data)
+            {
+                out_contents->data = allocation.data;
+                out_contents->length = read_res;
+            }
+        }
+        proceed = did_read_data;
+        res = proceed ? JSL_FILE_LOAD_SUCCESS : JSL_FILE_LOAD_READ_FAILED;
+        if (!proceed && out_errno != NULL)
             *out_errno = errno;
     }
 
-    bool did_close = false;
     if (opened_file)
     {
         #if JSL_IS_WINDOWS
@@ -272,18 +279,13 @@ JSLLoadFileResultEnum jsl_load_file_contents(
             #error "Unsupported platform"
         #endif
 
-        did_close = close_res > -1;
-    }
-
-    if (opened_file && did_close)
-    {
-        res = JSL_FILE_LOAD_SUCCESS;
-    }
-    if (opened_file && !did_close)
-    {
-        res = JSL_FILE_LOAD_CLOSE_FAILED;
-        if (out_errno != NULL)
-            *out_errno = errno;
+        bool did_close = close_res > -1;
+        if (res == JSL_FILE_LOAD_SUCCESS && !did_close)
+        {
+            res = JSL_FILE_LOAD_CLOSE_FAILED;
+            if (out_errno != NULL)
+                *out_errno = errno;
+        }
     }
 
     return res;
@@ -441,13 +443,13 @@ JSLWriteFileResultEnum jsl_write_file_contents(
             errno_t open_err = _sopen_s(
                 &file_descriptor,
                 path_buffer,
-                _O_CREAT,
+                _O_CREAT | _O_WRONLY | _O_TRUNC,
                 _SH_DENYNO,
                 _S_IREAD | _S_IWRITE
             );
             opened_file = (open_err == 0);
         #elif JSL_IS_POSIX
-            file_descriptor = open(path_buffer, O_CREAT, S_IRUSR | S_IWUSR);
+            file_descriptor = open(path_buffer, O_CREAT | O_WRONLY | O_TRUNC, S_IRUSR | S_IWUSR);
             opened_file = file_descriptor > -1;
         #endif
     }
@@ -478,9 +480,11 @@ JSLWriteFileResultEnum jsl_write_file_contents(
 
     if (write_res > 0)
     {
-        *out_bytes_written = write_res;
+        res = JSL_FILE_WRITE_SUCCESS;
+        if (out_bytes_written != NULL)
+            *out_bytes_written = write_res;
     }
-    else
+    else if (opened_file)
     {
         res = JSL_FILE_WRITE_COULD_NOT_WRITE;
         if (out_errno != NULL)
