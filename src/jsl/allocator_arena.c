@@ -120,6 +120,34 @@ static bool jsl__alloc_interface_free_all(void* ctx)
     return true;
 }
 
+static bool jsl__alloc_interface_child_free(void* ctx, const void* allocation)
+{
+    (void) ctx;
+    (void) allocation;
+    return true;
+}
+
+static bool jsl__alloc_interface_child_free_all(void* ctx)
+{
+    (void) ctx;
+    return true;
+}
+
+static bool jsl__arena_create_child(void* ctx, JSLAllocatorInterface* child);
+static bool jsl__arena_create_child(void* ctx, JSLAllocatorInterface* child)
+{
+    jsl_allocator_interface_init(
+        child,
+        jsl__alloc_interface_alloc,
+        jsl__alloc_interface_realloc,
+        jsl__alloc_interface_child_free,
+        jsl__alloc_interface_child_free_all,
+        jsl__arena_create_child,
+        ctx
+    );
+    return true;
+}
+
 void jsl_arena_get_allocator_interface(JSLAllocatorInterface* allocator, JSLArena* arena)
 {
     jsl_allocator_interface_init(
@@ -128,6 +156,7 @@ void jsl_arena_get_allocator_interface(JSLAllocatorInterface* allocator, JSLAren
         jsl__alloc_interface_realloc,
         jsl__alloc_interface_free,
         jsl__alloc_interface_free_all,
+        jsl__arena_create_child,
         arena
     );
 }

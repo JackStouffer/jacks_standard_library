@@ -35,6 +35,7 @@ void jsl_allocator_interface_init(
     JSLReallocateFP reallocate_fp,
     JSLFreeFP free_fp,
     JSLFreeAllFP free_all_fp,
+    JSLCreateChildAllocatorFP create_child_fp,
     void* context
 )
 {
@@ -45,6 +46,7 @@ void jsl_allocator_interface_init(
     allocator->reallocate = reallocate_fp;
     allocator->free = free_fp;
     allocator->free_all = free_all_fp;
+    allocator->create_child = create_child_fp;
     allocator->context = context;
 }
 

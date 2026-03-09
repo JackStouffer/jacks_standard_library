@@ -66,7 +66,7 @@ struct JSL__InfiniteArena
  * of such programs would be batch scripts, developer tooling, and daemons. For these
  * types of programs it's perfectly legitimate to ask for a new piece of memory every time
  * you need something and never free until the program exits or the process starts over.
- * You're not going to exhaust the memory one your dev machine when writing tooling to
+ * You're not going to exhaust the memory on your dev machine when writing tooling to
  * process a 30kb text file, for example.
  * 
  * This infinite arena is more useful than a conventional arena in these situations because
@@ -77,7 +77,7 @@ struct JSL__InfiniteArena
  * have constraints as soon as possible in the development cycle to make sure that your
  * program can run performantly on the minimum tech specs you plan on supporting. You
  * should develop such a program with mechanisms to break work up so any problem size
- * fits in the memory limits so set.
+ * fits in the memory limits set.
  * 
  * ## Functions and Macros
  *
@@ -205,6 +205,31 @@ JSL_DEF void* jsl_infinite_arena_reallocate_aligned(
     int64_t new_num_bytes,
     int32_t align
 );
+
+/**
+ * Save the current position of the arena's bump pointer. The returned
+ * pointer can later be passed to `jsl_infinite_arena_load_restore_point`
+ * to free all allocations made after this point.
+ *
+ * @param arena The arena to snapshot.
+ * @return Opaque restore point (the current bump pointer).
+ */
+JSL_DEF uint8_t* jsl_infinite_arena_save_restore_point(JSLInfiniteArena* arena);
+
+/**
+ * Rewind the arena to a previously saved restore point, freeing all
+ * allocations made after that point.
+ *
+ * In debug builds (`JSL_DEBUG`), the freed region is overwritten with
+ * `0xfeefee`. When ASAN is enabled, the freed region is poisoned.
+ *
+ * The restore point must be within the arena's bounds and must not be
+ * past the current bump pointer (asserted in debug builds).
+ *
+ * @param arena The arena to restore.
+ * @param restore_point A value previously returned by `jsl_infinite_arena_save_restore_point`.
+ */
+JSL_DEF void jsl_infinite_arena_load_restore_point(JSLInfiniteArena* arena, uint8_t* restore_point);
 
 /**
  * Set the arena to have zero active memory regions. This does not return

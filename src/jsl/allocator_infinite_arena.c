@@ -175,6 +175,33 @@ static bool jsl__infinite_arena_alloc_interface_free_all(void* ctx)
     return true;
 }
 
+static bool jsl__infinite_arena_child_free(void* ctx, const void* allocation)
+{
+    (void) ctx;
+    (void) allocation;
+    return true;
+}
+
+static bool jsl__infinite_arena_child_free_all(void* ctx)
+{
+    (void) ctx;
+    return true;
+}
+
+static bool jsl__infinite_arena_create_child(void* ctx, JSLAllocatorInterface* child)
+{
+    jsl_allocator_interface_init(
+        child,
+        jsl__infinite_arena_alloc_interface_alloc,
+        jsl__infinite_arena_alloc_interface_realloc,
+        jsl__infinite_arena_child_free,
+        jsl__infinite_arena_child_free_all,
+        jsl__infinite_arena_create_child,
+        ctx
+    );
+    return true;
+}
+
 void jsl_infinite_arena_get_allocator_interface(JSLAllocatorInterface* allocator, JSLInfiniteArena* arena)
 {
     jsl_allocator_interface_init(
@@ -183,6 +210,7 @@ void jsl_infinite_arena_get_allocator_interface(JSLAllocatorInterface* allocator
         jsl__infinite_arena_alloc_interface_realloc,
         jsl__infinite_arena_alloc_interface_free,
         jsl__infinite_arena_alloc_interface_free_all,
+        jsl__infinite_arena_create_child,
         arena
     );
 }
@@ -479,6 +507,47 @@ void* jsl_infinite_arena_reallocate_aligned(
     );
 
     return res;
+}
+
+uint8_t* jsl_infinite_arena_save_restore_point(JSLInfiniteArena* arena)
+{
+    return arena->current;
+}
+
+void jsl_infinite_arena_load_restore_point(JSLInfiniteArena* arena, uint8_t* restore_point)
+{
+    const uintptr_t restore_addr = (uintptr_t) restore_point;
+    const uintptr_t start_addr = (uintptr_t) arena->start;
+    const uintptr_t end_addr = (uintptr_t) arena->end;
+    const uintptr_t current_addr = (uintptr_t) arena->current;
+
+    const bool in_bounds = restore_addr >= start_addr && restore_addr <= end_addr;
+    const bool before_current = restore_addr <= current_addr;
+
+    JSL_ASSERT(in_bounds && before_current);
+    #ifdef NDEBUG
+        if (!in_bounds || !before_current)
+            return;
+    #endif
+
+    ASAN_UNPOISON_MEMORY_REGION(
+        restore_point,
+        (size_t) (current_addr - restore_addr)
+    );
+
+    #ifdef JSL_DEBUG
+        jsl__infinite_arena_debug_memset_old_memory(
+            (void*) restore_point,
+            (int64_t) (current_addr - restore_addr)
+        );
+    #endif
+
+    ASAN_POISON_MEMORY_REGION(
+        restore_point,
+        (size_t) (current_addr - restore_addr)
+    );
+
+    arena->current = restore_point;
 }
 
 void jsl_infinite_arena_reset(JSLInfiniteArena* arena)

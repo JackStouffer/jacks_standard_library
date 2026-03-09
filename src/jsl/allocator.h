@@ -104,6 +104,18 @@ typedef bool (*JSLFreeFP)(void* ctx, const void* allocation);
 typedef bool (*JSLFreeAllFP)(void* ctx);
 
 /**
+ * Create a child allocator for scratch work. All allocations through
+ * the child can be bulk-freed via `free_all` without affecting the
+ * parent's allocations.
+ *
+ * The child interface is written into `child_out`. The caller owns
+ * this struct (typically stack-allocated).
+ *
+ * Returns false if child creation fails.
+ */
+typedef bool (*JSLCreateChildAllocatorFP)(void* ctx, JSLAllocatorInterface* child_out);
+
+/**
  * The structure makes the following assumptions:
  * 
  *      - A given instance of `JSLAllocatorInterface` must have the same or shorter lifetime of the underlying allocator
@@ -116,6 +128,7 @@ typedef struct JSLAllocatorInterface
     JSLReallocateFP reallocate;
     JSLFreeFP free;
     JSLFreeAllFP free_all;
+    JSLCreateChildAllocatorFP create_child;
     void* context;
 } JSLAllocatorInterface;
 
@@ -140,6 +153,7 @@ void jsl_allocator_interface_init(
     JSLReallocateFP reallocate_fp,
     JSLFreeFP free_fp,
     JSLFreeAllFP free_all_fp,
+    JSLCreateChildAllocatorFP create_child_fp,
     void* context
 );
 
@@ -188,6 +202,28 @@ static inline bool jsl_allocator_interface_free_all(
 )
 {
     return allocator.free_all(allocator.context);
+}
+
+/**
+ * Create a child allocator for scratch work.
+ *
+ * All allocations through the child can be bulk-freed via
+ * `jsl_allocator_interface_free_all` without affecting the parent's
+ * allocations. For arena-backed allocators the child's `free_all` is a
+ * no-op (all memory is reclaimed when the arena itself is reset). For
+ * tracking allocators like the libc allocator, the child maintains a
+ * separate tracking list.
+ *
+ * @param allocator The parent allocator interface.
+ * @param child_out Pointer to the child interface to initialize.
+ * @return true on success, false on failure.
+ */
+static inline bool jsl_allocator_interface_create_child(
+    JSLAllocatorInterface allocator,
+    JSLAllocatorInterface* child_out
+)
+{
+    return allocator.create_child(allocator.context, child_out);
 }
 
 /**

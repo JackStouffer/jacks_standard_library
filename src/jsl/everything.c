@@ -27,6 +27,7 @@
 #include "allocator.c"
 #include "allocator_arena.c"
 #include "allocator_infinite_arena.c"
+#include "allocator_libc.c"
 #include "allocator_pool.c"
 #include "os.c"
 #include "str_set.c"

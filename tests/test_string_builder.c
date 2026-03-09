@@ -93,6 +93,7 @@ static JSLAllocatorInterface test_make_allocator(JSLTestAllocatorContext* contex
         test_allocator_reallocate,
         test_allocator_free,
         test_allocator_free_all,
+        NULL,
         context
     );
     return allocator;

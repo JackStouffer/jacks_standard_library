@@ -241,6 +241,107 @@ static void test_arena_save_restore_point_rewinds(void)
     TEST_POINTERS_EQUAL(third, second);
 }
 
+static void test_arena_create_child_basic(void)
+{
+    uint8_t buffer[1024];
+    JSLArena arena = {0};
+    jsl_arena_init(&arena, buffer, (int64_t) sizeof(buffer));
+
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &arena);
+
+    uint8_t* parent_alloc = (uint8_t*) jsl_allocator_interface_alloc(allocator, 32, 8, true);
+    TEST_BOOL(parent_alloc != NULL);
+    if (!parent_alloc) return;
+
+    for (uint8_t i = 0; i < 32; ++i)
+    {
+        parent_alloc[i] = (uint8_t) (i + 1);
+    }
+
+    JSLAllocatorInterface scratch;
+    TEST_BOOL(jsl_allocator_interface_create_child(allocator, &scratch));
+
+    void* scratch1 = jsl_allocator_interface_alloc(scratch, 64, 8, false);
+    TEST_BOOL(scratch1 != NULL);
+
+    void* scratch2 = jsl_allocator_interface_alloc(scratch, 64, 8, false);
+    TEST_BOOL(scratch2 != NULL);
+
+    jsl_allocator_interface_free_all(scratch);
+
+    for (uint8_t i = 0; i < 32; ++i)
+    {
+        TEST_BOOL(parent_alloc[i] == (uint8_t) (i + 1));
+    }
+}
+
+static void test_arena_create_child_parent_survives_realloc(void)
+{
+    uint8_t buffer[2048];
+    JSLArena arena = {0};
+    jsl_arena_init(&arena, buffer, (int64_t) sizeof(buffer));
+
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &arena);
+
+    uint8_t* parent_buf = (uint8_t*) jsl_allocator_interface_alloc(allocator, 16, 8, false);
+    TEST_BOOL(parent_buf != NULL);
+    if (!parent_buf) return;
+
+    for (uint8_t i = 0; i < 16; ++i)
+    {
+        parent_buf[i] = (uint8_t) (100 + i);
+    }
+
+    JSLAllocatorInterface scratch;
+    TEST_BOOL(jsl_allocator_interface_create_child(allocator, &scratch));
+
+    void* scratch_alloc = jsl_allocator_interface_alloc(scratch, 64, 8, false);
+    TEST_BOOL(scratch_alloc != NULL);
+
+    uint8_t* grown = (uint8_t*) jsl_allocator_interface_realloc(allocator, parent_buf, 64, 8);
+    TEST_BOOL(grown != NULL);
+    if (!grown) return;
+
+    for (uint8_t i = 0; i < 16; ++i)
+    {
+        TEST_BOOL(grown[i] == (uint8_t) (100 + i));
+    }
+
+    jsl_allocator_interface_free_all(scratch);
+
+    for (uint8_t i = 0; i < 16; ++i)
+    {
+        TEST_BOOL(grown[i] == (uint8_t) (100 + i));
+    }
+}
+
+static void test_arena_create_child_nested(void)
+{
+    uint8_t buffer[2048];
+    JSLArena arena = {0};
+    jsl_arena_init(&arena, buffer, (int64_t) sizeof(buffer));
+
+    JSLAllocatorInterface allocator;
+    jsl_arena_get_allocator_interface(&allocator, &arena);
+
+    JSLAllocatorInterface child1;
+    TEST_BOOL(jsl_allocator_interface_create_child(allocator, &child1));
+
+    void* a = jsl_allocator_interface_alloc(child1, 32, 8, false);
+    TEST_BOOL(a != NULL);
+
+    JSLAllocatorInterface child2;
+    TEST_BOOL(jsl_allocator_interface_create_child(child1, &child2));
+
+    void* b = jsl_allocator_interface_alloc(child2, 32, 8, false);
+    TEST_BOOL(b != NULL);
+
+    jsl_allocator_interface_free_all(child2);
+    jsl_allocator_interface_free_all(child1);
+}
+
 static void test_arena_allocator_interface_basic(void)
 {
     uint8_t buffer[256];
@@ -614,6 +715,141 @@ static void test_infinite_arena_reset_reuses_memory(void)
     jsl_infinite_arena_release(&arena);
 }
 
+static void test_infinite_arena_save_restore_point(void)
+{
+    JSLInfiniteArena arena = {0};
+    bool init = jsl_infinite_arena_init(&arena);
+    TEST_BOOL(init == true);
+    if (!init) return;
+
+    void* first = jsl_infinite_arena_allocate(&arena, 16, false);
+    TEST_BOOL(first != NULL);
+    if (!first) return;
+
+    uint8_t* restore = jsl_infinite_arena_save_restore_point(&arena);
+
+    void* second = jsl_infinite_arena_allocate(&arena, 32, false);
+    TEST_BOOL(second != NULL);
+    if (!second) return;
+
+    jsl_infinite_arena_load_restore_point(&arena, restore);
+
+    void* third = jsl_infinite_arena_allocate(&arena, 32, false);
+    TEST_POINTERS_EQUAL(third, second);
+
+    jsl_infinite_arena_release(&arena);
+}
+
+static void test_infinite_arena_create_child_basic(void)
+{
+    JSLInfiniteArena arena = {0};
+    bool init = jsl_infinite_arena_init(&arena);
+    TEST_BOOL(init == true);
+    if (!init) return;
+
+    JSLAllocatorInterface allocator;
+    jsl_infinite_arena_get_allocator_interface(&allocator, &arena);
+
+    uint8_t* parent_alloc = (uint8_t*) jsl_allocator_interface_alloc(allocator, 32, 8, true);
+    TEST_BOOL(parent_alloc != NULL);
+    if (!parent_alloc) { jsl_infinite_arena_release(&arena); return; }
+
+    for (uint8_t i = 0; i < 32; ++i)
+    {
+        parent_alloc[i] = (uint8_t) (i + 1);
+    }
+
+    JSLAllocatorInterface scratch;
+    TEST_BOOL(jsl_allocator_interface_create_child(allocator, &scratch));
+
+    void* scratch1 = jsl_allocator_interface_alloc(scratch, 64, 8, false);
+    TEST_BOOL(scratch1 != NULL);
+
+    void* scratch2 = jsl_allocator_interface_alloc(scratch, 64, 8, false);
+    TEST_BOOL(scratch2 != NULL);
+
+    jsl_allocator_interface_free_all(scratch);
+
+    for (uint8_t i = 0; i < 32; ++i)
+    {
+        TEST_BOOL(parent_alloc[i] == (uint8_t) (i + 1));
+    }
+
+    jsl_infinite_arena_release(&arena);
+}
+
+static void test_infinite_arena_create_child_parent_survives_realloc(void)
+{
+    JSLInfiniteArena arena = {0};
+    bool init = jsl_infinite_arena_init(&arena);
+    TEST_BOOL(init == true);
+    if (!init) return;
+
+    JSLAllocatorInterface allocator;
+    jsl_infinite_arena_get_allocator_interface(&allocator, &arena);
+
+    uint8_t* parent_buf = (uint8_t*) jsl_allocator_interface_alloc(allocator, 16, 8, false);
+    TEST_BOOL(parent_buf != NULL);
+    if (!parent_buf) { jsl_infinite_arena_release(&arena); return; }
+
+    for (uint8_t i = 0; i < 16; ++i)
+    {
+        parent_buf[i] = (uint8_t) (100 + i);
+    }
+
+    JSLAllocatorInterface scratch;
+    TEST_BOOL(jsl_allocator_interface_create_child(allocator, &scratch));
+
+    void* scratch_alloc = jsl_allocator_interface_alloc(scratch, 64, 8, false);
+    TEST_BOOL(scratch_alloc != NULL);
+
+    uint8_t* grown = (uint8_t*) jsl_allocator_interface_realloc(allocator, parent_buf, 64, 8);
+    TEST_BOOL(grown != NULL);
+    if (!grown) { jsl_infinite_arena_release(&arena); return; }
+
+    for (uint8_t i = 0; i < 16; ++i)
+    {
+        TEST_BOOL(grown[i] == (uint8_t) (100 + i));
+    }
+
+    jsl_allocator_interface_free_all(scratch);
+
+    for (uint8_t i = 0; i < 16; ++i)
+    {
+        TEST_BOOL(grown[i] == (uint8_t) (100 + i));
+    }
+
+    jsl_infinite_arena_release(&arena);
+}
+
+static void test_infinite_arena_create_child_nested(void)
+{
+    JSLInfiniteArena arena = {0};
+    bool init = jsl_infinite_arena_init(&arena);
+    TEST_BOOL(init == true);
+    if (!init) return;
+
+    JSLAllocatorInterface allocator;
+    jsl_infinite_arena_get_allocator_interface(&allocator, &arena);
+
+    JSLAllocatorInterface child1;
+    TEST_BOOL(jsl_allocator_interface_create_child(allocator, &child1));
+
+    void* a = jsl_allocator_interface_alloc(child1, 32, 8, false);
+    TEST_BOOL(a != NULL);
+
+    JSLAllocatorInterface child2;
+    TEST_BOOL(jsl_allocator_interface_create_child(child1, &child2));
+
+    void* b = jsl_allocator_interface_alloc(child2, 32, 8, false);
+    TEST_BOOL(b != NULL);
+
+    jsl_allocator_interface_free_all(child2);
+    jsl_allocator_interface_free_all(child1);
+
+    jsl_infinite_arena_release(&arena);
+}
+
 static void test_infinite_arena_allocator_interface_basic(void)
 {
     JSLInfiniteArena arena = {0};
@@ -662,6 +898,9 @@ int main(void)
     RUN_TEST_FUNCTION("Test arena reset reuses memory", test_arena_reset_reuses_memory);
     RUN_TEST_FUNCTION("Test arena save/restore point", test_arena_save_restore_point_rewinds);
     RUN_TEST_FUNCTION("Test arena allocator interface", test_arena_allocator_interface_basic);
+    RUN_TEST_FUNCTION("Test arena create child basic", test_arena_create_child_basic);
+    RUN_TEST_FUNCTION("Test arena create child parent survives realloc", test_arena_create_child_parent_survives_realloc);
+    RUN_TEST_FUNCTION("Test arena create child nested", test_arena_create_child_nested);
     RUN_TEST_FUNCTION("Test arena typed macros", test_arena_typed_macros);
     RUN_TEST_FUNCTION("Test arena from stack macro", test_arena_from_stack_macro);
 
@@ -677,7 +916,11 @@ int main(void)
     RUN_TEST_FUNCTION("Test infinite arena realloc aligned not last", test_infinite_arena_reallocate_aligned_not_last_allocates_new);
     RUN_TEST_FUNCTION("Test infinite arena realloc aligned mismatch", test_infinite_arena_reallocate_aligned_alignment_mismatch_allocates_new);
     RUN_TEST_FUNCTION("Test infinite arena reset reuses memory", test_infinite_arena_reset_reuses_memory);
+    RUN_TEST_FUNCTION("Test infinite arena save/restore point", test_infinite_arena_save_restore_point);
     RUN_TEST_FUNCTION("Test infinite arena allocator interface", test_infinite_arena_allocator_interface_basic);
+    RUN_TEST_FUNCTION("Test infinite arena create child basic", test_infinite_arena_create_child_basic);
+    RUN_TEST_FUNCTION("Test infinite arena create child parent survives realloc", test_infinite_arena_create_child_parent_survives_realloc);
+    RUN_TEST_FUNCTION("Test infinite arena create child nested", test_infinite_arena_create_child_nested);
 
     TEST_RESULTS();
     return lfails != 0;
