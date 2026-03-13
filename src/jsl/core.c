@@ -1264,14 +1264,58 @@ bool jsl_compare_ascii_insensitive(JSLImmutableMemory a, JSLImmutableMemory b)
     return true;
 }
 
-int32_t jsl_memory_to_int32(JSLImmutableMemory str, int32_t* result)
+int32_t jsl_memory_to_u16(JSLImmutableMemory str, uint16_t* result)
+{
+    if (JSL__UNLIKELY(str.data == NULL || str.length < 1))
+        return 0;
+
+    uint16_t parsed_val = 0;
+    uint16_t parsed_val_temp = 0;
+    int32_t i = 0;
+    int32_t error = 0;
+
+    while (str.data[i] == '0' && i < str.length)
+    {
+        ++i;
+    }
+
+    for (; i < str.length; i++)
+    {
+        uint8_t digit = str.data[i] - '0';
+        if (digit > 9)
+        {
+            error = JSL_CONVERSION_UNEXPECTED_CHARACTER;
+            break;
+        }
+
+        parsed_val_temp = (parsed_val * 10) + digit;
+        if (parsed_val_temp > parsed_val)
+        {
+            parsed_val = parsed_val_temp;
+        }
+        else if (parsed_val_temp <= parsed_val)
+        {
+            error = JSL_CONVERSION_OVERFLOW;
+            break;
+        }
+    }
+
+    if (i > 0 && error == 0 && result != NULL)
+        *result = parsed_val;
+
+    return error == 0 ? i : error;
+}
+
+int32_t jsl_memory_to_i32(JSLImmutableMemory str, int32_t* result)
 {
     if (JSL__UNLIKELY(str.data == NULL || str.length < 1))
         return 0;
 
     bool negative = false;
-    int32_t ret = 0;
+    int32_t parsed_val = 0;
+    int32_t parsed_val_temp = 0;
     int32_t i = 0;
+    int32_t error = 0;
 
     if (str.data[0] == '-')
     {
@@ -1292,18 +1336,76 @@ int32_t jsl_memory_to_int32(JSLImmutableMemory str, int32_t* result)
     {
         uint8_t digit = str.data[i] - '0';
         if (digit > 9)
+        {
+            error = JSL_CONVERSION_UNEXPECTED_CHARACTER;
             break;
+        }
 
-        ret = (ret * 10) + digit;
+        parsed_val_temp = (parsed_val * 10) + digit;
+        if (parsed_val_temp > parsed_val)
+        {
+            parsed_val = parsed_val_temp;
+        }
+        else if (parsed_val_temp <= parsed_val && negative)
+        {
+            error = JSL_CONVERSION_UNDERFLOW;
+            break;
+        }
+        else if (parsed_val_temp <= parsed_val)
+        {
+            error = JSL_CONVERSION_OVERFLOW;
+            break;
+        }
     }
 
-    if (negative)
-        ret = -ret;
+    if (i > 0 && error == 0 && result != NULL && negative)
+        *result = -parsed_val;
+    else if (i > 0 && error == 0 && result != NULL)
+        *result = parsed_val;
 
-    if (i > 0)
-        *result = ret;
+    return error == 0 ? i : error;
+}
 
-    return i;
+int32_t jsl_memory_to_u32(JSLImmutableMemory str, uint32_t* result)
+{
+    if (JSL__UNLIKELY(str.data == NULL || str.length < 1))
+        return 0;
+
+    uint32_t parsed_val = 0;
+    uint32_t parsed_val_temp = 0;
+    int32_t i = 0;
+    int32_t error = 0;
+
+    while (str.data[i] == '0' && i < str.length)
+    {
+        ++i;
+    }
+
+    for (; i < str.length; i++)
+    {
+        uint8_t digit = str.data[i] - '0';
+        if (digit > 9)
+        {
+            error = JSL_CONVERSION_UNEXPECTED_CHARACTER;
+            break;
+        }
+
+        parsed_val_temp = (parsed_val * 10) + digit;
+        if (parsed_val_temp > parsed_val)
+        {
+            parsed_val = parsed_val_temp;
+        }
+        else if (parsed_val_temp <= parsed_val)
+        {
+            error = JSL_CONVERSION_OVERFLOW;
+            break;
+        }
+    }
+
+    if (i > 0 && error == 0 && result != NULL)
+        *result = parsed_val;
+
+    return error == 0 ? i : error;
 }
 
 int64_t jsl_strip_whitespace_left(JSLImmutableMemory* str)

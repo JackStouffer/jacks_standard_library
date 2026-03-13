@@ -1848,19 +1848,52 @@ JSL_DEF bool jsl_compare_ascii_insensitive(JSLImmutableMemory a, JSLImmutableMem
  */
 JSL_DEF int64_t jsl_to_lowercase_ascii(JSLOutputSink sink, JSLImmutableMemory str);
 
+// TODO: docs
+typedef enum JSLConversionErrors {
+    JSL_CONVERSION_UNEXPECTED_CHARACTER = -1,
+    JSL_CONVERSION_UNDERFLOW = -2,
+    JSL_CONVERSION_OVERFLOW = -3,
+} JSLConversionErrors;
+
+// TODO: docs
+int32_t jsl_memory_to_u16(JSLImmutableMemory str, uint16_t* result);
+
 /**
- * Reads a 32 bit integer in base-10 from the beginning of `str`.
- * Accepted characters are 0-9, +, and -.
- *
- * Stops once it hits the first non-accepted character. This function does
- * not check for overflows or underflows. `result` is not written to if
- * there were no successfully parsed bytes.
+ * Reads a signed 32 bit integer in base-10 from the beginning of `str`.
+ * Accepted characters are 0-9, `+`, and `-`. `+` or `-` must be the first
+ * character in the memory. Leading zeros are ignored.
+ * 
+ * This function returns the number of bytes that were successfully read.
+ * It will stop once it hits the first non-accepted character or an
+ * overflow/underflow is detected. On error the return value will be one
+ * of the values of the enum `JSLConversionErrors`.
+ * 
+ * If `result` is not `NULL` then it is set to the parsed integer value.
+ * `result` is not written to if there were no successfully parsed bytes.
  *
  * @param str a string with an int representation at the start
  * @param result out parameter where the parsing result will be stored
  * @return The number of bytes that were successfully read from the string
  */
-JSL_DEF int32_t jsl_memory_to_int32(JSLImmutableMemory str, int32_t* result);
+JSL_DEF int32_t jsl_memory_to_i32(JSLImmutableMemory str, int32_t* result);
+
+/**
+ * Reads a signed 32 bit integer in base-10 from the beginning of `str`.
+ * Accepted characters are 0-9. Leading zeros are ignored.
+ * 
+ * This function returns the number of bytes that were successfully read.
+ * It will stop once it hits the first non-accepted character or an
+ * overflow/underflow is detected. On error the return value will be one
+ * of the values of the enum `JSLConversionErrors`.
+ * 
+ * If `result` is not `NULL` then it is set to the parsed integer value.
+ * `result` is not written to if there were no successfully parsed bytes.
+ *
+ * @param str a string with an int representation at the start
+ * @param result out parameter where the parsing result will be stored
+ * @return The number of bytes that were successfully read from the string
+ */
+JSL_DEF int32_t jsl_memory_to_u32(JSLImmutableMemory str, uint32_t* result);
 
 /**
  * Advance the memory until the first non-whitespace character is
