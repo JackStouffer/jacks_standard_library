@@ -1269,8 +1269,7 @@ int32_t jsl_memory_to_u16(JSLImmutableMemory str, uint16_t* result)
     if (JSL__UNLIKELY(str.data == NULL || str.length < 1))
         return 0;
 
-    uint16_t parsed_val = 0;
-    uint16_t parsed_val_temp = 0;
+    uint32_t parsed_val = 0;
     int32_t i = 0;
     int32_t error = 0;
 
@@ -1287,12 +1286,8 @@ int32_t jsl_memory_to_u16(JSLImmutableMemory str, uint16_t* result)
             break;
         }
 
-        parsed_val_temp = (parsed_val * 10) + digit;
-        if (parsed_val_temp > parsed_val)
-        {
-            parsed_val = parsed_val_temp;
-        }
-        else if (parsed_val_temp <= parsed_val)
+        parsed_val = (parsed_val * 10) + digit;
+        if (parsed_val > UINT16_MAX)
         {
             error = JSL_CONVERSION_OVERFLOW;
             break;
@@ -1303,7 +1298,7 @@ int32_t jsl_memory_to_u16(JSLImmutableMemory str, uint16_t* result)
         error = JSL_CONVERSION_UNEXPECTED_CHARACTER;
 
     if (i > 0 && error == 0 && result != NULL)
-        *result = parsed_val;
+        *result = (uint16_t)parsed_val;
 
     return error == 0 ? i : error;
 }
@@ -1314,8 +1309,7 @@ int32_t jsl_memory_to_i32(JSLImmutableMemory str, int32_t* result)
         return 0;
 
     bool negative = false;
-    int32_t parsed_val = 0;
-    int32_t parsed_val_temp = 0;
+    int64_t parsed_val = 0;
     int32_t i = 0;
     int32_t error = 0;
 
@@ -1342,17 +1336,13 @@ int32_t jsl_memory_to_i32(JSLImmutableMemory str, int32_t* result)
             break;
         }
 
-        parsed_val_temp = (parsed_val * 10) + digit;
-        if (parsed_val_temp > parsed_val)
-        {
-            parsed_val = parsed_val_temp;
-        }
-        else if (parsed_val_temp <= parsed_val && negative)
+        parsed_val = (parsed_val * 10) + digit;
+        if (parsed_val > (int64_t)INT32_MAX + 1 && negative)
         {
             error = JSL_CONVERSION_UNDERFLOW;
             break;
         }
-        else if (parsed_val_temp <= parsed_val)
+        else if (parsed_val > INT32_MAX && !negative)
         {
             error = JSL_CONVERSION_OVERFLOW;
             break;
@@ -1363,9 +1353,9 @@ int32_t jsl_memory_to_i32(JSLImmutableMemory str, int32_t* result)
         error = JSL_CONVERSION_UNEXPECTED_CHARACTER;
 
     if (i > 0 && error == 0 && result != NULL && negative)
-        *result = -parsed_val;
+        *result = (int32_t)-parsed_val;
     else if (i > 0 && error == 0 && result != NULL)
-        *result = parsed_val;
+        *result = (int32_t)parsed_val;
 
     return error == 0 ? i : error;
 }
@@ -1375,8 +1365,7 @@ int32_t jsl_memory_to_u32(JSLImmutableMemory str, uint32_t* result)
     if (JSL__UNLIKELY(str.data == NULL || str.length < 1))
         return 0;
 
-    uint32_t parsed_val = 0;
-    uint32_t parsed_val_temp = 0;
+    uint64_t parsed_val = 0;
     int32_t i = 0;
     int32_t error = 0;
 
@@ -1393,12 +1382,8 @@ int32_t jsl_memory_to_u32(JSLImmutableMemory str, uint32_t* result)
             break;
         }
 
-        parsed_val_temp = (parsed_val * 10) + digit;
-        if (parsed_val_temp > parsed_val)
-        {
-            parsed_val = parsed_val_temp;
-        }
-        else if (parsed_val_temp <= parsed_val)
+        parsed_val = (parsed_val * 10) + digit;
+        if (parsed_val > UINT32_MAX)
         {
             error = JSL_CONVERSION_OVERFLOW;
             break;
@@ -1409,7 +1394,7 @@ int32_t jsl_memory_to_u32(JSLImmutableMemory str, uint32_t* result)
         error = JSL_CONVERSION_UNEXPECTED_CHARACTER;
 
     if (i > 0 && error == 0 && result != NULL)
-        *result = parsed_val;
+        *result = (uint32_t)parsed_val;
 
     return error == 0 ? i : error;
 }
