@@ -1284,7 +1284,6 @@ int32_t jsl_memory_to_u16(JSLImmutableMemory str, uint16_t* result)
         uint8_t digit = str.data[i] - '0';
         if (digit > 9)
         {
-            error = JSL_CONVERSION_UNEXPECTED_CHARACTER;
             break;
         }
 
@@ -1299,6 +1298,9 @@ int32_t jsl_memory_to_u16(JSLImmutableMemory str, uint16_t* result)
             break;
         }
     }
+
+    if (i == 0 && (str.data[i] > '9' || str.data[i] < '0'))
+        error = JSL_CONVERSION_UNEXPECTED_CHARACTER;
 
     if (i > 0 && error == 0 && result != NULL)
         *result = parsed_val;
@@ -1337,7 +1339,6 @@ int32_t jsl_memory_to_i32(JSLImmutableMemory str, int32_t* result)
         uint8_t digit = str.data[i] - '0';
         if (digit > 9)
         {
-            error = JSL_CONVERSION_UNEXPECTED_CHARACTER;
             break;
         }
 
@@ -1357,6 +1358,9 @@ int32_t jsl_memory_to_i32(JSLImmutableMemory str, int32_t* result)
             break;
         }
     }
+
+    if (i == 0 && (str.data[i] > '9' || str.data[i] < '0'))
+        error = JSL_CONVERSION_UNEXPECTED_CHARACTER;
 
     if (i > 0 && error == 0 && result != NULL && negative)
         *result = -parsed_val;
@@ -1386,7 +1390,6 @@ int32_t jsl_memory_to_u32(JSLImmutableMemory str, uint32_t* result)
         uint8_t digit = str.data[i] - '0';
         if (digit > 9)
         {
-            error = JSL_CONVERSION_UNEXPECTED_CHARACTER;
             break;
         }
 
@@ -1401,6 +1404,9 @@ int32_t jsl_memory_to_u32(JSLImmutableMemory str, uint32_t* result)
             break;
         }
     }
+
+    if (i == 0 && (str.data[i] > '9' || str.data[i] < '0'))
+        error = JSL_CONVERSION_UNEXPECTED_CHARACTER;
 
     if (i > 0 && error == 0 && result != NULL)
         *result = parsed_val;
