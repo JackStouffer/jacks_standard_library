@@ -77,14 +77,14 @@ static void test_jsl_from_cstr(void)
     JSLImmutableMemory str = jsl_cstr_to_memory(c_str);
 
     TEST_POINTERS_EQUAL(str.data, c_str);
-    TEST_BOOL((int64_t) str.length == (int64_t) length);
-    TEST_BOOL(memcmp(c_str, str.data, (size_t) str.length) == 0);
+    TEST_INT64_EQUAL(str.length, (int64_t) length);
+    TEST_INT32_EQUAL(memcmp(c_str, str.data, (size_t) str.length), 0);
 }
 
 static void test_jsl_cstr_memory_copy(void)
 {
     JSLMutableMemory buffer = jsl_mutable_memory(malloc(1024), 1024);
-    TEST_BOOL((int64_t) buffer.length == (int64_t) 1024);
+    TEST_INT64_EQUAL(buffer.length, (int64_t) 1024);
     JSLMutableMemory writer = buffer;
 
     char* str = "This is a test string!";
@@ -93,10 +93,10 @@ static void test_jsl_cstr_memory_copy(void)
     TEST_INT64_EQUAL(memcpy_res, (int64_t) 22);
 
     TEST_POINTERS_EQUAL(writer.data, buffer.data + length);
-    TEST_BOOL(writer.length == 1024 - length);
-    TEST_BOOL((int64_t) buffer.length == (int64_t) 1024);
+    TEST_INT64_EQUAL(writer.length, 1024 - length);
+    TEST_INT64_EQUAL(buffer.length, (int64_t) 1024);
 
-    TEST_BOOL(memcmp(str, buffer.data, (size_t) length) == 0);
+    TEST_INT32_EQUAL(memcmp(str, buffer.data, (size_t) length), 0);
 }
 
 static void test_jsl_memory_compare(void)
@@ -174,7 +174,7 @@ static void test_jsl_total_write_length(void)
 
         int64_t length_written = jsl_total_write_length(original, writer);
         TEST_INT64_EQUAL(length_written, 7);
-        TEST_BOOL(memcmp(buffer, "abcdefg", 7) == 0);
+        TEST_INT32_EQUAL(memcmp(buffer, "abcdefg", 7), 0);
     }
 
     {
@@ -206,7 +206,7 @@ static void test_jsl_auto_slice(void)
         JSLImmutableMemory slice = jsl_auto_slice(original, writer);
         TEST_INT64_EQUAL(slice.length, (int64_t) 10);
         TEST_POINTERS_EQUAL(slice.data, original.data);
-        TEST_BOOL(memcmp(slice.data, "HelloWorld", 10) == 0);
+        TEST_INT32_EQUAL(memcmp(slice.data, "HelloWorld", 10), 0);
     }
 
     {
@@ -227,7 +227,7 @@ static void test_jsl_auto_slice(void)
         JSLImmutableMemory slice = jsl_auto_slice(original, writer);
         TEST_INT64_EQUAL(slice.length, (int64_t) 4);
         TEST_POINTERS_EQUAL(slice.data, original.data);
-        TEST_BOOL(memcmp(slice.data, "xyzw", 4) == 0);
+        TEST_INT32_EQUAL(memcmp(slice.data, "xyzw", 4), 0);
     }
 }
 
@@ -552,70 +552,70 @@ static void test_jsl_index_of(void)
 {
     JSLImmutableMemory buffer1 = JSL_CSTR_INITIALIZER("");
     int64_t res1 = jsl_index_of(buffer1, '3');
-    TEST_BOOL(res1 == -1);
+    TEST_INT64_EQUAL(res1, -1);
 
     JSLImmutableMemory buffer2 = JSL_CSTR_INITIALIZER(".");
     int64_t res2 = jsl_index_of(buffer2, '.');
-    TEST_BOOL(res2 == 0);
+    TEST_INT64_EQUAL(res2, 0);
 
     JSLImmutableMemory buffer3 = JSL_CSTR_INITIALIZER("......");
     int64_t res3 = jsl_index_of(buffer3, '.');
-    TEST_BOOL(res3 == 0);
+    TEST_INT64_EQUAL(res3, 0);
 
     JSLImmutableMemory buffer4 = JSL_CSTR_INITIALIZER("Hello.World");
     int64_t res4 = jsl_index_of(buffer4, '.');
-    TEST_BOOL(res4 == 5);
+    TEST_INT64_EQUAL(res4, 5);
 
     JSLImmutableMemory buffer5 = JSL_CSTR_INITIALIZER("Hello          . Hello");
     int64_t res5 = jsl_index_of(buffer5, '.');
-    TEST_BOOL(res5 == 15);
+    TEST_INT64_EQUAL(res5, 15);
 
     JSLImmutableMemory buffer6 = JSL_CSTR_INITIALIZER("Hello.World.");
     int64_t res6 = jsl_index_of(buffer6, '.');
-    TEST_BOOL(res6 == 5);
+    TEST_INT64_EQUAL(res6, 5);
 
     JSLImmutableMemory buffer7 = JSL_CSTR_INITIALIZER("Hello Hello ");
     int64_t res7 = jsl_index_of(buffer7, ' ');
-    TEST_BOOL(res7 == 5);
+    TEST_INT64_EQUAL(res7, 5);
 
     JSLImmutableMemory buffer8 = JSL_CSTR_INITIALIZER("This is a very long string that is going to trigger SIMD code, as it's longer than a single AVX2 register when using 8-bit values, which we are since we're using ASCII/UTF-8.");
     int64_t res8 = jsl_index_of(buffer8, '8');
-    TEST_BOOL(res8 == 117);
+    TEST_INT64_EQUAL(res8, 117);
 }
 
 static void test_jsl_index_of_reverse(void)
 {
     JSLImmutableMemory buffer1 = JSL_CSTR_INITIALIZER("");
     int64_t res1 = jsl_index_of_reverse(buffer1, '3');
-    TEST_BOOL(res1 == -1);
+    TEST_INT64_EQUAL(res1, -1);
 
     JSLImmutableMemory buffer2 = JSL_CSTR_INITIALIZER(".");
     int64_t res2 = jsl_index_of_reverse(buffer2, '.');
-    TEST_BOOL(res2 == 0);
+    TEST_INT64_EQUAL(res2, 0);
 
     JSLImmutableMemory buffer3 = JSL_CSTR_INITIALIZER("......");
     int64_t res3 = jsl_index_of_reverse(buffer3, '.');
-    TEST_BOOL(res3 == 5);
+    TEST_INT64_EQUAL(res3, 5);
 
     JSLImmutableMemory buffer4 = JSL_CSTR_INITIALIZER("Hello.World");
     int64_t res4 = jsl_index_of_reverse(buffer4, '.');
-    TEST_BOOL(res4 == 5);
+    TEST_INT64_EQUAL(res4, 5);
 
     JSLImmutableMemory buffer5 = JSL_CSTR_INITIALIZER("Hello          . Hello");
     int64_t res5 = jsl_index_of_reverse(buffer5, '.');
-    TEST_BOOL(res5 == 15);
+    TEST_INT64_EQUAL(res5, 15);
 
     JSLImmutableMemory buffer6 = JSL_CSTR_INITIALIZER("Hello.World.");
     int64_t res6 = jsl_index_of_reverse(buffer6, '.');
-    TEST_BOOL(res6 == 11);
+    TEST_INT64_EQUAL(res6, 11);
 
     JSLImmutableMemory buffer7 = JSL_CSTR_INITIALIZER("This is a very long string that is going to trigger SIMD code, as it's longer than a single AVX2 register when using 8-bit values, which we are since we're using ASCII/UTF-8.");
     int64_t res7 = jsl_index_of_reverse(buffer7, 'M');
-    TEST_BOOL(res7 == 54);
+    TEST_INT64_EQUAL(res7, 54);
 
     JSLImmutableMemory buffer8 = JSL_CSTR_INITIALIZER("This is a very long string that is going to trigger SIMD code, as it's longer than a single AVX2 register when using 8-bit values, which we are since we're using ASCII/UTF-8.");
     int64_t res8 = jsl_index_of_reverse(buffer8, 'w');
-    TEST_BOOL(res8 == 150);
+    TEST_INT64_EQUAL(res8, 150);
 }
 
 static void test_jsl_get_file_extension(void)
@@ -752,96 +752,96 @@ static void test_jsl_memory_to_i32(void)
     result = -9999;
 
     JSLImmutableMemory buffer2 = JSL_CSTR_INITIALIZER("-0");
-    TEST_BOOL(jsl_memory_to_i32(buffer2, &result) == 2);
-    TEST_BOOL(result == 0);
+    TEST_INT32_EQUAL(jsl_memory_to_i32(buffer2, &result), 2);
+    TEST_INT32_EQUAL(result, 0);
 
     result = -9999;
 
     JSLImmutableMemory buffer3 = JSL_CSTR_INITIALIZER("11");
-    TEST_BOOL(jsl_memory_to_i32(buffer3, &result) == 2);
-    TEST_BOOL(result == 11);
+    TEST_INT32_EQUAL(jsl_memory_to_i32(buffer3, &result), 2);
+    TEST_INT32_EQUAL(result, 11);
 
     result = -9999;
 
     JSLImmutableMemory buffer4 = JSL_CSTR_INITIALIZER("-1243");
-    TEST_BOOL(jsl_memory_to_i32(buffer4, &result) == 5);
-    TEST_BOOL(result == -1243);
+    TEST_INT32_EQUAL(jsl_memory_to_i32(buffer4, &result), 5);
+    TEST_INT32_EQUAL(result, -1243);
 
     result = -9999;
 
     JSLImmutableMemory buffer5 = JSL_CSTR_INITIALIZER("000003");
-    TEST_BOOL(jsl_memory_to_i32(buffer5, &result) == 6);
-    TEST_BOOL(result == 3);
+    TEST_INT32_EQUAL(jsl_memory_to_i32(buffer5, &result), 6);
+    TEST_INT32_EQUAL(result, 3);
 
     result = -9999;
 
     JSLImmutableMemory buffer6 = JSL_CSTR_INITIALIZER("000000");
-    TEST_BOOL(jsl_memory_to_i32(buffer6, &result) == 6);
-    TEST_BOOL(result == 0);
+    TEST_INT32_EQUAL(jsl_memory_to_i32(buffer6, &result), 6);
+    TEST_INT32_EQUAL(result, 0);
 
     result = -9999;
 
     JSLImmutableMemory buffer7 = JSL_CSTR_INITIALIZER("-000000");
-    TEST_BOOL(jsl_memory_to_i32(buffer7, &result) == 7);
-    TEST_BOOL(result == 0);
+    TEST_INT32_EQUAL(jsl_memory_to_i32(buffer7, &result), 7);
+    TEST_INT32_EQUAL(result, 0);
 
     result = -9999;
 
     JSLImmutableMemory buffer8 = JSL_CSTR_INITIALIZER("98468465");
-    TEST_BOOL(jsl_memory_to_i32(buffer8, &result) == 8);
-    TEST_BOOL(result == 98468465);
+    TEST_INT32_EQUAL(jsl_memory_to_i32(buffer8, &result), 8);
+    TEST_INT32_EQUAL(result, 98468465);
 
     result = -9999;
 
     JSLImmutableMemory buffer9 = JSL_CSTR_INITIALIZER("454 hello, world");
-    TEST_BOOL(jsl_memory_to_i32(buffer9, &result) == 3);
-    TEST_BOOL(result == 454);
+    TEST_INT32_EQUAL(jsl_memory_to_i32(buffer9, &result), 3);
+    TEST_INT32_EQUAL(result, 454);
 
     result = -9999;
 
     JSLImmutableMemory buffer10 = JSL_CSTR_INITIALIZER("+488 hello, world");
-    TEST_BOOL(jsl_memory_to_i32(buffer10, &result) == 4);
-    TEST_BOOL(result == 488);
+    TEST_INT32_EQUAL(jsl_memory_to_i32(buffer10, &result), 4);
+    TEST_INT32_EQUAL(result, 488);
 
     result = -9999;
 
     /* overflow: larger than INT32_MAX */
     JSLImmutableMemory buffer11 = JSL_CSTR_INITIALIZER("2147483648");
-    TEST_BOOL(jsl_memory_to_i32(buffer11, &result) == JSL_CONVERSION_OVERFLOW);
+    TEST_INT32_EQUAL(jsl_memory_to_i32(buffer11, &result), JSL_CONVERSION_OVERFLOW);
 
     JSLImmutableMemory buffer12 = JSL_CSTR_INITIALIZER("9999999999");
-    TEST_BOOL(jsl_memory_to_i32(buffer12, &result) == JSL_CONVERSION_OVERFLOW);
+    TEST_INT32_EQUAL(jsl_memory_to_i32(buffer12, &result), JSL_CONVERSION_OVERFLOW);
 
     /* underflow: smaller than INT32_MIN */
     JSLImmutableMemory buffer13 = JSL_CSTR_INITIALIZER("-2147483649");
-    TEST_BOOL(jsl_memory_to_i32(buffer13, &result) == JSL_CONVERSION_UNDERFLOW);
+    TEST_INT32_EQUAL(jsl_memory_to_i32(buffer13, &result), JSL_CONVERSION_UNDERFLOW);
 
     JSLImmutableMemory buffer14 = JSL_CSTR_INITIALIZER("-9999999999");
-    TEST_BOOL(jsl_memory_to_i32(buffer14, &result) == JSL_CONVERSION_UNDERFLOW);
+    TEST_INT32_EQUAL(jsl_memory_to_i32(buffer14, &result), JSL_CONVERSION_UNDERFLOW);
 
     /* unexpected character */
     JSLImmutableMemory buffer15 = JSL_CSTR_INITIALIZER("abc");
-    TEST_BOOL(jsl_memory_to_i32(buffer15, &result) == JSL_CONVERSION_UNEXPECTED_CHARACTER);
+    TEST_INT32_EQUAL(jsl_memory_to_i32(buffer15, &result), JSL_CONVERSION_UNEXPECTED_CHARACTER);
 
     /* null and empty */
     JSLImmutableMemory buffer16 = {NULL, 0};
-    TEST_BOOL(jsl_memory_to_i32(buffer16, &result) == 0);
+    TEST_INT32_EQUAL(jsl_memory_to_i32(buffer16, &result), 0);
 
     JSLImmutableMemory buffer17 = JSL_CSTR_INITIALIZER("");
-    TEST_BOOL(jsl_memory_to_i32(buffer17, &result) == 0);
+    TEST_INT32_EQUAL(jsl_memory_to_i32(buffer17, &result), 0);
 
     result = -9999;
 
     /* max valid values */
     JSLImmutableMemory buffer18 = JSL_CSTR_INITIALIZER("2147483647");
-    TEST_BOOL(jsl_memory_to_i32(buffer18, &result) == 10);
-    TEST_BOOL(result == 2147483647);
+    TEST_INT32_EQUAL(jsl_memory_to_i32(buffer18, &result), 10);
+    TEST_INT32_EQUAL(result, 2147483647);
 
     result = -9999;
 
     JSLImmutableMemory buffer19 = JSL_CSTR_INITIALIZER("-2147483648");
-    TEST_BOOL(jsl_memory_to_i32(buffer19, &result) == 11);
-    TEST_BOOL(result == -2147483647 - 1);
+    TEST_INT32_EQUAL(jsl_memory_to_i32(buffer19, &result), 11);
+    TEST_INT32_EQUAL(result, -2147483647 - 1);
 }
 
 static void test_jsl_memory_to_u32(void)
@@ -849,47 +849,47 @@ static void test_jsl_memory_to_u32(void)
     uint32_t result;
 
     JSLImmutableMemory buffer1 = JSL_CSTR_INITIALIZER("0");
-    TEST_BOOL(jsl_memory_to_u32(buffer1, &result) == 1);
-    TEST_BOOL(result == 0);
+    TEST_INT32_EQUAL(jsl_memory_to_u32(buffer1, &result), 1);
+    TEST_UINT32_EQUAL(result, 0);
 
     JSLImmutableMemory buffer2 = JSL_CSTR_INITIALIZER("12345");
-    TEST_BOOL(jsl_memory_to_u32(buffer2, &result) == 5);
-    TEST_BOOL(result == 12345);
+    TEST_INT32_EQUAL(jsl_memory_to_u32(buffer2, &result), 5);
+    TEST_UINT32_EQUAL(result, 12345);
 
     JSLImmutableMemory buffer3 = JSL_CSTR_INITIALIZER("000042");
-    TEST_BOOL(jsl_memory_to_u32(buffer3, &result) == 6);
-    TEST_BOOL(result == 42);
+    TEST_INT32_EQUAL(jsl_memory_to_u32(buffer3, &result), 6);
+    TEST_UINT32_EQUAL(result, 42);
 
     JSLImmutableMemory buffer4 = JSL_CSTR_INITIALIZER("000000");
-    TEST_BOOL(jsl_memory_to_u32(buffer4, &result) == 6);
-    TEST_BOOL(result == 0);
+    TEST_INT32_EQUAL(jsl_memory_to_u32(buffer4, &result), 6);
+    TEST_UINT32_EQUAL(result, 0);
 
     JSLImmutableMemory buffer5 = JSL_CSTR_INITIALIZER("123 hello");
-    TEST_BOOL(jsl_memory_to_u32(buffer5, &result) == 3);
-    TEST_BOOL(result == 123);
+    TEST_INT32_EQUAL(jsl_memory_to_u32(buffer5, &result), 3);
+    TEST_UINT32_EQUAL(result, 123);
 
     /* max valid value */
     JSLImmutableMemory buffer6 = JSL_CSTR_INITIALIZER("4294967295");
-    TEST_BOOL(jsl_memory_to_u32(buffer6, &result) == 10);
-    TEST_BOOL(result == 4294967295u);
+    TEST_INT32_EQUAL(jsl_memory_to_u32(buffer6, &result), 10);
+    TEST_UINT32_EQUAL(result, 4294967295u);
 
     /* overflow */
     JSLImmutableMemory buffer7 = JSL_CSTR_INITIALIZER("4294967296");
-    TEST_BOOL(jsl_memory_to_u32(buffer7, &result) == JSL_CONVERSION_OVERFLOW);
+    TEST_INT32_EQUAL(jsl_memory_to_u32(buffer7, &result), JSL_CONVERSION_OVERFLOW);
 
     JSLImmutableMemory buffer8 = JSL_CSTR_INITIALIZER("9999999999");
-    TEST_BOOL(jsl_memory_to_u32(buffer8, &result) == JSL_CONVERSION_OVERFLOW);
+    TEST_INT32_EQUAL(jsl_memory_to_u32(buffer8, &result), JSL_CONVERSION_OVERFLOW);
 
     /* unexpected character */
     JSLImmutableMemory buffer9 = JSL_CSTR_INITIALIZER("abc");
-    TEST_BOOL(jsl_memory_to_u32(buffer9, &result) == JSL_CONVERSION_UNEXPECTED_CHARACTER);
+    TEST_INT32_EQUAL(jsl_memory_to_u32(buffer9, &result), JSL_CONVERSION_UNEXPECTED_CHARACTER);
 
     /* null and empty */
     JSLImmutableMemory buffer10 = {NULL, 0};
-    TEST_BOOL(jsl_memory_to_u32(buffer10, &result) == 0);
+    TEST_INT32_EQUAL(jsl_memory_to_u32(buffer10, &result), 0);
 
     JSLImmutableMemory buffer11 = JSL_CSTR_INITIALIZER("");
-    TEST_BOOL(jsl_memory_to_u32(buffer11, &result) == 0);
+    TEST_INT32_EQUAL(jsl_memory_to_u32(buffer11, &result), 0);
 }
 
 static void test_jsl_memory_to_u16(void)
@@ -897,47 +897,47 @@ static void test_jsl_memory_to_u16(void)
     uint16_t result;
 
     JSLImmutableMemory buffer1 = JSL_CSTR_INITIALIZER("0");
-    TEST_BOOL(jsl_memory_to_u16(buffer1, &result) == 1);
-    TEST_BOOL(result == 0);
+    TEST_INT32_EQUAL(jsl_memory_to_u16(buffer1, &result), 1);
+    TEST_INT32_EQUAL(result, 0);
 
     JSLImmutableMemory buffer2 = JSL_CSTR_INITIALIZER("12345");
-    TEST_BOOL(jsl_memory_to_u16(buffer2, &result) == 5);
-    TEST_BOOL(result == 12345);
+    TEST_INT32_EQUAL(jsl_memory_to_u16(buffer2, &result), 5);
+    TEST_INT32_EQUAL(result, 12345);
 
     JSLImmutableMemory buffer3 = JSL_CSTR_INITIALIZER("000042");
-    TEST_BOOL(jsl_memory_to_u16(buffer3, &result) == 6);
-    TEST_BOOL(result == 42);
+    TEST_INT32_EQUAL(jsl_memory_to_u16(buffer3, &result), 6);
+    TEST_INT32_EQUAL(result, 42);
 
     JSLImmutableMemory buffer4 = JSL_CSTR_INITIALIZER("000000");
-    TEST_BOOL(jsl_memory_to_u16(buffer4, &result) == 6);
-    TEST_BOOL(result == 0);
+    TEST_INT32_EQUAL(jsl_memory_to_u16(buffer4, &result), 6);
+    TEST_INT32_EQUAL(result, 0);
 
     JSLImmutableMemory buffer5 = JSL_CSTR_INITIALIZER("99 hello");
-    TEST_BOOL(jsl_memory_to_u16(buffer5, &result) == 2);
-    TEST_BOOL(result == 99);
+    TEST_INT32_EQUAL(jsl_memory_to_u16(buffer5, &result), 2);
+    TEST_INT32_EQUAL(result, 99);
 
     /* max valid value */
     JSLImmutableMemory buffer6 = JSL_CSTR_INITIALIZER("65535");
-    TEST_BOOL(jsl_memory_to_u16(buffer6, &result) == 5);
-    TEST_BOOL(result == 65535);
+    TEST_INT32_EQUAL(jsl_memory_to_u16(buffer6, &result), 5);
+    TEST_INT32_EQUAL(result, 65535);
 
     /* overflow */
     JSLImmutableMemory buffer7 = JSL_CSTR_INITIALIZER("65536");
-    TEST_BOOL(jsl_memory_to_u16(buffer7, &result) == JSL_CONVERSION_OVERFLOW);
+    TEST_INT32_EQUAL(jsl_memory_to_u16(buffer7, &result), JSL_CONVERSION_OVERFLOW);
 
     JSLImmutableMemory buffer8 = JSL_CSTR_INITIALIZER("99999");
-    TEST_BOOL(jsl_memory_to_u16(buffer8, &result) == JSL_CONVERSION_OVERFLOW);
+    TEST_INT32_EQUAL(jsl_memory_to_u16(buffer8, &result), JSL_CONVERSION_OVERFLOW);
 
     /* unexpected character */
     JSLImmutableMemory buffer9 = JSL_CSTR_INITIALIZER("abc");
-    TEST_BOOL(jsl_memory_to_u16(buffer9, &result) == JSL_CONVERSION_UNEXPECTED_CHARACTER);
+    TEST_INT32_EQUAL(jsl_memory_to_u16(buffer9, &result), JSL_CONVERSION_UNEXPECTED_CHARACTER);
 
     /* null and empty */
     JSLImmutableMemory buffer10 = {NULL, 0};
-    TEST_BOOL(jsl_memory_to_u16(buffer10, &result) == 0);
+    TEST_INT32_EQUAL(jsl_memory_to_u16(buffer10, &result), 0);
 
     JSLImmutableMemory buffer11 = JSL_CSTR_INITIALIZER("");
-    TEST_BOOL(jsl_memory_to_u16(buffer11, &result) == 0);
+    TEST_INT32_EQUAL(jsl_memory_to_u16(buffer11, &result), 0);
 }
 
 static void test_jsl_starts_with(void)
