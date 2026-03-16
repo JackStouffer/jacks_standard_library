@@ -34,7 +34,7 @@
 
 #include "minctest.h"
 
-static void test_pool_init_sets_counts_and_lists(void)
+void test_pool_init_sets_counts_and_lists(void)
 {
     uint8_t buffer[512];
     JSLPoolAllocator pool = {0};
@@ -54,7 +54,7 @@ static void test_pool_init_sets_counts_and_lists(void)
     }
 }
 
-static void test_pool_init2_sets_counts(void)
+void test_pool_init2_sets_counts(void)
 {
     uint8_t buffer[256];
     JSLPoolAllocator pool = {0};
@@ -70,7 +70,7 @@ static void test_pool_init2_sets_counts(void)
     TEST_INT64_EQUAL(pool.chunk_count, total);
 }
 
-static void test_pool_init_too_small_has_no_allocations(void)
+void test_pool_init_too_small_has_no_allocations(void)
 {
     uint8_t buffer[48];
     JSLPoolAllocator pool = {0};
@@ -82,7 +82,7 @@ static void test_pool_init_too_small_has_no_allocations(void)
     TEST_POINTERS_EQUAL(jsl_pool_allocate(&pool, false), NULL);
 }
 
-static void test_pool_allocate_zeroed_and_alignment_small(void)
+void test_pool_allocate_zeroed_and_alignment_small(void)
 {
     uint8_t buffer[512];
     JSLPoolAllocator pool = {0};
@@ -103,7 +103,7 @@ static void test_pool_allocate_zeroed_and_alignment_small(void)
     TEST_BOOL(jsl_pool_free(&pool, allocation));
 }
 
-static void test_pool_allocate_exhaustion_updates_counts(void)
+void test_pool_allocate_exhaustion_updates_counts(void)
 {
     uint8_t buffer[1024];
     JSLPoolAllocator pool = {0};
@@ -141,7 +141,7 @@ static void test_pool_allocate_exhaustion_updates_counts(void)
     free(allocations);
 }
 
-static void test_pool_free_invalid_and_double_free(void)
+void test_pool_free_invalid_and_double_free(void)
 {
     uint8_t buffer[512];
     JSLPoolAllocator pool = {0};
@@ -169,7 +169,7 @@ static void test_pool_free_invalid_and_double_free(void)
     TEST_INT64_EQUAL(jsl_pool_free_allocation_count(&pool), total);
 }
 
-static void test_pool_alignment_medium_alloc(void)
+void test_pool_alignment_medium_alloc(void)
 {
     uint8_t buffer[2048];
     JSLPoolAllocator pool = {0};
@@ -187,7 +187,7 @@ static void test_pool_alignment_medium_alloc(void)
     #endif
 }
 
-static void test_pool_alignment_large_alloc(void)
+void test_pool_alignment_large_alloc(void)
 {
     uint8_t raw_buffer[32768];
     const int32_t page_alignment = (int32_t) JSL_KILOBYTES(4);
@@ -216,7 +216,7 @@ static void test_pool_alignment_large_alloc(void)
     #endif
 }
 
-static void test_pool_free_middle_node(void)
+void test_pool_free_middle_node(void)
 {
     uint8_t buffer[512];
     JSLPoolAllocator pool = {0};
@@ -240,7 +240,7 @@ static void test_pool_free_middle_node(void)
     TEST_INT64_EQUAL(jsl_pool_free_allocation_count(&pool), total);
 }
 
-static void test_pool_free_interior_pointer(void)
+void test_pool_free_interior_pointer(void)
 {
     uint8_t buffer[512];
     JSLPoolAllocator pool = {0};
@@ -258,7 +258,7 @@ static void test_pool_free_interior_pointer(void)
     TEST_BOOL(jsl_pool_free(&pool, allocation));
 }
 
-static void test_pool_free_wrong_pool(void)
+void test_pool_free_wrong_pool(void)
 {
     uint8_t buffer_a[512];
     uint8_t buffer_b[512];
@@ -279,7 +279,7 @@ static void test_pool_free_wrong_pool(void)
     TEST_BOOL(jsl_pool_free(&pool_a, allocation));
 }
 
-static void test_pool_free_after_free_all(void)
+void test_pool_free_after_free_all(void)
 {
     uint8_t buffer[512];
     JSLPoolAllocator pool = {0};
@@ -296,7 +296,7 @@ static void test_pool_free_after_free_all(void)
     TEST_BOOL(!jsl_pool_free(&pool, allocation));
 }
 
-static void test_pool_free_sentinel_corruption(void)
+void test_pool_free_sentinel_corruption(void)
 {
     uint8_t buffer[512];
     JSLPoolAllocator pool = {0};

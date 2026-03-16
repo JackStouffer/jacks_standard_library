@@ -46,7 +46,7 @@
 const int64_t arena_size = JSL_MEGABYTES(32);
 JSLArena global_arena;
 
-static void test_fixed_insert(void)
+void test_fixed_insert(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -207,7 +207,7 @@ static void test_fixed_insert(void)
     jsl_allocator_interface_free_all(allocator);
 }
 
-static void test_fixed_get(void)
+void test_fixed_get(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -338,7 +338,7 @@ static void test_fixed_get(void)
     jsl_allocator_interface_free_all(allocator);
 }
 
-static void test_fixed_delete(void)
+void test_fixed_delete(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -657,7 +657,7 @@ static void test_fixed_delete(void)
     jsl_allocator_interface_free_all(allocator);
 }
 
-static void test_fixed_iterator(void)
+void test_fixed_iterator(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -934,7 +934,7 @@ typedef struct ExpectedPair {
     bool seen;
 } ExpectedPair;
 
-static void test_jsl_str_to_str_map_init_success(void)
+void test_jsl_str_to_str_map_init_success(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -952,7 +952,7 @@ static void test_jsl_str_to_str_map_init_success(void)
     TEST_BOOL(map.load_factor == 0.5f);
 }
 
-static void test_jsl_str_to_str_map_init_invalid_arguments(void)
+void test_jsl_str_to_str_map_init_invalid_arguments(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -968,7 +968,7 @@ static void test_jsl_str_to_str_map_init_invalid_arguments(void)
     TEST_BOOL(!jsl_str_to_str_map_init2(&map, allocator, 0, 4, 1.5f));
 }
 
-static void test_jsl_str_to_str_map_item_count_and_has_key(void)
+void test_jsl_str_to_str_map_item_count_and_has_key(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -998,7 +998,7 @@ static void test_jsl_str_to_str_map_item_count_and_has_key(void)
     TEST_INT64_EQUAL(jsl_str_to_str_map_item_count(&uninitialized), (int64_t) -1);
 }
 
-static void test_jsl_str_to_str_map_get(void)
+void test_jsl_str_to_str_map_get(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -1033,7 +1033,7 @@ static void test_jsl_str_to_str_map_get(void)
     TEST_BOOL(!jsl_str_to_str_map_get(&map, key, NULL));
 }
 
-static void test_jsl_str_to_str_map_insert_overwrites_value(void)
+void test_jsl_str_to_str_map_insert_overwrites_value(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -1071,7 +1071,7 @@ static void test_jsl_str_to_str_map_insert_overwrites_value(void)
     TEST_BOOL(found);
 }
 
-static void test_jsl_str_to_str_map_transient_lifetime_copies_data(void)
+void test_jsl_str_to_str_map_transient_lifetime_copies_data(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -1134,7 +1134,7 @@ static void test_jsl_str_to_str_map_transient_lifetime_copies_data(void)
     TEST_BOOL(saw_long);
 }
 
-static void test_jsl_str_to_str_map_fixed_lifetime_uses_original_pointers(void)
+void test_jsl_str_to_str_map_fixed_lifetime_uses_original_pointers(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -1168,7 +1168,7 @@ static void test_jsl_str_to_str_map_fixed_lifetime_uses_original_pointers(void)
     TEST_BOOL(jsl_memory_compare(out_value, value));
 }
 
-static void test_jsl_str_to_str_map_handles_empty_and_binary_strings(void)
+void test_jsl_str_to_str_map_handles_empty_and_binary_strings(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -1238,7 +1238,7 @@ static void test_jsl_str_to_str_map_handles_empty_and_binary_strings(void)
     }
 }
 
-static void test_jsl_str_to_str_map_iterator_covers_all_pairs(void)
+void test_jsl_str_to_str_map_iterator_covers_all_pairs(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -1298,7 +1298,7 @@ static void test_jsl_str_to_str_map_iterator_covers_all_pairs(void)
     TEST_BOOL(!jsl_str_to_str_map_key_value_iterator_next(&iter, &out_key, &out_value));
 }
 
-static void test_jsl_str_to_str_map_iterator_invalidated_on_mutation(void)
+void test_jsl_str_to_str_map_iterator_invalidated_on_mutation(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -1322,7 +1322,7 @@ static void test_jsl_str_to_str_map_iterator_invalidated_on_mutation(void)
     TEST_BOOL(has_data == false);
 }
 
-static void test_jsl_str_to_str_map_delete(void)
+void test_jsl_str_to_str_map_delete(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -1353,7 +1353,7 @@ static void test_jsl_str_to_str_map_delete(void)
     TEST_BOOL(jsl_str_to_str_map_has_key(&map, other));
 }
 
-static void test_jsl_str_to_str_map_clear(void)
+void test_jsl_str_to_str_map_clear(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -1384,7 +1384,7 @@ static void test_jsl_str_to_str_map_clear(void)
     TEST_BOOL(jsl_str_to_str_map_has_key(&map, JSL_CSTR_EXPRESSION("c")));
 }
 
-static void test_jsl_str_to_str_map_rehash(void)
+void test_jsl_str_to_str_map_rehash(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -1448,7 +1448,7 @@ static void test_jsl_str_to_str_map_rehash(void)
     #undef key_count
 }
 
-static void test_jsl_str_to_str_map_invalid_inserts(void)
+void test_jsl_str_to_str_map_invalid_inserts(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -1476,7 +1476,7 @@ static void test_jsl_str_to_str_map_invalid_inserts(void)
     TEST_INT64_EQUAL(jsl_str_to_str_map_item_count(&map), (int64_t) 0);
 }
 
-static void test_fixed_int32_to_str_free(void)
+void test_fixed_int32_to_str_free(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -1537,7 +1537,7 @@ static void test_fixed_int32_to_str_free(void)
     jsl_allocator_interface_free_all(allocator);
 }
 
-static void test_fixed_str_to_int32_free(void)
+void test_fixed_str_to_int32_free(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -1598,7 +1598,7 @@ static void test_fixed_str_to_int32_free(void)
     jsl_allocator_interface_free_all(allocator);
 }
 
-static void test_fixed_int32_to_str_overwrite_frees_old(void)
+void test_fixed_int32_to_str_overwrite_frees_old(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -1691,7 +1691,7 @@ static void test_fixed_int32_to_str_overwrite_frees_old(void)
     jsl_allocator_interface_free_all(allocator);
 }
 
-static void test_fixed_int32_to_str_insert_overwrites(void)
+void test_fixed_int32_to_str_insert_overwrites(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -1714,7 +1714,7 @@ static void test_fixed_int32_to_str_insert_overwrites(void)
     jsl_allocator_interface_free_all(allocator);
 }
 
-static void test_fixed_str_to_int32_insert_overwrites(void)
+void test_fixed_str_to_int32_insert_overwrites(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -1737,7 +1737,7 @@ static void test_fixed_str_to_int32_insert_overwrites(void)
     jsl_allocator_interface_free_all(allocator);
 }
 
-static void test_fixed_int32_to_str_lifetime(void)
+void test_fixed_int32_to_str_lifetime(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -1783,7 +1783,7 @@ static void test_fixed_int32_to_str_lifetime(void)
     jsl_allocator_interface_free_all(allocator);
 }
 
-static void test_fixed_str_to_int32_lifetime(void)
+void test_fixed_str_to_int32_lifetime(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -1848,45 +1848,4 @@ static void test_fixed_str_to_int32_lifetime(void)
     }
 
     jsl_allocator_interface_free_all(allocator);
-}
-
-int main(void)
-{
-    // Windows programs that crash can lose all of the terminal output.
-    // Set the buffer to zero to auto flush on output.
-    #if JSL_IS_WINDOWS
-        setvbuf(stdout, NULL, _IONBF, 0);
-    #endif
-
-    jsl_arena_init(&global_arena, malloc(arena_size), arena_size);
-
-    RUN_TEST_FUNCTION("Test fixed hashmap insert", test_fixed_insert);
-    RUN_TEST_FUNCTION("Test fixed hashmap get", test_fixed_get);
-    RUN_TEST_FUNCTION("Test fixed hashmap iterator", test_fixed_iterator);
-    RUN_TEST_FUNCTION("Test fixed hashmap delete", test_fixed_delete);
-    RUN_TEST_FUNCTION("Test fixed int32 to str insert overwrites", test_fixed_int32_to_str_insert_overwrites);
-    RUN_TEST_FUNCTION("Test fixed str to int32 insert overwrites", test_fixed_str_to_int32_insert_overwrites);
-    RUN_TEST_FUNCTION("Test fixed int32 to str lifetime", test_fixed_int32_to_str_lifetime);
-    RUN_TEST_FUNCTION("Test fixed str to int32 lifetime", test_fixed_str_to_int32_lifetime);
-    RUN_TEST_FUNCTION("Test fixed int32 to str free", test_fixed_int32_to_str_free);
-    RUN_TEST_FUNCTION("Test fixed str to int32 free", test_fixed_str_to_int32_free);
-    RUN_TEST_FUNCTION("Test fixed int32 to str overwrite frees old", test_fixed_int32_to_str_overwrite_frees_old);
-
-    RUN_TEST_FUNCTION("Test str to str map init success", test_jsl_str_to_str_map_init_success);
-    RUN_TEST_FUNCTION("Test str to str map init invalid args", test_jsl_str_to_str_map_init_invalid_arguments);
-    RUN_TEST_FUNCTION("Test str to str map item count and has key", test_jsl_str_to_str_map_item_count_and_has_key);
-    RUN_TEST_FUNCTION("Test str to str map get", test_jsl_str_to_str_map_get);
-    RUN_TEST_FUNCTION("Test str to str map insert", test_jsl_str_to_str_map_insert_overwrites_value);
-    RUN_TEST_FUNCTION("Test str to str map transient lifetime copies", test_jsl_str_to_str_map_transient_lifetime_copies_data);
-    RUN_TEST_FUNCTION("Test str to str map static lifetime keeps pointer", test_jsl_str_to_str_map_fixed_lifetime_uses_original_pointers);
-    RUN_TEST_FUNCTION("Test str to str map empty and binary strings", test_jsl_str_to_str_map_handles_empty_and_binary_strings);
-    RUN_TEST_FUNCTION("Test str to str map iterator", test_jsl_str_to_str_map_iterator_covers_all_pairs);
-    RUN_TEST_FUNCTION("Test str to str map iterator invalid after mutation", test_jsl_str_to_str_map_iterator_invalidated_on_mutation);
-    RUN_TEST_FUNCTION("Test str to str map delete", test_jsl_str_to_str_map_delete);
-    RUN_TEST_FUNCTION("Test str to str map clear", test_jsl_str_to_str_map_clear);
-    RUN_TEST_FUNCTION("Test str to str map rehash", test_jsl_str_to_str_map_rehash);
-    RUN_TEST_FUNCTION("Test str to str map invalid inserts", test_jsl_str_to_str_map_invalid_inserts);
-
-    TEST_RESULTS();
-    return lfails != 0;
 }

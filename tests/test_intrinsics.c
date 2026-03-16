@@ -34,7 +34,7 @@
 
 #include "minctest.h"
 
-static void test_jsl__count_trailing_zeros_u32(void)
+void test_jsl__count_trailing_zeros_u32(void)
 {
     /* Basic powers of two */
     TEST_INT32_EQUAL(jsl__count_trailing_zeros_u32(1u), 0);
@@ -64,7 +64,7 @@ static void test_jsl__count_trailing_zeros_u32(void)
     }
 }
 
-static void test_jsl__count_trailing_zeros_u64(void)
+void test_jsl__count_trailing_zeros_u64(void)
 {
     /* Basic powers of two */
     TEST_INT32_EQUAL(jsl__count_trailing_zeros_u64(1ull), 0);
@@ -97,7 +97,7 @@ static void test_jsl__count_trailing_zeros_u64(void)
     }
 }
 
-static void test_jsl__count_leading_zeros_u32(void)
+void test_jsl__count_leading_zeros_u32(void)
 {
     /* Defined zero behavior */
     TEST_INT32_EQUAL(jsl__count_leading_zeros_u32(0u), 32);
@@ -128,7 +128,7 @@ static void test_jsl__count_leading_zeros_u32(void)
     }
 }
 
-static void test_jsl__count_leading_zeros_u64(void)
+void test_jsl__count_leading_zeros_u64(void)
 {
     /* Defined zero behavior */
     TEST_INT32_EQUAL(jsl__count_leading_zeros_u64(0ull), 64);
@@ -161,7 +161,7 @@ static void test_jsl__count_leading_zeros_u64(void)
     }
 }
 
-static void test_jsl__find_first_set_u32(void)
+void test_jsl__find_first_set_u32(void)
 {
     /* Defined zero behavior */
     TEST_INT32_EQUAL(jsl__find_first_set_u32(0u), 0);
@@ -189,7 +189,7 @@ static void test_jsl__find_first_set_u32(void)
     }
 }
 
-static void test_jsl__find_first_set_u64(void)
+void test_jsl__find_first_set_u64(void)
 {
     /* Defined zero behavior */
     TEST_INT32_EQUAL(jsl__find_first_set_u64(0ull), 0);
@@ -220,7 +220,7 @@ static void test_jsl__find_first_set_u64(void)
     }
 }
 
-static void test_jsl__population_count_u32(void)
+void test_jsl__population_count_u32(void)
 {
     TEST_INT32_EQUAL(jsl__population_count_u32(0u), 0);
     TEST_INT32_EQUAL(jsl__population_count_u32(1u), 1);
@@ -251,7 +251,7 @@ static void test_jsl__population_count_u32(void)
     }
 }
 
-static void test_jsl__population_count_u64(void)
+void test_jsl__population_count_u64(void)
 {
     TEST_UINT32_EQUAL(jsl__population_count_u64(0ull), 0u);
     TEST_UINT32_EQUAL(jsl__population_count_u64(1ull), 1u);
@@ -281,7 +281,7 @@ static void test_jsl__population_count_u64(void)
     }
 }
 
-static void test_jsl_next_power_of_two_u32(void)
+void test_jsl_next_power_of_two_u32(void)
 {
     /* NOTE: implementation is not defined for x < 2 or x > 0x80000000 */
 
@@ -306,7 +306,7 @@ static void test_jsl_next_power_of_two_u32(void)
     TEST_UINT32_EQUAL(jsl_next_power_of_two_u32(0x7FFFFFFFu), 0x80000000u);
 }
 
-static void test_jsl_next_power_of_two_u64(void)
+void test_jsl_next_power_of_two_u64(void)
 {
     /* NOTE: implementation is not defined for x < 2 or x > 0x8000000000000000ull */
 
@@ -335,7 +335,7 @@ static void test_jsl_next_power_of_two_u64(void)
                       0x8000000000000000ull);
 }
 
-static void test_jsl_previous_power_of_two_u32(void)
+void test_jsl_previous_power_of_two_u32(void)
 {
     /* Powers of two stay themselves */
     TEST_UINT32_EQUAL(jsl_previous_power_of_two_u32(1u), 1u);
@@ -359,7 +359,7 @@ static void test_jsl_previous_power_of_two_u32(void)
     TEST_UINT32_EQUAL(jsl_previous_power_of_two_u32(123456789u), 67108864u);
 }
 
-static void test_jsl_previous_power_of_two_u64(void)
+void test_jsl_previous_power_of_two_u64(void)
 {
     /* Powers of two stay themselves */
     TEST_UINT64_EQUAL(jsl_previous_power_of_two_u64(1ull), 1ull);
@@ -382,23 +382,4 @@ static void test_jsl_previous_power_of_two_u64(void)
 
     TEST_UINT64_EQUAL(jsl_previous_power_of_two_u64(1000ull), 512ull);
     TEST_UINT64_EQUAL(jsl_previous_power_of_two_u64(123456789ull), 67108864ull);
-}
-
-int main(void)
-{
-    RUN_TEST_FUNCTION("Test count trailing zeros u32", test_jsl__count_trailing_zeros_u32);
-    RUN_TEST_FUNCTION("Test count trailing zeros u64", test_jsl__count_trailing_zeros_u64);
-    RUN_TEST_FUNCTION("Test count leading zeros u32", test_jsl__count_leading_zeros_u32);
-    RUN_TEST_FUNCTION("Test count leading zeros u64", test_jsl__count_leading_zeros_u64);
-    RUN_TEST_FUNCTION("Test find first set u32", test_jsl__find_first_set_u32);
-    RUN_TEST_FUNCTION("Test find first set u64", test_jsl__find_first_set_u64);
-    RUN_TEST_FUNCTION("Test population count u32", test_jsl__population_count_u32);
-    RUN_TEST_FUNCTION("Test population count u64", test_jsl__population_count_u64);
-    RUN_TEST_FUNCTION("Test next power of two u32", test_jsl_next_power_of_two_u32);
-    RUN_TEST_FUNCTION("Test next power of two u64", test_jsl_next_power_of_two_u64);
-    RUN_TEST_FUNCTION("Test previous power of two u32", test_jsl_previous_power_of_two_u32);
-    RUN_TEST_FUNCTION("Test previous power of two u64", test_jsl_previous_power_of_two_u64);
-
-    TEST_RESULTS();
-    return lfails != 0;
 }

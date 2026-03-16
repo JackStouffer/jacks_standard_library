@@ -424,23 +424,3 @@ static void test_cmd_line_write_reset_ansi_modes(void)
     int64_t result = jsl_cmd_line_write_reset(sink, &info);
     EXPECT_SINK_OUTPUT("\x1b[0m", result, buffer, writer);
 }
-
-int main(void)
-{
-    RUN_TEST_FUNCTION("Test command line arg short flags grouping", test_short_flags_grouping);
-    RUN_TEST_FUNCTION("Test command line arg short flag with equals fails", test_short_flag_equals_is_invalid);
-    RUN_TEST_FUNCTION("Test command line arg long flags, commands, and terminator", test_long_flags_and_commands);
-    RUN_TEST_FUNCTION("Test command line arg long flag values via equals and space", test_long_values_equals_and_space);
-    RUN_TEST_FUNCTION("Test command line arg wide argument parsing", test_wide_parsing);
-    RUN_TEST_FUNCTION("Test command line color conversions", test_cmd_line_color_conversions);
-    RUN_TEST_FUNCTION("Test command line style writes no color", test_cmd_line_write_style_no_color);
-    RUN_TEST_FUNCTION("Test command line style write ANSI16", test_cmd_line_write_style_ansi16);
-    RUN_TEST_FUNCTION("Test command line style converts to ANSI16", test_cmd_line_write_style_ansi16_converts_color_types);
-    RUN_TEST_FUNCTION("Test command line style write ANSI256", test_cmd_line_write_style_ansi256);
-    RUN_TEST_FUNCTION("Test command line style write truecolor", test_cmd_line_write_style_truecolor);
-    RUN_TEST_FUNCTION("Test command line style/reset invalid", test_cmd_line_write_style_and_reset_invalid);
-    RUN_TEST_FUNCTION("Test command line reset ANSI modes", test_cmd_line_write_reset_ansi_modes);
-
-    TEST_RESULTS();
-    return lfails != 0;
-}

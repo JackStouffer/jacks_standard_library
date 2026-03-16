@@ -36,7 +36,7 @@
 
 #include "minctest.h"
 
-static void test_jsl_load_file_contents(void)
+void test_jsl_load_file_contents(void)
 {
     #if JSL_IS_WINDOWS
         char* path = "tests\\example.txt";
@@ -76,7 +76,7 @@ static void test_jsl_load_file_contents(void)
     TEST_BUFFERS_EQUAL(stack_buffer, contents.data, (size_t) file_size);
 }
 
-static void test_jsl_get_file_size(void)
+void test_jsl_get_file_size(void)
 {
     #if JSL_IS_WINDOWS
         char* path = "tests\\example.txt";
@@ -117,7 +117,7 @@ static void test_jsl_get_file_size(void)
     TEST_INT64_EQUAL(size, (int64_t) expected_size);
 }
 
-static void test_jsl_load_file_contents_buffer(void)
+void test_jsl_load_file_contents_buffer(void)
 {
     char* path = "./tests/example.txt";
     char stack_buffer[4*1024];
@@ -202,7 +202,7 @@ static FILE* jsl__open_failing_stream(void)
 }
 
 
-static void test_jsl_format_file_formats_and_writes_output(void)
+void test_jsl_format_file_formats_and_writes_output(void)
 {
     FILE* file = tmpfile();
     TEST_BOOL(file != NULL);
@@ -231,7 +231,7 @@ static void test_jsl_format_file_formats_and_writes_output(void)
     fclose(file);
 }
 
-static void test_jsl_format_file_accepts_empty_format(void)
+void test_jsl_format_file_accepts_empty_format(void)
 {
     FILE* file = tmpfile();
     TEST_BOOL(file != NULL);
@@ -251,7 +251,7 @@ static void test_jsl_format_file_accepts_empty_format(void)
     fclose(file);
 }
 
-static void test_jsl_format_file_null_out_parameter(void)
+void test_jsl_format_file_null_out_parameter(void)
 {
     JSLOutputSink sink = jsl_c_file_output_sink(NULL);
 
@@ -259,7 +259,7 @@ static void test_jsl_format_file_null_out_parameter(void)
     TEST_BOOL(!res);
 }
 
-static void test_jsl_format_file_null_format_pointer(void)
+void test_jsl_format_file_null_format_pointer(void)
 {
     JSLImmutableMemory fmt = {
         .data = NULL,
@@ -272,7 +272,7 @@ static void test_jsl_format_file_null_format_pointer(void)
     TEST_INT64_EQUAL(res, -1);
 }
 
-static void test_jsl_format_file_negative_length(void)
+void test_jsl_format_file_negative_length(void)
 {
     JSLImmutableMemory fmt = {
         .data = (uint8_t*)"Hello",
@@ -284,7 +284,7 @@ static void test_jsl_format_file_negative_length(void)
     TEST_INT64_EQUAL(res, -1);
 }
 
-static void test_jsl_format_file_write_failure(void)
+void test_jsl_format_file_write_failure(void)
 {
 #if defined(__unix__) || defined(__APPLE__) || defined(__linux__)
     int pipe_fds[2];
@@ -351,27 +351,4 @@ static void test_jsl_format_file_write_failure(void)
 
     fclose(read_only);
     remove(path);
-}
-
-int main(void)
-{
-    // Windows programs that crash can lose all of the terminal output.
-    // Set the buffer to zero to auto flush on output.
-    #if JSL_IS_WINDOWS
-        setvbuf(stdout, NULL, _IONBF, 0);
-    #endif
-
-    RUN_TEST_FUNCTION("Test jsl_load_file_contents", test_jsl_load_file_contents);
-    RUN_TEST_FUNCTION("Test jsl_get_file_size", test_jsl_get_file_size);
-    RUN_TEST_FUNCTION("Test jsl_load_file_contents_buffer", test_jsl_load_file_contents_buffer);
-
-    RUN_TEST_FUNCTION("Test jsl_format_to_c_file formats and writes output", test_jsl_format_file_formats_and_writes_output);
-    RUN_TEST_FUNCTION("Test jsl_format_to_c_file accepts empty format", test_jsl_format_file_accepts_empty_format);
-    RUN_TEST_FUNCTION("Test jsl_format_to_c_file null out parameter", test_jsl_format_file_null_out_parameter);
-    RUN_TEST_FUNCTION("Test jsl_format_to_c_file null format pointer", test_jsl_format_file_null_format_pointer);
-    RUN_TEST_FUNCTION("Test jsl_format_to_c_file negative length", test_jsl_format_file_negative_length);
-    RUN_TEST_FUNCTION("Test jsl_format_to_c_file write failure", test_jsl_format_file_write_failure);
-
-    TEST_RESULTS();
-    return lfails != 0;
 }

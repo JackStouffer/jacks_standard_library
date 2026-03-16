@@ -45,7 +45,7 @@ typedef struct TestAlign16
     _Alignas(16) uint8_t data[16];
 } TestAlign16;
 
-static void test_libc_init(void)
+void test_libc_init(void)
 {
     JSLLibcAllocator allocator;
     jsl_libc_allocator_init(&allocator);
@@ -53,12 +53,12 @@ static void test_libc_init(void)
     TEST_POINTERS_EQUAL(allocator.head, NULL);
 }
 
-static void test_libc_init_null(void)
+void test_libc_init_null(void)
 {
     jsl_libc_allocator_init(NULL);
 }
 
-static void test_libc_allocate_basic(void)
+void test_libc_allocate_basic(void)
 {
     JSLLibcAllocator allocator;
     jsl_libc_allocator_init(&allocator);
@@ -69,7 +69,7 @@ static void test_libc_allocate_basic(void)
     jsl_libc_allocator_free_all(&allocator);
 }
 
-static void test_libc_allocate_zeroed(void)
+void test_libc_allocate_zeroed(void)
 {
     JSLLibcAllocator allocator;
     jsl_libc_allocator_init(&allocator);
@@ -86,7 +86,7 @@ static void test_libc_allocate_zeroed(void)
     jsl_libc_allocator_free_all(&allocator);
 }
 
-static void test_libc_allocate_alignment(void)
+void test_libc_allocate_alignment(void)
 {
     JSLLibcAllocator allocator;
     jsl_libc_allocator_init(&allocator);
@@ -112,7 +112,7 @@ static void test_libc_allocate_alignment(void)
     jsl_libc_allocator_free_all(&allocator);
 }
 
-static void test_libc_allocate_invalid_sizes_return_null(void)
+void test_libc_allocate_invalid_sizes_return_null(void)
 {
     JSLLibcAllocator allocator;
     jsl_libc_allocator_init(&allocator);
@@ -124,7 +124,7 @@ static void test_libc_allocate_invalid_sizes_return_null(void)
     jsl_libc_allocator_free_all(&allocator);
 }
 
-static void test_libc_allocate_multiple_are_distinct(void)
+void test_libc_allocate_multiple_are_distinct(void)
 {
     JSLLibcAllocator allocator;
     jsl_libc_allocator_init(&allocator);
@@ -142,7 +142,7 @@ static void test_libc_allocate_multiple_are_distinct(void)
     jsl_libc_allocator_free_all(&allocator);
 }
 
-static void test_libc_free_single(void)
+void test_libc_free_single(void)
 {
     JSLLibcAllocator allocator;
     jsl_libc_allocator_init(&allocator);
@@ -157,7 +157,7 @@ static void test_libc_free_single(void)
     TEST_BOOL(jsl_libc_allocator_free(&allocator, second));
 }
 
-static void test_libc_free_null_returns_false(void)
+void test_libc_free_null_returns_false(void)
 {
     JSLLibcAllocator allocator;
     jsl_libc_allocator_init(&allocator);
@@ -165,7 +165,7 @@ static void test_libc_free_null_returns_false(void)
     TEST_BOOL(jsl_libc_allocator_free(&allocator, NULL) == false);
 }
 
-static void test_libc_free_all(void)
+void test_libc_free_all(void)
 {
     JSLLibcAllocator allocator;
     jsl_libc_allocator_init(&allocator);
@@ -178,18 +178,18 @@ static void test_libc_free_all(void)
     TEST_POINTERS_EQUAL(allocator.head, NULL);
 }
 
-static void test_libc_free_all_null_returns_false(void)
+void test_libc_free_all_null_returns_false(void)
 {
     TEST_BOOL(jsl_libc_allocator_free_all(NULL) == false);
 }
 
-static void test_libc_free_all_uninitialized_returns_false(void)
+void test_libc_free_all_uninitialized_returns_false(void)
 {
     JSLLibcAllocator allocator = {0};
     TEST_BOOL(jsl_libc_allocator_free_all(&allocator) == false);
 }
 
-static void test_libc_reallocate_null_behaves_like_allocate(void)
+void test_libc_reallocate_null_behaves_like_allocate(void)
 {
     JSLLibcAllocator allocator;
     jsl_libc_allocator_init(&allocator);
@@ -203,7 +203,7 @@ static void test_libc_reallocate_null_behaves_like_allocate(void)
     jsl_libc_allocator_free_all(&allocator);
 }
 
-static void test_libc_reallocate_preserves_data(void)
+void test_libc_reallocate_preserves_data(void)
 {
     JSLLibcAllocator allocator;
     jsl_libc_allocator_init(&allocator);
@@ -229,7 +229,7 @@ static void test_libc_reallocate_preserves_data(void)
     jsl_libc_allocator_free_all(&allocator);
 }
 
-static void test_libc_reallocate_shrink_preserves_data(void)
+void test_libc_reallocate_shrink_preserves_data(void)
 {
     JSLLibcAllocator allocator;
     jsl_libc_allocator_init(&allocator);
@@ -255,7 +255,7 @@ static void test_libc_reallocate_shrink_preserves_data(void)
     jsl_libc_allocator_free_all(&allocator);
 }
 
-static void test_libc_reallocate_aligned_preserves_alignment(void)
+void test_libc_reallocate_aligned_preserves_alignment(void)
 {
     JSLLibcAllocator allocator;
     jsl_libc_allocator_init(&allocator);
@@ -284,7 +284,7 @@ static void test_libc_reallocate_aligned_preserves_alignment(void)
     jsl_libc_allocator_free_all(&allocator);
 }
 
-static void test_libc_reallocate_invalid_size_returns_null(void)
+void test_libc_reallocate_invalid_size_returns_null(void)
 {
     JSLLibcAllocator allocator;
     jsl_libc_allocator_init(&allocator);
@@ -298,7 +298,7 @@ static void test_libc_reallocate_invalid_size_returns_null(void)
     jsl_libc_allocator_free_all(&allocator);
 }
 
-static void test_libc_typed_allocate_macro(void)
+void test_libc_typed_allocate_macro(void)
 {
     JSLLibcAllocator allocator;
     jsl_libc_allocator_init(&allocator);
@@ -323,7 +323,7 @@ static void test_libc_typed_allocate_macro(void)
     jsl_libc_allocator_free_all(&allocator);
 }
 
-static void test_libc_allocator_interface_basic(void)
+void test_libc_allocator_interface_basic(void)
 {
     JSLLibcAllocator allocator;
     jsl_libc_allocator_init(&allocator);
@@ -344,7 +344,7 @@ static void test_libc_allocator_interface_basic(void)
     TEST_BOOL(jsl_allocator_interface_free_all(interface));
 }
 
-static void test_libc_allocator_interface_realloc(void)
+void test_libc_allocator_interface_realloc(void)
 {
     JSLLibcAllocator allocator;
     jsl_libc_allocator_init(&allocator);
@@ -373,7 +373,7 @@ static void test_libc_allocator_interface_realloc(void)
     jsl_allocator_interface_free_all(interface);
 }
 
-static void test_libc_create_child_basic(void)
+void test_libc_create_child_basic(void)
 {
     JSLLibcAllocator allocator;
     jsl_libc_allocator_init(&allocator);
@@ -409,7 +409,7 @@ static void test_libc_create_child_basic(void)
     jsl_libc_allocator_free_all(&allocator);
 }
 
-static void test_libc_create_child_parent_survives_realloc(void)
+void test_libc_create_child_parent_survives_realloc(void)
 {
     JSLLibcAllocator allocator;
     jsl_libc_allocator_init(&allocator);
@@ -451,7 +451,7 @@ static void test_libc_create_child_parent_survives_realloc(void)
     jsl_libc_allocator_free_all(&allocator);
 }
 
-static void test_libc_create_child_nested(void)
+void test_libc_create_child_nested(void)
 {
     JSLLibcAllocator allocator;
     jsl_libc_allocator_init(&allocator);
@@ -477,7 +477,7 @@ static void test_libc_create_child_nested(void)
     jsl_libc_allocator_free_all(&allocator);
 }
 
-static void test_libc_free_middle_of_list(void)
+void test_libc_free_middle_of_list(void)
 {
     JSLLibcAllocator allocator;
     jsl_libc_allocator_init(&allocator);
@@ -498,7 +498,7 @@ static void test_libc_free_middle_of_list(void)
     TEST_POINTERS_EQUAL(allocator.head, NULL);
 }
 
-static void test_libc_free_all_then_reuse(void)
+void test_libc_free_all_then_reuse(void)
 {
     JSLLibcAllocator allocator;
     jsl_libc_allocator_init(&allocator);
@@ -520,32 +520,6 @@ int main(void)
     #if JSL_IS_WINDOWS
         setvbuf(stdout, NULL, _IONBF, 0);
     #endif
-
-    RUN_TEST_FUNCTION("Test libc allocator init", test_libc_init);
-    RUN_TEST_FUNCTION("Test libc allocator init null", test_libc_init_null);
-    RUN_TEST_FUNCTION("Test libc allocate basic", test_libc_allocate_basic);
-    RUN_TEST_FUNCTION("Test libc allocate zeroed", test_libc_allocate_zeroed);
-    RUN_TEST_FUNCTION("Test libc allocate alignment", test_libc_allocate_alignment);
-    RUN_TEST_FUNCTION("Test libc allocate invalid sizes", test_libc_allocate_invalid_sizes_return_null);
-    RUN_TEST_FUNCTION("Test libc allocate distinct blocks", test_libc_allocate_multiple_are_distinct);
-    RUN_TEST_FUNCTION("Test libc free single", test_libc_free_single);
-    RUN_TEST_FUNCTION("Test libc free null returns false", test_libc_free_null_returns_false);
-    RUN_TEST_FUNCTION("Test libc free all", test_libc_free_all);
-    RUN_TEST_FUNCTION("Test libc free all null returns false", test_libc_free_all_null_returns_false);
-    RUN_TEST_FUNCTION("Test libc free all uninitialized returns false", test_libc_free_all_uninitialized_returns_false);
-    RUN_TEST_FUNCTION("Test libc free middle of list", test_libc_free_middle_of_list);
-    RUN_TEST_FUNCTION("Test libc free all then reuse", test_libc_free_all_then_reuse);
-    RUN_TEST_FUNCTION("Test libc realloc null behaves like alloc", test_libc_reallocate_null_behaves_like_allocate);
-    RUN_TEST_FUNCTION("Test libc realloc preserves data", test_libc_reallocate_preserves_data);
-    RUN_TEST_FUNCTION("Test libc realloc shrink preserves data", test_libc_reallocate_shrink_preserves_data);
-    RUN_TEST_FUNCTION("Test libc realloc aligned preserves alignment", test_libc_reallocate_aligned_preserves_alignment);
-    RUN_TEST_FUNCTION("Test libc realloc invalid size", test_libc_reallocate_invalid_size_returns_null);
-    RUN_TEST_FUNCTION("Test libc typed allocate macro", test_libc_typed_allocate_macro);
-    RUN_TEST_FUNCTION("Test libc allocator interface basic", test_libc_allocator_interface_basic);
-    RUN_TEST_FUNCTION("Test libc allocator interface realloc", test_libc_allocator_interface_realloc);
-    RUN_TEST_FUNCTION("Test libc create child basic", test_libc_create_child_basic);
-    RUN_TEST_FUNCTION("Test libc create child parent survives realloc", test_libc_create_child_parent_survives_realloc);
-    RUN_TEST_FUNCTION("Test libc create child nested", test_libc_create_child_nested);
 
     TEST_RESULTS();
     return lfails != 0;

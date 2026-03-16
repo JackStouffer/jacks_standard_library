@@ -141,7 +141,7 @@ SOFTWARE.
 }
 
 
-static void test_integers(void)
+void test_integers(void)
 {
     uint8_t _buf[1024];
     JSLMutableMemory buffer = JSL_MEMORY_FROM_STACK(_buf);
@@ -171,7 +171,7 @@ static void test_integers(void)
     CHECK2("9888777666", "%llu", 9888777666llu);
 }
 
-static void test_floating_point(void)
+void test_floating_point(void)
 {
     uint8_t _buf[1024];
     JSLMutableMemory buffer = JSL_MEMORY_FROM_STACK(_buf);
@@ -212,7 +212,7 @@ static void test_floating_point(void)
     CHECK2("N", "%.1g", positive_nan);
 }
 
-static void test_n(void)
+void test_n(void)
 {
     uint8_t _buf[1024];
     JSLMutableMemory buffer = JSL_MEMORY_FROM_STACK(_buf);
@@ -222,7 +222,7 @@ static void test_n(void)
     assert(n == 4);
 }
 
-static void test_hex_floats(void)
+void test_hex_floats(void)
 {
     uint8_t _buf[1024];
     JSLMutableMemory buffer = JSL_MEMORY_FROM_STACK(_buf);
@@ -234,7 +234,7 @@ static void test_hex_floats(void)
     CHECK2("-0x1.AB0P-5", "%.3A", -0x1.abp-5);
 }
 
-static void test_pointer(void)
+void test_pointer(void)
 {
     uint8_t _buf[1024];
     JSLMutableMemory buffer = JSL_MEMORY_FROM_STACK(_buf);
@@ -242,7 +242,7 @@ static void test_pointer(void)
     CHECK2("0000000000000000", "%p", (void*) NULL);
 }
 
-static void test_memory_format(void)
+void test_memory_format(void)
 {
     uint8_t _buf[4096];
     JSLMutableMemory buffer = JSL_MEMORY_FROM_STACK(_buf);
@@ -289,7 +289,7 @@ static void test_memory_format(void)
     );
 }
 
-static void test_quote_modifier(void)
+void test_quote_modifier(void)
 {
     uint8_t _buf[1024];
     JSLMutableMemory buffer = JSL_MEMORY_FROM_STACK(_buf);
@@ -303,7 +303,7 @@ static void test_quote_modifier(void)
     CHECK2("000,001,200,000", "%'015d", 1200000);
 }
 
-static void test_nonstandard(void)
+void test_nonstandard(void)
 {
     uint8_t _buf[1024];
     JSLMutableMemory buffer = JSL_MEMORY_FROM_STACK(_buf);
@@ -317,33 +317,11 @@ static void test_nonstandard(void)
     CHECK3("2.42 Mi 2.4 M", "%$$.2d %$$$d", 2536000, 2536000);
 }
 
-static void test_separators(void)
+void test_separators(void)
 {
     uint8_t _buf[1024];
     JSLMutableMemory buffer = JSL_MEMORY_FROM_STACK(_buf);
 
     jsl_format_set_separators(' ', ',');
     CHECK2("12 345,678900", "%'f", 12345.6789);
-}
-
-int main(void)
-{
-    // Windows programs that crash can lose all of the terminal output.
-    // Set the buffer to zero to auto flush on output.
-    #ifdef _WIN32
-        setvbuf(stdout, NULL, _IONBF, 0);
-    #endif
-
-    RUN_TEST_FUNCTION("Test format ints", test_integers);
-    RUN_TEST_FUNCTION("Test format floating point", test_floating_point);
-    RUN_TEST_FUNCTION("Test format length capture", test_n);
-    RUN_TEST_FUNCTION("Test format hex floats", test_hex_floats);
-    RUN_TEST_FUNCTION("Test format pointer", test_pointer);
-    RUN_TEST_FUNCTION("Test format fat pointer", test_memory_format);
-    RUN_TEST_FUNCTION("Test format quote modifier", test_quote_modifier);
-    RUN_TEST_FUNCTION("Test format non-standard", test_nonstandard);
-    RUN_TEST_FUNCTION("Test format separators", test_separators);
-
-    TEST_RESULTS();
-    return lfails != 0;
 }

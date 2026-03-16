@@ -311,153 +311,15 @@ static CompilerConfig msvc_configs[] = {
 
 static UnitTestDecl unit_test_declarations[] = {
     {
-        "test_core",
+        "test_main",
         (char*[])
         {
-            "tests/test_core.c",
-            "src/jsl/core.c",
-            "src/jsl/allocator.c",
-            "src/jsl/allocator_arena.c",
-            NULL
-        }
-    },
-    {
-        "test_allocator_arena",
-        (char*[])
-        {
-            "tests/test_allocator_arena.c",
-            "src/jsl/core.c",
-            "src/jsl/allocator.c",
-            "src/jsl/allocator_arena.c",
-            "src/jsl/allocator_infinite_arena.c",
-            NULL
-        }
-    },
-    {
-        "test_allocator_libc",
-        (char*[])
-        {
-            "tests/test_allocator_libc.c",
-            "src/jsl/core.c",
-            "src/jsl/allocator.c",
-            "src/jsl/allocator_libc.c",
-            NULL
-        }
-    },
-    {
-        "test_allocator_pool",
-        (char*[])
-        {
-            "tests/test_allocator_pool.c",
-            "src/jsl/core.c",
-            "src/jsl/allocator.c",
-            "src/jsl/allocator_pool.c",
-            NULL
-        }
-    },
-    {
-        "test_format",
-        (char*[])
-        {
-            "tests/test_format.c",
-            "src/jsl/core.c",
-            "src/jsl/allocator.c",
-            "src/jsl/allocator_arena.c",
-            NULL
-        }
-    },
-    {
-        "test_string_builder",
-        (char*[])
-        {
-            "tests/test_string_builder.c",
-            "src/jsl/core.c",
-            "src/jsl/allocator.c",
-            "src/jsl/allocator_arena.c",
-            "src/jsl/string_builder.c",
-            NULL
-        }
-    },
-    {
-        "test_cmd_line",
-        (char*[])
-        {
-            "tests/test_cmd_line.c",
-            "src/jsl/core.c",
-            "src/jsl/allocator.c",
-            "src/jsl/allocator_arena.c",
-            "src/jsl/str_set.c",
-            "src/jsl/str_to_str_map.c",
-            "src/jsl/str_to_str_multimap.c",
-            "src/jsl/cmd_line.c",
-            NULL
-        }
-    },
-    {
-        "test_intrinsics",
-        (char*[])
-        {
-            "tests/test_intrinsics.c",
-            "src/jsl/core.c",
-            "src/jsl/allocator.c",
-            "src/jsl/allocator_arena.c",
-            NULL
-        }
-    },
-    {
-        "test_file_utils", (char*[]) {
-            "tests/test_file_utils.c",
-            "src/jsl/core.c",
-            "src/jsl/allocator.c",
-            "src/jsl/allocator_arena.c",
-            "src/jsl/os.c",
-            NULL
-        }
-    },
-    {
-        "test_str_to_str_multimap",
-        (char*[]) {
-            "tests/test_str_to_str_multimap.c",
-            "src/jsl/core.c",
-            "src/jsl/allocator.c",
-            "src/jsl/allocator_arena.c",
-            "src/jsl/str_to_str_multimap.c",
-            NULL
-        }
-    },
-    {
-        "test_hash_set",
-        (char*[]) {
-            "tests/test_hash_set.c",
-            "src/jsl/core.c",
-            "src/jsl/allocator.c",
-            "src/jsl/allocator_arena.c",
-            "src/jsl/str_set.c",
-            NULL
-        }
-    },
-    {
-        "test_array",
-        (char*[]) {
-            "tests/test_array.c",
-            "src/jsl/core.c",
-            "src/jsl/allocator.c",
-            "src/jsl/allocator_arena.c",
+            "tests/test_main.c",
+            "src/jsl/everything.c",
             "tests/arrays/dynamic_comp1_array.c",
             "tests/arrays/dynamic_comp2_array.c",
             "tests/arrays/dynamic_comp3_array.c",
             "tests/arrays/dynamic_int32_array.c",
-            NULL
-        }
-    },
-    {
-        "test_hash_map",
-        (char*[]) {
-            "tests/test_hash_map.c",
-            "src/jsl/core.c",
-            "src/jsl/allocator.c",
-            "src/jsl/allocator_arena.c",
-            "src/jsl/str_to_str_map.c",
             "tests/hash_maps/fixed_comp2_to_int_map.c",
             "tests/hash_maps/fixed_comp3_to_comp2_map.c",
             "tests/hash_maps/fixed_int32_to_comp1_map.c",

@@ -46,7 +46,7 @@ typedef struct TestAlign16
     _Alignas(16) uint8_t data[16];
 } TestAlign16;
 
-static void test_arena_init_sets_pointers(void)
+void test_arena_init_sets_pointers(void)
 {
     uint8_t buffer[128];
     JSLArena arena = {0};
@@ -58,7 +58,7 @@ static void test_arena_init_sets_pointers(void)
     TEST_POINTERS_EQUAL(arena.end, buffer + sizeof(buffer));
 }
 
-static void test_arena_init2_sets_pointers(void)
+void test_arena_init2_sets_pointers(void)
 {
     uint8_t buffer[96];
     JSLMutableMemory memory = JSL_MEMORY_FROM_STACK(buffer);
@@ -71,7 +71,7 @@ static void test_arena_init2_sets_pointers(void)
     TEST_POINTERS_EQUAL(arena.end, buffer + sizeof(buffer));
 }
 
-static void test_arena_allocate_zeroed_and_alignment(void)
+void test_arena_allocate_zeroed_and_alignment(void)
 {
     uint8_t buffer[4096];
     JSLArena arena = {0};
@@ -100,7 +100,7 @@ static void test_arena_allocate_zeroed_and_alignment(void)
     TEST_BOOL(((uintptr_t) aligned % 256) == 0);
 }
 
-static void test_arena_allocate_invalid_sizes_return_null(void)
+void test_arena_allocate_invalid_sizes_return_null(void)
 {
     uint8_t buffer[128];
     JSLArena arena = {0};
@@ -111,7 +111,7 @@ static void test_arena_allocate_invalid_sizes_return_null(void)
     TEST_POINTERS_EQUAL(jsl_arena_allocate_aligned(&arena, 0, 8, false), NULL);
 }
 
-static void test_arena_allocate_out_of_memory_returns_null(void)
+void test_arena_allocate_out_of_memory_returns_null(void)
 {
     uint8_t buffer[64];
     JSLArena arena = {0};
@@ -120,7 +120,7 @@ static void test_arena_allocate_out_of_memory_returns_null(void)
     TEST_POINTERS_EQUAL(jsl_arena_allocate(&arena, 1024, false), NULL);
 }
 
-static void test_arena_reallocate_null_behaves_like_allocate(void)
+void test_arena_reallocate_null_behaves_like_allocate(void)
 {
     uint8_t buffer[256];
     JSLArena arena = {0};
@@ -133,7 +133,7 @@ static void test_arena_reallocate_null_behaves_like_allocate(void)
     TEST_BOOL(((uintptr_t) allocation % JSL_DEFAULT_ALLOCATION_ALIGNMENT) == 0);
 }
 
-static void test_arena_reallocate_in_place_when_last(void)
+void test_arena_reallocate_in_place_when_last(void)
 {
     uint8_t buffer[512];
     JSLArena arena = {0};
@@ -163,7 +163,7 @@ static void test_arena_reallocate_in_place_when_last(void)
     }
 }
 
-static void test_arena_reallocate_not_last_allocates_new(void)
+void test_arena_reallocate_not_last_allocates_new(void)
 {
     uint8_t buffer[512];
     JSLArena arena = {0};
@@ -193,7 +193,7 @@ static void test_arena_reallocate_not_last_allocates_new(void)
     TEST_BOOL(memcmp(moved, expected, sizeof(expected)) == 0);
 }
 
-static void test_arena_reallocate_invalid_pointer_returns_null(void)
+void test_arena_reallocate_invalid_pointer_returns_null(void)
 {
     uint8_t buffer[128];
     JSLArena arena = {0};
@@ -203,7 +203,7 @@ static void test_arena_reallocate_invalid_pointer_returns_null(void)
     TEST_POINTERS_EQUAL(jsl_arena_reallocate(&arena, dummy, 8), NULL);
 }
 
-static void test_arena_reset_reuses_memory(void)
+void test_arena_reset_reuses_memory(void)
 {
     uint8_t buffer[256];
     JSLArena arena = {0};
@@ -219,7 +219,7 @@ static void test_arena_reset_reuses_memory(void)
     TEST_POINTERS_EQUAL(first, second);
 }
 
-static void test_arena_save_restore_point_rewinds(void)
+void test_arena_save_restore_point_rewinds(void)
 {
     uint8_t buffer[256];
     JSLArena arena = {0};
@@ -241,7 +241,7 @@ static void test_arena_save_restore_point_rewinds(void)
     TEST_POINTERS_EQUAL(third, second);
 }
 
-static void test_arena_create_child_basic(void)
+void test_arena_create_child_basic(void)
 {
     uint8_t buffer[1024];
     JSLArena arena = {0};
@@ -276,7 +276,7 @@ static void test_arena_create_child_basic(void)
     }
 }
 
-static void test_arena_create_child_parent_survives_realloc(void)
+void test_arena_create_child_parent_survives_realloc(void)
 {
     uint8_t buffer[2048];
     JSLArena arena = {0};
@@ -317,7 +317,7 @@ static void test_arena_create_child_parent_survives_realloc(void)
     }
 }
 
-static void test_arena_create_child_nested(void)
+void test_arena_create_child_nested(void)
 {
     uint8_t buffer[2048];
     JSLArena arena = {0};
@@ -342,7 +342,7 @@ static void test_arena_create_child_nested(void)
     jsl_allocator_interface_free_all(child1);
 }
 
-static void test_arena_allocator_interface_basic(void)
+void test_arena_allocator_interface_basic(void)
 {
     uint8_t buffer[256];
     JSLArena arena = {0};
@@ -368,7 +368,7 @@ static void test_arena_allocator_interface_basic(void)
     TEST_POINTERS_EQUAL(second, allocation);
 }
 
-static void test_arena_typed_macros(void)
+void test_arena_typed_macros(void)
 {
     uint8_t buffer[256];
     JSLArena arena = {0};
@@ -397,7 +397,7 @@ static void test_arena_typed_macros(void)
     TEST_BOOL(((uintptr_t) aligned % _Alignof(TestAlign16)) == 0);
 }
 
-static void test_arena_from_stack_macro(void)
+void test_arena_from_stack_macro(void)
 {
     uint8_t buffer[128];
     JSLArena arena = JSL_ARENA_FROM_STACK(buffer);
@@ -416,7 +416,7 @@ static void test_arena_from_stack_macro(void)
     ASAN_UNPOISON_MEMORY_REGION(buffer, sizeof(buffer));
 }
 
-static void test_infinite_arena_init(void)
+void test_infinite_arena_init(void)
 {
     JSLInfiniteArena arena;
     arena.start = (void*) 1;
@@ -434,7 +434,7 @@ static void test_infinite_arena_init(void)
     jsl_infinite_arena_release(&arena);
 }
 
-static void test_infinite_arena_allocate_zeroed_and_alignment(void)
+void test_infinite_arena_allocate_zeroed_and_alignment(void)
 {
     JSLInfiniteArena arena = {0};
     bool init = jsl_infinite_arena_init(&arena);
@@ -466,7 +466,7 @@ static void test_infinite_arena_allocate_zeroed_and_alignment(void)
     jsl_infinite_arena_release(&arena);
 }
 
-static void test_infinite_arena_allocate_invalid_sizes_return_null(void)
+void test_infinite_arena_allocate_invalid_sizes_return_null(void)
 {
     JSLInfiniteArena arena = {0};
     bool init = jsl_infinite_arena_init(&arena);
@@ -480,7 +480,7 @@ static void test_infinite_arena_allocate_invalid_sizes_return_null(void)
     jsl_infinite_arena_release(&arena);
 }
 
-static void test_infinite_arena_allocate_multiple_are_distinct(void)
+void test_infinite_arena_allocate_multiple_are_distinct(void)
 {
     JSLInfiniteArena arena = {0};
     bool init = jsl_infinite_arena_init(&arena);
@@ -500,7 +500,7 @@ static void test_infinite_arena_allocate_multiple_are_distinct(void)
     jsl_infinite_arena_release(&arena);
 }
 
-static void test_infinite_arena_reallocate_null_behaves_like_allocate(void)
+void test_infinite_arena_reallocate_null_behaves_like_allocate(void)
 {
     JSLInfiniteArena arena = {0};
     bool init = jsl_infinite_arena_init(&arena);
@@ -516,7 +516,7 @@ static void test_infinite_arena_reallocate_null_behaves_like_allocate(void)
     jsl_infinite_arena_release(&arena);
 }
 
-static void test_infinite_arena_reallocate_aligned_null_behaves_like_allocate(void)
+void test_infinite_arena_reallocate_aligned_null_behaves_like_allocate(void)
 {
     JSLInfiniteArena arena = {0};
     jsl_infinite_arena_init(&arena);
@@ -530,7 +530,7 @@ static void test_infinite_arena_reallocate_aligned_null_behaves_like_allocate(vo
     jsl_infinite_arena_release(&arena);
 }
 
-static void test_infinite_arena_reallocate_in_place_when_last(void)
+void test_infinite_arena_reallocate_in_place_when_last(void)
 {
     JSLInfiniteArena arena = {0};
     bool init = jsl_infinite_arena_init(&arena);
@@ -563,7 +563,7 @@ static void test_infinite_arena_reallocate_in_place_when_last(void)
     jsl_infinite_arena_release(&arena);
 }
 
-static void test_infinite_arena_reallocate_not_last_allocates_new(void)
+void test_infinite_arena_reallocate_not_last_allocates_new(void)
 {
     JSLInfiniteArena arena = {0};
     bool init = jsl_infinite_arena_init(&arena);
@@ -596,7 +596,7 @@ static void test_infinite_arena_reallocate_not_last_allocates_new(void)
     jsl_infinite_arena_release(&arena);
 }
 
-static void test_infinite_arena_reallocate_aligned_in_place_when_last_and_fits(void)
+void test_infinite_arena_reallocate_aligned_in_place_when_last_and_fits(void)
 {
     JSLInfiniteArena arena = {0};
     bool init = jsl_infinite_arena_init(&arena);
@@ -631,7 +631,7 @@ static void test_infinite_arena_reallocate_aligned_in_place_when_last_and_fits(v
     jsl_infinite_arena_release(&arena);
 }
 
-static void test_infinite_arena_reallocate_aligned_not_last_allocates_new(void)
+void test_infinite_arena_reallocate_aligned_not_last_allocates_new(void)
 {
     JSLInfiniteArena arena = {0};
     bool init = jsl_infinite_arena_init(&arena);
@@ -665,7 +665,7 @@ static void test_infinite_arena_reallocate_aligned_not_last_allocates_new(void)
     jsl_infinite_arena_release(&arena);
 }
 
-static void test_infinite_arena_reallocate_aligned_alignment_mismatch_allocates_new(void)
+void test_infinite_arena_reallocate_aligned_alignment_mismatch_allocates_new(void)
 {
     JSLInfiniteArena arena = {0};
     bool init = jsl_infinite_arena_init(&arena);
@@ -696,7 +696,7 @@ static void test_infinite_arena_reallocate_aligned_alignment_mismatch_allocates_
     jsl_infinite_arena_release(&arena);
 }
 
-static void test_infinite_arena_reset_reuses_memory(void)
+void test_infinite_arena_reset_reuses_memory(void)
 {
     JSLInfiniteArena arena = {0};
     bool init = jsl_infinite_arena_init(&arena);
@@ -715,7 +715,7 @@ static void test_infinite_arena_reset_reuses_memory(void)
     jsl_infinite_arena_release(&arena);
 }
 
-static void test_infinite_arena_save_restore_point(void)
+void test_infinite_arena_save_restore_point(void)
 {
     JSLInfiniteArena arena = {0};
     bool init = jsl_infinite_arena_init(&arena);
@@ -740,7 +740,7 @@ static void test_infinite_arena_save_restore_point(void)
     jsl_infinite_arena_release(&arena);
 }
 
-static void test_infinite_arena_create_child_basic(void)
+void test_infinite_arena_create_child_basic(void)
 {
     JSLInfiniteArena arena = {0};
     bool init = jsl_infinite_arena_init(&arena);
@@ -778,7 +778,7 @@ static void test_infinite_arena_create_child_basic(void)
     jsl_infinite_arena_release(&arena);
 }
 
-static void test_infinite_arena_create_child_parent_survives_realloc(void)
+void test_infinite_arena_create_child_parent_survives_realloc(void)
 {
     JSLInfiniteArena arena = {0};
     bool init = jsl_infinite_arena_init(&arena);
@@ -822,7 +822,7 @@ static void test_infinite_arena_create_child_parent_survives_realloc(void)
     jsl_infinite_arena_release(&arena);
 }
 
-static void test_infinite_arena_create_child_nested(void)
+void test_infinite_arena_create_child_nested(void)
 {
     JSLInfiniteArena arena = {0};
     bool init = jsl_infinite_arena_init(&arena);
@@ -850,7 +850,7 @@ static void test_infinite_arena_create_child_nested(void)
     jsl_infinite_arena_release(&arena);
 }
 
-static void test_infinite_arena_allocator_interface_basic(void)
+void test_infinite_arena_allocator_interface_basic(void)
 {
     JSLInfiniteArena arena = {0};
     bool init = jsl_infinite_arena_init(&arena);
@@ -876,52 +876,4 @@ static void test_infinite_arena_allocator_interface_basic(void)
     TEST_BOOL(second != NULL);
 
     jsl_infinite_arena_release(&arena);
-}
-
-int main(void)
-{
-    // Windows programs that crash can lose all of the terminal output.
-    // Set the buffer to zero to auto flush on output.
-    #if JSL_IS_WINDOWS
-        setvbuf(stdout, NULL, _IONBF, 0);
-    #endif
-
-    RUN_TEST_FUNCTION("Test arena init sets pointers", test_arena_init_sets_pointers);
-    RUN_TEST_FUNCTION("Test arena init2 sets pointers", test_arena_init2_sets_pointers);
-    RUN_TEST_FUNCTION("Test arena allocate zeroed and alignment", test_arena_allocate_zeroed_and_alignment);
-    RUN_TEST_FUNCTION("Test arena allocate invalid sizes", test_arena_allocate_invalid_sizes_return_null);
-    RUN_TEST_FUNCTION("Test arena allocate out of memory", test_arena_allocate_out_of_memory_returns_null);
-    RUN_TEST_FUNCTION("Test arena realloc null behaves like alloc", test_arena_reallocate_null_behaves_like_allocate);
-    RUN_TEST_FUNCTION("Test arena realloc in place", test_arena_reallocate_in_place_when_last);
-    RUN_TEST_FUNCTION("Test arena realloc not last", test_arena_reallocate_not_last_allocates_new);
-    RUN_TEST_FUNCTION("Test arena realloc invalid pointer", test_arena_reallocate_invalid_pointer_returns_null);
-    RUN_TEST_FUNCTION("Test arena reset reuses memory", test_arena_reset_reuses_memory);
-    RUN_TEST_FUNCTION("Test arena save/restore point", test_arena_save_restore_point_rewinds);
-    RUN_TEST_FUNCTION("Test arena allocator interface", test_arena_allocator_interface_basic);
-    RUN_TEST_FUNCTION("Test arena create child basic", test_arena_create_child_basic);
-    RUN_TEST_FUNCTION("Test arena create child parent survives realloc", test_arena_create_child_parent_survives_realloc);
-    RUN_TEST_FUNCTION("Test arena create child nested", test_arena_create_child_nested);
-    RUN_TEST_FUNCTION("Test arena typed macros", test_arena_typed_macros);
-    RUN_TEST_FUNCTION("Test arena from stack macro", test_arena_from_stack_macro);
-
-    RUN_TEST_FUNCTION("Test infinite arena init sets pointers", test_infinite_arena_init);
-    RUN_TEST_FUNCTION("Test infinite arena allocate zeroed and alignment", test_infinite_arena_allocate_zeroed_and_alignment);
-    RUN_TEST_FUNCTION("Test infinite arena allocate invalid sizes", test_infinite_arena_allocate_invalid_sizes_return_null);
-    RUN_TEST_FUNCTION("Test infinite arena allocate distinct blocks", test_infinite_arena_allocate_multiple_are_distinct);
-    RUN_TEST_FUNCTION("Test infinite arena realloc null behaves like alloc", test_infinite_arena_reallocate_null_behaves_like_allocate);
-    RUN_TEST_FUNCTION("Test infinite arena realloc aligned null behaves like alloc", test_infinite_arena_reallocate_aligned_null_behaves_like_allocate);
-    RUN_TEST_FUNCTION("Test infinite arena realloc in place", test_infinite_arena_reallocate_in_place_when_last);
-    RUN_TEST_FUNCTION("Test infinite arena realloc not last", test_infinite_arena_reallocate_not_last_allocates_new);
-    RUN_TEST_FUNCTION("Test infinite arena realloc aligned in place", test_infinite_arena_reallocate_aligned_in_place_when_last_and_fits);
-    RUN_TEST_FUNCTION("Test infinite arena realloc aligned not last", test_infinite_arena_reallocate_aligned_not_last_allocates_new);
-    RUN_TEST_FUNCTION("Test infinite arena realloc aligned mismatch", test_infinite_arena_reallocate_aligned_alignment_mismatch_allocates_new);
-    RUN_TEST_FUNCTION("Test infinite arena reset reuses memory", test_infinite_arena_reset_reuses_memory);
-    RUN_TEST_FUNCTION("Test infinite arena save/restore point", test_infinite_arena_save_restore_point);
-    RUN_TEST_FUNCTION("Test infinite arena allocator interface", test_infinite_arena_allocator_interface_basic);
-    RUN_TEST_FUNCTION("Test infinite arena create child basic", test_infinite_arena_create_child_basic);
-    RUN_TEST_FUNCTION("Test infinite arena create child parent survives realloc", test_infinite_arena_create_child_parent_survives_realloc);
-    RUN_TEST_FUNCTION("Test infinite arena create child nested", test_infinite_arena_create_child_nested);
-
-    TEST_RESULTS();
-    return lfails != 0;
 }

@@ -58,7 +58,7 @@ static bool insert_values(JSLStrSet* set, const char** values, size_t count)
     return true;
 }
 
-static void test_jsl_str_set_init_success(void)
+void test_jsl_str_set_init_success(void)
 {
     JSLStrSet set = {0};
     JSLAllocatorInterface allocator;
@@ -76,7 +76,7 @@ static void test_jsl_str_set_init_success(void)
     TEST_INT64_EQUAL(set.tombstone_count, (int64_t) 0);
 }
 
-static void test_jsl_str_set_init_invalid_arguments(void)
+void test_jsl_str_set_init_invalid_arguments(void)
 {
     JSLStrSet set = {0};
     JSLAllocatorInterface allocator;
@@ -90,7 +90,7 @@ static void test_jsl_str_set_init_invalid_arguments(void)
     TEST_BOOL(!jsl_str_set_init2(&set, allocator, 0, 4, -0.25f));
 }
 
-static void test_jsl_str_set_insert_and_has(void)
+void test_jsl_str_set_insert_and_has(void)
 {
     JSLStrSet set = {0};
     JSLAllocatorInterface allocator;
@@ -125,7 +125,7 @@ static void test_jsl_str_set_insert_and_has(void)
     TEST_INT64_EQUAL(jsl_str_set_item_count(NULL), (int64_t) -1);
 }
 
-static void test_jsl_str_set_respects_lifetime_rules(void)
+void test_jsl_str_set_respects_lifetime_rules(void)
 {
     JSLStrSet set = {0};
     JSLAllocatorInterface allocator;
@@ -179,7 +179,7 @@ static void test_jsl_str_set_respects_lifetime_rules(void)
     TEST_BOOL(saw_literal);
 }
 
-static void test_jsl_str_set_iterator_covers_all_values(void)
+void test_jsl_str_set_iterator_covers_all_values(void)
 {
     JSLStrSet set = {0};
     JSLAllocatorInterface allocator;
@@ -231,7 +231,7 @@ static void test_jsl_str_set_iterator_covers_all_values(void)
     TEST_BOOL(!jsl_str_set_iterator_next(&iter, &out_value));
 }
 
-static void test_jsl_str_set_iterator_invalidated_on_mutation(void)
+void test_jsl_str_set_iterator_invalidated_on_mutation(void)
 {
     JSLStrSet set = {0};
     JSLAllocatorInterface allocator;
@@ -252,7 +252,7 @@ static void test_jsl_str_set_iterator_invalidated_on_mutation(void)
     TEST_BOOL(!jsl_str_set_iterator_next(&iter, &out_value));
 }
 
-static void test_jsl_str_set_delete(void)
+void test_jsl_str_set_delete(void)
 {
     JSLStrSet set = {0};
     JSLAllocatorInterface allocator;
@@ -280,7 +280,7 @@ static void test_jsl_str_set_delete(void)
     TEST_BOOL(jsl_str_set_has(&set, JSL_CSTR_EXPRESSION("new")));
 }
 
-static void test_jsl_str_set_clear(void)
+void test_jsl_str_set_clear(void)
 {
     JSLStrSet set = {0};
     JSLAllocatorInterface allocator;
@@ -312,7 +312,7 @@ static void test_jsl_str_set_clear(void)
     TEST_BOOL(jsl_str_set_has(&set, JSL_CSTR_EXPRESSION("reused")));
 }
 
-static void test_jsl_str_set_handles_empty_and_binary_values(void)
+void test_jsl_str_set_handles_empty_and_binary_values(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -362,7 +362,7 @@ static void test_jsl_str_set_handles_empty_and_binary_values(void)
     }
 }
 
-static void test_jsl_str_set_intersection_basic(void)
+void test_jsl_str_set_intersection_basic(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -393,7 +393,7 @@ static void test_jsl_str_set_intersection_basic(void)
     TEST_BOOL(!jsl_str_set_has(&out, JSL_CSTR_EXPRESSION("gamma")));
 }
 
-static void test_jsl_str_set_intersection_with_empty_sets(void)
+void test_jsl_str_set_intersection_with_empty_sets(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -421,7 +421,7 @@ static void test_jsl_str_set_intersection_with_empty_sets(void)
     TEST_INT64_EQUAL(jsl_str_set_item_count(&out_two), (int64_t) 0);
 }
 
-static void test_jsl_str_set_union_collects_all_unique_values(void)
+void test_jsl_str_set_union_collects_all_unique_values(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -454,7 +454,7 @@ static void test_jsl_str_set_union_collects_all_unique_values(void)
     TEST_BOOL(jsl_str_set_has(&out, JSL_CSTR_EXPRESSION("delta")));
 }
 
-static void test_jsl_str_set_union_with_empty_sets(void)
+void test_jsl_str_set_union_with_empty_sets(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -492,7 +492,7 @@ static void test_jsl_str_set_union_with_empty_sets(void)
     TEST_INT64_EQUAL(jsl_str_set_item_count(&out_three), (int64_t) 0);
 }
 
-static void test_jsl_str_set_difference_basic(void)
+void test_jsl_str_set_difference_basic(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -523,7 +523,7 @@ static void test_jsl_str_set_difference_basic(void)
     TEST_BOOL(!jsl_str_set_has(&out, JSL_CSTR_EXPRESSION("other")));
 }
 
-static void test_jsl_str_set_difference_with_empty_sets(void)
+void test_jsl_str_set_difference_with_empty_sets(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -563,7 +563,7 @@ static void test_jsl_str_set_difference_with_empty_sets(void)
     TEST_INT64_EQUAL(jsl_str_set_item_count(&out_three), (int64_t) 0);
 }
 
-static void test_jsl_str_set_set_operations_invalid_parameters(void)
+void test_jsl_str_set_set_operations_invalid_parameters(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -605,7 +605,7 @@ static void test_jsl_str_set_set_operations_invalid_parameters(void)
     TEST_INT64_EQUAL(jsl_str_set_item_count(&out), (int64_t) 0);
 }
 
-static void test_jsl_str_set_rehash_preserves_entries(void)
+void test_jsl_str_set_rehash_preserves_entries(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -647,7 +647,7 @@ static void test_jsl_str_set_rehash_preserves_entries(void)
     TEST_INT64_EQUAL(iterated, (int64_t) insert_count);
 }
 
-static void test_jsl_str_set_rejects_invalid_parameters(void)
+void test_jsl_str_set_rejects_invalid_parameters(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -669,66 +669,4 @@ static void test_jsl_str_set_rejects_invalid_parameters(void)
     TEST_BOOL(!jsl_str_set_insert(&set, negative_length, JSL_STRING_LIFETIME_LONGER));
 
     TEST_INT64_EQUAL(jsl_str_set_item_count(&set), (int64_t) 0);
-}
-
-int main(void)
-{
-    jsl_arena_init(&global_arena, malloc(arena_size), arena_size);
-
-    RUN_TEST_FUNCTION("String set init success", test_jsl_str_set_init_success);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("String set init invalid args", test_jsl_str_set_init_invalid_arguments);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("String set insert and has", test_jsl_str_set_insert_and_has);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("String Set lifetime rules", test_jsl_str_set_respects_lifetime_rules);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("String Set iterator covers all", test_jsl_str_set_iterator_covers_all_values);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("String Set iterator invalidation", test_jsl_str_set_iterator_invalidated_on_mutation);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("String Set delete behavior", test_jsl_str_set_delete);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("String Set clear behavior", test_jsl_str_set_clear);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("String Set empty and binary values", test_jsl_str_set_handles_empty_and_binary_values);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("String Set intersection basic cases", test_jsl_str_set_intersection_basic);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("String Set intersection empty sets", test_jsl_str_set_intersection_with_empty_sets);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("String Set union collects uniques", test_jsl_str_set_union_collects_all_unique_values);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("String Set union with empty sets", test_jsl_str_set_union_with_empty_sets);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("String Set difference basic cases", test_jsl_str_set_difference_basic);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("String Set difference with empty sets", test_jsl_str_set_difference_with_empty_sets);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("String Set operations invalid parameters", test_jsl_str_set_set_operations_invalid_parameters);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("String Set rehash preserves entries", test_jsl_str_set_rehash_preserves_entries);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("String Set rejects invalid parameters", test_jsl_str_set_rejects_invalid_parameters);
-    jsl_arena_reset(&global_arena);
-
-    TEST_RESULTS();
-    return lfails != 0;
 }

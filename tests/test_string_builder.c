@@ -44,7 +44,7 @@ typedef struct JSLTestAllocatorContext
     int64_t active_allocations;
 } JSLTestAllocatorContext;
 
-static void* test_allocator_allocate(void* ctx, int64_t bytes, int32_t alignment, bool zeroed)
+void* test_allocator_allocate(void* ctx, int64_t bytes, int32_t alignment, bool zeroed)
 {
     (void) alignment;
     JSLTestAllocatorContext* context = (JSLTestAllocatorContext*) ctx;
@@ -62,7 +62,7 @@ static void* test_allocator_allocate(void* ctx, int64_t bytes, int32_t alignment
     return allocation;
 }
 
-static void* test_allocator_reallocate(void* ctx, void* allocation, int64_t new_bytes, int32_t alignment)
+void* test_allocator_reallocate(void* ctx, void* allocation, int64_t new_bytes, int32_t alignment)
 {
     (void) ctx;
     (void) alignment;
@@ -100,7 +100,7 @@ static JSLAllocatorInterface test_make_allocator(JSLTestAllocatorContext* contex
 }
 
 /// @brief copy all of the chunks out to a buffer
-static void debug_concatenate_builder(JSLStringBuilder* builder, JSLMutableMemory* writer)
+void debug_concatenate_builder(JSLStringBuilder* builder, JSLMutableMemory* writer)
 {
     JSLStringBuilderIterator iterator;
     jsl_string_builder_iterator_init(builder, &iterator);
@@ -113,7 +113,7 @@ static void debug_concatenate_builder(JSLStringBuilder* builder, JSLMutableMemor
     }
 }
 
-static void test_jsl_string_builder_init(void)
+void test_jsl_string_builder_init(void)
 {
     JSLStringBuilder builder;
     JSLAllocatorInterface allocator;
@@ -130,7 +130,7 @@ static void test_jsl_string_builder_init(void)
     TEST_POINTERS_EQUAL(builder.head->buffer.data, builder.head->writer.data);
 }
 
-static void test_jsl_string_builder_init2(void)
+void test_jsl_string_builder_init2(void)
 {
     JSLStringBuilder builder;
     JSLAllocatorInterface allocator;
@@ -149,7 +149,7 @@ static void test_jsl_string_builder_init2(void)
     TEST_BOOL(builder.head->writer.length == chunk_size);
 }
 
-static void test_jsl_string_builder_init_invalid_arguments(void)
+void test_jsl_string_builder_init_invalid_arguments(void)
 {
     JSLStringBuilder builder;
     JSLAllocatorInterface allocator;
@@ -160,7 +160,7 @@ static void test_jsl_string_builder_init_invalid_arguments(void)
     TEST_BOOL(!jsl_string_builder_init2(&builder, allocator, 16, 0));
 }
 
-static void test_jsl_string_builder_insert_memory_multi_chunk(void)
+void test_jsl_string_builder_insert_memory_multi_chunk(void)
 {
     JSLStringBuilder builder;
     JSLAllocatorInterface allocator;
@@ -200,7 +200,7 @@ static void test_jsl_string_builder_insert_memory_multi_chunk(void)
     TEST_BUFFERS_EQUAL(third.data, "ij", 2);
 }
 
-static void test_jsl_string_builder_insert_memory_edge_cases(void)
+void test_jsl_string_builder_insert_memory_edge_cases(void)
 {
     JSLStringBuilder builder;
     JSLAllocatorInterface allocator;
@@ -235,7 +235,7 @@ static void test_jsl_string_builder_insert_memory_edge_cases(void)
     TEST_INT64_EQUAL(jsl_string_builder_insert_memory(&uninitialized, binary_ptr), -1);
 }
 
-static void test_jsl_string_builder_iterator_behavior(void)
+void test_jsl_string_builder_iterator_behavior(void)
 {
     JSLStringBuilder builder;
     JSLAllocatorInterface allocator;
@@ -277,7 +277,7 @@ static void test_jsl_string_builder_iterator_behavior(void)
     TEST_BOOL(!jsl_string_builder_iterator_next(&invalid_iterator, &invalid_slice));
 }
 
-static void test_jsl_string_builder_with_format(void)
+void test_jsl_string_builder_with_format(void)
 {
     JSLStringBuilder builder;
     JSLAllocatorInterface allocator;
@@ -302,7 +302,7 @@ static void test_jsl_string_builder_with_format(void)
     TEST_BUFFERS_EQUAL(actual, "alpha-42:AB", len);
 }
 
-static void test_jsl_string_builder_with_format_needs_multiple_chunks(void)
+void test_jsl_string_builder_with_format_needs_multiple_chunks(void)
 {
     uint8_t arena_buffer[256];
     JSLArena arena = JSL_ARENA_FROM_STACK(arena_buffer);
@@ -330,14 +330,14 @@ static void test_jsl_string_builder_with_format_needs_multiple_chunks(void)
     TEST_BOOL(builder.head != builder.tail);
 }
 
-static void test_jsl_string_builder_with_format_invalid_builder(void)
+void test_jsl_string_builder_with_format_invalid_builder(void)
 {
     JSLStringBuilder builder = {0};
     JSLOutputSink builder_sink = jsl_string_builder_output_sink(&builder);
     TEST_INT64_EQUAL(jsl_format_sink(builder_sink, jsl_cstr_to_memory("abc")), -1);
 }
 
-static void test_jsl_string_builder_free_null_and_uninitialized(void)
+void test_jsl_string_builder_free_null_and_uninitialized(void)
 {
     jsl_string_builder_free(NULL);
 
@@ -350,7 +350,7 @@ static void test_jsl_string_builder_free_null_and_uninitialized(void)
     TEST_BOOL(jsl_output_sink_write_u8(builder_sink, 'X') < 0);
 }
 
-static void test_jsl_string_builder_free_invalid_sentinel_noop(void)
+void test_jsl_string_builder_free_invalid_sentinel_noop(void)
 {
     JSLTestAllocatorContext context = {0};
     JSLAllocatorInterface allocator = test_make_allocator(&context);
@@ -372,7 +372,7 @@ static void test_jsl_string_builder_free_invalid_sentinel_noop(void)
     TEST_INT64_EQUAL(context.active_allocations, (int64_t) 0);
 }
 
-static void test_jsl_string_builder_free_empty_builder(void)
+void test_jsl_string_builder_free_empty_builder(void)
 {
     JSLTestAllocatorContext context = {0};
     JSLAllocatorInterface allocator = test_make_allocator(&context);
@@ -391,7 +391,7 @@ static void test_jsl_string_builder_free_empty_builder(void)
     TEST_INT64_EQUAL(context.free_count, frees_before);
 }
 
-static void test_jsl_string_builder_free_single_chunk(void)
+void test_jsl_string_builder_free_single_chunk(void)
 {
     JSLTestAllocatorContext context = {0};
     JSLAllocatorInterface allocator = test_make_allocator(&context);
@@ -417,7 +417,7 @@ static void test_jsl_string_builder_free_single_chunk(void)
     TEST_INT64_EQUAL(context.free_count, frees_before);
 }
 
-static void test_jsl_string_builder_free_multiple_chunks_and_reinit(void)
+void test_jsl_string_builder_free_multiple_chunks_and_reinit(void)
 {
     JSLTestAllocatorContext context = {0};
     JSLAllocatorInterface allocator = test_make_allocator(&context);
@@ -446,54 +446,4 @@ static void test_jsl_string_builder_free_multiple_chunks_and_reinit(void)
 
     TEST_INT64_EQUAL(context.alloc_count, context.free_count);
     TEST_INT64_EQUAL(context.active_allocations, (int64_t) 0);
-}
-
-int main(void)
-{
-    jsl_arena_init(&global_arena, malloc(JSL_MEGABYTES(1)), JSL_MEGABYTES(1));
-
-    RUN_TEST_FUNCTION("Test builder init", test_jsl_string_builder_init);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("Test builder init2", test_jsl_string_builder_init2);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("Test invalid init args", test_jsl_string_builder_init_invalid_arguments);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("Test empty string and null bytes", test_jsl_string_builder_insert_memory_edge_cases);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("Test iterator", test_jsl_string_builder_iterator_behavior);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("Test iterator across chunks", test_jsl_string_builder_insert_memory_multi_chunk);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("Test format", test_jsl_string_builder_with_format);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("Test format across chunks", test_jsl_string_builder_with_format_needs_multiple_chunks);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("Test format invalid args", test_jsl_string_builder_with_format_invalid_builder);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("Test free null and uninitialized", test_jsl_string_builder_free_null_and_uninitialized);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("Test free invalid sentinel no-op", test_jsl_string_builder_free_invalid_sentinel_noop);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("Test free empty builder", test_jsl_string_builder_free_empty_builder);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("Test free single chunk", test_jsl_string_builder_free_single_chunk);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("Test free multiple chunks and reinit", test_jsl_string_builder_free_multiple_chunks_and_reinit);
-    jsl_arena_reset(&global_arena);
-
-    TEST_RESULTS();
-    return lfails != 0;
 }

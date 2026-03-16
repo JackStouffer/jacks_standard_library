@@ -60,7 +60,7 @@ static JSLImmutableMemory random_string(int64_t len)
     return res;
 }
 
-static void test_jsl_str_to_str_multimap_init_success(void)
+void test_jsl_str_to_str_multimap_init_success(void)
 {
     JSLStrToStrMultimap map = {0};
     JSLAllocatorInterface allocator;
@@ -70,7 +70,7 @@ static void test_jsl_str_to_str_multimap_init_success(void)
     TEST_BOOL(ok);
 }
 
-static void test_jsl_str_to_str_multimap_init_invalid_arguments(void)
+void test_jsl_str_to_str_multimap_init_invalid_arguments(void)
 {
     JSLStrToStrMultimap map = {0};
     JSLAllocatorInterface allocator;
@@ -84,7 +84,7 @@ static void test_jsl_str_to_str_multimap_init_invalid_arguments(void)
     TEST_BOOL(!jsl_str_to_str_multimap_init2(&map, allocator, 0, 4, -0.5f));
 }
 
-static void test_jsl_str_to_str_multimap_insert_and_get_value_count(void)
+void test_jsl_str_to_str_multimap_insert_and_get_value_count(void)
 {
     JSLStrToStrMultimap map = {0};
     JSLAllocatorInterface allocator;
@@ -111,7 +111,7 @@ static void test_jsl_str_to_str_multimap_insert_and_get_value_count(void)
     TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&uninitialized, key1), (int64_t) -1);
 }
 
-static void test_jsl_str_to_str_multimap_duplicate_values_allowed(void)
+void test_jsl_str_to_str_multimap_duplicate_values_allowed(void)
 {
     JSLStrToStrMultimap map = {0};
     JSLAllocatorInterface allocator;
@@ -148,7 +148,7 @@ static void test_jsl_str_to_str_multimap_duplicate_values_allowed(void)
     TEST_INT32_EQUAL(unique_seen, 1);
 }
 
-static void test_jsl_str_to_str_multimap_transient_lifetime_copies(void)
+void test_jsl_str_to_str_multimap_transient_lifetime_copies(void)
 {
     JSLStrToStrMultimap map = {0};
     JSLAllocatorInterface allocator;
@@ -189,7 +189,7 @@ static void test_jsl_str_to_str_multimap_transient_lifetime_copies(void)
     TEST_BOOL(found);
 }
 
-static void test_jsl_str_to_str_multimap_static_lifetime_no_copy(void)
+void test_jsl_str_to_str_multimap_static_lifetime_no_copy(void)
 {
     JSLStrToStrMultimap map = {0};
     JSLAllocatorInterface allocator;
@@ -219,7 +219,7 @@ static void test_jsl_str_to_str_multimap_static_lifetime_no_copy(void)
     TEST_BOOL(jsl_memory_compare(out_value, value));
 }
 
-static void test_jsl_str_to_str_multimap_key_value_iterator_covers_all_pairs(void)
+void test_jsl_str_to_str_multimap_key_value_iterator_covers_all_pairs(void)
 {
     JSLStrToStrMultimap map = {0};
     JSLAllocatorInterface allocator;
@@ -278,7 +278,7 @@ static void test_jsl_str_to_str_multimap_key_value_iterator_covers_all_pairs(voi
     TEST_BOOL(!jsl_str_to_str_multimap_key_value_iterator_next(&iter, &out_key, &out_value));
 }
 
-static void test_jsl_str_to_str_multimap_get_key_iterator_filters_by_key(void)
+void test_jsl_str_to_str_multimap_get_key_iterator_filters_by_key(void)
 {
     JSLStrToStrMultimap map = {0};
     JSLAllocatorInterface allocator;
@@ -319,7 +319,7 @@ static void test_jsl_str_to_str_multimap_get_key_iterator_filters_by_key(void)
     TEST_BOOL(has_data == false);
 }
 
-static void test_jsl_str_to_str_multimap_handles_empty_and_binary_values(void)
+void test_jsl_str_to_str_multimap_handles_empty_and_binary_values(void)
 {
     JSLStrToStrMultimap map = {0};
     JSLAllocatorInterface allocator;
@@ -367,7 +367,7 @@ static void test_jsl_str_to_str_multimap_handles_empty_and_binary_values(void)
     TEST_BOOL(saw_empty);
 }
 
-static void test_jsl_str_to_str_multimap_delete_value(void)
+void test_jsl_str_to_str_multimap_delete_value(void)
 {
     JSLStrToStrMultimap map = {0};
     JSLAllocatorInterface allocator;
@@ -400,7 +400,7 @@ static void test_jsl_str_to_str_multimap_delete_value(void)
     TEST_BOOL(!jsl_str_to_str_multimap_delete_value(&map, key, one));
 }
 
-static void test_jsl_str_to_str_multimap_delete_value_removes_empty_key(void)
+void test_jsl_str_to_str_multimap_delete_value_removes_empty_key(void)
 {
     JSLStrToStrMultimap map = {0};
     JSLAllocatorInterface allocator;
@@ -444,7 +444,7 @@ static void test_jsl_str_to_str_multimap_delete_value_removes_empty_key(void)
     TEST_BOOL(saw_other);
 }
 
-static void test_jsl_str_to_str_multimap_delete_key(void)
+void test_jsl_str_to_str_multimap_delete_key(void)
 {
     JSLStrToStrMultimap map = {0};
     JSLAllocatorInterface allocator;
@@ -481,7 +481,7 @@ static void test_jsl_str_to_str_multimap_delete_key(void)
     TEST_BOOL(!jsl_str_to_str_multimap_delete_key(&map, JSL_CSTR_EXPRESSION("none")));
 }
 
-static void test_jsl_str_to_str_multimap_clear(void)
+void test_jsl_str_to_str_multimap_clear(void)
 {
     JSLStrToStrMultimap map = {0};
     JSLAllocatorInterface allocator;
@@ -510,7 +510,7 @@ static void test_jsl_str_to_str_multimap_clear(void)
     TEST_INT64_EQUAL(jsl_str_to_str_multimap_get_value_count_for_key(&map, JSL_CSTR_EXPRESSION("z")), (int64_t) 1);
 }
 
-static void test_stress_test(void)
+void test_stress_test(void)
 {
     JSLStrToStrMultimap map = {0};
     JSLAllocatorInterface allocator;
@@ -567,56 +567,4 @@ static void test_stress_test(void)
     }
 
     TEST_INT64_EQUAL(seen_value_count, key_count * value_per_key);
-}
-
-int main(void)
-{
-    srand((unsigned) time(NULL));
-
-    jsl_arena_init(&global_arena, malloc(JSL_MEGABYTES(32)), JSL_MEGABYTES(32));
-
-    RUN_TEST_FUNCTION("init success", test_jsl_str_to_str_multimap_init_success);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("init invalid args", test_jsl_str_to_str_multimap_init_invalid_arguments);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("insert and value count", test_jsl_str_to_str_multimap_insert_and_get_value_count);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("duplicate values", test_jsl_str_to_str_multimap_duplicate_values_allowed);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("transient lifetime copies data", test_jsl_str_to_str_multimap_transient_lifetime_copies);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("static lifetime uses original pointers", test_jsl_str_to_str_multimap_static_lifetime_no_copy);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("key/value iterator covers all", test_jsl_str_to_str_multimap_key_value_iterator_covers_all_pairs);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("get-key iterator filters", test_jsl_str_to_str_multimap_get_key_iterator_filters_by_key);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("empty strings and binary values", test_jsl_str_to_str_multimap_handles_empty_and_binary_values);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("delete value behavior", test_jsl_str_to_str_multimap_delete_value);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("delete value removes empty key", test_jsl_str_to_str_multimap_delete_value_removes_empty_key);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("delete key behavior", test_jsl_str_to_str_multimap_delete_key);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("clear and reuse", test_jsl_str_to_str_multimap_clear);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("stress test", test_stress_test);
-    jsl_arena_reset(&global_arena);
-
-    TEST_RESULTS();
-    return lfails != 0;
 }

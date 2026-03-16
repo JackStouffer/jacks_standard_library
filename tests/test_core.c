@@ -69,7 +69,7 @@ JSLImmutableMemory long_str = JSL_CSTR_INITIALIZER(
     "risus et rutrum."
 );
 
-static void test_jsl_from_cstr(void)
+void test_jsl_from_cstr(void)
 {
     char* c_str = "This is a test string!";
     size_t length = strlen(c_str);
@@ -81,7 +81,7 @@ static void test_jsl_from_cstr(void)
     TEST_INT32_EQUAL(memcmp(c_str, str.data, (size_t) str.length), 0);
 }
 
-static void test_jsl_cstr_memory_copy(void)
+void test_jsl_cstr_memory_copy(void)
 {
     JSLMutableMemory buffer = jsl_mutable_memory(malloc(1024), 1024);
     TEST_INT64_EQUAL(buffer.length, (int64_t) 1024);
@@ -99,7 +99,7 @@ static void test_jsl_cstr_memory_copy(void)
     TEST_INT32_EQUAL(memcmp(str, buffer.data, (size_t) length), 0);
 }
 
-static void test_jsl_memory_compare(void)
+void test_jsl_memory_compare(void)
 {
     JSLMutableMemory buffer1 = jsl_mutable_memory(malloc(13), 13);
     JSLMutableMemory buffer2 = jsl_mutable_memory(malloc(13), 13);
@@ -126,7 +126,7 @@ static void test_jsl_memory_compare(void)
     TEST_BOOL(!jsl_memory_compare(buffer1, buffer4));
 }
 
-static void test_jsl_slice(void)
+void test_jsl_slice(void)
 {
     JSLMutableMemory buffer1 = jsl_mutable_memory(malloc(13), 13);
 
@@ -160,7 +160,7 @@ static void test_jsl_slice(void)
     }
 }
 
-static void test_jsl_total_write_length(void)
+void test_jsl_total_write_length(void)
 {
     {
         uint8_t buffer[32] = {0};
@@ -191,7 +191,7 @@ static void test_jsl_total_write_length(void)
     }
 }
 
-static void test_jsl_auto_slice(void)
+void test_jsl_auto_slice(void)
 {
     {
         uint8_t buffer[32] = {0};
@@ -231,7 +231,7 @@ static void test_jsl_auto_slice(void)
     }
 }
 
-static void test_jsl_auto_slice_arena_reallocate(void)
+void test_jsl_auto_slice_arena_reallocate(void)
 {
     const int64_t arena_size = JSL_KILOBYTES(64);
     JSLArena arena;
@@ -272,7 +272,7 @@ static void test_jsl_auto_slice_arena_reallocate(void)
     TEST_POINTERS_EQUAL(slice.data, buffer.data);
 }
 
-static void test_jsl_strip_whitespace_left(void)
+void test_jsl_strip_whitespace_left(void)
 {
     {
         JSLImmutableMemory empty = {0};
@@ -318,7 +318,7 @@ static void test_jsl_strip_whitespace_left(void)
     }
 }
 
-static void test_jsl_strip_whitespace_right(void)
+void test_jsl_strip_whitespace_right(void)
 {
     {
         JSLImmutableMemory empty = {0};
@@ -364,7 +364,7 @@ static void test_jsl_strip_whitespace_right(void)
     }
 }
 
-static void test_jsl_strip_whitespace(void)
+void test_jsl_strip_whitespace(void)
 {
     {
         JSLImmutableMemory empty = {0};
@@ -410,7 +410,7 @@ static void test_jsl_strip_whitespace(void)
     }
 }
 
-static void test_jsl_substring_search(void)
+void test_jsl_substring_search(void)
 {
     {
         JSLImmutableMemory string = JSL_CSTR_INITIALIZER("");
@@ -548,7 +548,7 @@ static void test_jsl_substring_search(void)
     }
 }
 
-static void test_jsl_index_of(void)
+void test_jsl_index_of(void)
 {
     JSLImmutableMemory buffer1 = JSL_CSTR_INITIALIZER("");
     int64_t res1 = jsl_index_of(buffer1, '3');
@@ -583,7 +583,7 @@ static void test_jsl_index_of(void)
     TEST_INT64_EQUAL(res8, 117);
 }
 
-static void test_jsl_index_of_reverse(void)
+void test_jsl_index_of_reverse(void)
 {
     JSLImmutableMemory buffer1 = JSL_CSTR_INITIALIZER("");
     int64_t res1 = jsl_index_of_reverse(buffer1, '3');
@@ -618,7 +618,7 @@ static void test_jsl_index_of_reverse(void)
     TEST_INT64_EQUAL(res8, 150);
 }
 
-static void test_jsl_get_file_extension(void)
+void test_jsl_get_file_extension(void)
 {
     JSLImmutableMemory buffer1 = JSL_CSTR_INITIALIZER("");
     JSLImmutableMemory res1 = jsl_get_file_extension(buffer1);
@@ -645,7 +645,7 @@ static void test_jsl_get_file_extension(void)
     TEST_BOOL(jsl_memory_cstr_compare(res6, "css"));
 }
 
-static void test_jsl_to_lowercase_ascii(void)
+void test_jsl_to_lowercase_ascii(void)
 {
     uint8_t _stack_memory[JSL_KILOBYTES(4)];
 
@@ -741,7 +741,7 @@ static void test_jsl_to_lowercase_ascii(void)
     }
 }
 
-static void test_jsl_memory_to_i32(void)
+void test_jsl_memory_to_i32(void)
 {
     int32_t result = -9999;
 
@@ -844,7 +844,7 @@ static void test_jsl_memory_to_i32(void)
     TEST_INT32_EQUAL(result, -2147483647 - 1);
 }
 
-static void test_jsl_memory_to_u32(void)
+void test_jsl_memory_to_u32(void)
 {
     uint32_t result;
 
@@ -892,7 +892,7 @@ static void test_jsl_memory_to_u32(void)
     TEST_INT32_EQUAL(jsl_memory_to_u32(buffer11, &result), 0);
 }
 
-static void test_jsl_memory_to_u16(void)
+void test_jsl_memory_to_u16(void)
 {
     uint16_t result;
 
@@ -940,7 +940,7 @@ static void test_jsl_memory_to_u16(void)
     TEST_INT32_EQUAL(jsl_memory_to_u16(buffer11, &result), 0);
 }
 
-static void test_jsl_starts_with(void)
+void test_jsl_starts_with(void)
 {
     JSLImmutableMemory buffer1 = JSL_CSTR_INITIALIZER("Hello, World!");
     JSLImmutableMemory prefix1 = JSL_CSTR_INITIALIZER("Hello, World!");
@@ -975,7 +975,7 @@ static void test_jsl_starts_with(void)
     TEST_BOOL(jsl_starts_with(buffer8, prefix8));
 }
 
-static void test_jsl_ends_with(void)
+void test_jsl_ends_with(void)
 {
     JSLImmutableMemory buffer1 = JSL_CSTR_INITIALIZER("Hello, World!");
     JSLImmutableMemory postfix1 = JSL_CSTR_INITIALIZER("Hello, World!");
@@ -1013,7 +1013,7 @@ static void test_jsl_ends_with(void)
     TEST_BOOL(jsl_ends_with(medium_str, postfix9));
 }
 
-static void test_jsl_compare_ascii_insensitive(void)
+void test_jsl_compare_ascii_insensitive(void)
 {
     {
         JSLImmutableMemory buffer1 = {
@@ -1090,7 +1090,7 @@ static void test_jsl_compare_ascii_insensitive(void)
     }
 }
 
-static void test_jsl_count(void)
+void test_jsl_count(void)
 {
     {
         JSLImmutableMemory buffer = JSL_CSTR_INITIALIZER("");
@@ -1143,7 +1143,7 @@ static void test_jsl_count(void)
     }
 }
 
-static void test_jsl_to_cstr(void)
+void test_jsl_to_cstr(void)
 {
     JSLArena arena;
     jsl_arena_init(&arena, malloc(1024), 1024);
@@ -1171,34 +1171,4 @@ static void test_jsl_to_cstr(void)
         const char* cstr = jsl_memory_to_cstr(allocator, memory);
         TEST_BOOL(jsl_memory_cstr_compare(memory, cstr));
     }
-}
-
-int main(void)
-{
-    RUN_TEST_FUNCTION("Test jsl_cstr_to_memory", test_jsl_from_cstr);
-    RUN_TEST_FUNCTION("Test jsl_cstr_memory_copy", test_jsl_cstr_memory_copy);
-    RUN_TEST_FUNCTION("Test jsl_memory_compare", test_jsl_memory_compare);
-    RUN_TEST_FUNCTION("Test jsl_slice", test_jsl_slice);
-    RUN_TEST_FUNCTION("Test jsl_total_write_length", test_jsl_total_write_length);
-    RUN_TEST_FUNCTION("Test jsl_auto_slice", test_jsl_auto_slice);
-    RUN_TEST_FUNCTION("Test jsl_auto_slice_arena_reallocate", test_jsl_auto_slice_arena_reallocate);
-    RUN_TEST_FUNCTION("Test jsl_strip_whitespace_left", test_jsl_strip_whitespace_left);
-    RUN_TEST_FUNCTION("Test jsl_strip_whitespace_right", test_jsl_strip_whitespace_right);
-    RUN_TEST_FUNCTION("Test jsl_strip_whitespace", test_jsl_strip_whitespace);
-    RUN_TEST_FUNCTION("Test jsl_index_of", test_jsl_index_of);
-    RUN_TEST_FUNCTION("Test jsl_index_of_reverse", test_jsl_index_of_reverse);
-    RUN_TEST_FUNCTION("Test jsl_to_lowercase_ascii", test_jsl_to_lowercase_ascii);
-    RUN_TEST_FUNCTION("Test jsl_memory_to_i32", test_jsl_memory_to_i32);
-    RUN_TEST_FUNCTION("Test jsl_memory_to_u32", test_jsl_memory_to_u32);
-    RUN_TEST_FUNCTION("Test jsl_memory_to_u16", test_jsl_memory_to_u16);
-    RUN_TEST_FUNCTION("Test jsl_substring_search", test_jsl_substring_search);
-    RUN_TEST_FUNCTION("Test jsl_starts_with", test_jsl_starts_with);
-    RUN_TEST_FUNCTION("Test jsl_ends_with", test_jsl_ends_with);
-    RUN_TEST_FUNCTION("Test jsl_compare_ascii_insensitive", test_jsl_compare_ascii_insensitive);
-    RUN_TEST_FUNCTION("Test jsl_count", test_jsl_count);
-    RUN_TEST_FUNCTION("Test jsl_memory_to_cstr", test_jsl_to_cstr);
-    RUN_TEST_FUNCTION("Test jsl_get_file_extension", test_jsl_get_file_extension);
-
-    TEST_RESULTS();
-    return lfails != 0;
 }

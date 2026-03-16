@@ -89,7 +89,7 @@ static bool comp3_equal(const CompositeType3* lhs, const CompositeType3* rhs)
     return memcmp(lhs, rhs, sizeof(CompositeType3)) == 0;
 }
 
-static void test_dynamic_array_init_success(void)
+void test_dynamic_array_init_success(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -161,7 +161,7 @@ static void test_dynamic_array_init_success(void)
     jsl_allocator_interface_free_all(allocator);
 }
 
-static void test_dynamic_array_init_invalid_args(void)
+void test_dynamic_array_init_invalid_args(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -192,7 +192,7 @@ static void test_dynamic_array_init_invalid_args(void)
     }
 }
 
-static void test_dynamic_array_insert_appends_and_grows(void)
+void test_dynamic_array_insert_appends_and_grows(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -289,7 +289,7 @@ static void test_dynamic_array_insert_appends_and_grows(void)
     jsl_allocator_interface_free_all(allocator);
 }
 
-static void test_dynamic_array_insert_at_inserts_and_shifts(void)
+void test_dynamic_array_insert_at_inserts_and_shifts(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -433,7 +433,7 @@ static void test_dynamic_array_insert_at_inserts_and_shifts(void)
     jsl_allocator_interface_free_all(allocator);
 }
 
-static void test_dynamic_array_delete_at_removes_and_shifts(void)
+void test_dynamic_array_delete_at_removes_and_shifts(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -594,7 +594,7 @@ static void test_dynamic_array_delete_at_removes_and_shifts(void)
     jsl_allocator_interface_free_all(allocator);
 }
 
-static void test_dynamic_array_clear_resets_length(void)
+void test_dynamic_array_clear_resets_length(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -685,7 +685,7 @@ static void test_dynamic_array_clear_resets_length(void)
     jsl_allocator_interface_free_all(allocator);
 }
 
-static void test_dynamic_array_checks_sentinel(void)
+void test_dynamic_array_checks_sentinel(void)
 {
     JSLAllocatorInterface allocator;
     jsl_arena_get_allocator_interface(&allocator, &global_arena);
@@ -707,39 +707,4 @@ static void test_dynamic_array_checks_sentinel(void)
     TEST_INT64_EQUAL(array.length, (int64_t) 5);
 
     jsl_arena_reset(&global_arena);
-}
-
-int main(void)
-{
-    // Windows programs that crash can lose all of the terminal output.
-    // Set the buffer to zero to auto flush on output.
-    #if JSL_IS_WINDOWS
-        setvbuf(stdout, NULL, _IONBF, 0);
-    #endif
-
-    jsl_arena_init(&global_arena, malloc(arena_size), arena_size);
-
-    RUN_TEST_FUNCTION("Test dynamic array init success", test_dynamic_array_init_success);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("Test dynamic array init invalid args", test_dynamic_array_init_invalid_args);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("Test dynamic array insert", test_dynamic_array_insert_appends_and_grows);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("Test dynamic array insert at", test_dynamic_array_insert_at_inserts_and_shifts);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("Test dynamic array delete at", test_dynamic_array_delete_at_removes_and_shifts);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("Test dynamic array clear", test_dynamic_array_clear_resets_length);
-    jsl_arena_reset(&global_arena);
-
-    RUN_TEST_FUNCTION("Test dynamic array sentinel checks", test_dynamic_array_checks_sentinel);
-    jsl_arena_reset(&global_arena);
-
-    TEST_RESULTS();
-    return lfails != 0;
 }
