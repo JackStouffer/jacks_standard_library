@@ -529,27 +529,18 @@ int64_t jsl_write_to_c_file(FILE* out, JSLImmutableMemory data)
         return -errno;
 }
 
-static int64_t jsl__c_file_sink_out(void* user, JSLImmutableMemory data)
+static void jsl__c_file_sink_out(void* user, JSLImmutableMemory data)
 {
     FILE* file = (FILE*) user;
     if (file == NULL)
-        return false;
+        return;
 
-    int64_t written = (int64_t) fwrite(
+    fwrite(
         data.data,
         sizeof(uint8_t),
         (size_t) data.length,
         file
     );
-
-    int32_t err_res = ferror(file);
-
-    JSL_DEBUG_DONT_OPTIMIZE_AWAY(err_res);
-
-    if (err_res == 0)
-        return written;
-    else
-        return -errno;
 }
 
 JSLOutputSink jsl_c_file_output_sink(FILE* out)

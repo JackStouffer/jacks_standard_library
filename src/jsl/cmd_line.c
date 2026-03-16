@@ -1697,7 +1697,7 @@ void jsl_cmd_line_style_with_foreground_and_background(
     style->_style_attributes = style_flags;
 }
 
-static int64_t jsl__cmd_line_write_color(
+static void jsl__cmd_line_write_color(
     JSLOutputSink sink,
     int32_t output_mode,
     JSLCmdLineColor* color,
@@ -1711,7 +1711,7 @@ static int64_t jsl__cmd_line_write_color(
     static const JSLImmutableMemory bg_rgb_fmt = JSL_CSTR_INITIALIZER("\x1b[48;2;%d;%d;%dm");
 
     if (color->_color_type == JSL__CMD_LINE_COLOR_DEFAULT)
-        return 0;
+        return;
 
     int32_t terminal_color_type = JSL__CMD_LINE_COLOR_DEFAULT;
     switch (output_mode)
@@ -1726,7 +1726,7 @@ static int64_t jsl__cmd_line_write_color(
             terminal_color_type = JSL__CMD_LINE_COLOR_RGB;
             break;
         default:
-            return 0;
+            return;
     }
 
     JSLCmdLineColor output_color;
@@ -1768,55 +1768,54 @@ static int64_t jsl__cmd_line_write_color(
                 code = (is_foreground ? 90 : 100) + (output_color._ansi16 - 8);
             }
 
-            return jsl_format_sink(
+            jsl_format_sink(
                 sink,
                 ansi16_fmt,
                 code
             );
+            break;
         }
         case JSL__CMD_LINE_COLOR_ANSI256:
         {
             JSLImmutableMemory fmt = is_foreground ? fg_256_fmt : bg_256_fmt;
-            return jsl_format_sink(
+            jsl_format_sink(
                 sink,
                 fmt,
                 (int32_t) output_color._ansi256
             );
+            break;
         }
         case JSL__CMD_LINE_COLOR_RGB:
         {
             JSLImmutableMemory fmt = is_foreground ? fg_rgb_fmt : bg_rgb_fmt;
-            return jsl_format_sink(
+            jsl_format_sink(
                 sink,
                 fmt,
                 (int32_t) output_color._rgb._r,
                 (int32_t) output_color._rgb._g,
                 (int32_t) output_color._rgb._b
             );
+            break;
         }
 
         case JSL__CMD_LINE_COLOR_DEFAULT:
+            break;
         default:
             break;
     }
-
-    return 0;
 }
 
-int64_t jsl_cmd_line_write_style(JSLOutputSink sink, JSLTerminalInfo* terminal_info, JSLCmdLineStyle* style)
+void jsl_cmd_line_write_style(JSLOutputSink sink, JSLTerminalInfo* terminal_info, JSLCmdLineStyle* style)
 {
     if (
         terminal_info == NULL
         || style == NULL
         || terminal_info->_output_mode == JSL__CMD_LINE_OUTPUT_MODE_INVALID_STATE
     )
-        return -1;
+        return;
     
     if (terminal_info->_output_mode == JSL__CMD_LINE_OUTPUT_MODE_NONE)
-        return 0;
-
-    int64_t bytes_written = 0;
-    int64_t result = 0;
+        return;
 
     static const JSLImmutableMemory bold_code = JSL_CSTR_INITIALIZER("\x1b[1m");
     static const JSLImmutableMemory dim_code = JSL_CSTR_INITIALIZER("\x1b[2m");
@@ -1832,110 +1831,61 @@ int64_t jsl_cmd_line_write_style(JSLOutputSink sink, JSLTerminalInfo* terminal_i
     uint32_t attributes = style->_style_attributes;
 
     if (JSL_IS_BITFLAG_SET(attributes, JSL_CMD_LINE_STYLE_BOLD))
-    {
-        result = jsl_output_sink_write(sink, bold_code);
-        if (result < 0) return -1;
-        bytes_written += result;
-    }
+        jsl_output_sink_write(sink, bold_code);
 
     if (JSL_IS_BITFLAG_SET(attributes, JSL_CMD_LINE_STYLE_DIM))
-    {
-        result = jsl_output_sink_write(sink, dim_code);
-        if (result < 0) return -1;
-        bytes_written += result;
-    }
+        jsl_output_sink_write(sink, dim_code);
 
     if (JSL_IS_BITFLAG_SET(attributes, JSL_CMD_LINE_STYLE_ITALIC))
-    {
-        result = jsl_output_sink_write(sink, italic_code);
-        if (result < 0) return -1;
-        bytes_written += result;
-    }
+        jsl_output_sink_write(sink, italic_code);
 
     if (JSL_IS_BITFLAG_SET(attributes, JSL_CMD_LINE_STYLE_UNDERLINE))
-    {
-        result = jsl_output_sink_write(sink, underline_code);
-        if (result < 0) return -1;
-        bytes_written += result;
-    }
+        jsl_output_sink_write(sink, underline_code);
 
     if (JSL_IS_BITFLAG_SET(attributes, JSL_CMD_LINE_STYLE_DUNDERLINE))
-    {
-        result = jsl_output_sink_write(sink, dunderline_code);
-        if (result < 0) return -1;
-        bytes_written += result;
-    }
+        jsl_output_sink_write(sink, dunderline_code);
 
     if (JSL_IS_BITFLAG_SET(attributes, JSL_CMD_LINE_STYLE_BLINK))
-    {
-        result = jsl_output_sink_write(sink, blink_code);
-        if (result < 0) return -1;
-        bytes_written += result;
-    }
+        jsl_output_sink_write(sink, blink_code);
 
     if (JSL_IS_BITFLAG_SET(attributes, JSL_CMD_LINE_STYLE_RBLINK))
-    {
-        result = jsl_output_sink_write(sink, rblink_code);
-        if (result < 0) return -1;
-        bytes_written += result;
-    }
+        jsl_output_sink_write(sink, rblink_code);
 
     if (JSL_IS_BITFLAG_SET(attributes, JSL_CMD_LINE_STYLE_INVERSE))
-    {
-        result = jsl_output_sink_write(sink, inverse_code);
-        if (result < 0) return -1;
-        bytes_written += result;
-    }
+        jsl_output_sink_write(sink, inverse_code);
 
     if (JSL_IS_BITFLAG_SET(attributes, JSL_CMD_LINE_STYLE_HIDDEN))
-    {
-        result = jsl_output_sink_write(sink, hidden_code);
-        if (result < 0) return -1;
-        bytes_written += result;
-    }
+        jsl_output_sink_write(sink, hidden_code);
 
     if (JSL_IS_BITFLAG_SET(attributes, JSL_CMD_LINE_STYLE_STRIKE))
-    {
-        result = jsl_output_sink_write(sink, strike_code);
-        if (result < 0) return -1;
-        bytes_written += result;
-    }
+        jsl_output_sink_write(sink, strike_code);
 
-    result = jsl__cmd_line_write_color(
+    jsl__cmd_line_write_color(
         sink,
         terminal_info->_output_mode,
         &style->_foreground,
         true
     );
-    if (result < 0) return -1;
-    bytes_written += result;
-
-    result = jsl__cmd_line_write_color(
+    jsl__cmd_line_write_color(
         sink,
         terminal_info->_output_mode,
         &style->_background,
         false
     );
-    if (result < 0) return -1;
-    bytes_written += result;
-
-    return bytes_written;
 }
 
-int64_t jsl_cmd_line_write_reset(JSLOutputSink sink, JSLTerminalInfo* terminal_info)
+void jsl_cmd_line_write_reset(JSLOutputSink sink, JSLTerminalInfo* terminal_info)
 {
     if (terminal_info == NULL || terminal_info->_output_mode == JSL__CMD_LINE_OUTPUT_MODE_INVALID_STATE)
-        return -1;
+        return;
 
     if (terminal_info->_output_mode == JSL__CMD_LINE_OUTPUT_MODE_ANSI16
         || terminal_info->_output_mode == JSL__CMD_LINE_OUTPUT_MODE_ANSI256
         || terminal_info->_output_mode == JSL__CMD_LINE_OUTPUT_MODE_TRUECOLOR)
     {
         static JSLImmutableMemory reset_code = JSL_CSTR_INITIALIZER("\x1b[0m");
-        return jsl_output_sink_write(sink, reset_code);
+        jsl_output_sink_write(sink, reset_code);
     }
-
-    return 0;
 }
 
 bool jsl_cmd_line_args_init(JSLCmdLineArgs* cmd_args, JSLAllocatorInterface allocator)

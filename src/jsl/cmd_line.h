@@ -344,9 +344,8 @@ void jsl_cmd_line_style_with_foreground_and_background(
  * @param sink Where to send the ANSI escape codes
  * @param terminal_info Information about the current terminal environment so this knows what codes to send
  * @param style The style to write
- * @returns The number of bytes written to the sink, or -1 if there was an error in the sink
  */
-int64_t jsl_cmd_line_write_style(JSLOutputSink sink, JSLTerminalInfo* terminal_info, JSLCmdLineStyle* style);
+void jsl_cmd_line_write_style(JSLOutputSink sink, JSLTerminalInfo* terminal_info, JSLCmdLineStyle* style);
 
 /**
  * Reset all styling by sending the reset ANSI escape code to the given output sink
@@ -383,9 +382,8 @@ int64_t jsl_cmd_line_write_style(JSLOutputSink sink, JSLTerminalInfo* terminal_i
  * 
  * @param sink Where to send the ANSI reset escape code
  * @param terminal_info Information about the current terminal environment so this knows what codes to send
- * @returns The number of bytes written to the sink, or -1 if there was an error in the sink
  */
-int64_t jsl_cmd_line_write_reset(JSLOutputSink sink, JSLTerminalInfo* terminal_info);
+void jsl_cmd_line_write_reset(JSLOutputSink sink, JSLTerminalInfo* terminal_info);
 
 /**
  * This file provides all of the functionality you should need to parse command line

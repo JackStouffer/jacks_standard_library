@@ -1138,12 +1138,11 @@ JSLImmutableMemory jsl_duplicate(JSLAllocatorInterface allocator, JSLImmutableMe
     return res;
 }
 
-int64_t jsl_to_lowercase_ascii(JSLOutputSink sink, JSLImmutableMemory str)
+void jsl_to_lowercase_ascii(JSLOutputSink sink, JSLImmutableMemory str)
 {
     if (str.data == NULL || str.length < 1)
-        return -1;
+        return;
 
-    int64_t res = 0;
     // small chunked buffer before writing to the output sink
     uint8_t buf[64];
     int64_t buf_len = 0;
@@ -1160,10 +1159,7 @@ int64_t jsl_to_lowercase_ascii(JSLOutputSink sink, JSLImmutableMemory str)
         if (buf_len == 64)
         {
             JSLImmutableMemory chunk = {buf, buf_len};
-            int64_t sink_res = jsl_output_sink_write(sink, chunk);
-            if (sink_res < 0)
-                return sink_res;
-            res += sink_res;
+            jsl_output_sink_write(sink, chunk);
             buf_len = 0;
         }
     }
@@ -1171,13 +1167,8 @@ int64_t jsl_to_lowercase_ascii(JSLOutputSink sink, JSLImmutableMemory str)
     if (buf_len > 0)
     {
         JSLImmutableMemory chunk = {buf, buf_len};
-        int64_t sink_res = jsl_output_sink_write(sink, chunk);
-        if (sink_res < 0)
-            return sink_res;
-        res += sink_res;
+        jsl_output_sink_write(sink, chunk);
     }
-
-    return res;
 }
 
 static inline uint8_t jsl__ascii_to_lower(uint8_t ch)
@@ -1459,11 +1450,10 @@ int64_t jsl_strip_whitespace(JSLImmutableMemory* str)
     return bytes_read;
 }
 
-static int64_t jsl__memory_output_sink_write(void *user, JSLImmutableMemory data)
+static void jsl__memory_output_sink_write(void *user, JSLImmutableMemory data)
 {
     JSLMutableMemory* buffer = (JSLMutableMemory*) user;
-    int64_t bytes_written_to_sink = jsl_memory_copy(buffer, data);
-    return bytes_written_to_sink < 1 ? -1 : bytes_written_to_sink;
+    (void) jsl_memory_copy(buffer, data);
 }
 
 JSLOutputSink jsl_memory_output_sink(JSLMutableMemory* buffer)
@@ -1620,14 +1610,14 @@ static JSL__ASAN_OFF uint32_t jsl__strlen_limited(char const *string, uint32_t l
     return (uint32_t)(source_ptr - string);
 }
 
-JSL__ASAN_OFF int64_t jsl_format_sink_valist(
+JSL__ASAN_OFF void jsl_format_sink_valist(
     JSLOutputSink sink,
     JSLImmutableMemory fmt,
     va_list va
 )
 {
     if (sink.write_fp == NULL || fmt.data == NULL || fmt.length < 0)
-        return -1;
+        return;
 
     static char hex[] = "0123456789abcdefxp";
     static char hexu[] = "0123456789ABCDEFXP";
@@ -1635,7 +1625,6 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
 
     JSLImmutableMemory f = fmt;
     int64_t bytes_written_to_sink = 0;
-    int64_t sink_err_res = 0;
 
     #if defined(__AVX2__)
         const __m256i percent_wide = _mm256_set1_epi8('%');
@@ -1651,18 +1640,12 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
         // write a block of bytes directly to the sink
         #define WRITE_TO_SINK(ptr, len)                                                     \
             {                                                                               \
-                int64_t wts_len = (int64_t)(len);                                           \
+                int64_t wts_len = (int64_t) (len);                                            \
                 if (wts_len > 0)                                                            \
                 {                                                                           \
                     JSLImmutableMemory wts_data = { (const uint8_t*)(ptr), wts_len };       \
-                    int64_t wts_res = sink.write_fp(sink.user_data, wts_data);              \
-                    if (wts_res > -1)                                                       \
-                        bytes_written_to_sink += wts_res;                                   \
-                    else                                                                    \
-                    {                                                                       \
-                        sink_err_res = wts_res;                                             \
-                        goto L_DONE;                                                        \
-                    }                                                                       \
+                    sink.write_fp(sink.user_data, wts_data);                                \
+                    bytes_written_to_sink += wts_len;                                       \
                 }                                                                           \
             }
 
@@ -2658,10 +2641,8 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
         JSL_MEMORY_ADVANCE(f, 1);
     }
 
-
     L_END_FORMAT:
-    L_DONE:
-    return sink_err_res < 0 ? sink_err_res : bytes_written_to_sink;
+    return;
 }
 
 // cleanup
@@ -2681,7 +2662,7 @@ JSL__ASAN_OFF int64_t jsl_format_sink_valist(
 // ============================================================================
 //   wrapper functions
 
-JSL__ASAN_OFF int64_t jsl_format_sink(
+JSL__ASAN_OFF void jsl_format_sink(
     JSLOutputSink sink,
     JSLImmutableMemory fmt,
     ...
@@ -2690,11 +2671,9 @@ JSL__ASAN_OFF int64_t jsl_format_sink(
     va_list va;
     va_start(va, fmt);
 
-    int64_t result = jsl_format_sink_valist(sink, fmt, va);
+    jsl_format_sink_valist(sink, fmt, va);
 
     va_end(va);
-
-    return result;
 }
 
 struct JSL__FormatAllocatorContext
@@ -2702,11 +2681,16 @@ struct JSL__FormatAllocatorContext
     JSLAllocatorInterface allocator;
     void* current_allocation;
     int64_t current_allocation_length;
+    int64_t written_bytes;
+    bool had_error_so_give_up;
 };
 
-static int64_t jsl__format_allocator_callback(void *user, JSLImmutableMemory data)
+static void jsl__format_to_sink_with_allocator(void *user, JSLImmutableMemory data)
 {
     struct JSL__FormatAllocatorContext* context = (struct JSL__FormatAllocatorContext*) user;
+    if (context->had_error_so_give_up)
+        return;
+
     int64_t old_length = context->current_allocation_length;
     int64_t new_length = context->current_allocation_length + data.length;
 
@@ -2717,7 +2701,10 @@ static int64_t jsl__format_allocator_callback(void *user, JSLImmutableMemory dat
         JSL_DEFAULT_ALLOCATION_ALIGNMENT
     );
     if (context->current_allocation == NULL)
-        return -1;
+    {
+        context->had_error_so_give_up = true;
+        return;
+    }
 
     JSL_MEMCPY(
         ((uint8_t*) context->current_allocation) + old_length,
@@ -2726,8 +2713,7 @@ static int64_t jsl__format_allocator_callback(void *user, JSLImmutableMemory dat
     );
 
     context->current_allocation_length = new_length;
-
-    return data.length;
+    context->written_bytes += data.length;
 }
 
 JSL__ASAN_OFF JSLImmutableMemory jsl_format(JSLAllocatorInterface allocator, JSLImmutableMemory fmt, ...)
@@ -2737,16 +2723,14 @@ JSL__ASAN_OFF JSLImmutableMemory jsl_format(JSLAllocatorInterface allocator, JSL
     va_list va;
     va_start(va, fmt);
 
-    struct JSL__FormatAllocatorContext context;
+    struct JSL__FormatAllocatorContext context = {0};
     context.allocator = allocator;
-    context.current_allocation = NULL;
-    context.current_allocation_length = 0;
 
     JSLOutputSink sink;
-    sink.write_fp = jsl__format_allocator_callback;
+    sink.write_fp = jsl__format_to_sink_with_allocator;
     sink.user_data = &context;
 
-    int64_t write_length = jsl_format_sink_valist(
+    jsl_format_sink_valist(
         sink,
         fmt,
         va
@@ -2754,10 +2738,10 @@ JSL__ASAN_OFF JSLImmutableMemory jsl_format(JSLAllocatorInterface allocator, JSL
 
     va_end(va);
 
-    if (context.current_allocation != NULL && write_length > 0)
+    if (context.current_allocation != NULL && context.written_bytes > 0)
     {
         ret.data = context.current_allocation;
-        ret.length = write_length;
+        ret.length = context.written_bytes;
     }
 
     return ret;

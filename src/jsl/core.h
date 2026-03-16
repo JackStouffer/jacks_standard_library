@@ -1342,7 +1342,7 @@ typedef struct JSLMutableMemory
  * 
  * Also flushing and/or closing the sink once its lifetime is over is also your responsibilty
  */
-typedef int64_t (*JSLOutputSinkWriteFP)(void* user, JSLImmutableMemory data);
+typedef void (*JSLOutputSinkWriteFP)(void* user, JSLImmutableMemory data);
 
 /**
  * An output sink is an abstraction designed to allow arbitrary data generating processes
@@ -1846,7 +1846,7 @@ JSL_DEF bool jsl_compare_ascii_insensitive(JSLImmutableMemory a, JSLImmutableMem
  * Modify the ASCII data in the memory in place to change all capital letters to
  * lowercase. ASCII validity is not checked.
  */
-JSL_DEF int64_t jsl_to_lowercase_ascii(JSLOutputSink sink, JSLImmutableMemory str);
+JSL_DEF void jsl_to_lowercase_ascii(JSLOutputSink sink, JSLImmutableMemory str);
 
 // TODO: docs
 typedef enum JSLConversionErrors {
@@ -2109,12 +2109,26 @@ static inline JSLImmutableMemory jsl_take_memory(JSLImmutableMemory* data, int64
 /**
  * TODO: docs
  *
- * one line convenience function
+ * convenience function
  */
-static inline int64_t jsl_output_sink_write(JSLOutputSink sink, JSLImmutableMemory data)
+static inline void jsl_output_sink_write(JSLOutputSink sink, JSLImmutableMemory data)
 {
-    if (sink.write_fp == NULL) return -1;
-    return sink.write_fp(sink.user_data, data);
+    if (JSL__LIKELY(sink.write_fp != NULL))
+    {
+        sink.write_fp(sink.user_data, data);
+    }
+}
+
+/**
+ * TODO: docs, convenience function 
+ */
+static inline void jsl_output_sink_write_bool(JSLOutputSink sink, bool data)
+{
+    if (sink.write_fp != NULL)
+    {
+        JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(bool)};
+        sink.write_fp(sink.user_data, fp);
+    }
 }
 
 /**
@@ -2122,10 +2136,13 @@ static inline int64_t jsl_output_sink_write(JSLOutputSink sink, JSLImmutableMemo
  * 
  * one line convenience function 
  */
-static inline int64_t jsl_output_sink_write_i8(JSLOutputSink sink, int8_t data)
+static inline void jsl_output_sink_write_i8(JSLOutputSink sink, int8_t data)
 {
-    JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(int8_t)};
-    return jsl_output_sink_write(sink, fp);
+    if (sink.write_fp != NULL)
+    {
+        JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(int8_t)};
+        sink.write_fp(sink.user_data, fp);
+    }
 }
 
 /**
@@ -2133,10 +2150,13 @@ static inline int64_t jsl_output_sink_write_i8(JSLOutputSink sink, int8_t data)
  * 
  * one line convenience function 
  */
-static inline int64_t jsl_output_sink_write_u8(JSLOutputSink sink, uint8_t data)
+static inline void jsl_output_sink_write_u8(JSLOutputSink sink, uint8_t data)
 {
-    JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(uint8_t)};
-    return jsl_output_sink_write(sink, fp);
+    if (sink.write_fp != NULL)
+    {
+        JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(uint8_t)};
+        sink.write_fp(sink.user_data, fp);
+    }
 }
 
 /**
@@ -2144,9 +2164,13 @@ static inline int64_t jsl_output_sink_write_u8(JSLOutputSink sink, uint8_t data)
  * 
  * one line convenience function 
  */
-static inline int64_t jsl_output_sink_write_bool(JSLOutputSink sink, bool data)
+static inline void jsl_output_sink_write_i16(JSLOutputSink sink, int16_t data)
 {
-    return jsl_output_sink_write_u8(sink, data);
+    if (sink.write_fp != NULL)
+    {
+        JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(int16_t)};
+        sink.write_fp(sink.user_data, fp);
+    }
 }
 
 /**
@@ -2154,10 +2178,13 @@ static inline int64_t jsl_output_sink_write_bool(JSLOutputSink sink, bool data)
  * 
  * one line convenience function 
  */
-static inline int64_t jsl_output_sink_write_i16(JSLOutputSink sink, int16_t data)
+static inline void jsl_output_sink_write_u16(JSLOutputSink sink, uint16_t data)
 {
-    JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(int16_t)};
-    return jsl_output_sink_write(sink, fp);
+    if (sink.write_fp != NULL)
+    {
+        JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(uint16_t)};
+        sink.write_fp(sink.user_data, fp);
+    }
 }
 
 /**
@@ -2165,10 +2192,13 @@ static inline int64_t jsl_output_sink_write_i16(JSLOutputSink sink, int16_t data
  * 
  * one line convenience function 
  */
-static inline int64_t jsl_output_sink_write_u16(JSLOutputSink sink, uint16_t data)
+static inline void jsl_output_sink_write_i32(JSLOutputSink sink, int32_t data)
 {
-    JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(uint16_t)};
-    return jsl_output_sink_write(sink, fp);
+    if (sink.write_fp != NULL)
+    {
+        JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(int32_t)};
+        sink.write_fp(sink.user_data, fp);
+    }
 }
 
 /**
@@ -2176,10 +2206,13 @@ static inline int64_t jsl_output_sink_write_u16(JSLOutputSink sink, uint16_t dat
  * 
  * one line convenience function 
  */
-static inline int64_t jsl_output_sink_write_i32(JSLOutputSink sink, int32_t data)
+static inline void jsl_output_sink_write_u32(JSLOutputSink sink, uint32_t data)
 {
-    JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(int32_t)};
-    return jsl_output_sink_write(sink, fp);
+    if (sink.write_fp != NULL)
+    {
+        JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(uint32_t)};
+        sink.write_fp(sink.user_data, fp);
+    }
 }
 
 /**
@@ -2187,10 +2220,13 @@ static inline int64_t jsl_output_sink_write_i32(JSLOutputSink sink, int32_t data
  * 
  * one line convenience function 
  */
-static inline int64_t jsl_output_sink_write_u32(JSLOutputSink sink, uint32_t data)
+static inline void jsl_output_sink_write_i64(JSLOutputSink sink, int64_t data)
 {
-    JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(uint32_t)};
-    return jsl_output_sink_write(sink, fp);
+    if (sink.write_fp != NULL)
+    {
+        JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(int64_t)};
+        sink.write_fp(sink.user_data, fp);
+    }
 }
 
 /**
@@ -2198,10 +2234,13 @@ static inline int64_t jsl_output_sink_write_u32(JSLOutputSink sink, uint32_t dat
  * 
  * one line convenience function 
  */
-static inline int64_t jsl_output_sink_write_i64(JSLOutputSink sink, int64_t data)
+static inline void jsl_output_sink_write_u64(JSLOutputSink sink, uint64_t data)
 {
-    JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(int64_t)};
-    return jsl_output_sink_write(sink, fp);
+    if (sink.write_fp != NULL)
+    {
+        JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(uint64_t)};
+        sink.write_fp(sink.user_data, fp);
+    }
 }
 
 /**
@@ -2209,10 +2248,13 @@ static inline int64_t jsl_output_sink_write_i64(JSLOutputSink sink, int64_t data
  * 
  * one line convenience function 
  */
-static inline int64_t jsl_output_sink_write_u64(JSLOutputSink sink, uint64_t data)
+static inline void jsl_output_sink_write_f32(JSLOutputSink sink, float data)
 {
-    JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(uint64_t)};
-    return jsl_output_sink_write(sink, fp);
+    if (sink.write_fp != NULL)
+    {
+        JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(float)};
+        sink.write_fp(sink.user_data, fp);
+    }
 }
 
 /**
@@ -2220,10 +2262,13 @@ static inline int64_t jsl_output_sink_write_u64(JSLOutputSink sink, uint64_t dat
  * 
  * one line convenience function 
  */
-static inline int64_t jsl_output_sink_write_f32(JSLOutputSink sink, float data)
+static inline void jsl_output_sink_write_f64(JSLOutputSink sink, double data)
 {
-    JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(float)};
-    return jsl_output_sink_write(sink, fp);
+    if (sink.write_fp != NULL)
+    {
+        JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(double)};
+        sink.write_fp(sink.user_data, fp);
+    }
 }
 
 /**
@@ -2231,21 +2276,13 @@ static inline int64_t jsl_output_sink_write_f32(JSLOutputSink sink, float data)
  * 
  * one line convenience function 
  */
-static inline int64_t jsl_output_sink_write_f64(JSLOutputSink sink, double data)
+static inline void jsl_output_sink_write_cstr(JSLOutputSink sink, const char* data)
 {
-    JSLImmutableMemory fp = {(uint8_t*) &data, sizeof(double)};
-    return jsl_output_sink_write(sink, fp);
-}
-
-/**
- * TODO: docs
- * 
- * one line convenience function 
- */
-static inline int64_t jsl_output_sink_write_cstr(JSLOutputSink sink, const char* data)
-{
-    JSLImmutableMemory fp = jsl_cstr_to_memory(data);
-    return jsl_output_sink_write(sink, fp);
+    if (sink.write_fp != NULL)
+    {
+        JSLImmutableMemory fp = jsl_cstr_to_memory(data);
+        sink.write_fp(sink.user_data, fp);
+    }
 }
 
 /**
@@ -2319,7 +2356,7 @@ JSL_DEF JSLImmutableMemory jsl_format(JSLAllocatorInterface allocator, JSLImmuta
  * 
  * TODO: docs
  */
-JSL_DEF int64_t jsl_format_sink_valist(
+JSL_DEF void jsl_format_sink_valist(
    JSLOutputSink sink,
    JSLImmutableMemory fmt,
    va_list va
@@ -2330,7 +2367,7 @@ JSL_DEF int64_t jsl_format_sink_valist(
  * 
  * TODO: docs
  */
-JSL_DEF int64_t jsl_format_sink(
+JSL_DEF void jsl_format_sink(
    JSLOutputSink sink,
    JSLImmutableMemory fmt,
    ...

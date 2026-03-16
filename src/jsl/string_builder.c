@@ -218,9 +218,9 @@ bool jsl_string_builder_iterator_next(JSLStringBuilderIterator* iterator, JSLImm
     return true;
 }
 
-static int64_t jsl__format_string_builder_callback(void* user, JSLImmutableMemory data)
+static void jsl__format_string_builder_callback(void* user, JSLImmutableMemory data)
 {
-    return jsl_string_builder_insert_memory((JSLStringBuilder*) user, data);
+    jsl_string_builder_insert_memory((JSLStringBuilder*) user, data);
 }
 
 JSLOutputSink jsl_string_builder_output_sink(JSLStringBuilder* builder)
