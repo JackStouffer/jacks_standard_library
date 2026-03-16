@@ -32,6 +32,7 @@
 #include "jsl/allocator_arena.h"
 
 #include "minctest.h"
+#include "test_cmd_line.h"
 
 #define EXPECT_SINK_OUTPUT(expected_literal, bytes_written, buffer, writer) \
     do { \
@@ -42,7 +43,7 @@
         TEST_BUFFERS_EQUAL((buffer).data, (expected_literal), expected_len); \
     } while (0)
 
-static void test_short_flags_grouping(void)
+void test_short_flags_grouping(void)
 {
     uint8_t buffer[4096];
     JSLArena arena = JSL_ARENA_FROM_STACK(buffer);
@@ -83,7 +84,7 @@ static void test_short_flags_grouping(void)
     ));
 }
 
-static void test_short_flag_equals_is_invalid(void)
+void test_short_flag_equals_is_invalid(void)
 {
     uint8_t buffer[4096];
     JSLArena arena = JSL_ARENA_FROM_STACK(buffer);
@@ -106,7 +107,7 @@ static void test_short_flag_equals_is_invalid(void)
     TEST_BOOL(jsl_index_of(error, '=') >= 0);
 }
 
-static void test_long_flags_and_commands(void)
+void test_long_flags_and_commands(void)
 {
     uint8_t buffer[4096];
     JSLArena arena = JSL_ARENA_FROM_STACK(buffer);
@@ -159,7 +160,7 @@ static bool contains_value(JSLImmutableMemory* values, int32_t length, const cha
     return false;
 }
 
-static void test_long_values_equals_and_space(void)
+void test_long_values_equals_and_space(void)
 {
     uint8_t buffer[4096];
     JSLArena arena = JSL_ARENA_FROM_STACK(buffer);
@@ -208,7 +209,7 @@ static void test_long_values_equals_and_space(void)
     TEST_BOOL(!jsl_cmd_line_args_pop_arg_list(&cmd, &arg));
 }
 
-static void test_wide_parsing(void)
+void test_wide_parsing(void)
 {
     uint8_t buffer[4096];
     JSLArena arena = JSL_ARENA_FROM_STACK(buffer);
@@ -245,7 +246,7 @@ static void test_wide_parsing(void)
     TEST_BOOL(!jsl_cmd_line_args_has_command(&cmd, JSL_CSTR_EXPRESSION("alice")));
 }
 
-static void test_cmd_line_color_conversions(void)
+void test_cmd_line_color_conversions(void)
 {
     TEST_UINT32_EQUAL(jsl_cmd_line_rgb_to_ansi16(0, 0, 0), 0);
     TEST_UINT32_EQUAL(jsl_cmd_line_rgb_to_ansi16(255, 0, 0), 9);
@@ -263,7 +264,7 @@ static void test_cmd_line_color_conversions(void)
     TEST_UINT32_EQUAL(jsl_cmd_line_ansi256_to_ansi16(196), 9);
 }
 
-static void test_cmd_line_write_style_no_color(void)
+void test_cmd_line_write_style_no_color(void)
 {
     JSLTerminalInfo info = {0};
     TEST_BOOL(jsl_cmd_line_get_terminal_info(&info, JSL_GET_TERMINAL_INFO_FORCE_NO_COLOR));
@@ -288,7 +289,7 @@ static void test_cmd_line_write_style_no_color(void)
     EXPECT_SINK_OUTPUT("", result, buffer, reset_writer);
 }
 
-static void test_cmd_line_write_style_ansi16(void)
+void test_cmd_line_write_style_ansi16(void)
 {
     JSLTerminalInfo info = {0};
     TEST_BOOL(jsl_cmd_line_get_terminal_info(&info, JSL_GET_TERMINAL_INFO_FORCE_16_COLOR_MODE));
@@ -315,7 +316,7 @@ static void test_cmd_line_write_style_ansi16(void)
     EXPECT_SINK_OUTPUT("\x1b[1m\x1b[4m\x1b[9m\x1b[31m\x1b[104m", result, buffer, writer);
 }
 
-static void test_cmd_line_write_style_ansi16_converts_color_types(void)
+void test_cmd_line_write_style_ansi16_converts_color_types(void)
 {
     JSLTerminalInfo info = {0};
     TEST_BOOL(jsl_cmd_line_get_terminal_info(&info, JSL_GET_TERMINAL_INFO_FORCE_16_COLOR_MODE));
@@ -337,7 +338,7 @@ static void test_cmd_line_write_style_ansi16_converts_color_types(void)
     EXPECT_SINK_OUTPUT("\x1b[92m\x1b[101m", result, buffer, writer);
 }
 
-static void test_cmd_line_write_style_ansi256(void)
+void test_cmd_line_write_style_ansi256(void)
 {
     JSLTerminalInfo info = {0};
     TEST_BOOL(jsl_cmd_line_get_terminal_info(&info, JSL_GET_TERMINAL_INFO_FORCE_255_COLOR_MODE));
@@ -359,7 +360,7 @@ static void test_cmd_line_write_style_ansi256(void)
     EXPECT_SINK_OUTPUT("\x1b[2m\x1b[38;5;67m\x1b[43m", result, buffer, writer);
 }
 
-static void test_cmd_line_write_style_truecolor(void)
+void test_cmd_line_write_style_truecolor(void)
 {
     JSLTerminalInfo info = {0};
     TEST_BOOL(jsl_cmd_line_get_terminal_info(&info, JSL_GET_TERMINAL_INFO_FORCE_24_BIT_COLOR_MODE));
@@ -386,7 +387,7 @@ static void test_cmd_line_write_style_truecolor(void)
     EXPECT_SINK_OUTPUT("\x1b[3m\x1b[7m\x1b[38;2;12;34;56m\x1b[48;5;200m", result, buffer, writer);
 }
 
-static void test_cmd_line_write_style_and_reset_invalid(void)
+void test_cmd_line_write_style_and_reset_invalid(void)
 {
     JSLTerminalInfo info = {0};
     bool ok = jsl_cmd_line_get_terminal_info(
@@ -411,7 +412,7 @@ static void test_cmd_line_write_style_and_reset_invalid(void)
     EXPECT_SINK_OUTPUT("", 0, buffer, reset_writer);
 }
 
-static void test_cmd_line_write_reset_ansi_modes(void)
+void test_cmd_line_write_reset_ansi_modes(void)
 {
     JSLTerminalInfo info = {0};
     TEST_BOOL(jsl_cmd_line_get_terminal_info(&info, JSL_GET_TERMINAL_INFO_FORCE_16_COLOR_MODE));

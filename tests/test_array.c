@@ -32,17 +32,18 @@
 #include "jsl/core.h"
 #include "jsl/allocator.h"
 #include "jsl/allocator_arena.h"
+#include "jsl/allocator_infinite_arena.h"
 #include "jsl/str_to_str_map.h"
 
 #include "minctest.h"
+#include "test_array.h"
 #include "test_hash_map_types.h"
 #include "arrays/dynamic_int32_array.h"
 #include "arrays/dynamic_comp1_array.h"
 #include "arrays/dynamic_comp2_array.h"
 #include "arrays/dynamic_comp3_array.h"
 
-const int64_t arena_size = JSL_MEGABYTES(32);
-JSLArena global_arena;
+extern JSLInfiniteArena global_arena;
 
 static CompositeType1 make_comp1(int32_t a, int32_t b)
 {
@@ -92,7 +93,7 @@ static bool comp3_equal(const CompositeType3* lhs, const CompositeType3* rhs)
 void test_dynamic_array_init_success(void)
 {
     JSLAllocatorInterface allocator;
-    jsl_arena_get_allocator_interface(&allocator, &global_arena);
+    jsl_infinite_arena_get_allocator_interface(&allocator, &global_arena);
 
     jsl_allocator_interface_free_all(allocator);
 
@@ -164,7 +165,7 @@ void test_dynamic_array_init_success(void)
 void test_dynamic_array_init_invalid_args(void)
 {
     JSLAllocatorInterface allocator;
-    jsl_arena_get_allocator_interface(&allocator, &global_arena);
+    jsl_infinite_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(allocator);
 
     {
@@ -195,7 +196,7 @@ void test_dynamic_array_init_invalid_args(void)
 void test_dynamic_array_insert_appends_and_grows(void)
 {
     JSLAllocatorInterface allocator;
-    jsl_arena_get_allocator_interface(&allocator, &global_arena);
+    jsl_infinite_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(allocator);
 
     {
@@ -292,7 +293,7 @@ void test_dynamic_array_insert_appends_and_grows(void)
 void test_dynamic_array_insert_at_inserts_and_shifts(void)
 {
     JSLAllocatorInterface allocator;
-    jsl_arena_get_allocator_interface(&allocator, &global_arena);
+    jsl_infinite_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(allocator);
 
     {
@@ -436,7 +437,7 @@ void test_dynamic_array_insert_at_inserts_and_shifts(void)
 void test_dynamic_array_delete_at_removes_and_shifts(void)
 {
     JSLAllocatorInterface allocator;
-    jsl_arena_get_allocator_interface(&allocator, &global_arena);
+    jsl_infinite_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(allocator);
 
     {
@@ -597,7 +598,7 @@ void test_dynamic_array_delete_at_removes_and_shifts(void)
 void test_dynamic_array_clear_resets_length(void)
 {
     JSLAllocatorInterface allocator;
-    jsl_arena_get_allocator_interface(&allocator, &global_arena);
+    jsl_infinite_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(allocator);
 
     {
@@ -688,7 +689,7 @@ void test_dynamic_array_clear_resets_length(void)
 void test_dynamic_array_checks_sentinel(void)
 {
     JSLAllocatorInterface allocator;
-    jsl_arena_get_allocator_interface(&allocator, &global_arena);
+    jsl_infinite_arena_get_allocator_interface(&allocator, &global_arena);
     jsl_allocator_interface_free_all(allocator);
 
     DynamicInt32Array array = {0};
@@ -705,6 +706,4 @@ void test_dynamic_array_checks_sentinel(void)
     array.length = 5;
     dynamic_int32_array_clear(&array);
     TEST_INT64_EQUAL(array.length, (int64_t) 5);
-
-    jsl_arena_reset(&global_arena);
 }

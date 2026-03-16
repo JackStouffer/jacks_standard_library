@@ -1,0 +1,19 @@
+#ifndef TEST_STR_TO_STR_MULTIMAP_H
+#define TEST_STR_TO_STR_MULTIMAP_H
+
+void test_jsl_str_to_str_multimap_init_success(void);
+void test_jsl_str_to_str_multimap_init_invalid_arguments(void);
+void test_jsl_str_to_str_multimap_insert_and_get_value_count(void);
+void test_jsl_str_to_str_multimap_duplicate_values_allowed(void);
+void test_jsl_str_to_str_multimap_transient_lifetime_copies(void);
+void test_jsl_str_to_str_multimap_static_lifetime_no_copy(void);
+void test_jsl_str_to_str_multimap_key_value_iterator_covers_all_pairs(void);
+void test_jsl_str_to_str_multimap_get_key_iterator_filters_by_key(void);
+void test_jsl_str_to_str_multimap_handles_empty_and_binary_values(void);
+void test_jsl_str_to_str_multimap_delete_value(void);
+void test_jsl_str_to_str_multimap_delete_value_removes_empty_key(void);
+void test_jsl_str_to_str_multimap_delete_key(void);
+void test_jsl_str_to_str_multimap_clear(void);
+void test_stress_test(void);
+
+#endif

@@ -1,0 +1,19 @@
+#ifndef TEST_STRING_BUILDER_H
+#define TEST_STRING_BUILDER_H
+
+void test_jsl_string_builder_init(void);
+void test_jsl_string_builder_init2(void);
+void test_jsl_string_builder_init_invalid_arguments(void);
+void test_jsl_string_builder_insert_memory_multi_chunk(void);
+void test_jsl_string_builder_insert_memory_edge_cases(void);
+void test_jsl_string_builder_iterator_behavior(void);
+void test_jsl_string_builder_with_format(void);
+void test_jsl_string_builder_with_format_needs_multiple_chunks(void);
+void test_jsl_string_builder_with_format_invalid_builder(void);
+void test_jsl_string_builder_free_null_and_uninitialized(void);
+void test_jsl_string_builder_free_invalid_sentinel_noop(void);
+void test_jsl_string_builder_free_empty_builder(void);
+void test_jsl_string_builder_free_single_chunk(void);
+void test_jsl_string_builder_free_multiple_chunks_and_reinit(void);
+
+#endif

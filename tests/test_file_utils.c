@@ -35,6 +35,7 @@
 #include "jsl/os.h"
 
 #include "minctest.h"
+#include "test_file_utils.h"
 
 void test_jsl_load_file_contents(void)
 {

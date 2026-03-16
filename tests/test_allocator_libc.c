@@ -33,6 +33,7 @@
 #include "jsl/allocator_libc.h"
 
 #include "minctest.h"
+#include "test_allocator_libc.h"
 
 typedef struct TestStruct
 {
@@ -515,12 +516,3 @@ void test_libc_free_all_then_reuse(void)
     jsl_libc_allocator_free_all(&allocator);
 }
 
-int main(void)
-{
-    #if JSL_IS_WINDOWS
-        setvbuf(stdout, NULL, _IONBF, 0);
-    #endif
-
-    TEST_RESULTS();
-    return lfails != 0;
-}

@@ -34,6 +34,7 @@
 #include "jsl/allocator_infinite_arena.h"
 
 #include "minctest.h"
+#include "test_allocator_arena.h"
 
 typedef struct TestStruct
 {

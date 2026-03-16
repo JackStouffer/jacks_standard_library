@@ -34,13 +34,14 @@
 #include "jsl/allocator_arena.h"
 
 #include "minctest.h"
+#include "test_core.h"
 
-JSLImmutableMemory medium_str = JSL_CSTR_INITIALIZER(
+static JSLImmutableMemory medium_str = JSL_CSTR_INITIALIZER(
     "This is a very long string that is going to trigger SIMD code, "
     "as it's longer than a single AVX2 register when using 8-bit "
     "values, which we are since we're using ASCII/UTF-8."
 );
-JSLImmutableMemory long_str = JSL_CSTR_INITIALIZER(
+static JSLImmutableMemory long_str = JSL_CSTR_INITIALIZER(
     "Lorem ipsum dolor sit amet, consectetur adipiscing elit. "
     "Nulla purus justo, iaculis sit amet interdum sit amet, "
     "tincidunt at erat. Etiam vulputate ornare dictum. Nullam "

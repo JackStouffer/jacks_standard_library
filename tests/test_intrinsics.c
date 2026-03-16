@@ -33,6 +33,7 @@
 #include "jsl/allocator_arena.h"
 
 #include "minctest.h"
+#include "test_intrinsics.h"
 
 void test_jsl__count_trailing_zeros_u32(void)
 {

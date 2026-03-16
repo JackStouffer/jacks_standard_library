@@ -73,9 +73,9 @@
 
 
 /* Track the number of passes, fails. */
-/* NB this is made for all tests to be in one file. */
-static size_t ltests = 0;
-static size_t lfails = 0;
+/* Defined in test_main.c so counters are shared across translation units. */
+extern size_t ltests;
+extern size_t lfails;
 
 
 /* Display the test results. */

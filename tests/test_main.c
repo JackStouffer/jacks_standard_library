@@ -32,15 +32,27 @@
 #include "jsl/core.h"
 #include "jsl/allocator.h"
 #include "jsl/allocator_arena.h"
+#include "jsl/allocator_infinite_arena.h"
 
 #include "minctest.h"
 #include "test_core.h"
 #include "test_allocator_arena.h"
 #include "test_allocator_libc.h"
+#include "test_allocator_pool.h"
 #include "test_array.h"
+#include "test_cmd_line.h"
+#include "test_file_utils.h"
+#include "test_format.h"
+#include "test_hash_map.h"
+#include "test_hash_set.h"
+#include "test_intrinsics.h"
+#include "test_str_to_str_multimap.h"
+#include "test_string_builder.h"
 
-const int64_t arena_size = JSL_MEGABYTES(32);
-JSLArena global_arena;
+size_t ltests = 0;
+size_t lfails = 0;
+
+JSLInfiniteArena global_arena;
 
 int main(void)
 {
@@ -52,9 +64,11 @@ int main(void)
 
     srand((unsigned) time(NULL));
 
-    // 
+    jsl_infinite_arena_init(&global_arena);
+
+    //
     //              Test Core
-    // 
+    //
 
     RUN_TEST_FUNCTION("Test jsl_cstr_to_memory", test_jsl_from_cstr);
     RUN_TEST_FUNCTION("Test jsl_cstr_memory_copy", test_jsl_cstr_memory_copy);
@@ -154,9 +168,27 @@ int main(void)
     RUN_TEST_FUNCTION("Test libc create child parent survives realloc", test_libc_create_child_parent_survives_realloc);
     RUN_TEST_FUNCTION("Test libc create child nested", test_libc_create_child_nested);
 
-    // 
+    //
+    //              Test Allocator Pool
+    //
+
+    RUN_TEST_FUNCTION("Test pool init sets counts and lists", test_pool_init_sets_counts_and_lists);
+    RUN_TEST_FUNCTION("Test pool init2 sets counts", test_pool_init2_sets_counts);
+    RUN_TEST_FUNCTION("Test pool init too small has no allocations", test_pool_init_too_small_has_no_allocations);
+    RUN_TEST_FUNCTION("Test pool allocate zeroed and alignment small", test_pool_allocate_zeroed_and_alignment_small);
+    RUN_TEST_FUNCTION("Test pool allocate exhaustion updates counts", test_pool_allocate_exhaustion_updates_counts);
+    RUN_TEST_FUNCTION("Test pool free invalid and double free", test_pool_free_invalid_and_double_free);
+    RUN_TEST_FUNCTION("Test pool alignment medium alloc", test_pool_alignment_medium_alloc);
+    RUN_TEST_FUNCTION("Test pool alignment large alloc", test_pool_alignment_large_alloc);
+    RUN_TEST_FUNCTION("Test pool free middle node", test_pool_free_middle_node);
+    RUN_TEST_FUNCTION("Test pool free interior pointer", test_pool_free_interior_pointer);
+    RUN_TEST_FUNCTION("Test pool free wrong pool", test_pool_free_wrong_pool);
+    RUN_TEST_FUNCTION("Test pool free after free all", test_pool_free_after_free_all);
+    RUN_TEST_FUNCTION("Test pool free sentinel corruption", test_pool_free_sentinel_corruption);
+
+    //
     //              Test Intrinsics
-    // 
+    //
 
     RUN_TEST_FUNCTION("Test count trailing zeros u32", test_jsl__count_trailing_zeros_u32);
     RUN_TEST_FUNCTION("Test count trailing zeros u64", test_jsl__count_trailing_zeros_u64);
@@ -204,29 +236,13 @@ int main(void)
     //              Test Array
     // 
 
-    jsl_arena_init(&global_arena, malloc(arena_size), arena_size);
-
     RUN_TEST_FUNCTION("Test dynamic array init success", test_dynamic_array_init_success);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("Test dynamic array init invalid args", test_dynamic_array_init_invalid_args);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("Test dynamic array insert", test_dynamic_array_insert_appends_and_grows);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("Test dynamic array insert at", test_dynamic_array_insert_at_inserts_and_shifts);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("Test dynamic array delete at", test_dynamic_array_delete_at_removes_and_shifts);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("Test dynamic array clear", test_dynamic_array_clear_resets_length);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("Test dynamic array sentinel checks", test_dynamic_array_checks_sentinel);
-    jsl_arena_reset(&global_arena);
-
     // 
     //              Test Fixed Hash Map
     // 
@@ -267,152 +283,61 @@ int main(void)
     // 
 
     RUN_TEST_FUNCTION("init success", test_jsl_str_to_str_multimap_init_success);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("init invalid args", test_jsl_str_to_str_multimap_init_invalid_arguments);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("insert and value count", test_jsl_str_to_str_multimap_insert_and_get_value_count);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("duplicate values", test_jsl_str_to_str_multimap_duplicate_values_allowed);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("transient lifetime copies data", test_jsl_str_to_str_multimap_transient_lifetime_copies);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("static lifetime uses original pointers", test_jsl_str_to_str_multimap_static_lifetime_no_copy);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("key/value iterator covers all", test_jsl_str_to_str_multimap_key_value_iterator_covers_all_pairs);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("get-key iterator filters", test_jsl_str_to_str_multimap_get_key_iterator_filters_by_key);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("empty strings and binary values", test_jsl_str_to_str_multimap_handles_empty_and_binary_values);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("delete value behavior", test_jsl_str_to_str_multimap_delete_value);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("delete value removes empty key", test_jsl_str_to_str_multimap_delete_value_removes_empty_key);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("delete key behavior", test_jsl_str_to_str_multimap_delete_key);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("clear and reuse", test_jsl_str_to_str_multimap_clear);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("stress test", test_stress_test);
-    jsl_arena_reset(&global_arena);
-
 
     // 
     //              Test Hash Set
     // 
 
     RUN_TEST_FUNCTION("String set init success", test_jsl_str_set_init_success);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("String set init invalid args", test_jsl_str_set_init_invalid_arguments);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("String set insert and has", test_jsl_str_set_insert_and_has);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("String Set lifetime rules", test_jsl_str_set_respects_lifetime_rules);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("String Set iterator covers all", test_jsl_str_set_iterator_covers_all_values);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("String Set iterator invalidation", test_jsl_str_set_iterator_invalidated_on_mutation);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("String Set delete behavior", test_jsl_str_set_delete);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("String Set clear behavior", test_jsl_str_set_clear);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("String Set empty and binary values", test_jsl_str_set_handles_empty_and_binary_values);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("String Set intersection basic cases", test_jsl_str_set_intersection_basic);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("String Set intersection empty sets", test_jsl_str_set_intersection_with_empty_sets);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("String Set union collects uniques", test_jsl_str_set_union_collects_all_unique_values);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("String Set union with empty sets", test_jsl_str_set_union_with_empty_sets);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("String Set difference basic cases", test_jsl_str_set_difference_basic);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("String Set difference with empty sets", test_jsl_str_set_difference_with_empty_sets);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("String Set operations invalid parameters", test_jsl_str_set_set_operations_invalid_parameters);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("String Set rehash preserves entries", test_jsl_str_set_rehash_preserves_entries);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("String Set rejects invalid parameters", test_jsl_str_set_rejects_invalid_parameters);
-    jsl_arena_reset(&global_arena);
 
     // 
     //              Test String builder
     // 
 
     RUN_TEST_FUNCTION("Test builder init", test_jsl_string_builder_init);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("Test builder init2", test_jsl_string_builder_init2);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("Test invalid init args", test_jsl_string_builder_init_invalid_arguments);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("Test empty string and null bytes", test_jsl_string_builder_insert_memory_edge_cases);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("Test iterator", test_jsl_string_builder_iterator_behavior);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("Test iterator across chunks", test_jsl_string_builder_insert_memory_multi_chunk);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("Test format", test_jsl_string_builder_with_format);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("Test format across chunks", test_jsl_string_builder_with_format_needs_multiple_chunks);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("Test format invalid args", test_jsl_string_builder_with_format_invalid_builder);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("Test free null and uninitialized", test_jsl_string_builder_free_null_and_uninitialized);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("Test free invalid sentinel no-op", test_jsl_string_builder_free_invalid_sentinel_noop);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("Test free empty builder", test_jsl_string_builder_free_empty_builder);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("Test free single chunk", test_jsl_string_builder_free_single_chunk);
-    jsl_arena_reset(&global_arena);
-
     RUN_TEST_FUNCTION("Test free multiple chunks and reinit", test_jsl_string_builder_free_multiple_chunks_and_reinit);
-    jsl_arena_reset(&global_arena);
-
 
     // 
     //              Test Command Line Args

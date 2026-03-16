@@ -33,6 +33,7 @@
 #include "jsl/allocator_pool.h"
 
 #include "minctest.h"
+#include "test_allocator_pool.h"
 
 void test_pool_init_sets_counts_and_lists(void)
 {
@@ -320,28 +321,3 @@ void test_pool_free_sentinel_corruption(void)
     TEST_BOOL(jsl_pool_free(&pool, allocation));
 }
 
-int main(void)
-{
-    // Windows programs that crash can lose all of the terminal output.
-    // Set the buffer to zero to auto flush on output.
-    #if JSL_IS_WINDOWS
-        setvbuf(stdout, NULL, _IONBF, 0);
-    #endif
-
-    RUN_TEST_FUNCTION("Test pool init sets counts", test_pool_init_sets_counts_and_lists);
-    RUN_TEST_FUNCTION("Test pool init2 sets counts", test_pool_init2_sets_counts);
-    RUN_TEST_FUNCTION("Test pool init too small", test_pool_init_too_small_has_no_allocations);
-    RUN_TEST_FUNCTION("Test pool allocate zeroed", test_pool_allocate_zeroed_and_alignment_small);
-    RUN_TEST_FUNCTION("Test pool allocate exhaustion", test_pool_allocate_exhaustion_updates_counts);
-    RUN_TEST_FUNCTION("Test pool free invalid/double", test_pool_free_invalid_and_double_free);
-    RUN_TEST_FUNCTION("Test pool medium alignment", test_pool_alignment_medium_alloc);
-    RUN_TEST_FUNCTION("Test pool large alignment", test_pool_alignment_large_alloc);
-    RUN_TEST_FUNCTION("Test pool free middle node", test_pool_free_middle_node);
-    RUN_TEST_FUNCTION("Test pool free interior pointer", test_pool_free_interior_pointer);
-    RUN_TEST_FUNCTION("Test pool free wrong pool", test_pool_free_wrong_pool);
-    RUN_TEST_FUNCTION("Test pool free after free all", test_pool_free_after_free_all);
-    RUN_TEST_FUNCTION("Test pool free sentinel corruption", test_pool_free_sentinel_corruption);
-
-    TEST_RESULTS();
-    return lfails != 0;
-}

@@ -50,6 +50,7 @@ SOFTWARE.
 #endif
 
 #include "minctest.h"
+#include "test_format.h"
 
 #include "jsl/core.h"
 #include "jsl/allocator.h"

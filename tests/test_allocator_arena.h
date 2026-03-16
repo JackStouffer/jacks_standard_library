@@ -1,0 +1,40 @@
+#ifndef TEST_ALLOCATOR_ARENA_H
+#define TEST_ALLOCATOR_ARENA_H
+
+void test_arena_init_sets_pointers(void);
+void test_arena_init2_sets_pointers(void);
+void test_arena_allocate_zeroed_and_alignment(void);
+void test_arena_allocate_invalid_sizes_return_null(void);
+void test_arena_allocate_out_of_memory_returns_null(void);
+void test_arena_reallocate_null_behaves_like_allocate(void);
+void test_arena_reallocate_in_place_when_last(void);
+void test_arena_reallocate_not_last_allocates_new(void);
+void test_arena_reallocate_invalid_pointer_returns_null(void);
+void test_arena_reset_reuses_memory(void);
+void test_arena_save_restore_point_rewinds(void);
+void test_arena_create_child_basic(void);
+void test_arena_create_child_parent_survives_realloc(void);
+void test_arena_create_child_nested(void);
+void test_arena_allocator_interface_basic(void);
+void test_arena_typed_macros(void);
+void test_arena_from_stack_macro(void);
+
+void test_infinite_arena_init(void);
+void test_infinite_arena_allocate_zeroed_and_alignment(void);
+void test_infinite_arena_allocate_invalid_sizes_return_null(void);
+void test_infinite_arena_allocate_multiple_are_distinct(void);
+void test_infinite_arena_reallocate_null_behaves_like_allocate(void);
+void test_infinite_arena_reallocate_aligned_null_behaves_like_allocate(void);
+void test_infinite_arena_reallocate_in_place_when_last(void);
+void test_infinite_arena_reallocate_not_last_allocates_new(void);
+void test_infinite_arena_reallocate_aligned_in_place_when_last_and_fits(void);
+void test_infinite_arena_reallocate_aligned_not_last_allocates_new(void);
+void test_infinite_arena_reallocate_aligned_alignment_mismatch_allocates_new(void);
+void test_infinite_arena_reset_reuses_memory(void);
+void test_infinite_arena_save_restore_point(void);
+void test_infinite_arena_create_child_basic(void);
+void test_infinite_arena_create_child_parent_survives_realloc(void);
+void test_infinite_arena_create_child_nested(void);
+void test_infinite_arena_allocator_interface_basic(void);
+
+#endif
