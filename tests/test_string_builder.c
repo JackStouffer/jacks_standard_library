@@ -257,9 +257,9 @@ void test_jsl_string_builder_iterator_behavior(void)
     TEST_BOOL(slice.data != NULL);
     TEST_BOOL(slice.length == 0);
 
-    TEST_INT64_EQUAL(jsl_output_sink_write_u8(builder_sink, '1'), 1);
-    TEST_INT64_EQUAL(jsl_output_sink_write_u8(builder_sink, '2'), 1);
-    TEST_INT64_EQUAL(jsl_output_sink_write_u8(builder_sink, '3'), 1);
+    jsl_output_sink_write_u8(builder_sink, '1');
+    jsl_output_sink_write_u8(builder_sink, '2');
+    jsl_output_sink_write_u8(builder_sink, '3');
 
     jsl_string_builder_iterator_init(&builder, &iterator);
     TEST_BOOL(jsl_string_builder_iterator_next(&iterator, &slice));
@@ -290,8 +290,8 @@ void test_jsl_string_builder_with_format(void)
 
     JSLOutputSink builder_sink = jsl_string_builder_output_sink(&builder);
 
-    TEST_BOOL(jsl_format_sink(builder_sink, JSL_CSTR_EXPRESSION("%s-%d"), "alpha", 42) > -1);
-    TEST_BOOL(jsl_format_sink(builder_sink, JSL_CSTR_EXPRESSION(":%02X"), 0xAB) > -1);
+    jsl_format_sink(builder_sink, JSL_CSTR_EXPRESSION("%s-%d"), "alpha", 42);
+    jsl_format_sink(builder_sink, JSL_CSTR_EXPRESSION(":%02X"), 0xAB);
 
     uint8_t actual[64] = {0};
     JSLMutableMemory buffer = JSL_MEMORY_FROM_STACK(actual);
@@ -318,7 +318,7 @@ void test_jsl_string_builder_with_format_needs_multiple_chunks(void)
     JSLOutputSink builder_sink = jsl_string_builder_output_sink(&builder);
 
     char long_fragment[] = "0123456789ABCDEF0123456789";
-    TEST_BOOL(jsl_format_sink(builder_sink, JSL_CSTR_EXPRESSION("%s"), long_fragment) > -1);
+    jsl_format_sink(builder_sink, JSL_CSTR_EXPRESSION("%s"), long_fragment);
 
     uint8_t actual[128] = {0};
     JSLMutableMemory buffer = JSL_MEMORY_FROM_STACK(actual);
@@ -336,7 +336,7 @@ void test_jsl_string_builder_with_format_invalid_builder(void)
 {
     JSLStringBuilder builder = {0};
     JSLOutputSink builder_sink = jsl_string_builder_output_sink(&builder);
-    TEST_INT64_EQUAL(jsl_format_sink(builder_sink, jsl_cstr_to_memory("abc")), -1);
+    jsl_format_sink(builder_sink, jsl_cstr_to_memory("abc"));
 }
 
 void test_jsl_string_builder_free_null_and_uninitialized(void)
@@ -349,7 +349,7 @@ void test_jsl_string_builder_free_null_and_uninitialized(void)
 
     JSLOutputSink builder_sink = jsl_string_builder_output_sink(&builder);
 
-    TEST_BOOL(jsl_output_sink_write_u8(builder_sink, 'X') < 0);
+    jsl_output_sink_write_u8(builder_sink, 'X');
 }
 
 void test_jsl_string_builder_free_invalid_sentinel_noop(void)
@@ -405,14 +405,14 @@ void test_jsl_string_builder_free_single_chunk(void)
 
     JSLOutputSink builder_sink = jsl_string_builder_output_sink(&builder);
 
-    TEST_INT64_EQUAL(jsl_output_sink_write_u8(builder_sink, 'A'), 1);
-    TEST_INT64_EQUAL(jsl_output_sink_write_u8(builder_sink, 'B'), 1);
+    jsl_output_sink_write_u8(builder_sink, 'A');
+    jsl_output_sink_write_u8(builder_sink, 'B');
 
     jsl_string_builder_free(&builder);
     TEST_INT64_EQUAL(context.alloc_count, context.free_count);
     TEST_INT64_EQUAL(context.active_allocations, (int64_t) 0);
     TEST_INT64_EQUAL(builder.sentinel, (int64_t) 0);
-    TEST_INT64_EQUAL(jsl_output_sink_write_u8(builder_sink, 'C'), -1);
+    jsl_output_sink_write_u8(builder_sink, 'C');
 
     int64_t frees_before = context.free_count;
     jsl_string_builder_free(&builder);
@@ -432,7 +432,7 @@ void test_jsl_string_builder_free_multiple_chunks_and_reinit(void)
 
     for (int i = 0; i < 10; ++i)
     {
-        TEST_INT64_EQUAL(jsl_output_sink_write_u8(builder_sink, (uint8_t) ('a' + i)), 1);
+        jsl_output_sink_write_u8(builder_sink, (uint8_t) ('a' + i));
     }
 
     TEST_INT64_EQUAL(context.alloc_count, (int64_t) 6);
@@ -443,7 +443,7 @@ void test_jsl_string_builder_free_multiple_chunks_and_reinit(void)
 
     ok = jsl_string_builder_init2(&builder, allocator, 8, 8);
     TEST_BOOL(ok);
-    TEST_BOOL(jsl_output_sink_write_u8(builder_sink, 'Z'));
+    jsl_output_sink_write_u8(builder_sink, 'Z');
     jsl_string_builder_free(&builder);
 
     TEST_INT64_EQUAL(context.alloc_count, context.free_count);

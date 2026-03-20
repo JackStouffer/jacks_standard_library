@@ -34,11 +34,10 @@
 #include "minctest.h"
 #include "test_cmd_line.h"
 
-#define EXPECT_SINK_OUTPUT(expected_literal, bytes_written, buffer, writer) \
+#define EXPECT_SINK_OUTPUT(expected_literal, buffer, writer) \
     do { \
         int64_t expected_len = (int64_t)(sizeof(expected_literal) - 1); \
         int64_t actual_len = jsl_total_write_length((buffer), (writer)); \
-        TEST_INT64_EQUAL((bytes_written), expected_len); \
         TEST_INT64_EQUAL(actual_len, expected_len); \
         TEST_BUFFERS_EQUAL((buffer).data, (expected_literal), expected_len); \
     } while (0)
@@ -280,13 +279,13 @@ void test_cmd_line_write_style_no_color(void)
     JSLMutableMemory writer = buffer;
     JSLOutputSink sink = jsl_memory_output_sink(&writer);
 
-    int64_t result = jsl_cmd_line_write_style(sink, &info, &style);
-    EXPECT_SINK_OUTPUT("", result, buffer, writer);
+    jsl_cmd_line_write_style(sink, &info, &style);
+    EXPECT_SINK_OUTPUT("", buffer, writer);
 
     JSLMutableMemory reset_writer = buffer;
     JSLOutputSink reset_sink = jsl_memory_output_sink(&reset_writer);
-    result = jsl_cmd_line_write_reset(reset_sink, &info);
-    EXPECT_SINK_OUTPUT("", result, buffer, reset_writer);
+    jsl_cmd_line_write_reset(reset_sink, &info);
+    EXPECT_SINK_OUTPUT("", buffer, reset_writer);
 }
 
 void test_cmd_line_write_style_ansi16(void)
@@ -312,8 +311,8 @@ void test_cmd_line_write_style_ansi16(void)
     JSLMutableMemory writer = buffer;
     JSLOutputSink sink = jsl_memory_output_sink(&writer);
 
-    int64_t result = jsl_cmd_line_write_style(sink, &info, &style);
-    EXPECT_SINK_OUTPUT("\x1b[1m\x1b[4m\x1b[9m\x1b[31m\x1b[104m", result, buffer, writer);
+    jsl_cmd_line_write_style(sink, &info, &style);
+    EXPECT_SINK_OUTPUT("\x1b[1m\x1b[4m\x1b[9m\x1b[31m\x1b[104m", buffer, writer);
 }
 
 void test_cmd_line_write_style_ansi16_converts_color_types(void)
@@ -334,8 +333,8 @@ void test_cmd_line_write_style_ansi16_converts_color_types(void)
     JSLMutableMemory writer = buffer;
     JSLOutputSink sink = jsl_memory_output_sink(&writer);
 
-    int64_t result = jsl_cmd_line_write_style(sink, &info, &style);
-    EXPECT_SINK_OUTPUT("\x1b[92m\x1b[101m", result, buffer, writer);
+    jsl_cmd_line_write_style(sink, &info, &style);
+    EXPECT_SINK_OUTPUT("\x1b[92m\x1b[101m", buffer, writer);
 }
 
 void test_cmd_line_write_style_ansi256(void)
@@ -356,8 +355,8 @@ void test_cmd_line_write_style_ansi256(void)
     JSLMutableMemory writer = buffer;
     JSLOutputSink sink = jsl_memory_output_sink(&writer);
 
-    int64_t result = jsl_cmd_line_write_style(sink, &info, &style);
-    EXPECT_SINK_OUTPUT("\x1b[2m\x1b[38;5;67m\x1b[43m", result, buffer, writer);
+    jsl_cmd_line_write_style(sink, &info, &style);
+    EXPECT_SINK_OUTPUT("\x1b[2m\x1b[38;5;67m\x1b[43m", buffer, writer);
 }
 
 void test_cmd_line_write_style_truecolor(void)
@@ -383,8 +382,8 @@ void test_cmd_line_write_style_truecolor(void)
     JSLMutableMemory writer = buffer;
     JSLOutputSink sink = jsl_memory_output_sink(&writer);
 
-    int64_t result = jsl_cmd_line_write_style(sink, &info, &style);
-    EXPECT_SINK_OUTPUT("\x1b[3m\x1b[7m\x1b[38;2;12;34;56m\x1b[48;5;200m", result, buffer, writer);
+    jsl_cmd_line_write_style(sink, &info, &style);
+    EXPECT_SINK_OUTPUT("\x1b[3m\x1b[7m\x1b[38;2;12;34;56m\x1b[48;5;200m", buffer, writer);
 }
 
 void test_cmd_line_write_style_and_reset_invalid(void)
@@ -403,13 +402,13 @@ void test_cmd_line_write_style_and_reset_invalid(void)
     JSLMutableMemory writer = buffer;
     JSLOutputSink sink = jsl_memory_output_sink(&writer);
 
-    TEST_INT64_EQUAL(jsl_cmd_line_write_style(sink, &info, &style), -1);
-    EXPECT_SINK_OUTPUT("", 0, buffer, writer);
+    jsl_cmd_line_write_style(sink, &info, &style);
+    EXPECT_SINK_OUTPUT("", buffer, writer);
 
     JSLMutableMemory reset_writer = buffer;
     JSLOutputSink reset_sink = jsl_memory_output_sink(&reset_writer);
-    TEST_INT64_EQUAL(jsl_cmd_line_write_reset(reset_sink, &info), -1);
-    EXPECT_SINK_OUTPUT("", 0, buffer, reset_writer);
+    jsl_cmd_line_write_reset(reset_sink, &info);
+    EXPECT_SINK_OUTPUT("", buffer, reset_writer);
 }
 
 void test_cmd_line_write_reset_ansi_modes(void)
@@ -422,6 +421,6 @@ void test_cmd_line_write_reset_ansi_modes(void)
     JSLMutableMemory writer = buffer;
     JSLOutputSink sink = jsl_memory_output_sink(&writer);
 
-    int64_t result = jsl_cmd_line_write_reset(sink, &info);
-    EXPECT_SINK_OUTPUT("\x1b[0m", result, buffer, writer);
+    jsl_cmd_line_write_reset(sink, &info);
+    EXPECT_SINK_OUTPUT("\x1b[0m", buffer, writer);
 }

@@ -57,88 +57,89 @@ SOFTWARE.
 #include "jsl/allocator_arena.h"
 
 #define CHECK_END(str)                                                              \
-    JSLImmutableMemory written = jsl_slice(buffer, 0, ret);                           \
+    int64_t ret = jsl_total_write_length(buffer, writer);                            \
+    JSLImmutableMemory written = jsl_slice(buffer, 0, ret);                          \
     TEST_BOOL(jsl_memory_cstr_compare(written, str) && ret == (int64_t) strlen(str))
 
 #define CHECK9(str, v1, v2, v3, v4, v5, v6, v7, v8, v9) \
 {                                                                                   \
-    JSLMutableMemory writer = buffer;                                                      \
-    JSLOutputSink sink = jsl_memory_output_sink(&writer);                           \
-    JSLImmutableMemory fmt_str = jsl_cstr_to_memory(v1);                                   \
-    int64_t ret = jsl_format_sink(sink, fmt_str, v2, v3, v4, v5, v6, v7, v8, v9);   \
-    CHECK_END(str);                                                                 \
+    JSLMutableMemory writer = buffer;                                                \
+    JSLOutputSink sink = jsl_memory_output_sink(&writer);                            \
+    JSLImmutableMemory fmt_str = jsl_cstr_to_memory(v1);                             \
+    jsl_format_sink(sink, fmt_str, v2, v3, v4, v5, v6, v7, v8, v9);                 \
+    CHECK_END(str);                                                                  \
 }
 
 #define CHECK8(str, v1, v2, v3, v4, v5, v6, v7, v8)                                 \
 {                                                                                   \
-    JSLMutableMemory writer = buffer;                                                      \
-    JSLOutputSink sink = jsl_memory_output_sink(&writer);                           \
-    JSLImmutableMemory fmt_str = jsl_cstr_to_memory(v1);                                   \
-    int64_t ret = jsl_format_sink(sink, fmt_str, v2, v3, v4, v5, v6, v7, v8);       \
-    CHECK_END(str);                                                                 \
+    JSLMutableMemory writer = buffer;                                                \
+    JSLOutputSink sink = jsl_memory_output_sink(&writer);                            \
+    JSLImmutableMemory fmt_str = jsl_cstr_to_memory(v1);                             \
+    jsl_format_sink(sink, fmt_str, v2, v3, v4, v5, v6, v7, v8);                     \
+    CHECK_END(str);                                                                  \
 }
 
 #define CHECK7(str, v1, v2, v3, v4, v5, v6, v7)                                     \
 {                                                                                   \
-    JSLMutableMemory writer = buffer;                                                      \
-    JSLOutputSink sink = jsl_memory_output_sink(&writer);                           \
-    JSLImmutableMemory fmt_str = jsl_cstr_to_memory(v1);                                   \
-    int64_t ret = jsl_format_sink(sink, fmt_str, v2, v3, v4, v5, v6, v7);    \
-    CHECK_END(str);                                                                 \
+    JSLMutableMemory writer = buffer;                                                \
+    JSLOutputSink sink = jsl_memory_output_sink(&writer);                            \
+    JSLImmutableMemory fmt_str = jsl_cstr_to_memory(v1);                             \
+    jsl_format_sink(sink, fmt_str, v2, v3, v4, v5, v6, v7);                         \
+    CHECK_END(str);                                                                  \
 }
 
 #define CHECK6(str, v1, v2, v3, v4, v5, v6)                                         \
 {                                                                                   \
-    JSLMutableMemory writer = buffer;                                                      \
-    JSLOutputSink sink = jsl_memory_output_sink(&writer);                           \
-    JSLImmutableMemory fmt_str = jsl_cstr_to_memory(v1);                                   \
-    int64_t ret = jsl_format_sink(sink, fmt_str, v2, v3, v4, v5, v6);        \
-    CHECK_END(str);                                                                 \
+    JSLMutableMemory writer = buffer;                                                \
+    JSLOutputSink sink = jsl_memory_output_sink(&writer);                            \
+    JSLImmutableMemory fmt_str = jsl_cstr_to_memory(v1);                             \
+    jsl_format_sink(sink, fmt_str, v2, v3, v4, v5, v6);                             \
+    CHECK_END(str);                                                                  \
 }
 
 #define CHECK5(str, v1, v2, v3, v4, v5)                                             \
 {                                                                                   \
-    JSLMutableMemory writer = buffer;                                                      \
-    JSLOutputSink sink = jsl_memory_output_sink(&writer);                           \
-    JSLImmutableMemory fmt_str = jsl_cstr_to_memory(v1);                                   \
-    int64_t ret = jsl_format_sink(sink, fmt_str, v2, v3, v4, v5);            \
-    CHECK_END(str);                                                                 \
+    JSLMutableMemory writer = buffer;                                                \
+    JSLOutputSink sink = jsl_memory_output_sink(&writer);                            \
+    JSLImmutableMemory fmt_str = jsl_cstr_to_memory(v1);                             \
+    jsl_format_sink(sink, fmt_str, v2, v3, v4, v5);                                 \
+    CHECK_END(str);                                                                  \
 }
 
 #define CHECK4(str, v1, v2, v3, v4)                                                 \
 {                                                                                   \
-    JSLMutableMemory writer = buffer;                                                      \
-    JSLOutputSink sink = jsl_memory_output_sink(&writer);                           \
-    JSLImmutableMemory fmt_str = jsl_cstr_to_memory(v1);                                   \
-    int64_t ret = jsl_format_sink(sink, fmt_str, v2, v3, v4);                \
-    CHECK_END(str);                                                                 \
+    JSLMutableMemory writer = buffer;                                                \
+    JSLOutputSink sink = jsl_memory_output_sink(&writer);                            \
+    JSLImmutableMemory fmt_str = jsl_cstr_to_memory(v1);                             \
+    jsl_format_sink(sink, fmt_str, v2, v3, v4);                                     \
+    CHECK_END(str);                                                                  \
 }
 
 #define CHECK3(str, v1, v2, v3)                                                     \
 {                                                                                   \
-    JSLMutableMemory writer = buffer;                                                      \
-    JSLOutputSink sink = jsl_memory_output_sink(&writer);                           \
-    JSLImmutableMemory fmt_str = jsl_cstr_to_memory(v1);                                   \
-    int64_t ret = jsl_format_sink(sink, fmt_str, v2, v3);                    \
-    CHECK_END(str);                                                                 \
+    JSLMutableMemory writer = buffer;                                                \
+    JSLOutputSink sink = jsl_memory_output_sink(&writer);                            \
+    JSLImmutableMemory fmt_str = jsl_cstr_to_memory(v1);                             \
+    jsl_format_sink(sink, fmt_str, v2, v3);                                         \
+    CHECK_END(str);                                                                  \
 }
 
 #define CHECK2(str, v1, v2)                                                         \
 {                                                                                   \
-    JSLMutableMemory writer = buffer;                                                      \
-    JSLOutputSink sink = jsl_memory_output_sink(&writer);                           \
-    JSLImmutableMemory fmt_str = jsl_cstr_to_memory(v1);                                   \
-    int64_t ret = jsl_format_sink(sink, fmt_str, v2);                        \
-    CHECK_END(str);                                                                 \
+    JSLMutableMemory writer = buffer;                                                \
+    JSLOutputSink sink = jsl_memory_output_sink(&writer);                            \
+    JSLImmutableMemory fmt_str = jsl_cstr_to_memory(v1);                             \
+    jsl_format_sink(sink, fmt_str, v2);                                             \
+    CHECK_END(str);                                                                  \
 }
 
 #define CHECK1(str, v1)                                                             \
 {                                                                                   \
-    JSLImmutableMemory writer = buffer;                                                      \
-    JSLOutputSink sink = jsl_memory_output_sink(&writer);                           \
-    JSLImmutableMemory fmt_str = jsl_cstr_to_memory(v1);                                   \
-    int64_t ret = jsl_format_sink(sink, fmt_str);                            \
-    CHECK_END(str);                                                                 \
+    JSLMutableMemory writer = buffer;                                                \
+    JSLOutputSink sink = jsl_memory_output_sink(&writer);                            \
+    JSLImmutableMemory fmt_str = jsl_cstr_to_memory(v1);                             \
+    jsl_format_sink(sink, fmt_str);                                                 \
+    CHECK_END(str);                                                                  \
 }
 
 
@@ -151,7 +152,8 @@ void test_integers(void)
     { JSLMutableMemory writer = buffer;
         JSLOutputSink sink = jsl_memory_output_sink(&writer);
         JSLImmutableMemory fmt_str = jsl_cstr_to_memory("%c %s     %d");
-        int64_t ret = jsl_format_sink(sink, fmt_str, 'a', "b", 1);
+        jsl_format_sink(sink, fmt_str, 'a', "b", 1);
+        int64_t ret = jsl_total_write_length(buffer, writer);
         JSLImmutableMemory written = jsl__slice(((JSLImmutableMemory){(const uint8_t*)(buffer).data, (buffer).length}), 0, ret);
         do { ++ltests; if (!(jsl_memory_cstr_compare(written, "a b     1") && ret == (int64_t) strlen("a b     1"))) { ++lfails; printf("%s:%d error \n", "/Users/jackstouffer/Documents/code/jacks_standard_library/tests/test_format.c", 149); }} while (0); }
     CHECK4("This is a very long string which will call SIMD code for sure a b     1", "This is a very long string which will call SIMD code for sure %c %s     %d", 'a', "b", 1);

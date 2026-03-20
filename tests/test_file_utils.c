@@ -212,13 +212,12 @@ void test_jsl_format_file_formats_and_writes_output(void)
 
     JSLOutputSink sink = jsl_c_file_output_sink(file);
 
-    bool res = jsl_format_sink(
+    jsl_format_sink(
         sink,
         JSL_CSTR_EXPRESSION("Hello %s %d"),
         "World",
         42
     );
-    TEST_BOOL(res == true);
 
     TEST_BOOL(fflush(file) == 0);
     TEST_BOOL(fseek(file, 0, SEEK_SET) == 0);
@@ -241,8 +240,7 @@ void test_jsl_format_file_accepts_empty_format(void)
 
     JSLOutputSink sink = jsl_c_file_output_sink(file);
 
-    int64_t res = jsl_format_sink(sink, JSL_CSTR_EXPRESSION(""));
-    TEST_INT64_EQUAL(res, 0);
+    jsl_format_sink(sink, JSL_CSTR_EXPRESSION(""));
 
     TEST_BOOL(fflush(file) == 0);
     TEST_BOOL(fseek(file, 0, SEEK_END) == 0);
@@ -256,8 +254,7 @@ void test_jsl_format_file_null_out_parameter(void)
 {
     JSLOutputSink sink = jsl_c_file_output_sink(NULL);
 
-    bool res = jsl_format_sink(sink, JSL_CSTR_EXPRESSION("Hello"));
-    TEST_BOOL(!res);
+    jsl_format_sink(sink, JSL_CSTR_EXPRESSION("Hello"));
 }
 
 void test_jsl_format_file_null_format_pointer(void)
@@ -269,8 +266,7 @@ void test_jsl_format_file_null_format_pointer(void)
 
     JSLOutputSink sink = jsl_c_file_output_sink(stdout);
 
-    int64_t res = jsl_format_sink(sink, fmt);
-    TEST_INT64_EQUAL(res, -1);
+    jsl_format_sink(sink, fmt);
 }
 
 void test_jsl_format_file_negative_length(void)
@@ -281,8 +277,7 @@ void test_jsl_format_file_negative_length(void)
     };
     JSLOutputSink sink = jsl_c_file_output_sink(stdout);
 
-    int64_t res = jsl_format_sink(sink, fmt);
-    TEST_INT64_EQUAL(res, -1);
+    jsl_format_sink(sink, fmt);
 }
 
 void test_jsl_format_file_write_failure(void)
@@ -302,8 +297,7 @@ void test_jsl_format_file_write_failure(void)
 
             JSLOutputSink sink = jsl_c_file_output_sink(writer);
 
-            int64_t res = jsl_format_sink(sink, JSL_CSTR_EXPRESSION("Hello"));
-            TEST_BOOL(res < 0);
+            jsl_format_sink(sink, JSL_CSTR_EXPRESSION("Hello"));
 
             fclose(writer);
             if (previous_handler == SIG_ERR)
@@ -326,8 +320,7 @@ void test_jsl_format_file_write_failure(void)
     if (file != NULL)
     {
         JSLOutputSink sink = jsl_c_file_output_sink(file);
-        int64_t res1 = jsl_format_sink(sink, JSL_CSTR_EXPRESSION("Hello"));
-        TEST_INT64_EQUAL(res1, -1);
+        jsl_format_sink(sink, JSL_CSTR_EXPRESSION("Hello"));
 
         fclose(file);
         return;
@@ -347,8 +340,7 @@ void test_jsl_format_file_write_failure(void)
     }
 
     JSLOutputSink ro_sink = jsl_c_file_output_sink(read_only);
-    int64_t res2 = jsl_format_sink(ro_sink, JSL_CSTR_EXPRESSION("Hello"));
-    TEST_BOOL(res2 < 0);
+    jsl_format_sink(ro_sink, JSL_CSTR_EXPRESSION("Hello"));
 
     fclose(read_only);
     remove(path);
