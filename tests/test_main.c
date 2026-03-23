@@ -320,24 +320,24 @@ int main(void)
     RUN_TEST_FUNCTION("String Set rehash preserves entries", test_jsl_str_set_rehash_preserves_entries);
     RUN_TEST_FUNCTION("String Set rejects invalid parameters", test_jsl_str_set_rejects_invalid_parameters);
 
-    // 
+    //
     //              Test String builder
-    // 
+    //
 
     RUN_TEST_FUNCTION("Test builder init", test_jsl_string_builder_init);
-    RUN_TEST_FUNCTION("Test builder init2", test_jsl_string_builder_init2);
     RUN_TEST_FUNCTION("Test invalid init args", test_jsl_string_builder_init_invalid_arguments);
-    RUN_TEST_FUNCTION("Test empty string and null bytes", test_jsl_string_builder_insert_memory_edge_cases);
-    RUN_TEST_FUNCTION("Test iterator", test_jsl_string_builder_iterator_behavior);
-    RUN_TEST_FUNCTION("Test iterator across chunks", test_jsl_string_builder_insert_memory_multi_chunk);
-    RUN_TEST_FUNCTION("Test format", test_jsl_string_builder_with_format);
-    RUN_TEST_FUNCTION("Test format across chunks", test_jsl_string_builder_with_format_needs_multiple_chunks);
-    RUN_TEST_FUNCTION("Test format invalid args", test_jsl_string_builder_with_format_invalid_builder);
+    RUN_TEST_FUNCTION("Test builder append", test_jsl_string_builder_append);
+    RUN_TEST_FUNCTION("Test append edge cases", test_jsl_string_builder_append_edge_cases);
+    RUN_TEST_FUNCTION("Test get string", test_jsl_string_builder_get_string);
+    RUN_TEST_FUNCTION("Test delete", test_jsl_string_builder_delete);
+    RUN_TEST_FUNCTION("Test clear", test_jsl_string_builder_clear);
+    RUN_TEST_FUNCTION("Test output sink", test_jsl_string_builder_output_sink);
+    RUN_TEST_FUNCTION("Test format via sink", test_jsl_string_builder_format_via_sink);
+    RUN_TEST_FUNCTION("Test format invalid builder", test_jsl_string_builder_format_invalid_builder);
     RUN_TEST_FUNCTION("Test free null and uninitialized", test_jsl_string_builder_free_null_and_uninitialized);
     RUN_TEST_FUNCTION("Test free invalid sentinel no-op", test_jsl_string_builder_free_invalid_sentinel_noop);
     RUN_TEST_FUNCTION("Test free empty builder", test_jsl_string_builder_free_empty_builder);
-    RUN_TEST_FUNCTION("Test free single chunk", test_jsl_string_builder_free_single_chunk);
-    RUN_TEST_FUNCTION("Test free multiple chunks and reinit", test_jsl_string_builder_free_multiple_chunks_and_reinit);
+    RUN_TEST_FUNCTION("Test free and reinit", test_jsl_string_builder_free_and_reinit);
 
     // 
     //              Test Command Line Args

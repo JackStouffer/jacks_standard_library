@@ -1,234 +1,169 @@
-/**
- * # JSL String Builder
- * 
- * A string builder is a container for building large strings. It's specialized for
- * situations where many different smaller operations result in small strings being
- * coalesced into a final result, specifically using an arena as its allocator.
- *
- * While this is called string builder, the underlying data store is just bytes, so
- * any binary data which is built in chunks can use the string builder.
- *
- * ## Implementation
- *
- * A string builder is different from a normal dynamic array in two ways. One, it
- * has specific operations for writing string data in both fat pointer form but also
- * as a `snprintf` like operation. Two, the resulting string data is not stored as a
- * contiguous range of memory, but as a series of chunks which is given to the user
- * as an iterator when the string is finished.
- *
- * This is due to the nature of arena allocations. If you have some part of your
- * program which generates string output, the most common form of that code would be:
- *
- * 1. You do some operations, these operations themselves allocate
- * 2. You generate a string from the operations
- * 3. The string is concatenated into some buffer
- * 4. Repeat
- *
- * A dynamically sized array which grows would mean throwing away the old memory when
- * the array resizes. This would be fine for your typical heap but for an arena this
- * the old memory is unavailable until the arena is reset. A separate arena that's
- * used purely for the array would work, but that sort of defeats the whole purpose
- * of an arena, which is it's supposed to make lifetime tracking easier. Having a
- * whole bunch of separate arenas for different objects makes the program more
- * complicated than it should be.
- *
- * Having the memory in chunks means that a single arena is not wasteful with its
- * available memory.
- *
- * By default, each chunk is 256 bytes and is aligned to a 8 byte address. These are
- * tuneable parameters that you can set during init. The custom alignment helps if you
- * want to use SIMD code on the consuming code.
- * 
- * ## License
- *
- * Copyright (c) 2026 Jack Stouffer
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the “Software”),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the Software
- * is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in all
- * copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
- * WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
- * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
- */
-
 #include <stdint.h>
 #include <stddef.h>
 #if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L
     #include <stdbool.h>
 #endif
+#include <string.h>
 
-#include "core.h"
-#include "allocator.h"
-#include "string_builder.h"
+#include "jsl/core.h"
+#include "jsl/string_builder.h"
 
-#define JSL__BUILDER_PRIVATE_SENTINEL 4401537694999363085U
+#define JSL___BUILDER_PRIVATE_SENTINEL 16674017140609501479U
 
-static bool jsl__string_builder_add_chunk(JSLStringBuilder* builder)
+static inline bool jsl_string_builder__ensure_capacity(
+    JSLStringBuilder* builder,
+    int64_t needed_capacity
+)
 {
-    struct JSL__StringBuilderChunk* chunk = JSL_TYPED_ALLOCATE(
-        struct JSL__StringBuilderChunk,
-        builder->allocator
-    );
-    chunk->next = NULL;
-    chunk->buffer.data = jsl_allocator_interface_alloc(
-        builder->allocator,
-        builder->chunk_size,
-        builder->chunk_alignment,
-        false
-    );
-    chunk->buffer.length = builder->chunk_size;
-
-    if (chunk->buffer.data != NULL)
-    {
-        chunk->writer = chunk->buffer;
-
-        if (builder->head == NULL)
-            builder->head = chunk;
-
-        if (builder->tail == NULL)
-        {
-            builder->tail = chunk;
-        }
-        else
-        {
-            builder->tail->next = chunk;
-            builder->tail = chunk;
-        }
+    if (JSL__LIKELY(needed_capacity <= builder->capacity))
         return true;
+
+    bool res = false;
+    int64_t target_capacity = jsl_next_power_of_two_i64(needed_capacity);
+
+    void* new_mem = NULL;
+
+    if (builder->data != NULL && builder->capacity > 0)
+    {
+        new_mem = jsl_allocator_interface_realloc(
+            builder->allocator,
+            builder->data,
+            target_capacity,
+            JSL_DEFAULT_ALLOCATION_ALIGNMENT
+        );
     }
     else
     {
-        return false;
+        new_mem = jsl_allocator_interface_alloc(
+            builder->allocator,
+            target_capacity,
+            JSL_DEFAULT_ALLOCATION_ALIGNMENT,
+            false
+        );
     }
-}
 
-bool jsl_string_builder_init(JSLStringBuilder* builder, JSLAllocatorInterface alocator)
-{
-    return jsl_string_builder_init2(
-        builder,
-        alocator,
-        1024,
-        8
-    );
-}
-
-bool jsl_string_builder_init2(
-    JSLStringBuilder* builder,
-    JSLAllocatorInterface allocator,
-    int32_t chunk_size,
-    int32_t chunk_alignment
-)
-{
-    bool res = false;
-
-    if (builder != NULL)
+    if (new_mem != NULL)
     {
-        JSL_MEMSET(builder, 0, sizeof(JSLStringBuilder));
-    }
-    
-    if (
-        builder != NULL
-        && chunk_size > 0
-        && chunk_alignment > 0
-    )
-    {
-        builder->sentinel = JSL__BUILDER_PRIVATE_SENTINEL;
-        builder->allocator = allocator;
-        builder->chunk_size = chunk_size;
-        builder->chunk_alignment = chunk_alignment;
-        res = jsl__string_builder_add_chunk(builder);
+        builder->data = (uint8_t*) new_mem;
+        builder->capacity = target_capacity;
+        res = true;
     }
 
     return res;
 }
 
-int64_t jsl_string_builder_insert_memory(JSLStringBuilder* builder, JSLImmutableMemory data)
+bool jsl_string_builder_init(
+    JSLStringBuilder* builder,
+    JSLAllocatorInterface allocator,
+    int64_t initial_capacity
+)
 {
-    if (
-        builder == NULL
-        || builder->sentinel != JSL__BUILDER_PRIVATE_SENTINEL
-        || builder->head == NULL
-        || builder->tail == NULL
-    )
-        return -1;
+    bool res = builder != NULL && initial_capacity > -1;
 
-    int64_t bytes_written = 0;
-
-    while (data.length > 0)
+    if (res)
     {
-        if (builder->tail->writer.length == 0 && !jsl__string_builder_add_chunk(builder))
-        {
-            break;
-        }
+        JSL_MEMSET(builder, 0, sizeof(JSLStringBuilder));
+        builder->allocator = allocator;
+        builder->sentinel = JSL___BUILDER_PRIVATE_SENTINEL;
 
-        int64_t copy_res = jsl_memory_copy(&builder->tail->writer, data);
-        
-        if (copy_res > 0)
-        {
-            JSL_MEMORY_ADVANCE(data, copy_res);
-            bytes_written += copy_res;
-        }
-        else
-        {
-            break;
-        }
+        int64_t target_capacity = jsl_next_power_of_two_i64(JSL_MAX(32L, initial_capacity));
+        res = jsl_string_builder__ensure_capacity(builder, target_capacity);
     }
 
-    return bytes_written;
+    return res;
 }
 
-void jsl_string_builder_iterator_init(JSLStringBuilder* builder, JSLStringBuilderIterator* iterator)
+JSLImmutableMemory jsl_string_builder_get_string(
+    JSLStringBuilder* builder
+)
 {
-    if (iterator != NULL)
-        JSL_MEMSET(iterator, 0, sizeof(JSLStringBuilderIterator));
+    JSLImmutableMemory res = {builder->data, builder->length};
+    return res;
+}
 
+bool jsl_string_builder_append(
+    JSLStringBuilder* builder,
+    JSLImmutableMemory str_data
+)
+{
+    bool res = (
+        builder != NULL
+        && builder->sentinel == JSL___BUILDER_PRIVATE_SENTINEL
+        && jsl_string_builder__ensure_capacity(builder, builder->length + str_data.length)
+    );
+
+    if (res)
+    {
+        JSL_MEMCPY(&builder->data[builder->length], str_data.data, (size_t) str_data.length);
+        builder->length += str_data.length;
+    }
+
+    return res;
+}
+
+bool jsl_string_builder_delete(
+    JSLStringBuilder* builder,
+    int64_t index,
+    int64_t count
+)
+{
+    bool res = (
+        builder != NULL
+        && builder->sentinel == JSL___BUILDER_PRIVATE_SENTINEL
+        && index > -1
+        && count > 0
+        && index + count <= builder->length
+    );
+
+    int64_t items_to_move = res ? builder->length - index - count : -1;
+
+    if (items_to_move > 0)
+    {
+        size_t move_bytes = (size_t) items_to_move;
+        JSL_MEMMOVE(
+            builder->data + index,
+            builder->data + index + count,
+            move_bytes
+        );
+        builder->length -= count;
+    }
+    else if (items_to_move == 0)
+    {
+        builder->length -= count;
+    }
+
+    return res;
+}
+
+void jsl_string_builder_clear(
+    JSLStringBuilder* builder
+)
+{
     if (
         builder != NULL
-        && iterator != NULL
-        && builder->sentinel == JSL__BUILDER_PRIVATE_SENTINEL
+        && builder->sentinel == JSL___BUILDER_PRIVATE_SENTINEL
     )
-        iterator->current = builder->head;
+    {
+        builder->length = 0;
+    }
 }
 
-bool jsl_string_builder_iterator_next(JSLStringBuilderIterator* iterator, JSLImmutableMemory* out_chunk)
+static void jsl__builder_sink_write(
+    void* user_data, JSLImmutableMemory data
+)
 {
-    if (iterator == NULL || out_chunk == NULL)
-        return false;
-
-    *out_chunk = (JSLImmutableMemory){0};
-
-    struct JSL__StringBuilderChunk* current = iterator->current;
-    if (current == NULL || current->buffer.data == NULL)
-        return false;
-
-    iterator->current = current->next;
-
-    *out_chunk = jsl_auto_slice(current->buffer, current->writer);
-
-    return true;
+    JSLStringBuilder* builder = user_data;
+    jsl_string_builder_append(builder, data);
 }
 
-static void jsl__format_string_builder_callback(void* user, JSLImmutableMemory data)
+JSLOutputSink jsl_string_builder_output_sink(
+    JSLStringBuilder* builder
+)
 {
-    jsl_string_builder_insert_memory((JSLStringBuilder*) user, data);
-}
-
-JSLOutputSink jsl_string_builder_output_sink(JSLStringBuilder* builder)
-{
-    JSLOutputSink sink;
-    sink.write_fp = jsl__format_string_builder_callback;
-    sink.user_data = builder;
-    return sink;
+    JSLOutputSink res;
+    res.write_fp = jsl__builder_sink_write;
+    res.user_data = builder;
+    return res;
 }
 
 void jsl_string_builder_free(
@@ -236,23 +171,18 @@ void jsl_string_builder_free(
 )
 {
     if (
-        builder == NULL
-        || builder->sentinel != JSL__BUILDER_PRIVATE_SENTINEL
+        builder != NULL
+        && builder->sentinel == JSL___BUILDER_PRIVATE_SENTINEL
     )
-        return;
-
-    struct JSL__StringBuilderChunk* current = builder->head;
-    while (current != NULL)
     {
-        struct JSL__StringBuilderChunk* next = current->next;
-        if (current->buffer.data != NULL)
-            jsl_allocator_interface_free(builder->allocator, current->buffer.data);
-
-        jsl_allocator_interface_free(builder->allocator, current);
-        current = next;
+        jsl_allocator_interface_free(
+            builder->allocator,
+            builder->data
+        );
+        builder->length = 0;
+        builder->capacity = 0;
+        builder->sentinel = 0;
     }
-
-    builder->sentinel = 0;
 }
 
-#undef JSL__BUILDER_PRIVATE_SENTINEL
+#undef JSL___BUILDER_PRIVATE_SENTINEL
