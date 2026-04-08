@@ -73,6 +73,7 @@ extern "C" {
 #elif JSL_IS_POSIX
 
     #include <errno.h>
+    #include <ftw.h>
     #include <limits.h>
     #include <fcntl.h>
     #include <stdio.h>
@@ -151,8 +152,41 @@ typedef enum
 /**
 * TODO: docs
 */
+typedef enum
+{
+    JSL_DELETE_FILE_BAD_PARAMETERS = 0,
+    JSL_DELETE_FILE_SUCCESS,
+    JSL_DELETE_FILE_NOT_FOUND,
+    JSL_DELETE_FILE_IS_DIRECTORY,
+    JSL_DELETE_FILE_PERMISSION_DENIED,
+    JSL_DELETE_FILE_PATH_TOO_LONG,
+    JSL_DELETE_FILE_ERROR_UNKNOWN,
+
+    JSL_DELETE_FILE_ENUM_COUNT
+} JSLDeleteFileResultEnum;
+
+/**
+* TODO: docs
+*/
+typedef enum
+{
+    JSL_DELETE_DIRECTORY_BAD_PARAMETERS = 0,
+    JSL_DELETE_DIRECTORY_SUCCESS,
+    JSL_DELETE_DIRECTORY_NOT_FOUND,
+    JSL_DELETE_DIRECTORY_NOT_A_DIRECTORY,
+    JSL_DELETE_DIRECTORY_PERMISSION_DENIED,
+    JSL_DELETE_DIRECTORY_PATH_TOO_LONG,
+    JSL_DELETE_DIRECTORY_ERROR_UNKNOWN,
+
+    JSL_DELETE_DIRECTORY_ENUM_COUNT
+} JSLDeleteDirectoryResultEnum;
+
+/**
+* TODO: docs
+*/
 typedef enum {
     JSL_FILE_TYPE_UNKNOWN = 0,
+    JSL_FILE_TYPE_NOT_FOUND,
     JSL_FILE_TYPE_REG,
     JSL_FILE_TYPE_DIR,
     JSL_FILE_TYPE_SYMLINK,
@@ -194,6 +228,46 @@ JSL_WARN_UNUSED JSL_DEF JSLMakeDirectoryResultEnum jsl_make_directory(
 );
 
 /**
+* Delete the file system entry at `path`.
+*
+* The path may be relative or absolute. The path is copied into a stack
+* buffer so no heap allocation is performed. Follows `unlink()` semantics:
+* symbolic links, FIFOs, sockets, and other non-regular files are removed
+* by unlinking the filesystem entry rather than following it. Directories
+* are explicitly rejected and cause `JSL_DELETE_FILE_IS_DIRECTORY` to be
+* returned.
+*
+* @param path The file system path to delete
+* @param out_errno Optional pointer that receives the system errno on failure
+* @returns A result enum describing the outcome
+*/
+JSL_WARN_UNUSED JSL_DEF JSLDeleteFileResultEnum jsl_delete_file(
+    JSLImmutableMemory path,
+    int32_t* out_errno
+);
+
+/**
+* Delete the directory at `path` and all of its contents recursively.
+*
+* The path may be relative or absolute. All files and subdirectories inside
+* the target directory are removed before the directory itself is deleted.
+* No heap allocation is performed; path components are built in stack buffers.
+* Symlinks inside the directory are unlinked without following them.
+*
+* Returns `JSL_DELETE_DIRECTORY_NOT_A_DIRECTORY` when the path exists but
+* does not point to a directory. Returns `JSL_DELETE_DIRECTORY_NOT_FOUND`
+* when the path does not exist.
+*
+* @param path The file system path of the directory to delete
+* @param out_errno Optional pointer that receives a system error code on failure
+* @returns A result enum describing the outcome
+*/
+JSL_WARN_UNUSED JSL_DEF JSLDeleteDirectoryResultEnum jsl_delete_directory(
+    JSLImmutableMemory path,
+    int32_t* out_errno
+);
+
+/**
 * Determine the type of file system entry at `path`.
 *
 * The path may be relative or absolute. The path is copied into a stack
@@ -203,8 +277,9 @@ JSL_WARN_UNUSED JSL_DEF JSLMakeDirectoryResultEnum jsl_make_directory(
 * reparse points (symbolic links and junctions), which are reported as
 * `JSL_FILE_TYPE_SYMLINK`.
 *
-* If the path is invalid, does not exist, or the type cannot be
-* determined, `JSL_FILE_TYPE_UNKNOWN` is returned.
+* If the path argument is invalid or the type cannot be determined,
+* `JSL_FILE_TYPE_UNKNOWN` is returned. If the path does not exist,
+* `JSL_FILE_TYPE_NOT_FOUND` is returned.
 *
 * @param path The file system path
 * @returns A `JSLFileTypeEnum` value describing the entry type

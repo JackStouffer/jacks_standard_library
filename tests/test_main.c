@@ -244,7 +244,22 @@ int main(void)
     RUN_TEST_FUNCTION("Test jsl_get_file_type nonexistent", test_jsl_get_file_type_nonexistent);
     RUN_TEST_FUNCTION("Test jsl_get_file_type symlink", test_jsl_get_file_type_symlink);
 
-    // 
+    RUN_TEST_FUNCTION("Test jsl_delete_file bad parameters", test_jsl_delete_file_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_delete_file success", test_jsl_delete_file_success);
+    RUN_TEST_FUNCTION("Test jsl_delete_file not found", test_jsl_delete_file_not_found);
+    RUN_TEST_FUNCTION("Test jsl_delete_file is directory", test_jsl_delete_file_is_directory);
+    RUN_TEST_FUNCTION("Test jsl_delete_file symlink", test_jsl_delete_file_symlink);
+    RUN_TEST_FUNCTION("Test jsl_delete_file path too long", test_jsl_delete_file_path_too_long);
+
+    RUN_TEST_FUNCTION("Test jsl_delete_directory bad parameters", test_jsl_delete_directory_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_delete_directory not found", test_jsl_delete_directory_not_found);
+    RUN_TEST_FUNCTION("Test jsl_delete_directory not a directory", test_jsl_delete_directory_not_a_directory);
+    RUN_TEST_FUNCTION("Test jsl_delete_directory empty", test_jsl_delete_directory_empty);
+    RUN_TEST_FUNCTION("Test jsl_delete_directory with files", test_jsl_delete_directory_with_files);
+    RUN_TEST_FUNCTION("Test jsl_delete_directory nested", test_jsl_delete_directory_nested);
+    RUN_TEST_FUNCTION("Test jsl_delete_directory path too long", test_jsl_delete_directory_path_too_long);
+
+    //
     //              Test Array
     // 
 

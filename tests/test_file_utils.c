@@ -423,7 +423,123 @@ void test_jsl_get_file_type_nonexistent(void)
 {
     const char* path = "./tests/this_path_does_not_exist_xyz_12345";
     JSLFileTypeEnum t = jsl_get_file_type(jsl_cstr_to_memory(path));
-    TEST_INT32_EQUAL(t, JSL_FILE_TYPE_UNKNOWN);
+    TEST_INT32_EQUAL(t, JSL_FILE_TYPE_NOT_FOUND);
+}
+
+void test_jsl_delete_file_bad_parameters(void)
+{
+    JSLImmutableMemory null_path = { .data = NULL, .length = 5 };
+    JSLDeleteFileResultEnum res = jsl_delete_file(null_path, NULL);
+    TEST_INT32_EQUAL(res, JSL_DELETE_FILE_BAD_PARAMETERS);
+
+    JSLImmutableMemory zero_path = { .data = (const uint8_t*) "x", .length = 0 };
+    res = jsl_delete_file(zero_path, NULL);
+    TEST_INT32_EQUAL(res, JSL_DELETE_FILE_BAD_PARAMETERS);
+}
+
+void test_jsl_delete_file_success(void)
+{
+    const char* path = "./tests/tmp_delete_file_success.txt";
+
+    FILE* f = fopen(path, "wb");
+    TEST_BOOL(f != NULL);
+    if (f == NULL)
+        return;
+    fclose(f);
+
+    int32_t os_err = 0;
+    JSLDeleteFileResultEnum res = jsl_delete_file(
+        jsl_cstr_to_memory(path),
+        &os_err
+    );
+    TEST_INT32_EQUAL(res, JSL_DELETE_FILE_SUCCESS);
+    TEST_INT32_EQUAL(os_err, 0);
+
+    // Confirm the file is gone
+    JSLFileTypeEnum type = jsl_get_file_type(jsl_cstr_to_memory(path));
+    TEST_INT32_EQUAL(type, JSL_FILE_TYPE_NOT_FOUND);
+}
+
+void test_jsl_delete_file_not_found(void)
+{
+    const char* path = "./tests/tmp_delete_file_does_not_exist_xyz_12345.txt";
+    int32_t os_err = 0;
+    JSLDeleteFileResultEnum res = jsl_delete_file(
+        jsl_cstr_to_memory(path),
+        &os_err
+    );
+    TEST_INT32_EQUAL(res, JSL_DELETE_FILE_NOT_FOUND);
+    TEST_BOOL(os_err != 0);
+}
+
+void test_jsl_delete_file_is_directory(void)
+{
+    const char* path = "./tests/tmp_delete_file_dir";
+
+    #if JSL_IS_WINDOWS
+        _mkdir(path);
+    #else
+        mkdir(path, S_IRWXU);
+    #endif
+
+    int32_t os_err = 0;
+    JSLDeleteFileResultEnum res = jsl_delete_file(
+        jsl_cstr_to_memory(path),
+        &os_err
+    );
+    TEST_INT32_EQUAL(res, JSL_DELETE_FILE_IS_DIRECTORY);
+
+    #if JSL_IS_WINDOWS
+        _rmdir(path);
+    #else
+        rmdir(path);
+    #endif
+}
+
+void test_jsl_delete_file_symlink(void)
+{
+#if JSL_IS_POSIX
+    const char* target    = "./tests/example.txt";
+    const char* link_path = "./tests/tmp_delete_file_symlink";
+
+    // Best-effort cleanup from any prior failed run
+    unlink(link_path);
+
+    int sym_res = symlink(target, link_path);
+    TEST_INT32_EQUAL(sym_res, 0);
+    if (sym_res != 0)
+        return;
+
+    int32_t os_err = 0;
+    JSLDeleteFileResultEnum res = jsl_delete_file(
+        jsl_cstr_to_memory(link_path),
+        &os_err
+    );
+    TEST_INT32_EQUAL(res, JSL_DELETE_FILE_SUCCESS);
+
+    // The symlink itself must be gone
+    JSLFileTypeEnum type = jsl_get_file_type(jsl_cstr_to_memory(link_path));
+    TEST_INT32_EQUAL(type, JSL_FILE_TYPE_NOT_FOUND);
+
+    // The target must still exist
+    JSLFileTypeEnum target_type = jsl_get_file_type(jsl_cstr_to_memory(target));
+    TEST_INT32_EQUAL(target_type, JSL_FILE_TYPE_REG);
+#endif
+}
+
+void test_jsl_delete_file_path_too_long(void)
+{
+    char buffer[FILENAME_MAX + 16];
+    for (int64_t i = 0; i < (int64_t) sizeof(buffer); i++)
+        buffer[i] = 'a';
+
+    JSLImmutableMemory long_path = {
+        .data   = (const uint8_t*) buffer,
+        .length = (int64_t) FILENAME_MAX
+    };
+
+    JSLDeleteFileResultEnum res = jsl_delete_file(long_path, NULL);
+    TEST_INT32_EQUAL(res, JSL_DELETE_FILE_BAD_PARAMETERS);
 }
 
 void test_jsl_get_file_type_symlink(void)
@@ -446,6 +562,164 @@ void test_jsl_get_file_type_symlink(void)
     int rm_res = unlink(link_path);
     TEST_INT32_EQUAL(rm_res, 0);
 #endif
+}
+
+void test_jsl_delete_directory_bad_parameters(void)
+{
+    JSLImmutableMemory null_path = { .data = NULL, .length = 5 };
+    JSLDeleteDirectoryResultEnum res = jsl_delete_directory(null_path, NULL);
+    TEST_INT32_EQUAL(res, JSL_DELETE_DIRECTORY_BAD_PARAMETERS);
+
+    JSLImmutableMemory zero_path = { .data = (const uint8_t*) "x", .length = 0 };
+    res = jsl_delete_directory(zero_path, NULL);
+    TEST_INT32_EQUAL(res, JSL_DELETE_DIRECTORY_BAD_PARAMETERS);
+}
+
+void test_jsl_delete_directory_not_found(void)
+{
+    const char* path = "./tests/tmp_delete_dir_does_not_exist_xyz_12345";
+    int32_t os_err = 0;
+    JSLDeleteDirectoryResultEnum res = jsl_delete_directory(
+        jsl_cstr_to_memory(path),
+        &os_err
+    );
+    TEST_INT32_EQUAL(res, JSL_DELETE_DIRECTORY_NOT_FOUND);
+    TEST_BOOL(os_err != 0);
+}
+
+void test_jsl_delete_directory_not_a_directory(void)
+{
+    const char* path = "./tests/tmp_delete_dir_is_file.txt";
+
+    FILE* f = fopen(path, "wb");
+    TEST_BOOL(f != NULL);
+    if (f == NULL)
+        return;
+    fclose(f);
+
+    int32_t os_err = 0;
+    JSLDeleteDirectoryResultEnum res = jsl_delete_directory(
+        jsl_cstr_to_memory(path),
+        &os_err
+    );
+    TEST_INT32_EQUAL(res, JSL_DELETE_DIRECTORY_NOT_A_DIRECTORY);
+
+    remove(path);
+}
+
+void test_jsl_delete_directory_empty(void)
+{
+    const char* path = "./tests/tmp_delete_dir_empty";
+
+    JSL_TEST_RMDIR(path);
+
+    #if JSL_IS_WINDOWS
+        _mkdir(path);
+    #else
+        mkdir(path, S_IRWXU);
+    #endif
+
+    int32_t os_err = 0;
+    JSLDeleteDirectoryResultEnum res = jsl_delete_directory(
+        jsl_cstr_to_memory(path),
+        &os_err
+    );
+    TEST_INT32_EQUAL(res, JSL_DELETE_DIRECTORY_SUCCESS);
+
+    JSLFileTypeEnum type = jsl_get_file_type(jsl_cstr_to_memory(path));
+    TEST_INT32_EQUAL(type, JSL_FILE_TYPE_NOT_FOUND);
+}
+
+void test_jsl_delete_directory_with_files(void)
+{
+    const char* dir_path   = "./tests/tmp_delete_dir_with_files";
+    const char* file1_path = "./tests/tmp_delete_dir_with_files/a.txt";
+    const char* file2_path = "./tests/tmp_delete_dir_with_files/b.txt";
+
+    JSL_TEST_RMDIR(dir_path);
+
+    #if JSL_IS_WINDOWS
+        _mkdir(dir_path);
+    #else
+        mkdir(dir_path, S_IRWXU);
+    #endif
+
+    FILE* f = fopen(file1_path, "wb");
+    TEST_BOOL(f != NULL);
+    if (f != NULL)
+        fclose(f);
+
+    f = fopen(file2_path, "wb");
+    TEST_BOOL(f != NULL);
+    if (f != NULL)
+        fclose(f);
+
+    int32_t os_err = 0;
+    JSLDeleteDirectoryResultEnum res = jsl_delete_directory(
+        jsl_cstr_to_memory(dir_path),
+        &os_err
+    );
+    TEST_INT32_EQUAL(res, JSL_DELETE_DIRECTORY_SUCCESS);
+
+    JSLFileTypeEnum type = jsl_get_file_type(jsl_cstr_to_memory(dir_path));
+    TEST_INT32_EQUAL(type, JSL_FILE_TYPE_NOT_FOUND);
+}
+
+void test_jsl_delete_directory_nested(void)
+{
+    const char* top     = "./tests/tmp_delete_dir_nested";
+    const char* sub     = "./tests/tmp_delete_dir_nested/sub";
+    const char* top_f   = "./tests/tmp_delete_dir_nested/top.txt";
+    const char* sub_f   = "./tests/tmp_delete_dir_nested/sub/deep.txt";
+
+    // Best-effort cleanup from any prior failed run
+    remove(sub_f);
+    remove(top_f);
+    JSL_TEST_RMDIR(sub);
+    JSL_TEST_RMDIR(top);
+
+    #if JSL_IS_WINDOWS
+        _mkdir(top);
+        _mkdir(sub);
+    #else
+        mkdir(top, S_IRWXU);
+        mkdir(sub, S_IRWXU);
+    #endif
+
+    FILE* f = fopen(top_f, "wb");
+    TEST_BOOL(f != NULL);
+    if (f != NULL)
+        fclose(f);
+
+    f = fopen(sub_f, "wb");
+    TEST_BOOL(f != NULL);
+    if (f != NULL)
+        fclose(f);
+
+    int32_t os_err = 0;
+    JSLDeleteDirectoryResultEnum res = jsl_delete_directory(
+        jsl_cstr_to_memory(top),
+        &os_err
+    );
+    TEST_INT32_EQUAL(res, JSL_DELETE_DIRECTORY_SUCCESS);
+
+    JSLFileTypeEnum type = jsl_get_file_type(jsl_cstr_to_memory(top));
+    TEST_INT32_EQUAL(type, JSL_FILE_TYPE_NOT_FOUND);
+}
+
+void test_jsl_delete_directory_path_too_long(void)
+{
+    char buffer[FILENAME_MAX + 16];
+    for (int64_t i = 0; i < (int64_t) sizeof(buffer); i++)
+        buffer[i] = 'a';
+
+    JSLImmutableMemory long_path = {
+        .data   = (const uint8_t*) buffer,
+        .length = (int64_t) FILENAME_MAX
+    };
+
+    JSLDeleteDirectoryResultEnum res = jsl_delete_directory(long_path, NULL);
+    TEST_INT32_EQUAL(res, JSL_DELETE_DIRECTORY_BAD_PARAMETERS);
 }
 
 void test_jsl_format_file_write_failure(void)

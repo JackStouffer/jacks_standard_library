@@ -587,6 +587,448 @@ JSLMakeDirectoryResultEnum jsl_make_directory(
     return res;
 }
 
+JSLDeleteFileResultEnum jsl_delete_file(
+    JSLImmutableMemory path,
+    int32_t* out_errno
+)
+{
+    char path_buffer[FILENAME_MAX + 1];
+    JSLDeleteFileResultEnum res = JSL_DELETE_FILE_BAD_PARAMETERS;
+    bool proceed = (path.data != NULL
+        && path.length > 0
+        && path.length < (int64_t) FILENAME_MAX);
+    bool had_valid_params = proceed;
+
+    if (proceed)
+    {
+        JSL_MEMCPY(path_buffer, path.data, (size_t) path.length);
+        path_buffer[path.length] = '\0';
+    }
+
+    #if JSL_IS_WINDOWS
+
+        DWORD attrs = INVALID_FILE_ATTRIBUTES;
+        bool got_attrs = false;
+        bool is_directory = false;
+
+        if (proceed)
+        {
+            attrs = GetFileAttributesA(path_buffer);
+            got_attrs = (attrs != INVALID_FILE_ATTRIBUTES);
+        }
+
+        bool attrs_not_found = (had_valid_params && !got_attrs);
+        if (attrs_not_found)
+        {
+            DWORD last_err = GetLastError();
+            if (out_errno != NULL)
+                *out_errno = (int32_t) last_err;
+            bool is_not_found = (last_err == ERROR_FILE_NOT_FOUND
+                || last_err == ERROR_PATH_NOT_FOUND);
+            res = is_not_found ? JSL_DELETE_FILE_NOT_FOUND : JSL_DELETE_FILE_ERROR_UNKNOWN;
+            proceed = false;
+        }
+
+        if (got_attrs)
+        {
+            // Treat any directory attribute (including junctions) as a directory
+            is_directory = (attrs & FILE_ATTRIBUTE_DIRECTORY) != 0;
+        }
+
+        if (proceed && is_directory)
+        {
+            res = JSL_DELETE_FILE_IS_DIRECTORY;
+            proceed = false;
+        }
+
+        BOOL delete_ok = FALSE;
+        if (proceed)
+        {
+            delete_ok = DeleteFileA(path_buffer);
+        }
+
+        bool delete_success = (proceed && delete_ok != FALSE);
+        if (delete_success)
+        {
+            res = JSL_DELETE_FILE_SUCCESS;
+        }
+
+        bool delete_failed = (proceed && delete_ok == FALSE);
+        if (delete_failed)
+        {
+            DWORD last_err = GetLastError();
+            if (out_errno != NULL)
+                *out_errno = (int32_t) last_err;
+
+            if (last_err == ERROR_ACCESS_DENIED)
+                res = JSL_DELETE_FILE_PERMISSION_DENIED;
+            else if (last_err == ERROR_FILE_NOT_FOUND || last_err == ERROR_PATH_NOT_FOUND)
+                res = JSL_DELETE_FILE_NOT_FOUND;
+            else
+                res = JSL_DELETE_FILE_ERROR_UNKNOWN;
+        }
+
+    #elif JSL_IS_POSIX
+
+        struct stat st_posix;
+        int32_t stat_ret = -1;
+        bool stat_ok = false;
+        bool stat_not_found = false;
+        bool stat_other_error = false;
+        bool is_directory = false;
+
+        if (proceed)
+        {
+            errno = 0;
+            stat_ret = lstat(path_buffer, &st_posix);
+            stat_ok = (stat_ret == 0);
+            stat_not_found = (!stat_ok && (errno == ENOENT || errno == ENOTDIR));
+            stat_other_error = (!stat_ok && !stat_not_found);
+            proceed = stat_ok;
+        }
+
+        if (had_valid_params && stat_not_found)
+        {
+            if (out_errno != NULL)
+                *out_errno = errno;
+            res = JSL_DELETE_FILE_NOT_FOUND;
+        }
+
+        if (had_valid_params && stat_other_error)
+        {
+            int32_t err = errno;
+            if (out_errno != NULL)
+                *out_errno = err;
+            res = (err == EACCES) ? JSL_DELETE_FILE_PERMISSION_DENIED : JSL_DELETE_FILE_ERROR_UNKNOWN;
+        }
+
+        if (stat_ok)
+        {
+            is_directory = ((st_posix.st_mode & (mode_t) S_IFMT) == S_IFDIR);
+        }
+
+        if (proceed && is_directory)
+        {
+            res = JSL_DELETE_FILE_IS_DIRECTORY;
+            proceed = false;
+        }
+
+        int32_t unlink_ret = -1;
+        if (proceed)
+        {
+            errno = 0;
+            unlink_ret = unlink(path_buffer);
+        }
+
+        bool unlink_ok = (proceed && unlink_ret == 0);
+        if (unlink_ok)
+        {
+            res = JSL_DELETE_FILE_SUCCESS;
+        }
+
+        bool unlink_failed = (proceed && unlink_ret != 0);
+        if (unlink_failed)
+        {
+            int32_t err = errno;
+            if (out_errno != NULL)
+                *out_errno = err;
+
+            switch (err)
+            {
+                case EACCES:
+                case EPERM:
+                    res = JSL_DELETE_FILE_PERMISSION_DENIED;
+                    break;
+                case ENOENT:
+                    res = JSL_DELETE_FILE_NOT_FOUND;
+                    break;
+                case ENAMETOOLONG:
+                    res = JSL_DELETE_FILE_PATH_TOO_LONG;
+                    break;
+                default:
+                    res = JSL_DELETE_FILE_ERROR_UNKNOWN;
+                    break;
+            }
+        }
+
+    #else
+        JSL_ASSERT(0 && "File utils only work on Windows or POSIX platforms.");
+        (void) had_valid_params;
+    #endif
+
+    return res;
+}
+
+#if JSL_IS_POSIX
+static int jsl__nftw_delete_callback(
+    const char* fpath,
+    const struct stat* sb,
+    int typeflag,
+    struct FTW* ftwbuf
+)
+{
+    (void) sb;
+    (void) ftwbuf;
+
+    int res = 0;
+    bool is_dir = (typeflag == FTW_DP || typeflag == FTW_DNR);
+
+    if (is_dir)
+        res = rmdir(fpath);
+    else
+        res = unlink(fpath);
+
+    return res == 0 ? 0 : errno;
+}
+#endif
+
+#if JSL_IS_WINDOWS
+static JSLDeleteDirectoryResultEnum jsl__delete_directory_windows(
+    const char* path,
+    size_t path_len
+)
+{
+    char child_path[FILENAME_MAX + 1];
+    char search_pattern[FILENAME_MAX + 3];
+    JSLDeleteDirectoryResultEnum result = JSL_DELETE_DIRECTORY_SUCCESS;
+    bool entry_fits = false;
+
+    bool pattern_fits = (path_len + 3 <= (size_t) FILENAME_MAX);
+    if (!pattern_fits)
+        result = JSL_DELETE_DIRECTORY_PATH_TOO_LONG;
+
+    WIN32_FIND_DATAA find_data;
+    HANDLE find_handle = INVALID_HANDLE_VALUE;
+    bool found = false;
+    if (pattern_fits)
+    {
+        JSL_MEMCPY(search_pattern, path, path_len);
+        search_pattern[path_len]     = '\\';
+        search_pattern[path_len + 1] = '*';
+        search_pattern[path_len + 2] = '\0';
+        find_handle = FindFirstFileA(search_pattern, &find_data);
+        found = (find_handle != INVALID_HANDLE_VALUE);
+    }
+
+    bool find_failed = pattern_fits && !found;
+    if (find_failed && result == JSL_DELETE_DIRECTORY_SUCCESS)
+    {
+        DWORD err = GetLastError();
+        bool not_found = (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND);
+        result = not_found ? JSL_DELETE_DIRECTORY_NOT_FOUND
+                           : JSL_DELETE_DIRECTORY_ERROR_UNKNOWN;
+    }
+
+    JSL_MEMCPY(child_path, path, path_len);
+    child_path[path_len] = '\\';
+
+    bool iterate = found;
+    while (iterate)
+    {
+        bool is_dot    = find_data.cFileName[0] == '.' && find_data.cFileName[1] == '\0';
+        bool is_dotdot = find_data.cFileName[0] == '.' && find_data.cFileName[1] == '.'
+                                                        && find_data.cFileName[2] == '\0';
+        bool skip = is_dot || is_dotdot;
+
+        size_t name_len = 0;
+        entry_fits = false;
+        if (!skip)
+        {
+            name_len   = JSL_STRLEN(find_data.cFileName);
+            entry_fits = (path_len + 1 + name_len < (size_t) FILENAME_MAX);
+        }
+
+        bool path_too_long = !skip && !entry_fits;
+        if (path_too_long && result == JSL_DELETE_DIRECTORY_SUCCESS)
+            result = JSL_DELETE_DIRECTORY_PATH_TOO_LONG;
+
+        bool is_directory = false;
+        if (entry_fits)
+        {
+            JSL_MEMCPY(child_path + path_len + 1, find_data.cFileName, name_len + 1);
+            is_directory = (find_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
+        }
+
+        JSLDeleteDirectoryResultEnum sub = JSL_DELETE_DIRECTORY_SUCCESS;
+        if (is_directory)
+            sub = jsl__delete_directory_windows(child_path, path_len + 1 + name_len);
+
+        bool sub_failed = is_directory && (sub != JSL_DELETE_DIRECTORY_SUCCESS);
+        if (sub_failed && result == JSL_DELETE_DIRECTORY_SUCCESS)
+            result = sub;
+
+        bool is_file  = entry_fits && !is_directory;
+        BOOL del_ok   = TRUE;
+        if (is_file)
+            del_ok = DeleteFileA(child_path);
+
+        bool del_failed = is_file && (del_ok == FALSE);
+        if (del_failed && result == JSL_DELETE_DIRECTORY_SUCCESS)
+        {
+            DWORD err = GetLastError();
+            bool perm = (err == ERROR_ACCESS_DENIED);
+            result = perm ? JSL_DELETE_DIRECTORY_PERMISSION_DENIED
+                          : JSL_DELETE_DIRECTORY_ERROR_UNKNOWN;
+        }
+
+        BOOL next = FindNextFileA(find_handle, &find_data);
+        iterate   = (next != FALSE);
+    }
+
+    if (found)
+        FindClose(find_handle);
+
+    BOOL rm_ok     = TRUE;
+    bool should_rm = found && (result == JSL_DELETE_DIRECTORY_SUCCESS);
+    if (should_rm)
+        rm_ok = RemoveDirectoryA(path);
+
+    bool rm_failed = should_rm && (rm_ok == FALSE);
+    if (rm_failed)
+    {
+        DWORD err = GetLastError();
+        bool perm = (err == ERROR_ACCESS_DENIED);
+        result = perm ? JSL_DELETE_DIRECTORY_PERMISSION_DENIED
+                      : JSL_DELETE_DIRECTORY_ERROR_UNKNOWN;
+    }
+
+    return result;
+}
+#endif
+
+JSLDeleteDirectoryResultEnum jsl_delete_directory(
+    JSLImmutableMemory path,
+    int32_t* out_errno
+)
+{
+    char path_buffer[FILENAME_MAX + 1];
+    JSLDeleteDirectoryResultEnum res = JSL_DELETE_DIRECTORY_BAD_PARAMETERS;
+    bool proceed = false;
+
+    proceed = (path.data != NULL
+        && path.length > 0
+        && path.length < (int64_t) FILENAME_MAX);
+
+    if (proceed)
+    {
+        JSL_MEMCPY(path_buffer, path.data, (size_t) path.length);
+        path_buffer[path.length] = '\0';
+    }
+
+    #if JSL_IS_WINDOWS
+
+        DWORD attrs = INVALID_FILE_ATTRIBUTES;
+        bool got_attrs = false;
+
+        if (proceed)
+        {
+            attrs      = GetFileAttributesA(path_buffer);
+            got_attrs  = (attrs != INVALID_FILE_ATTRIBUTES);
+        }
+
+        bool attrs_not_found = proceed && !got_attrs;
+        if (attrs_not_found)
+        {
+            DWORD last_err = GetLastError();
+            if (out_errno != NULL)
+                *out_errno = (int32_t) last_err;
+            bool is_not_found = (last_err == ERROR_FILE_NOT_FOUND
+                || last_err == ERROR_PATH_NOT_FOUND);
+            res     = is_not_found ? JSL_DELETE_DIRECTORY_NOT_FOUND
+                                   : JSL_DELETE_DIRECTORY_ERROR_UNKNOWN;
+            proceed = false;
+        }
+
+        bool not_a_directory = proceed && got_attrs && !(attrs & FILE_ATTRIBUTE_DIRECTORY);
+        if (not_a_directory)
+        {
+            res     = JSL_DELETE_DIRECTORY_NOT_A_DIRECTORY;
+            proceed = false;
+        }
+
+        if (proceed)
+        {
+            res = jsl__delete_directory_windows(path_buffer, (size_t) path.length);
+            if (res != JSL_DELETE_DIRECTORY_SUCCESS && out_errno != NULL)
+                *out_errno = (int32_t) GetLastError();
+        }
+
+    #elif JSL_IS_POSIX
+
+        struct stat st_posix;
+        int32_t stat_ret = -1;
+        bool stat_ok        = false;
+        bool stat_not_found = false;
+        bool stat_error     = false;
+
+        if (proceed)
+        {
+            errno           = 0;
+            stat_ret        = (int32_t) lstat(path_buffer, &st_posix);
+            stat_ok         = (stat_ret == 0);
+            stat_not_found  = (!stat_ok && (errno == ENOENT || errno == ENOTDIR));
+            stat_error      = (!stat_ok && !stat_not_found);
+        }
+
+        bool is_not_found = proceed && stat_not_found;
+        if (is_not_found)
+        {
+            if (out_errno != NULL)
+                *out_errno = errno;
+            res     = JSL_DELETE_DIRECTORY_NOT_FOUND;
+            proceed = false;
+        }
+
+        bool had_stat_error = proceed && stat_error;
+        if (had_stat_error)
+        {
+            if (out_errno != NULL)
+                *out_errno = errno;
+            res     = JSL_DELETE_DIRECTORY_ERROR_UNKNOWN;
+            proceed = false;
+        }
+
+        bool not_a_directory = proceed && stat_ok
+            && ((st_posix.st_mode & (mode_t) S_IFMT) != S_IFDIR);
+        if (not_a_directory)
+        {
+            res     = JSL_DELETE_DIRECTORY_NOT_A_DIRECTORY;
+            proceed = false;
+        }
+
+        if (proceed)
+        {
+            int32_t nftw_res = (int32_t) nftw(
+                path_buffer,
+                jsl__nftw_delete_callback,
+                64,
+                FTW_DEPTH | FTW_PHYS
+            );
+            bool nftw_ok = (nftw_res == 0);
+
+            if (nftw_ok)
+                res = JSL_DELETE_DIRECTORY_SUCCESS;
+
+            bool nftw_failed = !nftw_ok;
+            if (nftw_failed)
+            {
+                int32_t err = (nftw_res == -1) ? errno : nftw_res;
+                if (out_errno != NULL)
+                    *out_errno = err;
+                bool perm = (err == EACCES || err == EPERM);
+                res = perm ? JSL_DELETE_DIRECTORY_PERMISSION_DENIED
+                           : JSL_DELETE_DIRECTORY_ERROR_UNKNOWN;
+            }
+        }
+
+    #else
+        JSL_ASSERT(0 && "File utils only work on Windows or POSIX platforms.");
+        (void) proceed;
+    #endif
+
+    return res;
+}
+
 JSLFileTypeEnum jsl_get_file_type(JSLImmutableMemory path)
 {
     char path_buffer[FILENAME_MAX + 1];
@@ -615,6 +1057,20 @@ JSLFileTypeEnum jsl_get_file_type(JSLImmutableMemory path)
             attrs = GetFileAttributesA(path_buffer);
             got_attrs = (attrs != INVALID_FILE_ATTRIBUTES);
             proceed = got_attrs;
+        }
+
+        bool attrs_not_found = false;
+        if (!got_attrs && path.data != NULL && path.length > 0
+            && path.length < (int64_t) FILENAME_MAX)
+        {
+            DWORD last_err = GetLastError();
+            attrs_not_found = (last_err == ERROR_FILE_NOT_FOUND
+                || last_err == ERROR_PATH_NOT_FOUND);
+        }
+
+        if (attrs_not_found)
+        {
+            result = JSL_FILE_TYPE_NOT_FOUND;
         }
 
         if (proceed)
@@ -661,12 +1117,20 @@ JSLFileTypeEnum jsl_get_file_type(JSLImmutableMemory path)
         struct stat st_posix;
         int32_t stat_ret = -1;
         bool stat_ok = false;
+        bool stat_not_found = false;
 
         if (proceed)
         {
+            errno = 0;
             stat_ret = lstat(path_buffer, &st_posix);
             stat_ok = (stat_ret == 0);
+            stat_not_found = (!stat_ok && (errno == ENOENT || errno == ENOTDIR));
             proceed = stat_ok;
+        }
+
+        if (stat_not_found)
+        {
+            result = JSL_FILE_TYPE_NOT_FOUND;
         }
 
         if (proceed)

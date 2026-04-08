@@ -20,5 +20,18 @@ void test_jsl_get_file_type_directory(void);
 void test_jsl_get_file_type_bad_parameters(void);
 void test_jsl_get_file_type_nonexistent(void);
 void test_jsl_get_file_type_symlink(void);
+void test_jsl_delete_file_bad_parameters(void);
+void test_jsl_delete_file_success(void);
+void test_jsl_delete_file_not_found(void);
+void test_jsl_delete_file_is_directory(void);
+void test_jsl_delete_file_symlink(void);
+void test_jsl_delete_file_path_too_long(void);
+void test_jsl_delete_directory_bad_parameters(void);
+void test_jsl_delete_directory_not_found(void);
+void test_jsl_delete_directory_not_a_directory(void);
+void test_jsl_delete_directory_empty(void);
+void test_jsl_delete_directory_with_files(void);
+void test_jsl_delete_directory_nested(void);
+void test_jsl_delete_directory_path_too_long(void);
 
 #endif
