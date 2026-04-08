@@ -66,7 +66,9 @@ extern "C" {
     #include <stdio.h>
     #include <io.h>
     #include <share.h>
+    #include <direct.h>
     #include <sys\stat.h>
+    #include <windows.h>
 
 #elif JSL_IS_POSIX
 
@@ -131,6 +133,24 @@ typedef enum
 /**
 * TODO: docs
 */
+typedef enum
+{
+    JSL_MAKE_DIRECTORY_BAD_PARAMETERS = 0,
+    JSL_MAKE_DIRECTORY_SUCCESS,
+    JSL_MAKE_DIRECTORY_ALREADY_EXISTS,
+    JSL_MAKE_DIRECTORY_PATH_TOO_LONG,
+    JSL_MAKE_DIRECTORY_PERMISSION_DENIED,
+    JSL_MAKE_DIRECTORY_PARENT_NOT_FOUND,
+    JSL_MAKE_DIRECTORY_NO_SPACE,
+    JSL_MAKE_DIRECTORY_READ_ONLY_FS,
+    JSL_MAKE_DIRECTORY_ERROR_UNKNOWN,
+
+    JSL_MAKE_DIRECTORY_ENUM_COUNT
+} JSLMakeDirectoryResultEnum;
+
+/**
+* TODO: docs
+*/
 typedef enum {
     JSL_FILE_TYPE_UNKNOWN = 0,
     JSL_FILE_TYPE_REG,
@@ -157,6 +177,39 @@ JSL_WARN_UNUSED JSLGetFileSizeResultEnum jsl_get_file_size(
     int64_t* out_size,
     int32_t* out_os_error_code
 );
+
+/**
+* Create a new directory at `path`.
+*
+* The path may be relative or absolute. On POSIX systems the directory is
+* created with permissions `0755` (subject to the process umask).
+*
+* @param path File system path of the directory to create
+* @param out_errno Optional pointer that receives the system errno on failure
+* @returns A result enum describing the outcome
+*/
+JSL_WARN_UNUSED JSL_DEF JSLMakeDirectoryResultEnum jsl_make_directory(
+    JSLImmutableMemory path,
+    int32_t* out_errno
+);
+
+/**
+* Determine the type of file system entry at `path`.
+*
+* The path may be relative or absolute. The path is copied into a stack
+* buffer so no heap allocation is performed. On POSIX, `lstat` is used so
+* symlinks themselves are reported as `JSL_FILE_TYPE_SYMLINK` rather than
+* the target's type. On Windows, `GetFileAttributesA` is used to detect
+* reparse points (symbolic links and junctions), which are reported as
+* `JSL_FILE_TYPE_SYMLINK`.
+*
+* If the path is invalid, does not exist, or the type cannot be
+* determined, `JSL_FILE_TYPE_UNKNOWN` is returned.
+*
+* @param path The file system path
+* @returns A `JSLFileTypeEnum` value describing the entry type
+*/
+JSL_WARN_UNUSED JSLFileTypeEnum jsl_get_file_type(JSLImmutableMemory path);
 
 /**
     * Load the contents of the file at `path` into a newly allocated buffer

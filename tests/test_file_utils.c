@@ -280,6 +280,174 @@ void test_jsl_format_file_negative_length(void)
     jsl_format_sink(sink, fmt);
 }
 
+#if JSL_IS_WINDOWS
+    #define JSL_TEST_RMDIR(p) _rmdir(p)
+#else
+    #define JSL_TEST_RMDIR(p) rmdir(p)
+#endif
+
+void test_jsl_make_directory_bad_parameters(void)
+{
+    int32_t os_err = 0;
+
+    JSLImmutableMemory null_path = { .data = NULL, .length = 5 };
+    JSLMakeDirectoryResultEnum res = jsl_make_directory(null_path, &os_err);
+    TEST_INT32_EQUAL(res, JSL_MAKE_DIRECTORY_BAD_PARAMETERS);
+
+    JSLImmutableMemory zero_path = { .data = (const uint8_t*) "x", .length = 0 };
+    res = jsl_make_directory(zero_path, &os_err);
+    TEST_INT32_EQUAL(res, JSL_MAKE_DIRECTORY_BAD_PARAMETERS);
+}
+
+void test_jsl_make_directory_creates_directory(void)
+{
+    const char* path = "./tests/tmp_make_dir_create";
+
+    // Best-effort cleanup from any prior failed run
+    JSL_TEST_RMDIR(path);
+
+    int32_t os_err = 0;
+    JSLMakeDirectoryResultEnum res = jsl_make_directory(
+        jsl_cstr_to_memory(path),
+        &os_err
+    );
+    TEST_INT32_EQUAL(res, JSL_MAKE_DIRECTORY_SUCCESS);
+
+    // Verify it really exists by checking jsl_get_file_size returns
+    // not-a-regular-file (directories aren't regular files).
+    int64_t size = -1;
+    int32_t size_err = 0;
+    JSLGetFileSizeResultEnum size_res = jsl_get_file_size(
+        jsl_cstr_to_memory(path),
+        &size,
+        &size_err
+    );
+    TEST_INT32_EQUAL(size_res, JSL_GET_FILE_SIZE_NOT_REGULAR_FILE);
+
+    int rm_res = JSL_TEST_RMDIR(path);
+    TEST_INT32_EQUAL(rm_res, 0);
+}
+
+void test_jsl_make_directory_already_exists(void)
+{
+    const char* path = "./tests/tmp_make_dir_exists";
+
+    JSL_TEST_RMDIR(path);
+
+    int32_t os_err = 0;
+    JSLMakeDirectoryResultEnum first = jsl_make_directory(
+        jsl_cstr_to_memory(path),
+        &os_err
+    );
+    TEST_INT32_EQUAL(first, JSL_MAKE_DIRECTORY_SUCCESS);
+
+    os_err = 0;
+    JSLMakeDirectoryResultEnum second = jsl_make_directory(
+        jsl_cstr_to_memory(path),
+        &os_err
+    );
+    TEST_INT32_EQUAL(second, JSL_MAKE_DIRECTORY_ALREADY_EXISTS);
+    TEST_BOOL(os_err != 0);
+
+    int rm_res = JSL_TEST_RMDIR(path);
+    TEST_INT32_EQUAL(rm_res, 0);
+}
+
+void test_jsl_make_directory_parent_not_found(void)
+{
+    const char* path = "./tests/tmp_make_dir_no_parent_xyz/child";
+
+    int32_t os_err = 0;
+    JSLMakeDirectoryResultEnum res = jsl_make_directory(
+        jsl_cstr_to_memory(path),
+        &os_err
+    );
+    TEST_INT32_EQUAL(res, JSL_MAKE_DIRECTORY_PARENT_NOT_FOUND);
+    TEST_BOOL(os_err != 0);
+}
+
+void test_jsl_make_directory_path_too_long(void)
+{
+    char buffer[FILENAME_MAX + 16];
+    for (int64_t i = 0; i < (int64_t) sizeof(buffer); i++)
+    {
+        buffer[i] = 'a';
+    }
+
+    JSLImmutableMemory long_path = {
+        .data = (const uint8_t*) buffer,
+        .length = (int64_t) FILENAME_MAX
+    };
+
+    int32_t os_err = 0;
+    JSLMakeDirectoryResultEnum res = jsl_make_directory(long_path, &os_err);
+    TEST_INT32_EQUAL(res, JSL_MAKE_DIRECTORY_PATH_TOO_LONG);
+}
+
+void test_jsl_get_file_type_regular_file(void)
+{
+    #if JSL_IS_WINDOWS
+        const char* path = "tests\\example.txt";
+    #else
+        const char* path = "./tests/example.txt";
+    #endif
+
+    JSLFileTypeEnum t = jsl_get_file_type(jsl_cstr_to_memory(path));
+    TEST_INT32_EQUAL(t, JSL_FILE_TYPE_REG);
+}
+
+void test_jsl_get_file_type_directory(void)
+{
+    #if JSL_IS_WINDOWS
+        const char* path = "tests";
+    #else
+        const char* path = "./tests";
+    #endif
+
+    JSLFileTypeEnum t = jsl_get_file_type(jsl_cstr_to_memory(path));
+    TEST_INT32_EQUAL(t, JSL_FILE_TYPE_DIR);
+}
+
+void test_jsl_get_file_type_bad_parameters(void)
+{
+    JSLImmutableMemory null_path = { .data = NULL, .length = 5 };
+    JSLFileTypeEnum t1 = jsl_get_file_type(null_path);
+    TEST_INT32_EQUAL(t1, JSL_FILE_TYPE_UNKNOWN);
+
+    JSLImmutableMemory zero_path = { .data = (const uint8_t*) "x", .length = 0 };
+    JSLFileTypeEnum t2 = jsl_get_file_type(zero_path);
+    TEST_INT32_EQUAL(t2, JSL_FILE_TYPE_UNKNOWN);
+}
+
+void test_jsl_get_file_type_nonexistent(void)
+{
+    const char* path = "./tests/this_path_does_not_exist_xyz_12345";
+    JSLFileTypeEnum t = jsl_get_file_type(jsl_cstr_to_memory(path));
+    TEST_INT32_EQUAL(t, JSL_FILE_TYPE_UNKNOWN);
+}
+
+void test_jsl_get_file_type_symlink(void)
+{
+#if JSL_IS_POSIX
+    const char* target = "./tests/example.txt";
+    const char* link_path = "./tests/tmp_symlink_get_file_type";
+
+    // Best-effort cleanup from any prior failed run
+    unlink(link_path);
+
+    int sym_res = symlink(target, link_path);
+    TEST_INT32_EQUAL(sym_res, 0);
+    if (sym_res != 0)
+        return;
+
+    JSLFileTypeEnum t = jsl_get_file_type(jsl_cstr_to_memory(link_path));
+    TEST_INT32_EQUAL(t, JSL_FILE_TYPE_SYMLINK);
+
+    int rm_res = unlink(link_path);
+    TEST_INT32_EQUAL(rm_res, 0);
+#endif
+}
+
 void test_jsl_format_file_write_failure(void)
 {
 #if defined(__unix__) || defined(__APPLE__) || defined(__linux__)

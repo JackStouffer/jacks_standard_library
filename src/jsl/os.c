@@ -511,6 +511,192 @@ JSLWriteFileResultEnum jsl_write_file_contents(
     return res;
 }
 
+JSLMakeDirectoryResultEnum jsl_make_directory(
+    JSLImmutableMemory path,
+    int32_t* out_errno
+)
+{
+    char path_buffer[FILENAME_MAX + 1];
+    JSLMakeDirectoryResultEnum res = JSL_MAKE_DIRECTORY_BAD_PARAMETERS;
+    bool proceed = false;
+
+    proceed = (path.data != NULL && path.length > 0);
+
+    bool path_too_long = proceed && path.length >= (int64_t) FILENAME_MAX;
+    if (path_too_long)
+    {
+        res = JSL_MAKE_DIRECTORY_PATH_TOO_LONG;
+        proceed = false;
+    }
+
+    int mkdir_res = -1;
+    if (proceed)
+    {
+        // File system APIs require a null terminated string
+        JSL_MEMCPY(path_buffer, path.data, (size_t) path.length);
+        path_buffer[path.length] = '\0';
+
+        #if JSL_IS_WINDOWS
+            mkdir_res = _mkdir(path_buffer);
+        #elif JSL_IS_POSIX
+            mkdir_res = mkdir(path_buffer, S_IRWXU | S_IRGRP | S_IXGRP | S_IROTH | S_IXOTH);
+        #else
+            #error "Unsupported platform"
+        #endif
+    }
+
+    bool mkdir_ok = proceed && (mkdir_res == 0);
+    if (mkdir_ok)
+    {
+        res = JSL_MAKE_DIRECTORY_SUCCESS;
+    }
+
+    bool mkdir_failed = proceed && (mkdir_res != 0);
+    if (mkdir_failed)
+    {
+        int32_t err = errno;
+        if (out_errno != NULL)
+            *out_errno = err;
+
+        switch (err)
+        {
+            case EEXIST:
+                res = JSL_MAKE_DIRECTORY_ALREADY_EXISTS;
+                break;
+            case EACCES:
+                res = JSL_MAKE_DIRECTORY_PERMISSION_DENIED;
+                break;
+            case ENOENT:
+                res = JSL_MAKE_DIRECTORY_PARENT_NOT_FOUND;
+                break;
+            case ENOSPC:
+                res = JSL_MAKE_DIRECTORY_NO_SPACE;
+                break;
+            case EROFS:
+                res = JSL_MAKE_DIRECTORY_READ_ONLY_FS;
+                break;
+            case ENAMETOOLONG:
+                res = JSL_MAKE_DIRECTORY_PATH_TOO_LONG;
+                break;
+            default:
+                res = JSL_MAKE_DIRECTORY_ERROR_UNKNOWN;
+                break;
+        }
+    }
+
+    return res;
+}
+
+JSLFileTypeEnum jsl_get_file_type(JSLImmutableMemory path)
+{
+    char path_buffer[FILENAME_MAX + 1];
+    JSLFileTypeEnum result = JSL_FILE_TYPE_UNKNOWN;
+    bool proceed = false;
+
+    proceed = (path.data != NULL
+        && path.length > 0
+        && path.length < (int64_t) FILENAME_MAX);
+
+    if (proceed)
+    {
+        // File system APIs require a null terminated string
+        JSL_MEMCPY(path_buffer, path.data, (size_t) path.length);
+        path_buffer[path.length] = '\0';
+    }
+
+    #if JSL_IS_WINDOWS
+
+        DWORD attrs = INVALID_FILE_ATTRIBUTES;
+        bool got_attrs = false;
+        bool is_reparse = false;
+
+        if (proceed)
+        {
+            attrs = GetFileAttributesA(path_buffer);
+            got_attrs = (attrs != INVALID_FILE_ATTRIBUTES);
+            proceed = got_attrs;
+        }
+
+        if (proceed)
+        {
+            is_reparse = (attrs & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
+        }
+
+        // Reparse points include symbolic links and junctions. We report
+        // them as symlinks here without resolving to the target.
+        if (proceed && is_reparse)
+        {
+            result = JSL_FILE_TYPE_SYMLINK;
+            proceed = false;
+        }
+
+        struct _stat64 st_win = {0};
+        int32_t stat_ret = -1;
+        bool stat_ok = false;
+
+        if (proceed)
+        {
+            stat_ret = _stat64(path_buffer, &st_win);
+            stat_ok = (stat_ret == 0);
+            proceed = stat_ok;
+        }
+
+        if (proceed)
+        {
+            uint32_t mode = (uint32_t) (st_win.st_mode & _S_IFMT);
+            if (mode == _S_IFREG)
+                result = JSL_FILE_TYPE_REG;
+            else if (mode == _S_IFDIR)
+                result = JSL_FILE_TYPE_DIR;
+            else if (mode == _S_IFCHR)
+                result = JSL_FILE_TYPE_CHAR;
+            else if (mode == _S_IFIFO)
+                result = JSL_FILE_TYPE_FIFO;
+            else
+                result = JSL_FILE_TYPE_UNKNOWN;
+        }
+
+    #elif JSL_IS_POSIX
+
+        struct stat st_posix;
+        int32_t stat_ret = -1;
+        bool stat_ok = false;
+
+        if (proceed)
+        {
+            stat_ret = lstat(path_buffer, &st_posix);
+            stat_ok = (stat_ret == 0);
+            proceed = stat_ok;
+        }
+
+        if (proceed)
+        {
+            mode_t mode = st_posix.st_mode & (mode_t) S_IFMT;
+            if (mode == S_IFREG)
+                result = JSL_FILE_TYPE_REG;
+            else if (mode == S_IFDIR)
+                result = JSL_FILE_TYPE_DIR;
+            else if (mode == S_IFLNK)
+                result = JSL_FILE_TYPE_SYMLINK;
+            else if (mode == S_IFBLK)
+                result = JSL_FILE_TYPE_BLOCK;
+            else if (mode == S_IFCHR)
+                result = JSL_FILE_TYPE_CHAR;
+            else if (mode == S_IFIFO)
+                result = JSL_FILE_TYPE_FIFO;
+            else if (mode == S_IFSOCK)
+                result = JSL_FILE_TYPE_SOCKET;
+            else
+                result = JSL_FILE_TYPE_UNKNOWN;
+        }
+
+    #else
+        JSL_ASSERT(0 && "File utils only work on Windows or POSIX platforms.");
+    #endif
+
+    return result;
+}
+
 int64_t jsl_write_to_c_file(FILE* out, JSLImmutableMemory data)
 {
     if (out == NULL || data.data == NULL || data.length < 0)

@@ -232,6 +232,18 @@ int main(void)
     RUN_TEST_FUNCTION("Test jsl_format_to_c_file negative length", test_jsl_format_file_negative_length);
     RUN_TEST_FUNCTION("Test jsl_format_to_c_file write failure", test_jsl_format_file_write_failure);
 
+    RUN_TEST_FUNCTION("Test jsl_make_directory bad parameters", test_jsl_make_directory_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_make_directory creates directory", test_jsl_make_directory_creates_directory);
+    RUN_TEST_FUNCTION("Test jsl_make_directory already exists", test_jsl_make_directory_already_exists);
+    RUN_TEST_FUNCTION("Test jsl_make_directory parent not found", test_jsl_make_directory_parent_not_found);
+    RUN_TEST_FUNCTION("Test jsl_make_directory path too long", test_jsl_make_directory_path_too_long);
+
+    RUN_TEST_FUNCTION("Test jsl_get_file_type regular file", test_jsl_get_file_type_regular_file);
+    RUN_TEST_FUNCTION("Test jsl_get_file_type directory", test_jsl_get_file_type_directory);
+    RUN_TEST_FUNCTION("Test jsl_get_file_type bad parameters", test_jsl_get_file_type_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_get_file_type nonexistent", test_jsl_get_file_type_nonexistent);
+    RUN_TEST_FUNCTION("Test jsl_get_file_type symlink", test_jsl_get_file_type_symlink);
+
     // 
     //              Test Array
     // 
