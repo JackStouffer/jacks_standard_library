@@ -2182,13 +2182,13 @@ JSLCopyDirectoryResultEnum jsl_copy_directory(
             sub_mkdir_perm = sub_mkdir_res == JSL_MAKE_DIRECTORY_PERMISSION_DENIED;
         }
 
-        if (sub_mkdir_perm)
+        if (is_dir && sub_mkdir_perm)
         {
             res = JSL_COPY_DIRECTORY_PERMISSION_DENIED;
             keep_going = false;
         }
 
-        if (!sub_mkdir_ok && !sub_mkdir_perm)
+        if (is_dir && !sub_mkdir_ok && !sub_mkdir_perm)
         {
             res = JSL_COPY_DIRECTORY_MAKE_SUBDIR_FAILED;
             keep_going = false;
@@ -2204,13 +2204,13 @@ JSLCopyDirectoryResultEnum jsl_copy_directory(
             copy_perm = (copy_file_res == JSL_COPY_FILE_PERMISSION_DENIED);
         }
 
-        if (copy_perm)
+        if (is_file && copy_perm)
         {
             res = JSL_COPY_DIRECTORY_PERMISSION_DENIED;
             keep_going = false;
         }
 
-        if (!copy_ok && !copy_perm)
+        if (is_file && !copy_ok && !copy_perm)
         {
             res = JSL_COPY_DIRECTORY_COPY_FILE_FAILED;
             keep_going = false;
