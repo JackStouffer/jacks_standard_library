@@ -72,11 +72,13 @@ extern "C" {
 
 #elif JSL_IS_POSIX
 
+    #include <dirent.h>
     #include <errno.h>
     #include <ftw.h>
     #include <limits.h>
     #include <fcntl.h>
     #include <stdio.h>
+    #include <stdlib.h>
     #include <unistd.h>
     #include <sys/types.h>
     #include <sys/stat.h>
@@ -180,6 +182,26 @@ typedef enum
 
     JSL_DELETE_DIRECTORY_ENUM_COUNT
 } JSLDeleteDirectoryResultEnum;
+
+/**
+* TODO: docs
+*/
+typedef enum
+{
+    JSL_COPY_FILE_BAD_PARAMETERS = 0,
+    JSL_COPY_FILE_SUCCESS,
+    JSL_COPY_FILE_PATH_TOO_LONG,
+    JSL_COPY_FILE_SOURCE_NOT_FOUND,
+    JSL_COPY_FILE_SOURCE_IS_DIRECTORY,
+    JSL_COPY_FILE_COULD_NOT_OPEN_SOURCE,
+    JSL_COPY_FILE_COULD_NOT_OPEN_DEST,
+    JSL_COPY_FILE_READ_FAILED,
+    JSL_COPY_FILE_WRITE_FAILED,
+    JSL_COPY_FILE_PERMISSION_DENIED,
+    JSL_COPY_FILE_ERROR_UNKNOWN,
+
+    JSL_COPY_FILE_ENUM_COUNT
+} JSLCopyFileResultEnum;
 
 /**
 * TODO: docs
@@ -357,6 +379,296 @@ int64_t jsl_write_to_c_file(FILE* out, JSLImmutableMemory data);
 * TODO: docs
 */
 JSLOutputSink jsl_c_file_output_sink(FILE* file);
+
+/**
+* Maximum directory depth supported by the recursive iterator. The iterator
+* state is allocated inline so this puts a hard cap on the deepest tree it
+* can walk. Trees deeper than this will cause `JSL_DIRECTORY_ITERATOR_MAX_DEPTH_EXCEEDED`
+* to be reported on the entry that would have descended past the limit.
+*/
+#define JSL_DIRECTORY_ITERATOR_MAX_DEPTH 128
+
+/**
+* Result codes for `jsl_directory_iterator_init`.
+*/
+typedef enum
+{
+    JSL_DIRECTORY_ITERATOR_INIT_BAD_PARAMETERS = 0,
+    JSL_DIRECTORY_ITERATOR_INIT_SUCCESS,
+    JSL_DIRECTORY_ITERATOR_INIT_PATH_TOO_LONG,
+    JSL_DIRECTORY_ITERATOR_INIT_NOT_FOUND,
+    JSL_DIRECTORY_ITERATOR_INIT_NOT_A_DIRECTORY,
+    JSL_DIRECTORY_ITERATOR_INIT_COULD_NOT_OPEN,
+    JSL_DIRECTORY_ITERATOR_INIT_RESOLVE_FAILED,
+    JSL_DIRECTORY_ITERATOR_INIT_ERROR_UNKNOWN,
+
+    JSL_DIRECTORY_ITERATOR_INIT_ENUM_COUNT
+} JSLDirectoryIteratorInitResultEnum;
+
+/**
+* Per-entry status reported by `jsl_directory_iterator_next` on the result
+* struct. `OK` means the entry data is fully populated. `PARTIAL` means the
+* path is valid but the entry's type could not be determined. The remaining
+* values describe failures encountered while preparing to read the entry.
+*/
+typedef enum
+{
+    JSL_DIRECTORY_ITERATOR_PARTIAL = 0,
+    JSL_DIRECTORY_ITERATOR_OK,
+    JSL_DIRECTORY_ITERATOR_COULD_NOT_OPEN,
+    JSL_DIRECTORY_ITERATOR_PATH_TOO_LONG,
+    JSL_DIRECTORY_ITERATOR_MAX_DEPTH_EXCEEDED,
+
+    JSL_DIRECTORY_ITERATOR_ENUM_COUNT
+} JSLDirectoryIteratorResultEnum;
+
+/**
+* Information for the entry produced by `jsl_directory_iterator_next`.
+*
+* The `absolute_path` and `relative_path` members both point into a buffer
+* owned by the `JSLDirectoryIterator`. They are only valid until the next call
+* to `jsl_directory_iterator_next` or `jsl_directory_iterator_end` on the
+* same iterator. If you need a copy that outlives the next iteration, copy
+* the bytes out yourself.
+*
+* `relative_path` is rooted at the directory passed to
+* `jsl_directory_iterator_init` (it does not include a leading separator).
+* `depth` is `0` for entries directly inside the input directory, `1` for
+* entries one level deeper, and so on.
+*/
+typedef struct JSLDirectoryIteratorResult
+{
+    JSLImmutableMemory absolute_path;
+    JSLImmutableMemory relative_path;
+    JSLFileTypeEnum type;
+    int32_t depth;
+    JSLDirectoryIteratorResultEnum status;
+} JSLDirectoryIteratorResult;
+
+/**
+* Per-directory frame stored on the iterator's internal stack. This type is
+* part of the public ABI only because it is embedded in `JSLDirectoryIterator`;
+* its members are private to the implementation and should not be used by
+* callers.
+*/
+typedef struct JSLDirectoryIteratorFrame
+{
+    int64_t prefix_length;
+    #if JSL_IS_WINDOWS
+        HANDLE find_handle;
+        bool consumed_first;
+    #elif JSL_IS_POSIX
+        DIR* dir;
+    #endif
+} JSLDirectoryIteratorFrame;
+
+/**
+* Recursive directory iterator state. Allocate one of these on the stack and
+* hand a pointer to `jsl_directory_iterator_init`. The iterator owns its own
+* path buffer and per-frame state so it does not allocate from the heap.
+*
+* All members are private to the implementation. Treat the struct as opaque.
+*/
+typedef struct JSLDirectoryIterator
+{
+    uint64_t sentinel;
+    char path_buffer[FILENAME_MAX + 1];
+    int64_t current_length;
+    int64_t base_length;
+    int32_t depth;
+    bool follow_symlinks;
+    bool exhausted;
+
+    #if JSL_IS_WINDOWS
+        WIN32_FIND_DATAA find_data;
+        char find_pattern[FILENAME_MAX + 3];
+    #endif
+
+    JSLDirectoryIteratorFrame frames[JSL_DIRECTORY_ITERATOR_MAX_DEPTH];
+} JSLDirectoryIterator;
+
+/**
+* Begin a depth-first walk of the directory tree rooted at `path`.
+*
+* The iterator state is stored entirely inside `iterator`; no heap allocation
+* is performed. After a successful return the caller should drive iteration
+* with `jsl_directory_iterator_next` until it returns `false`, then optionally
+* call `jsl_directory_iterator_end`. Calling `jsl_directory_iterator_end`
+* on a fully drained iterator is safe and is also the correct way to release
+* resources if iteration is abandoned early.
+*
+* The `.` and `..` entries are always skipped. There is no guaranteed ordering
+* among siblings within a single directory; the order matches whatever the
+* underlying OS returns. The walk is depth-first pre-order: a directory entry
+* is reported before its contents.
+*
+* When `follow_symlinks` is `false` (the default behavior recommended for most
+* uses) symbolic links are reported as `JSL_FILE_TYPE_SYMLINK` and their
+* targets are not descended into. When `follow_symlinks` is `true` the iterator
+* resolves the link target's type and will descend into directories reached
+* through symlinks. Symlink loop detection is *not* performed.
+*
+* @param path Directory path to walk
+* @param iterator State block to initialize, must not be null
+* @param follow_symlinks Whether to follow symbolic links into directories
+* @returns A result enum describing the outcome of the init step
+*/
+JSL_WARN_UNUSED JSL_DEF JSLDirectoryIteratorInitResultEnum jsl_directory_iterator_init(
+    JSLImmutableMemory path,
+    JSLDirectoryIterator* iterator,
+    bool follow_symlinks
+);
+
+/**
+* Advance to the next entry in the walk.
+*
+* Fills `result` with information about the entry. Returns `true` while the
+* iterator has more entries to report. When iteration completes (either
+* because the tree is exhausted or because the iterator was never successfully
+* initialized) returns `false` and `result->status` is left unchanged.
+*
+* If the iterator could not enter a subdirectory it does not stop. The error
+* is recorded on `result->status` (e.g., `JSL_DIRECTORY_ITERATOR_COULD_NOT_OPEN`)
+* on the entry that represents the directory itself, and iteration continues
+* with the next sibling on the next call. If a single entry's metadata could
+* not be determined the entry is still returned with `result->type` set to
+* `JSL_FILE_TYPE_UNKNOWN` and `result->status` set to `JSL_DIRECTORY_ITERATOR_PARTIAL`.
+*
+* @param iterator The iterator state, must not be null
+* @param result The result struct to fill, must not be null
+* @param out_errno Optional pointer that receives the system errno when a
+*                  failure code is reported on this entry
+* @returns `true` if a new entry was produced, `false` when iteration is done
+*/
+JSL_WARN_UNUSED JSL_DEF bool jsl_directory_iterator_next(
+    JSLDirectoryIterator* iterator,
+    JSLDirectoryIteratorResult* result,
+    int32_t* out_errno
+);
+
+/**
+* Release any OS handles still held by the iterator.
+*
+* Safe to call any number of times and on a fully drained iterator. Calling
+* this is only required when iteration is abandoned early - draining the
+* iterator with `jsl_directory_iterator_next` until it returns `false`
+* releases all resources automatically.
+*
+* @param iterator The iterator state, may be null
+*/
+JSL_DEF void jsl_directory_iterator_end(JSLDirectoryIterator* iterator);
+
+/**
+* Copy the file at `src_path` to `dst_path`.
+*
+* The paths may be relative or absolute. Both paths are copied into stack
+* buffers so no heap allocation is performed. On POSIX, the copy is
+* performed using `open`/`read`/`write` with an 8 KiB stack buffer and
+* the destination is created with permissions `0600` (subject to the
+* process umask). On Windows, `CopyFileA` is used and any existing
+* destination file is overwritten.
+*
+* Only regular files may be used as the source. Attempting to copy a
+* directory returns `JSL_COPY_FILE_SOURCE_IS_DIRECTORY`.
+*
+* @param src_path File system path of the source file
+* @param dst_path File system path for the destination file
+* @param out_errno Optional pointer that receives the system error code on failure
+* @returns A result enum describing the outcome
+*/
+JSL_WARN_UNUSED JSL_DEF JSLCopyFileResultEnum jsl_copy_file(
+    JSLImmutableMemory src_path,
+    JSLImmutableMemory dst_path,
+    int32_t* out_errno
+);
+
+/**
+* TODO: docs
+*/
+typedef enum
+{
+    JSL_RENAME_FILE_BAD_PARAMETERS = 0,
+    JSL_RENAME_FILE_SUCCESS,
+    JSL_RENAME_FILE_SOURCE_NOT_FOUND,
+    JSL_RENAME_FILE_DEST_ALREADY_EXISTS,
+    JSL_RENAME_FILE_PATH_TOO_LONG,
+    JSL_RENAME_FILE_PERMISSION_DENIED,
+    JSL_RENAME_FILE_CROSS_DEVICE,
+    JSL_RENAME_FILE_READ_ONLY_FS,
+    JSL_RENAME_FILE_ERROR_UNKNOWN,
+
+    JSL_RENAME_FILE_ENUM_COUNT
+} JSLRenameFileResultEnum;
+
+/**
+* Rename or move the file system entry at `src_path` to `dst_path`.
+*
+* Works on files, directories, and symbolic links. The paths may be relative
+* or absolute. Both paths are copied into stack buffers so no heap allocation
+* is performed.
+*
+* On POSIX, `rename()` is used; it atomically replaces the destination if
+* it names an existing file of compatible type. On Windows, `MoveFileExA`
+* is used with `MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED`.
+*
+* Cross-device moves (source and destination on different filesystems)
+* return `JSL_RENAME_FILE_CROSS_DEVICE`.
+*
+* @param src_path File system path of the source entry
+* @param dst_path File system path for the destination entry
+* @param out_errno Optional pointer that receives the system error code on failure
+* @returns A result enum describing the outcome
+*/
+JSL_WARN_UNUSED JSL_DEF JSLRenameFileResultEnum jsl_rename_file(
+    JSLImmutableMemory src_path,
+    JSLImmutableMemory dst_path,
+    int32_t* out_errno
+);
+
+/**
+* TODO: docs
+*/
+typedef enum
+{
+    JSL_COPY_DIRECTORY_BAD_PARAMETERS = 0,
+    JSL_COPY_DIRECTORY_SUCCESS,
+    JSL_COPY_DIRECTORY_PATH_TOO_LONG,
+    JSL_COPY_DIRECTORY_SOURCE_NOT_FOUND,
+    JSL_COPY_DIRECTORY_SOURCE_NOT_A_DIRECTORY,
+    JSL_COPY_DIRECTORY_DEST_ALREADY_EXISTS,
+    JSL_COPY_DIRECTORY_COULD_NOT_CREATE_DEST,
+    JSL_COPY_DIRECTORY_COULD_NOT_OPEN_SOURCE,
+    JSL_COPY_DIRECTORY_COPY_FILE_FAILED,
+    JSL_COPY_DIRECTORY_MAKE_SUBDIR_FAILED,
+    JSL_COPY_DIRECTORY_PERMISSION_DENIED,
+    JSL_COPY_DIRECTORY_ERROR_UNKNOWN,
+
+    JSL_COPY_DIRECTORY_ENUM_COUNT
+} JSLCopyDirectoryResultEnum;
+
+/**
+* Copy the directory at `src_path` to `dst_path` recursively.
+*
+* The paths may be relative or absolute. Both paths are copied into stack
+* buffers so no heap allocation is performed. The destination directory must
+* not already exist; if it does, `JSL_COPY_DIRECTORY_DEST_ALREADY_EXISTS` is
+* returned. Symbolic links encountered during the walk are not followed and
+* are not copied to the destination. Only regular files and subdirectories
+* are reproduced in the destination tree.
+*
+* The copy is not atomic. If an error occurs mid-copy the destination may
+* already contain a partial copy of the source tree.
+*
+* @param src_path File system path of the source directory
+* @param dst_path File system path for the destination directory
+* @param out_errno Optional pointer that receives the system error code on failure
+* @returns A result enum describing the outcome
+*/
+JSL_WARN_UNUSED JSL_DEF JSLCopyDirectoryResultEnum jsl_copy_directory(
+    JSLImmutableMemory src_path,
+    JSLImmutableMemory dst_path,
+    int32_t* out_errno
+);
 
 
 #ifdef __cplusplus

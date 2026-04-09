@@ -259,9 +259,46 @@ int main(void)
     RUN_TEST_FUNCTION("Test jsl_delete_directory nested", test_jsl_delete_directory_nested);
     RUN_TEST_FUNCTION("Test jsl_delete_directory path too long", test_jsl_delete_directory_path_too_long);
 
+    RUN_TEST_FUNCTION("Test jsl_directory_iterator bad parameters", test_jsl_directory_iterator_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_directory_iterator not found", test_jsl_directory_iterator_not_found);
+    RUN_TEST_FUNCTION("Test jsl_directory_iterator not a directory", test_jsl_directory_iterator_not_a_directory);
+    RUN_TEST_FUNCTION("Test jsl_directory_iterator empty", test_jsl_directory_iterator_empty);
+    RUN_TEST_FUNCTION("Test jsl_directory_iterator flat", test_jsl_directory_iterator_flat);
+    RUN_TEST_FUNCTION("Test jsl_directory_iterator nested", test_jsl_directory_iterator_nested);
+    RUN_TEST_FUNCTION("Test jsl_directory_iterator relative paths", test_jsl_directory_iterator_relative_paths);
+    RUN_TEST_FUNCTION("Test jsl_directory_iterator close early", test_jsl_directory_iterator_close_early);
+    RUN_TEST_FUNCTION("Test jsl_directory_iterator symlink default", test_jsl_directory_iterator_symlink_default);
+    RUN_TEST_FUNCTION("Test jsl_directory_iterator symlink follow", test_jsl_directory_iterator_symlink_follow);
+    RUN_TEST_FUNCTION("Test jsl_directory_iterator path too long", test_jsl_directory_iterator_path_too_long);
+    RUN_TEST_FUNCTION("Test jsl_directory_iterator skips dot and dotdot", test_jsl_directory_iterator_skips_dot_and_dotdot);
+
+    RUN_TEST_FUNCTION("Test jsl_copy_file bad parameters", test_jsl_copy_file_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_copy_file path too long", test_jsl_copy_file_path_too_long);
+    RUN_TEST_FUNCTION("Test jsl_copy_file source not found", test_jsl_copy_file_source_not_found);
+    RUN_TEST_FUNCTION("Test jsl_copy_file source is directory", test_jsl_copy_file_source_is_directory);
+    RUN_TEST_FUNCTION("Test jsl_copy_file success", test_jsl_copy_file_success);
+    RUN_TEST_FUNCTION("Test jsl_copy_file overwrites existing", test_jsl_copy_file_overwrites_existing);
+    RUN_TEST_FUNCTION("Test jsl_copy_file dest parent not found", test_jsl_copy_file_dest_parent_not_found);
+
+    RUN_TEST_FUNCTION("Test jsl_copy_directory bad parameters", test_jsl_copy_directory_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_copy_directory path too long", test_jsl_copy_directory_path_too_long);
+    RUN_TEST_FUNCTION("Test jsl_copy_directory source not found", test_jsl_copy_directory_source_not_found);
+    RUN_TEST_FUNCTION("Test jsl_copy_directory source not a directory", test_jsl_copy_directory_source_not_a_directory);
+    RUN_TEST_FUNCTION("Test jsl_copy_directory dest already exists", test_jsl_copy_directory_dest_already_exists);
+    RUN_TEST_FUNCTION("Test jsl_copy_directory empty", test_jsl_copy_directory_empty);
+    RUN_TEST_FUNCTION("Test jsl_copy_directory with files", test_jsl_copy_directory_with_files);
+    RUN_TEST_FUNCTION("Test jsl_copy_directory nested", test_jsl_copy_directory_nested);
+    RUN_TEST_FUNCTION("Test jsl_rename_file bad parameters", test_jsl_rename_file_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_rename_file path too long", test_jsl_rename_file_path_too_long);
+    RUN_TEST_FUNCTION("Test jsl_rename_file source not found", test_jsl_rename_file_source_not_found);
+    RUN_TEST_FUNCTION("Test jsl_rename_file renames file", test_jsl_rename_file_renames_file);
+    RUN_TEST_FUNCTION("Test jsl_rename_file renames directory", test_jsl_rename_file_renames_directory);
+    RUN_TEST_FUNCTION("Test jsl_rename_file overwrites existing file", test_jsl_rename_file_overwrites_existing_file);
+    RUN_TEST_FUNCTION("Test jsl_rename_file renames symlink", test_jsl_rename_file_renames_symlink);
+
     //
     //              Test Array
-    // 
+    //
 
     RUN_TEST_FUNCTION("Test dynamic array init success", test_dynamic_array_init_success);
     RUN_TEST_FUNCTION("Test dynamic array init invalid args", test_dynamic_array_init_invalid_args);

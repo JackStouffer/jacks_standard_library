@@ -31,6 +31,8 @@
 #include "allocator.h"
 #include "os.h"
 
+#define JSL__DIR_ITERATOR_PRIVATE_SENTINEL 9523783263672821879U
+
 JSLGetFileSizeResultEnum jsl_get_file_size(
     JSLImmutableMemory path,
     int64_t* out_size,
@@ -1199,4 +1201,1154 @@ JSLOutputSink jsl_c_file_output_sink(FILE* out)
     sink.write_fp = jsl__c_file_sink_out;
     sink.user_data = out;
     return sink;
+}
+
+JSLDirectoryIteratorInitResultEnum jsl_directory_iterator_init(
+    JSLImmutableMemory path,
+    JSLDirectoryIterator* iterator,
+    bool follow_symlinks
+)
+{
+    JSLDirectoryIteratorInitResultEnum res = JSL_DIRECTORY_ITERATOR_INIT_BAD_PARAMETERS;
+    bool proceed = (path.data != NULL && path.length > 0 && iterator != NULL);
+
+    // Initialize iterator state to a known-empty configuration regardless of
+    // outcome so the caller can safely call close() and so next() will
+    // immediately return false on a failed init.
+    if (iterator != NULL)
+    {
+        iterator->path_buffer[0]  = '\0';
+        iterator->base_length     = 0;
+        iterator->current_length  = 0;
+        iterator->depth           = 0;
+        iterator->follow_symlinks = follow_symlinks;
+        iterator->exhausted       = true;
+        #if JSL_IS_WINDOWS
+            iterator->find_pattern[0] = '\0';
+        #endif
+    }
+
+    bool path_too_long_input = proceed && (path.length > (int64_t) FILENAME_MAX);
+    if (path_too_long_input)
+    {
+        res = JSL_DIRECTORY_ITERATOR_INIT_PATH_TOO_LONG;
+        proceed = false;
+    }
+
+    char input_buffer[FILENAME_MAX + 1];
+    if (proceed)
+    {
+        JSL_MEMCPY(input_buffer, path.data, (size_t) path.length);
+        input_buffer[path.length] = '\0';
+    }
+
+    #if JSL_IS_POSIX
+
+        char    resolved_buffer[FILENAME_MAX + 1];
+        bool    resolved_ok   = false;
+        int32_t resolve_errno = 0;
+        int64_t resolved_len  = 0;
+
+        if (proceed)
+        {
+            errno = 0;
+            char* r       = realpath(input_buffer, resolved_buffer);
+            resolved_ok   = (r != NULL);
+            resolve_errno = errno;
+        }
+
+        bool resolve_failed = proceed && !resolved_ok;
+        if (resolve_failed)
+        {
+            bool not_found = (resolve_errno == ENOENT || resolve_errno == ENOTDIR);
+            res = not_found ? JSL_DIRECTORY_ITERATOR_INIT_NOT_FOUND
+                            : JSL_DIRECTORY_ITERATOR_INIT_RESOLVE_FAILED;
+            proceed = false;
+        }
+
+        if (proceed)
+        {
+            resolved_len = (int64_t) JSL_STRLEN(resolved_buffer);
+        }
+
+        // We need room for the resolved path plus a trailing separator and a
+        // NUL terminator: resolved_len + 1 (sep) + 1 (NUL) <= FILENAME_MAX + 1.
+        bool resolved_too_long = proceed
+            && (resolved_len + 1 > (int64_t) FILENAME_MAX);
+        if (resolved_too_long)
+        {
+            res = JSL_DIRECTORY_ITERATOR_INIT_PATH_TOO_LONG;
+            proceed = false;
+        }
+
+        if (proceed)
+        {
+            JSL_MEMCPY(iterator->path_buffer, resolved_buffer, (size_t) resolved_len);
+            iterator->path_buffer[resolved_len] = '\0';
+
+            // Append a trailing separator unless realpath already gave us one
+            // (which only happens for the filesystem root "/").
+            bool needs_sep = (resolved_len > 0
+                && iterator->path_buffer[resolved_len - 1] != '/');
+            if (needs_sep)
+            {
+                iterator->path_buffer[resolved_len]     = '/';
+                iterator->path_buffer[resolved_len + 1] = '\0';
+                resolved_len++;
+            }
+
+            iterator->base_length    = resolved_len;
+            iterator->current_length = resolved_len;
+        }
+
+        DIR*    root_dir    = NULL;
+        bool    opened_root = false;
+        int32_t open_errno  = 0;
+        if (proceed)
+        {
+            errno       = 0;
+            root_dir    = opendir(iterator->path_buffer);
+            opened_root = (root_dir != NULL);
+            open_errno  = errno;
+        }
+
+        bool open_failed = proceed && !opened_root;
+        if (open_failed)
+        {
+            if (open_errno == ENOENT)
+                res = JSL_DIRECTORY_ITERATOR_INIT_NOT_FOUND;
+            else if (open_errno == ENOTDIR)
+                res = JSL_DIRECTORY_ITERATOR_INIT_NOT_A_DIRECTORY;
+            else
+                res = JSL_DIRECTORY_ITERATOR_INIT_COULD_NOT_OPEN;
+            proceed = false;
+        }
+
+        if (proceed)
+        {
+            iterator->frames[0].dir = root_dir;
+            iterator->frames[0].prefix_length = iterator->base_length;
+            iterator->depth = 1;
+            iterator->exhausted = false;
+            iterator->sentinel = JSL__DIR_ITERATOR_PRIVATE_SENTINEL;
+            res = JSL_DIRECTORY_ITERATOR_INIT_SUCCESS;
+        }
+
+    #elif JSL_IS_WINDOWS
+
+        char  resolved_buffer[FILENAME_MAX + 1];
+        DWORD resolve_res = 0;
+        if (proceed)
+        {
+            resolve_res = GetFullPathNameA(
+                input_buffer,
+                (DWORD)(FILENAME_MAX + 1),
+                resolved_buffer,
+                NULL
+            );
+        }
+
+        bool resolve_too_long = proceed && (resolve_res > (DWORD) FILENAME_MAX);
+        if (resolve_too_long)
+        {
+            res = JSL_DIRECTORY_ITERATOR_INIT_PATH_TOO_LONG;
+            proceed = false;
+        }
+
+        bool resolve_failed = proceed && (resolve_res == 0);
+        if (resolve_failed)
+        {
+            DWORD err = GetLastError();
+            bool not_found = (err == ERROR_FILE_NOT_FOUND || err == ERROR_PATH_NOT_FOUND);
+            res = not_found ? JSL_DIRECTORY_ITERATOR_INIT_NOT_FOUND
+                            : JSL_DIRECTORY_ITERATOR_INIT_RESOLVE_FAILED;
+            proceed = false;
+        }
+
+        int64_t resolved_len = 0;
+        if (proceed)
+        {
+            resolved_len = (int64_t) resolve_res;
+        }
+
+        bool needs_sep = proceed && resolved_len > 0
+            && resolved_buffer[resolved_len - 1] != '\\'
+            && resolved_buffer[resolved_len - 1] != '/';
+
+        bool resolved_too_long_with_sep = proceed && needs_sep
+            && (resolved_len + 1 > (int64_t) FILENAME_MAX);
+        if (resolved_too_long_with_sep)
+        {
+            res = JSL_DIRECTORY_ITERATOR_INIT_PATH_TOO_LONG;
+            proceed = false;
+        }
+
+        if (proceed)
+        {
+            JSL_MEMCPY(iterator->path_buffer, resolved_buffer, (size_t) resolved_len);
+            iterator->path_buffer[resolved_len] = '\0';
+
+            if (needs_sep)
+            {
+                iterator->path_buffer[resolved_len]     = '\\';
+                iterator->path_buffer[resolved_len + 1] = '\0';
+                resolved_len++;
+            }
+
+            iterator->base_length    = resolved_len;
+            iterator->current_length = resolved_len;
+
+            // Build search pattern: path + "*"
+            JSL_MEMCPY(
+                iterator->find_pattern,
+                iterator->path_buffer,
+                (size_t) resolved_len
+            );
+            iterator->find_pattern[resolved_len]     = '*';
+            iterator->find_pattern[resolved_len + 1] = '\0';
+        }
+
+        HANDLE root_handle = INVALID_HANDLE_VALUE;
+        bool   found_root  = false;
+        DWORD  find_err    = 0;
+        if (proceed)
+        {
+            root_handle = FindFirstFileA(iterator->find_pattern, &iterator->find_data);
+            found_root  = (root_handle != INVALID_HANDLE_VALUE);
+            if (!found_root)
+                find_err = GetLastError();
+        }
+
+        bool find_failed = proceed && !found_root;
+        if (find_failed)
+        {
+            if (find_err == ERROR_FILE_NOT_FOUND || find_err == ERROR_PATH_NOT_FOUND)
+                res = JSL_DIRECTORY_ITERATOR_INIT_NOT_FOUND;
+            else if (find_err == ERROR_DIRECTORY)
+                res = JSL_DIRECTORY_ITERATOR_INIT_NOT_A_DIRECTORY;
+            else
+                res = JSL_DIRECTORY_ITERATOR_INIT_COULD_NOT_OPEN;
+            proceed = false;
+        }
+
+        if (proceed)
+        {
+            iterator->frames[0].find_handle = root_handle;
+            iterator->frames[0].prefix_length = iterator->base_length;
+            iterator->frames[0].consumed_first = false;
+            iterator->depth = 1;
+            iterator->exhausted = false;
+            iterator->sentinel = JSL__DIR_ITERATOR_PRIVATE_SENTINEL;
+            res = JSL_DIRECTORY_ITERATOR_INIT_SUCCESS;
+        }
+
+    #else
+        JSL_ASSERT(0 && "Directory iterator only supported on POSIX or Windows.");
+    #endif
+
+    return res;
+}
+
+bool jsl_directory_iterator_next(
+    JSLDirectoryIterator* iterator,
+    JSLDirectoryIteratorResult* result,
+    int32_t* out_errno
+)
+{
+    bool produced    = false;
+    bool valid_args  = (
+        iterator != NULL
+        && iterator->sentinel == JSL__DIR_ITERATOR_PRIVATE_SENTINEL
+        && !iterator->exhausted
+        && result != NULL
+    );
+
+    if (out_errno != NULL && valid_args)
+        *out_errno = 0;
+
+    while (valid_args && !produced && iterator->depth > 0)
+    {
+        int32_t                    frame_idx = iterator->depth - 1;
+        JSLDirectoryIteratorFrame* frame     = &iterator->frames[frame_idx];
+
+        const char* entry_name = NULL;
+        bool        got_name   = false;
+
+        // Read the next entry from the current frame.
+        #if JSL_IS_POSIX
+            errno = 0;
+            struct dirent* de = readdir(frame->dir);
+            if (de != NULL)
+            {
+                entry_name = de->d_name;
+                got_name   = true;
+            }
+        #elif JSL_IS_WINDOWS
+            if (!frame->consumed_first)
+            {
+                entry_name            = iterator->find_data.cFileName;
+                got_name              = true;
+                frame->consumed_first = true;
+            }
+            else
+            {
+                BOOL ok = FindNextFileA(frame->find_handle, &iterator->find_data);
+                if (ok != FALSE)
+                {
+                    entry_name = iterator->find_data.cFileName;
+                    got_name   = true;
+                }
+            }
+        #endif
+
+        // No more entries in this frame -> close handle, pop, retry parent.
+        if (!got_name)
+        {
+            #if JSL_IS_POSIX
+                if (frame->dir != NULL)
+                {
+                    closedir(frame->dir);
+                    frame->dir = NULL;
+                }
+            #elif JSL_IS_WINDOWS
+                if (frame->find_handle != INVALID_HANDLE_VALUE)
+                {
+                    FindClose(frame->find_handle);
+                    frame->find_handle = INVALID_HANDLE_VALUE;
+                }
+                frame->consumed_first = false;
+            #endif
+            iterator->depth--;
+            continue;
+        }
+
+        // Skip "." and "..".
+        bool is_dot    = (entry_name[0] == '.' && entry_name[1] == '\0');
+        bool is_dotdot = (entry_name[0] == '.'
+            && entry_name[1] == '.'
+            && entry_name[2] == '\0');
+        if (is_dot || is_dotdot)
+            continue;
+
+        int64_t name_len       = (int64_t) JSL_STRLEN(entry_name);
+        int64_t entry_path_len = frame->prefix_length + name_len;
+
+        // The entry path needs to fit in path_buffer along with a NUL byte.
+        bool entry_too_long = (entry_path_len > (int64_t) FILENAME_MAX);
+        if (entry_too_long)
+        {
+            // We cannot represent this entry's path. Report a degenerate
+            // result so the caller learns about it and continue iterating.
+            result->absolute_path.data   = (const uint8_t*) iterator->path_buffer;
+            result->absolute_path.length = 0;
+            result->relative_path.data   = (const uint8_t*) iterator->path_buffer;
+            result->relative_path.length = 0;
+            result->type                 = JSL_FILE_TYPE_UNKNOWN;
+            result->depth                = iterator->depth - 1;
+            result->status               = JSL_DIRECTORY_ITERATOR_PATH_TOO_LONG;
+            produced                     = true;
+            continue;
+        }
+
+        // Write the entry name into path_buffer (NUL-terminated for the OS calls).
+        JSL_MEMCPY(
+            iterator->path_buffer + frame->prefix_length,
+            entry_name,
+            (size_t) name_len
+        );
+        iterator->path_buffer[entry_path_len] = '\0';
+        iterator->current_length              = entry_path_len;
+
+        // Determine the entry type.
+        JSLFileTypeEnum entry_type = JSL_FILE_TYPE_UNKNOWN;
+        bool            stat_ok    = false;
+
+        #if JSL_IS_POSIX
+            int32_t     stat_errno = 0;
+            struct stat lst;
+            errno = 0;
+            int lr = lstat(iterator->path_buffer, &lst);
+            if (lr == 0)
+            {
+                stat_ok    = true;
+                mode_t m   = lst.st_mode & (mode_t) S_IFMT;
+                if      (m == S_IFREG)  entry_type = JSL_FILE_TYPE_REG;
+                else if (m == S_IFDIR)  entry_type = JSL_FILE_TYPE_DIR;
+                else if (m == S_IFLNK)  entry_type = JSL_FILE_TYPE_SYMLINK;
+                else if (m == S_IFBLK)  entry_type = JSL_FILE_TYPE_BLOCK;
+                else if (m == S_IFCHR)  entry_type = JSL_FILE_TYPE_CHAR;
+                else if (m == S_IFIFO)  entry_type = JSL_FILE_TYPE_FIFO;
+                else if (m == S_IFSOCK) entry_type = JSL_FILE_TYPE_SOCKET;
+            }
+            else
+            {
+                stat_errno = errno;
+            }
+
+            // If following symlinks, resolve the link target's type.
+            bool follow_this = stat_ok
+                && (entry_type == JSL_FILE_TYPE_SYMLINK)
+                && iterator->follow_symlinks;
+            if (follow_this)
+            {
+                struct stat tst;
+                int tr = stat(iterator->path_buffer, &tst);
+                if (tr == 0)
+                {
+                    mode_t m = tst.st_mode & (mode_t) S_IFMT;
+                    if      (m == S_IFREG)  entry_type = JSL_FILE_TYPE_REG;
+                    else if (m == S_IFDIR)  entry_type = JSL_FILE_TYPE_DIR;
+                    else if (m == S_IFLNK)  entry_type = JSL_FILE_TYPE_SYMLINK;
+                    else if (m == S_IFBLK)  entry_type = JSL_FILE_TYPE_BLOCK;
+                    else if (m == S_IFCHR)  entry_type = JSL_FILE_TYPE_CHAR;
+                    else if (m == S_IFIFO)  entry_type = JSL_FILE_TYPE_FIFO;
+                    else if (m == S_IFSOCK) entry_type = JSL_FILE_TYPE_SOCKET;
+                }
+                // If stat() failed, leave entry_type as SYMLINK and don't descend.
+            }
+        #elif JSL_IS_WINDOWS
+            DWORD attrs       = iterator->find_data.dwFileAttributes;
+            bool  is_reparse  = (attrs & FILE_ATTRIBUTE_REPARSE_POINT) != 0;
+            bool  is_dir_attr = (attrs & FILE_ATTRIBUTE_DIRECTORY) != 0;
+
+            stat_ok = true;
+
+            if (is_reparse)
+            {
+                entry_type = JSL_FILE_TYPE_SYMLINK;
+                if (iterator->follow_symlinks)
+                {
+                    struct _stat64 st_target = {0};
+                    int sr = _stat64(iterator->path_buffer, &st_target);
+                    if (sr == 0)
+                    {
+                        uint32_t m = (uint32_t)(st_target.st_mode & _S_IFMT);
+                        if      (m == _S_IFREG) entry_type = JSL_FILE_TYPE_REG;
+                        else if (m == _S_IFDIR) entry_type = JSL_FILE_TYPE_DIR;
+                        else if (m == _S_IFCHR) entry_type = JSL_FILE_TYPE_CHAR;
+                        else if (m == _S_IFIFO) entry_type = JSL_FILE_TYPE_FIFO;
+                    }
+                }
+            }
+            else if (is_dir_attr)
+            {
+                entry_type = JSL_FILE_TYPE_DIR;
+            }
+            else
+            {
+                entry_type = JSL_FILE_TYPE_REG;
+            }
+        #endif
+
+        // Fill the result. The status may be overridden below if descent fails.
+        result->absolute_path.data   = (const uint8_t*) iterator->path_buffer;
+        result->absolute_path.length = entry_path_len;
+        result->relative_path.data   = (const uint8_t*)
+            (iterator->path_buffer + iterator->base_length);
+        result->relative_path.length = entry_path_len - iterator->base_length;
+        result->type                 = entry_type;
+        result->depth                = iterator->depth - 1;
+        result->status               = stat_ok ? JSL_DIRECTORY_ITERATOR_OK
+                                               : JSL_DIRECTORY_ITERATOR_PARTIAL;
+
+        #if JSL_IS_POSIX
+            if (!stat_ok && out_errno != NULL)
+                *out_errno = stat_errno;
+        #endif
+
+        produced = true;
+
+        // Try to descend if this entry is a directory we should enter.
+        bool should_descend = (entry_type == JSL_FILE_TYPE_DIR);
+
+        bool depth_exceeded = should_descend
+            && (iterator->depth >= JSL_DIRECTORY_ITERATOR_MAX_DEPTH);
+        if (depth_exceeded)
+            result->status = JSL_DIRECTORY_ITERATOR_MAX_DEPTH_EXCEEDED;
+
+        int64_t new_prefix_length  = entry_path_len + 1;
+        bool    sep_fits_in_buffer = should_descend && !depth_exceeded
+            && (new_prefix_length <= (int64_t) FILENAME_MAX);
+
+        bool descent_path_too_long = should_descend
+            && !depth_exceeded && !sep_fits_in_buffer;
+        if (descent_path_too_long)
+            result->status = JSL_DIRECTORY_ITERATOR_PATH_TOO_LONG;
+
+        bool ok_to_open = should_descend && !depth_exceeded && sep_fits_in_buffer;
+
+        #if JSL_IS_POSIX
+            if (ok_to_open)
+            {
+                iterator->path_buffer[entry_path_len]    = '/';
+                iterator->path_buffer[new_prefix_length] = '\0';
+
+                errno    = 0;
+                DIR* sub = opendir(iterator->path_buffer);
+                if (sub != NULL)
+                {
+                    iterator->frames[iterator->depth].dir           = sub;
+                    iterator->frames[iterator->depth].prefix_length = new_prefix_length;
+                    iterator->depth++;
+                }
+                else
+                {
+                    int32_t open_err = errno;
+                    // Restore path_buffer (drop the appended separator).
+                    iterator->path_buffer[entry_path_len] = '\0';
+                    result->status = JSL_DIRECTORY_ITERATOR_COULD_NOT_OPEN;
+                    if (out_errno != NULL)
+                        *out_errno = open_err;
+                }
+            }
+        #elif JSL_IS_WINDOWS
+            if (ok_to_open)
+            {
+                iterator->path_buffer[entry_path_len]    = '\\';
+                iterator->path_buffer[new_prefix_length] = '\0';
+
+                JSL_MEMCPY(
+                    iterator->find_pattern,
+                    iterator->path_buffer,
+                    (size_t) new_prefix_length
+                );
+                iterator->find_pattern[new_prefix_length]     = '*';
+                iterator->find_pattern[new_prefix_length + 1] = '\0';
+
+                HANDLE sub_handle = FindFirstFileA(
+                    iterator->find_pattern,
+                    &iterator->find_data
+                );
+                if (sub_handle != INVALID_HANDLE_VALUE)
+                {
+                    iterator->frames[iterator->depth].find_handle    = sub_handle;
+                    iterator->frames[iterator->depth].prefix_length  = new_prefix_length;
+                    iterator->frames[iterator->depth].consumed_first = false;
+                    iterator->depth++;
+                }
+                else
+                {
+                    DWORD open_err = GetLastError();
+                    iterator->path_buffer[entry_path_len] = '\0';
+                    result->status = JSL_DIRECTORY_ITERATOR_COULD_NOT_OPEN;
+                    if (out_errno != NULL)
+                        *out_errno = (int32_t) open_err;
+                }
+            }
+        #endif
+    }
+
+    if (valid_args && !produced)
+    {
+        iterator->exhausted = true;
+    }
+
+    return produced;
+}
+
+void jsl_directory_iterator_end(JSLDirectoryIterator* iterator)
+{
+    if (
+        iterator != NULL 
+        && iterator->sentinel == JSL__DIR_ITERATOR_PRIVATE_SENTINEL
+    )
+    {
+        while (iterator->depth > 0)
+        {
+            int32_t                    frame_idx = iterator->depth - 1;
+            JSLDirectoryIteratorFrame* frame     = &iterator->frames[frame_idx];
+
+            #if JSL_IS_POSIX
+                if (frame->dir != NULL)
+                {
+                    closedir(frame->dir);
+                    frame->dir = NULL;
+                }
+            #elif JSL_IS_WINDOWS
+                if (frame->find_handle != INVALID_HANDLE_VALUE)
+                {
+                    FindClose(frame->find_handle);
+                    frame->find_handle = INVALID_HANDLE_VALUE;
+                }
+                frame->consumed_first = false;
+            #endif
+
+            iterator->depth--;
+        }
+
+        iterator->sentinel = 0;
+        iterator->exhausted = true;
+    }
+}
+
+JSLCopyFileResultEnum jsl_copy_file(
+    JSLImmutableMemory src_path,
+    JSLImmutableMemory dst_path,
+    int32_t* out_errno
+)
+{
+    char src_buffer[FILENAME_MAX + 1];
+    char dst_buffer[FILENAME_MAX + 1];
+    JSLCopyFileResultEnum res = JSL_COPY_FILE_BAD_PARAMETERS;
+    bool proceed = false;
+
+    proceed = (src_path.data != NULL
+        && src_path.length > 0
+        && dst_path.data != NULL
+        && dst_path.length > 0);
+
+    bool path_too_long = proceed && (src_path.length >= (int64_t) FILENAME_MAX
+        || dst_path.length >= (int64_t) FILENAME_MAX);
+    if (path_too_long)
+    {
+        res = JSL_COPY_FILE_PATH_TOO_LONG;
+        proceed = false;
+    }
+
+    if (proceed)
+    {
+        JSL_MEMCPY(src_buffer, src_path.data, (size_t) src_path.length);
+        src_buffer[src_path.length] = '\0';
+        JSL_MEMCPY(dst_buffer, dst_path.data, (size_t) dst_path.length);
+        dst_buffer[dst_path.length] = '\0';
+        res = JSL_COPY_FILE_SOURCE_NOT_FOUND;
+    }
+
+    #if JSL_IS_WINDOWS
+
+        DWORD src_attrs = INVALID_FILE_ATTRIBUTES;
+        bool got_src_attrs = false;
+
+        if (proceed)
+        {
+            src_attrs = GetFileAttributesA(src_buffer);
+            got_src_attrs = (src_attrs != INVALID_FILE_ATTRIBUTES);
+        }
+
+        bool src_attrs_failed = proceed && !got_src_attrs;
+        if (src_attrs_failed)
+        {
+            DWORD last_err = GetLastError();
+            if (out_errno != NULL)
+                *out_errno = (int32_t) last_err;
+            bool is_not_found = (last_err == ERROR_FILE_NOT_FOUND
+                || last_err == ERROR_PATH_NOT_FOUND);
+            res = is_not_found ? JSL_COPY_FILE_SOURCE_NOT_FOUND : JSL_COPY_FILE_ERROR_UNKNOWN;
+            proceed = false;
+        }
+
+        bool src_is_dir = got_src_attrs && ((src_attrs & FILE_ATTRIBUTE_DIRECTORY) != 0);
+        if (src_is_dir)
+        {
+            res = JSL_COPY_FILE_SOURCE_IS_DIRECTORY;
+            proceed = false;
+        }
+
+        BOOL copy_ok = FALSE;
+        if (proceed)
+        {
+            copy_ok = CopyFileA(src_buffer, dst_buffer, FALSE);
+        }
+
+        bool copy_success = (proceed && copy_ok != FALSE);
+        if (copy_success)
+        {
+            res = JSL_COPY_FILE_SUCCESS;
+        }
+
+        bool copy_failed = (proceed && copy_ok == FALSE);
+        if (copy_failed)
+        {
+            DWORD last_err = GetLastError();
+            if (out_errno != NULL)
+                *out_errno = (int32_t) last_err;
+
+            if (last_err == ERROR_FILE_NOT_FOUND || last_err == ERROR_PATH_NOT_FOUND)
+                res = JSL_COPY_FILE_SOURCE_NOT_FOUND;
+            else if (last_err == ERROR_ACCESS_DENIED)
+                res = JSL_COPY_FILE_PERMISSION_DENIED;
+            else if (last_err == ERROR_DISK_FULL || last_err == ERROR_HANDLE_DISK_FULL)
+                res = JSL_COPY_FILE_WRITE_FAILED;
+            else
+                res = JSL_COPY_FILE_ERROR_UNKNOWN;
+        }
+
+    #elif JSL_IS_POSIX
+
+        struct stat src_stat;
+        int32_t stat_ret = -1;
+        bool stat_ok = false;
+        bool is_source_reg = false;
+
+        if (proceed)
+        {
+            errno = 0;
+            stat_ret = lstat(src_buffer, &src_stat);
+            stat_ok = (stat_ret == 0);
+            proceed = stat_ok;
+        }
+
+        bool stat_failed = !stat_ok && (res == JSL_COPY_FILE_SOURCE_NOT_FOUND);
+        if (stat_failed)
+        {
+            int32_t err = errno;
+            if (out_errno != NULL)
+                *out_errno = err;
+            bool is_not_found = (err == ENOENT || err == ENOTDIR);
+            res = is_not_found ? JSL_COPY_FILE_SOURCE_NOT_FOUND : JSL_COPY_FILE_ERROR_UNKNOWN;
+        }
+
+        if (stat_ok)
+        {
+            is_source_reg = ((src_stat.st_mode & (mode_t) S_IFMT) == S_IFREG);
+        }
+
+        bool source_is_dir = stat_ok && !is_source_reg;
+        if (source_is_dir)
+        {
+            res = JSL_COPY_FILE_SOURCE_IS_DIRECTORY;
+            proceed = false;
+        }
+
+        int32_t src_fd = -1;
+        bool opened_src = false;
+
+        if (proceed)
+        {
+            errno = 0;
+            src_fd = open(src_buffer, O_RDONLY);
+            opened_src = (src_fd > -1);
+            proceed = opened_src;
+        }
+
+        bool open_src_failed = !opened_src && stat_ok && is_source_reg;
+        if (open_src_failed)
+        {
+            int32_t err = errno;
+            if (out_errno != NULL)
+                *out_errno = err;
+            res = (err == EACCES) ? JSL_COPY_FILE_PERMISSION_DENIED : JSL_COPY_FILE_COULD_NOT_OPEN_SOURCE;
+        }
+
+        int32_t dst_fd = -1;
+        bool opened_dst = false;
+
+        if (proceed)
+        {
+            errno = 0;
+            dst_fd = open(dst_buffer, O_WRONLY | O_CREAT | O_TRUNC, S_IRUSR | S_IWUSR);
+            opened_dst = (dst_fd > -1);
+            proceed = opened_dst;
+        }
+
+        bool open_dst_failed = opened_src && !opened_dst;
+        if (open_dst_failed)
+        {
+            int32_t err = errno;
+            if (out_errno != NULL)
+                *out_errno = err;
+            res = (err == EACCES) ? JSL_COPY_FILE_PERMISSION_DENIED : JSL_COPY_FILE_COULD_NOT_OPEN_DEST;
+        }
+
+        bool copy_ok = false;
+        if (proceed)
+        {
+            uint8_t copy_buf[8192];
+            bool loop_ok = true;
+            bool reached_eof = false;
+
+            while (loop_ok)
+            {
+                int64_t bytes_read = (int64_t) read(src_fd, copy_buf, sizeof(copy_buf));
+                bool read_failed = (bytes_read < 0);
+                reached_eof = (bytes_read == 0);
+
+                if (read_failed)
+                {
+                    res = JSL_COPY_FILE_READ_FAILED;
+                    if (out_errno != NULL)
+                        *out_errno = errno;
+                }
+
+                bool should_write = !read_failed && !reached_eof;
+                int64_t bytes_written = -1;
+                if (should_write)
+                {
+                    bytes_written = (int64_t) write(dst_fd, copy_buf, (size_t) bytes_read);
+                }
+                bool write_failed = should_write && (bytes_written != bytes_read);
+
+                if (write_failed)
+                {
+                    res = JSL_COPY_FILE_WRITE_FAILED;
+                    if (out_errno != NULL)
+                        *out_errno = errno;
+                }
+
+                copy_ok = reached_eof;
+                loop_ok = !read_failed && !write_failed && !reached_eof;
+            }
+        }
+
+        if (opened_dst)
+        {
+            close(dst_fd);
+        }
+        if (opened_src)
+        {
+            close(src_fd);
+        }
+
+        if (copy_ok)
+        {
+            res = JSL_COPY_FILE_SUCCESS;
+        }
+
+    #else
+        #error "Unsupported platform"
+    #endif
+
+    return res;
+}
+
+JSLCopyDirectoryResultEnum jsl_copy_directory(
+    JSLImmutableMemory src_path,
+    JSLImmutableMemory dst_path,
+    int32_t* out_errno
+)
+{
+    char dst_buffer[FILENAME_MAX + 1];
+    char dst_entry_buffer[FILENAME_MAX + 1];
+    JSLCopyDirectoryResultEnum res = JSL_COPY_DIRECTORY_BAD_PARAMETERS;
+
+    bool proceed = (src_path.data != NULL
+        && src_path.length > 0
+        && dst_path.data != NULL
+        && dst_path.length > 0);
+
+    bool src_too_long = proceed && (src_path.length >= (int64_t) FILENAME_MAX);
+    bool dst_too_long = proceed && !src_too_long && (dst_path.length >= (int64_t) FILENAME_MAX);
+
+    if (src_too_long || dst_too_long)
+    {
+        res = JSL_COPY_DIRECTORY_PATH_TOO_LONG;
+        proceed = false;
+    }
+
+    if (proceed)
+    {
+        JSL_MEMCPY(dst_buffer, dst_path.data, (size_t) dst_path.length);
+        dst_buffer[dst_path.length] = '\0';
+    }
+
+    JSLFileTypeEnum src_type = JSL_FILE_TYPE_UNKNOWN;
+    if (proceed)
+        src_type = jsl_get_file_type(src_path);
+
+    bool src_not_found = proceed && (src_type == JSL_FILE_TYPE_NOT_FOUND);
+    bool src_not_dir   = proceed && !src_not_found && (src_type != JSL_FILE_TYPE_DIR);
+
+    if (src_not_found)
+    {
+        res = JSL_COPY_DIRECTORY_SOURCE_NOT_FOUND;
+        proceed = false;
+    }
+
+    if (src_not_dir)
+    {
+        res = JSL_COPY_DIRECTORY_SOURCE_NOT_A_DIRECTORY;
+        proceed = false;
+    }
+
+    JSLMakeDirectoryResultEnum top_mkdir_res = JSL_MAKE_DIRECTORY_BAD_PARAMETERS;
+    if (proceed)
+        top_mkdir_res = jsl_make_directory(dst_path, out_errno);
+
+    bool top_mkdir_ok     = proceed && (top_mkdir_res == JSL_MAKE_DIRECTORY_SUCCESS);
+    bool top_mkdir_exists = proceed && (top_mkdir_res == JSL_MAKE_DIRECTORY_ALREADY_EXISTS);
+    bool top_mkdir_perm   = proceed && (top_mkdir_res == JSL_MAKE_DIRECTORY_PERMISSION_DENIED);
+    bool top_mkdir_fail   = proceed && !top_mkdir_ok && !top_mkdir_exists && !top_mkdir_perm;
+
+    if (top_mkdir_exists)
+    {
+        res = JSL_COPY_DIRECTORY_DEST_ALREADY_EXISTS;
+        proceed = false;
+    }
+
+    if (top_mkdir_perm)
+    {
+        res = JSL_COPY_DIRECTORY_PERMISSION_DENIED;
+        proceed = false;
+    }
+
+    if (top_mkdir_fail)
+    {
+        res = JSL_COPY_DIRECTORY_COULD_NOT_CREATE_DEST;
+        proceed = false;
+    }
+
+    JSLDirectoryIterator iterator;
+    JSLDirectoryIteratorInitResultEnum init_res = JSL_DIRECTORY_ITERATOR_INIT_BAD_PARAMETERS;
+    if (proceed)
+        init_res = jsl_directory_iterator_init(src_path, &iterator, false);
+
+    bool init_ok        = proceed && (init_res == JSL_DIRECTORY_ITERATOR_INIT_SUCCESS);
+    bool init_not_found = proceed && !init_ok && (init_res == JSL_DIRECTORY_ITERATOR_INIT_NOT_FOUND);
+    bool init_not_dir   = proceed && !init_ok && (init_res == JSL_DIRECTORY_ITERATOR_INIT_NOT_A_DIRECTORY);
+    bool init_other     = proceed && !init_ok && !init_not_found && !init_not_dir;
+
+    if (init_not_found)
+    {
+        res = JSL_COPY_DIRECTORY_SOURCE_NOT_FOUND;
+        proceed = false;
+    }
+
+    if (init_not_dir)
+    {
+        res = JSL_COPY_DIRECTORY_SOURCE_NOT_A_DIRECTORY;
+        proceed = false;
+    }
+
+    if (init_other)
+    {
+        res = JSL_COPY_DIRECTORY_COULD_NOT_OPEN_SOURCE;
+        proceed = false;
+    }
+
+    if (init_ok)
+    {
+        res = JSL_COPY_DIRECTORY_SUCCESS;
+    }
+
+    #if JSL_IS_WINDOWS
+        char sep = '\\';
+    #else
+        char sep = '/';
+    #endif
+
+    JSLDirectoryIteratorResult iter_result = {0};
+    bool keep_going = init_ok;
+    while (keep_going && jsl_directory_iterator_next(&iterator, &iter_result, out_errno))
+    {
+        int64_t dst_base_len = dst_path.length;
+        int64_t rel_len      = iter_result.relative_path.length;
+        int64_t total_len    = dst_base_len + 1 + rel_len;
+
+        bool entry_too_long = (total_len >= (int64_t) FILENAME_MAX);
+        bool iter_error = !entry_too_long
+            && (iter_result.status != JSL_DIRECTORY_ITERATOR_OK)
+            && (iter_result.status != JSL_DIRECTORY_ITERATOR_PARTIAL);
+        bool is_dir  = !entry_too_long && !iter_error
+            && (iter_result.type == JSL_FILE_TYPE_DIR);
+        bool is_file = !entry_too_long && !iter_error
+            && (iter_result.type == JSL_FILE_TYPE_REG);
+
+        if (!entry_too_long && !iter_error)
+        {
+            JSL_MEMCPY(dst_entry_buffer, dst_buffer, (size_t) dst_base_len);
+            dst_entry_buffer[dst_base_len] = sep;
+            JSL_MEMCPY(
+                dst_entry_buffer + dst_base_len + 1,
+                iter_result.relative_path.data,
+                (size_t) rel_len
+            );
+            dst_entry_buffer[total_len] = '\0';
+        }
+
+        if (entry_too_long)
+        {
+            res = JSL_COPY_DIRECTORY_PATH_TOO_LONG;
+            keep_going = false;
+        }
+
+        if (iter_error)
+        {
+            res = JSL_COPY_DIRECTORY_ERROR_UNKNOWN;
+            keep_going = false;
+        }
+
+        JSLImmutableMemory dst_entry_mem;
+        dst_entry_mem.data   = (const uint8_t*) dst_entry_buffer;
+        dst_entry_mem.length = total_len;
+
+        JSLMakeDirectoryResultEnum sub_mkdir_res = JSL_MAKE_DIRECTORY_BAD_PARAMETERS;
+        bool sub_mkdir_ok = false;
+        bool sub_mkdir_perm = false;
+
+        if (is_dir)
+        {
+            sub_mkdir_res = jsl_make_directory(dst_entry_mem, out_errno);
+            sub_mkdir_ok = sub_mkdir_res == JSL_MAKE_DIRECTORY_SUCCESS;
+            sub_mkdir_perm = sub_mkdir_res == JSL_MAKE_DIRECTORY_PERMISSION_DENIED;
+        }
+
+        if (sub_mkdir_perm)
+        {
+            res = JSL_COPY_DIRECTORY_PERMISSION_DENIED;
+            keep_going = false;
+        }
+
+        if (!sub_mkdir_ok && !sub_mkdir_perm)
+        {
+            res = JSL_COPY_DIRECTORY_MAKE_SUBDIR_FAILED;
+            keep_going = false;
+        }
+
+        JSLCopyFileResultEnum copy_file_res = JSL_COPY_FILE_BAD_PARAMETERS;
+        bool copy_ok = false;
+        bool copy_perm = false;
+        if (is_file)
+        {
+            copy_file_res = jsl_copy_file(iter_result.absolute_path, dst_entry_mem, out_errno);
+            copy_ok = (copy_file_res == JSL_COPY_FILE_SUCCESS);
+            copy_perm = (copy_file_res == JSL_COPY_FILE_PERMISSION_DENIED);
+        }
+
+        if (copy_perm)
+        {
+            res = JSL_COPY_DIRECTORY_PERMISSION_DENIED;
+            keep_going = false;
+        }
+
+        if (!copy_ok && !copy_perm)
+        {
+            res = JSL_COPY_DIRECTORY_COPY_FILE_FAILED;
+            keep_going = false;
+        }
+    }
+
+    jsl_directory_iterator_end(&iterator);
+
+    return res;
+}
+
+JSLRenameFileResultEnum jsl_rename_file(
+    JSLImmutableMemory src_path,
+    JSLImmutableMemory dst_path,
+    int32_t* out_errno
+)
+{
+    char src_buffer[FILENAME_MAX + 1];
+    char dst_buffer[FILENAME_MAX + 1];
+    JSLRenameFileResultEnum res = JSL_RENAME_FILE_BAD_PARAMETERS;
+    bool proceed = false;
+
+    proceed = (src_path.data != NULL
+        && src_path.length > 0
+        && dst_path.data != NULL
+        && dst_path.length > 0);
+
+    bool path_too_long = proceed && (src_path.length >= (int64_t) FILENAME_MAX
+        || dst_path.length >= (int64_t) FILENAME_MAX);
+    if (path_too_long)
+    {
+        res = JSL_RENAME_FILE_PATH_TOO_LONG;
+        proceed = false;
+    }
+
+    if (proceed)
+    {
+        JSL_MEMCPY(src_buffer, src_path.data, (size_t) src_path.length);
+        src_buffer[src_path.length] = '\0';
+        JSL_MEMCPY(dst_buffer, dst_path.data, (size_t) dst_path.length);
+        dst_buffer[dst_path.length] = '\0';
+    }
+
+    #if JSL_IS_WINDOWS
+
+        BOOL move_ok = FALSE;
+        if (proceed)
+        {
+            move_ok = MoveFileExA(
+                src_buffer,
+                dst_buffer,
+                MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED
+            );
+        }
+
+        bool move_success = proceed && (move_ok != FALSE);
+        if (move_success)
+        {
+            res = JSL_RENAME_FILE_SUCCESS;
+        }
+
+        bool move_failed = proceed && (move_ok == FALSE);
+        if (move_failed)
+        {
+            DWORD last_err = GetLastError();
+            if (out_errno != NULL)
+                *out_errno = (int32_t) last_err;
+
+            bool is_not_found = (last_err == ERROR_FILE_NOT_FOUND
+                || last_err == ERROR_PATH_NOT_FOUND);
+            bool is_access_denied = (last_err == ERROR_ACCESS_DENIED);
+            bool is_already_exists = (last_err == ERROR_ALREADY_EXISTS);
+            bool is_cross_device = (last_err == ERROR_NOT_SAME_DEVICE);
+
+            if (is_not_found)
+                res = JSL_RENAME_FILE_SOURCE_NOT_FOUND;
+            if (is_access_denied)
+                res = JSL_RENAME_FILE_PERMISSION_DENIED;
+            if (is_already_exists)
+                res = JSL_RENAME_FILE_DEST_ALREADY_EXISTS;
+            if (is_cross_device)
+                res = JSL_RENAME_FILE_CROSS_DEVICE;
+            if (!is_not_found && !is_access_denied && !is_already_exists && !is_cross_device)
+                res = JSL_RENAME_FILE_ERROR_UNKNOWN;
+        }
+
+    #elif JSL_IS_POSIX
+
+        int32_t rename_ret = -1;
+        if (proceed)
+        {
+            rename_ret = rename(src_buffer, dst_buffer);
+        }
+
+        bool rename_ok = proceed && (rename_ret == 0);
+        if (rename_ok)
+        {
+            res = JSL_RENAME_FILE_SUCCESS;
+        }
+
+        bool rename_failed = proceed && (rename_ret != 0);
+        if (rename_failed)
+        {
+            int32_t err = errno;
+            if (out_errno != NULL)
+                *out_errno = err;
+
+            switch (err)
+            {
+                case ENOENT:
+                    res = JSL_RENAME_FILE_SOURCE_NOT_FOUND;
+                    break;
+                case EACCES:
+                case EPERM:
+                    res = JSL_RENAME_FILE_PERMISSION_DENIED;
+                    break;
+                case EEXIST:
+                case ENOTEMPTY:
+                    res = JSL_RENAME_FILE_DEST_ALREADY_EXISTS;
+                    break;
+                case ENAMETOOLONG:
+                    res = JSL_RENAME_FILE_PATH_TOO_LONG;
+                    break;
+                case EXDEV:
+                    res = JSL_RENAME_FILE_CROSS_DEVICE;
+                    break;
+                case EROFS:
+                    res = JSL_RENAME_FILE_READ_ONLY_FS;
+                    break;
+                default:
+                    res = JSL_RENAME_FILE_ERROR_UNKNOWN;
+                    break;
+            }
+        }
+
+    #else
+        #error "Unsupported platform"
+    #endif
+
+    return res;
 }
