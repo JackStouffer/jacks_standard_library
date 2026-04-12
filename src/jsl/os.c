@@ -31,6 +31,25 @@
 #include "allocator.h"
 #include "os.h"
 
+#if JSL_IS_POSIX
+    #include <spawn.h>
+    #include <sys/wait.h>
+
+    /* Declared by POSIX in unistd.h on most systems, but the declaration is
+     * gated behind feature test macros on some libcs. Declare it ourselves so
+     * we do not have to leak _GNU_SOURCE / _BSD_SOURCE into the build. */
+    extern char** environ;
+
+    /* posix_spawn_file_actions_addchdir_np is available on macOS 10.15+ and
+     * glibc 2.29+, but its declaration in <spawn.h> is gated behind
+     * _GNU_SOURCE on glibc. Declare it ourselves so we can call it without
+     * forcing the user to define feature test macros. */
+    extern int posix_spawn_file_actions_addchdir_np(
+        posix_spawn_file_actions_t* file_actions,
+        const char* path
+    );
+#endif
+
 #define JSL__DIR_ITERATOR_PRIVATE_SENTINEL 9523783263672821879U
 
 JSLGetFileSizeResultEnum jsl_get_file_size(
@@ -2345,6 +2364,472 @@ JSLRenameFileResultEnum jsl_rename_file(
                     break;
             }
         }
+
+    #else
+        #error "Unsupported platform"
+    #endif
+
+    return res;
+}
+
+#if JSL_IS_WINDOWS
+static inline JSLSpawnSubprocessResultEnum jsl__spawn_classify_windows_error(DWORD err)
+{
+    JSLSpawnSubprocessResultEnum res = JSL_SPAWN_SUBPROCESS_ERROR_UNKNOWN;
+    bool is_not_found = (err == ERROR_FILE_NOT_FOUND) || (err == ERROR_PATH_NOT_FOUND);
+    bool is_denied = (err == ERROR_ACCESS_DENIED);
+    if (is_not_found)
+        res = JSL_SPAWN_SUBPROCESS_EXECUTABLE_NOT_FOUND;
+    if (is_denied)
+        res = JSL_SPAWN_SUBPROCESS_PERMISSION_DENIED;
+    return res;
+}
+#endif
+
+JSLSpawnSubprocessResultEnum jsl_spawn_subprocess(
+    JSLSpawnSubprocessOptions options,
+    JSLSubprocess* out_subprocess,
+    int32_t* out_errno
+)
+{
+    char exe_buffer[FILENAME_MAX + 1];
+    char cwd_buffer[FILENAME_MAX + 1];
+
+    bool params_ok = (out_subprocess != NULL
+        && options.executable_path.data != NULL
+        && options.executable_path.length > 0);
+
+    bool exe_too_long = params_ok && (options.executable_path.length >= (int64_t) sizeof(exe_buffer));
+    bool cwd_too_long = params_ok
+        && options.change_working_directory
+        && options.working_directory.length >= (int64_t) sizeof(cwd_buffer);
+
+    bool proceed = params_ok && !exe_too_long && !cwd_too_long;
+
+    JSLSpawnSubprocessResultEnum res = JSL_SPAWN_SUBPROCESS_BAD_PARAMETERS;
+    if (proceed)
+        res = JSL_SPAWN_SUBPROCESS_SUCCESS;
+    if (exe_too_long || cwd_too_long)
+        res = JSL_SPAWN_SUBPROCESS_PATH_TOO_LONG;
+
+    if (proceed)
+    {
+        JSL_MEMSET(out_subprocess, 0, sizeof(*out_subprocess));
+        out_subprocess->status = JSL_SUBPROCESS_STATUS_NOT_STARTED;
+        out_subprocess->exit_code = -1;
+        out_subprocess->stdin_write_fd = -1;
+        out_subprocess->stdout_read_fd = -1;
+        out_subprocess->stderr_read_fd = -1;
+
+        JSL_MEMCPY(exe_buffer, options.executable_path.data, (size_t) options.executable_path.length);
+        exe_buffer[options.executable_path.length] = '\0';
+
+        if (options.change_working_directory)
+        {
+            JSL_MEMCPY(cwd_buffer, options.working_directory.data, (size_t) options.working_directory.length);
+            cwd_buffer[options.working_directory.length] = '\0';
+        }
+    }
+
+    bool need_stdin_pipe = proceed && (options.stdin_kind == JSL_SUBPROCESS_STDIN_MEMORY);
+    bool need_stdout_pipe = proceed && (options.stdout_kind == JSL_SUBPROCESS_OUTPUT_SINK);
+    bool need_stderr_pipe = proceed && (options.stderr_kind == JSL_SUBPROCESS_OUTPUT_SINK);
+
+    int stdin_pipe[2] = {-1, -1};
+    int stdout_pipe[2] = {-1, -1};
+    int stderr_pipe[2] = {-1, -1};
+    int devnull_fd = -1;
+
+    #if JSL_IS_WINDOWS
+
+        bool pipe_ok = true;
+        if (need_stdin_pipe && proceed && _pipe(stdin_pipe, 65536, _O_BINARY) != 0)
+            pipe_ok = false;
+        if (need_stdout_pipe && proceed && pipe_ok && _pipe(stdout_pipe, 65536, _O_BINARY) != 0)
+            pipe_ok = false;
+        if (need_stderr_pipe && proceed && pipe_ok && _pipe(stderr_pipe, 65536, _O_BINARY) != 0)
+            pipe_ok = false;
+
+        if (proceed && !pipe_ok)
+        {
+            if (out_errno != NULL)
+                *out_errno = errno;
+            res = JSL_SPAWN_SUBPROCESS_PIPE_FAILED;
+            proceed = false;
+        }
+
+        bool need_devnull = proceed
+            && (options.stdin_kind == JSL_SUBPROCESS_STDIN_NONE
+                || options.stdout_kind == JSL_SUBPROCESS_OUTPUT_NONE
+                || options.stderr_kind == JSL_SUBPROCESS_OUTPUT_NONE);
+        if (need_devnull)
+        {
+            devnull_fd = _open("NUL", _O_RDWR | _O_BINARY);
+            if (devnull_fd < 0)
+            {
+                if (out_errno != NULL)
+                    *out_errno = errno;
+                res = JSL_SPAWN_SUBPROCESS_PIPE_FAILED;
+                proceed = false;
+            }
+        }
+
+        /* Pick the C runtime fd that the child should see for each stream. */
+        int child_stdin_fd = -1;
+        int child_stdout_fd = -1;
+        int child_stderr_fd = -1;
+
+        if (proceed && options.stdin_kind == JSL_SUBPROCESS_STDIN_NONE)
+            child_stdin_fd = devnull_fd;
+        if (proceed && options.stdin_kind == JSL_SUBPROCESS_STDIN_MEMORY)
+            child_stdin_fd = stdin_pipe[0];
+        if (proceed && options.stdin_kind == JSL_SUBPROCESS_STDIN_FD)
+            child_stdin_fd = options.stdin_fd;
+
+        if (proceed && options.stdout_kind == JSL_SUBPROCESS_OUTPUT_NONE)
+            child_stdout_fd = devnull_fd;
+        if (proceed && options.stdout_kind == JSL_SUBPROCESS_OUTPUT_FD)
+            child_stdout_fd = options.stdout_fd;
+        if (proceed && options.stdout_kind == JSL_SUBPROCESS_OUTPUT_SINK)
+            child_stdout_fd = stdout_pipe[1];
+
+        if (proceed && options.stderr_kind == JSL_SUBPROCESS_OUTPUT_NONE)
+            child_stderr_fd = devnull_fd;
+        if (proceed && options.stderr_kind == JSL_SUBPROCESS_OUTPUT_FD)
+            child_stderr_fd = options.stderr_fd;
+        if (proceed && options.stderr_kind == JSL_SUBPROCESS_OUTPUT_SINK)
+            child_stderr_fd = stderr_pipe[1];
+
+        STARTUPINFOA si;
+        PROCESS_INFORMATION pi;
+        JSL_MEMSET(&si, 0, sizeof(si));
+        JSL_MEMSET(&pi, 0, sizeof(pi));
+        si.cb = sizeof(si);
+        si.dwFlags = STARTF_USESTDHANDLES;
+
+        if (proceed && options.stdin_kind == JSL_SUBPROCESS_STDIN_INHERIT)
+            si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+        if (proceed && options.stdin_kind != JSL_SUBPROCESS_STDIN_INHERIT)
+            si.hStdInput = (HANDLE) _get_osfhandle(child_stdin_fd);
+
+        if (proceed && options.stdout_kind == JSL_SUBPROCESS_OUTPUT_INHERIT)
+            si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (proceed && options.stdout_kind != JSL_SUBPROCESS_OUTPUT_INHERIT)
+            si.hStdOutput = (HANDLE) _get_osfhandle(child_stdout_fd);
+
+        if (proceed && options.stderr_kind == JSL_SUBPROCESS_OUTPUT_INHERIT)
+            si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+        if (proceed && options.stderr_kind != JSL_SUBPROCESS_OUTPUT_INHERIT)
+            si.hStdError = (HANDLE) _get_osfhandle(child_stderr_fd);
+
+        /* The child needs to inherit the three handles we just attached.
+         * Mark them inheritable; the parent ends of the pipes (the fds we
+         * keep) are explicitly made non-inheritable just below. */
+        if (proceed)
+        {
+            SetHandleInformation(si.hStdInput, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+            SetHandleInformation(si.hStdOutput, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+            SetHandleInformation(si.hStdError, HANDLE_FLAG_INHERIT, HANDLE_FLAG_INHERIT);
+        }
+        if (need_stdin_pipe && proceed)
+            SetHandleInformation((HANDLE) _get_osfhandle(stdin_pipe[1]), HANDLE_FLAG_INHERIT, 0);
+        if (need_stdout_pipe && proceed)
+            SetHandleInformation((HANDLE) _get_osfhandle(stdout_pipe[0]), HANDLE_FLAG_INHERIT, 0);
+        if (need_stderr_pipe && proceed)
+            SetHandleInformation((HANDLE) _get_osfhandle(stderr_pipe[0]), HANDLE_FLAG_INHERIT, 0);
+
+        /* CreateProcessA wants a writable command line buffer. */
+        char cmd_line[FILENAME_MAX + 4];
+        if (proceed)
+        {
+            cmd_line[0] = '"';
+            JSL_MEMCPY(cmd_line + 1, exe_buffer, (size_t) options.executable_path.length);
+            cmd_line[1 + options.executable_path.length] = '"';
+            cmd_line[2 + options.executable_path.length] = '\0';
+        }
+
+        BOOL created = FALSE;
+        if (proceed)
+        {
+            const char* lp_cwd = options.change_working_directory ? cwd_buffer : NULL;
+            created = CreateProcessA(
+                exe_buffer,
+                cmd_line,
+                NULL,
+                NULL,
+                TRUE,
+                0,
+                NULL,
+                lp_cwd,
+                &si,
+                &pi
+            );
+        }
+
+        if (proceed && !created)
+        {
+            DWORD err = GetLastError();
+            if (out_errno != NULL)
+                *out_errno = (int32_t) err;
+            res = jsl__spawn_classify_windows_error(err);
+            if (res == JSL_SPAWN_SUBPROCESS_ERROR_UNKNOWN)
+                res = JSL_SPAWN_SUBPROCESS_FORK_FAILED;
+            proceed = false;
+        }
+
+        if (proceed)
+        {
+            CloseHandle(pi.hThread);
+
+            /* Close the child ends of the pipes that we own in the parent. */
+            if (need_stdin_pipe)
+                _close(stdin_pipe[0]);
+            if (need_stdout_pipe)
+                _close(stdout_pipe[1]);
+            if (need_stderr_pipe)
+                _close(stderr_pipe[1]);
+            if (devnull_fd >= 0)
+                _close(devnull_fd);
+
+            out_subprocess->process_handle = pi.hProcess;
+            out_subprocess->process_id = pi.dwProcessId;
+            out_subprocess->status = JSL_SUBPROCESS_STATUS_RUNNING;
+
+            if (need_stdin_pipe)
+            {
+                out_subprocess->stdin_write_fd = stdin_pipe[1];
+                out_subprocess->pending_stdin = options.stdin_memory;
+                out_subprocess->has_stdin_pipe = true;
+            }
+            if (need_stdout_pipe)
+            {
+                out_subprocess->stdout_read_fd = stdout_pipe[0];
+                out_subprocess->stdout_sink = options.stdout_sink;
+                out_subprocess->capture_stdout = true;
+            }
+            if (need_stderr_pipe)
+            {
+                out_subprocess->stderr_read_fd = stderr_pipe[0];
+                out_subprocess->stderr_sink = options.stderr_sink;
+                out_subprocess->capture_stderr = true;
+            }
+
+            res = JSL_SPAWN_SUBPROCESS_SUCCESS;
+        }
+
+        bool need_cleanup = !proceed && (res != JSL_SPAWN_SUBPROCESS_BAD_PARAMETERS);
+        if (need_cleanup)
+        {
+            if (stdin_pipe[0] >= 0) _close(stdin_pipe[0]);
+            if (stdin_pipe[1] >= 0) _close(stdin_pipe[1]);
+            if (stdout_pipe[0] >= 0) _close(stdout_pipe[0]);
+            if (stdout_pipe[1] >= 0) _close(stdout_pipe[1]);
+            if (stderr_pipe[0] >= 0) _close(stderr_pipe[0]);
+            if (stderr_pipe[1] >= 0) _close(stderr_pipe[1]);
+            if (devnull_fd >= 0) _close(devnull_fd);
+        }
+
+    #elif JSL_IS_POSIX
+
+        /* posix_spawn is used here instead of fork+exec so that there is
+         * no code path running in a forked child of the caller. The whole
+         * function runs in the parent and either succeeds or returns an
+         * error */
+
+        posix_spawn_file_actions_t actions;
+        bool actions_initialized = false;
+        if (proceed)
+        {
+            int init_err = posix_spawn_file_actions_init(&actions);
+            if (init_err == 0)
+            {
+                actions_initialized = true;
+            }
+            if (init_err != 0)
+            {
+                if (out_errno != NULL)
+                    *out_errno = init_err;
+                res = JSL_SPAWN_SUBPROCESS_ERROR_UNKNOWN;
+                proceed = false;
+            }
+        }
+
+        bool pipe_ok = true;
+        if (need_stdin_pipe && proceed && pipe(stdin_pipe) != 0)
+            pipe_ok = false;
+        if (need_stdout_pipe && proceed && pipe_ok && pipe(stdout_pipe) != 0)
+            pipe_ok = false;
+        if (need_stderr_pipe && proceed && pipe_ok && pipe(stderr_pipe) != 0)
+            pipe_ok = false;
+
+        if (proceed && !pipe_ok)
+        {
+            if (out_errno != NULL)
+                *out_errno = errno;
+            res = JSL_SPAWN_SUBPROCESS_PIPE_FAILED;
+            proceed = false;
+        }
+
+        bool need_devnull = proceed
+            && (options.stdin_kind == JSL_SUBPROCESS_STDIN_NONE
+                || options.stdout_kind == JSL_SUBPROCESS_OUTPUT_NONE
+                || options.stderr_kind == JSL_SUBPROCESS_OUTPUT_NONE);
+        if (need_devnull)
+        {
+            devnull_fd = open("/dev/null", O_RDWR);
+            if (devnull_fd < 0)
+            {
+                if (out_errno != NULL)
+                    *out_errno = errno;
+                res = JSL_SPAWN_SUBPROCESS_PIPE_FAILED;
+                proceed = false;
+            }
+        }
+
+        /* The fd that should become the child's stdin/stdout/stderr.
+         * `-1` means leave the inherited fd alone. */
+        int child_stdin_fd = -1;
+        int child_stdout_fd = -1;
+        int child_stderr_fd = -1;
+
+        if (proceed && options.stdin_kind == JSL_SUBPROCESS_STDIN_NONE)
+            child_stdin_fd = devnull_fd;
+        if (proceed && options.stdin_kind == JSL_SUBPROCESS_STDIN_MEMORY)
+            child_stdin_fd = stdin_pipe[0];
+        if (proceed && options.stdin_kind == JSL_SUBPROCESS_STDIN_FD)
+            child_stdin_fd = options.stdin_fd;
+
+        if (proceed && options.stdout_kind == JSL_SUBPROCESS_OUTPUT_NONE)
+            child_stdout_fd = devnull_fd;
+        if (proceed && options.stdout_kind == JSL_SUBPROCESS_OUTPUT_FD)
+            child_stdout_fd = options.stdout_fd;
+        if (proceed && options.stdout_kind == JSL_SUBPROCESS_OUTPUT_SINK)
+            child_stdout_fd = stdout_pipe[1];
+
+        if (proceed && options.stderr_kind == JSL_SUBPROCESS_OUTPUT_NONE)
+            child_stderr_fd = devnull_fd;
+        if (proceed && options.stderr_kind == JSL_SUBPROCESS_OUTPUT_FD)
+            child_stderr_fd = options.stderr_fd;
+        if (proceed && options.stderr_kind == JSL_SUBPROCESS_OUTPUT_SINK)
+            child_stderr_fd = stderr_pipe[1];
+
+        /* Build the file actions list. dup2 the chosen child fds onto the
+         * standard descriptors, then close the original copies that the
+         * child does not need. The order is important: the dup2s must run
+         * before the closes that target the same source fd.
+         *
+         * Each step is gated on a successful previous step - the
+         * posix_spawn_file_actions_* functions only ever fail in trivial
+         * ways (allocation failure, invalid descriptor) but if any one
+         * does we stop building the list and report the error. */
+        int actions_err = 0;
+        if (proceed && actions_err == 0 && child_stdin_fd >= 0)
+            actions_err = posix_spawn_file_actions_adddup2(&actions, child_stdin_fd, STDIN_FILENO);
+        if (proceed && actions_err == 0 && child_stdout_fd >= 0)
+            actions_err = posix_spawn_file_actions_adddup2(&actions, child_stdout_fd, STDOUT_FILENO);
+        if (proceed && actions_err == 0 && child_stderr_fd >= 0)
+            actions_err = posix_spawn_file_actions_adddup2(&actions, child_stderr_fd, STDERR_FILENO);
+
+        if (proceed && actions_err == 0 && stdin_pipe[0] >= 0)
+            actions_err = posix_spawn_file_actions_addclose(&actions, stdin_pipe[0]);
+        if (proceed && actions_err == 0 && stdin_pipe[1] >= 0)
+            actions_err = posix_spawn_file_actions_addclose(&actions, stdin_pipe[1]);
+        if (proceed && actions_err == 0 && stdout_pipe[0] >= 0)
+            actions_err = posix_spawn_file_actions_addclose(&actions, stdout_pipe[0]);
+        if (proceed && actions_err == 0 && stdout_pipe[1] >= 0)
+            actions_err = posix_spawn_file_actions_addclose(&actions, stdout_pipe[1]);
+        if (proceed && actions_err == 0 && stderr_pipe[0] >= 0)
+            actions_err = posix_spawn_file_actions_addclose(&actions, stderr_pipe[0]);
+        if (proceed && actions_err == 0 && stderr_pipe[1] >= 0)
+            actions_err = posix_spawn_file_actions_addclose(&actions, stderr_pipe[1]);
+        if (proceed && actions_err == 0 && devnull_fd >= 0)
+            actions_err = posix_spawn_file_actions_addclose(&actions, devnull_fd);
+
+        if (proceed && actions_err == 0 && options.change_working_directory)
+            actions_err = posix_spawn_file_actions_addchdir_np(&actions, cwd_buffer);
+
+        if (proceed && actions_err != 0)
+        {
+            if (out_errno != NULL)
+                *out_errno = actions_err;
+            res = JSL_SPAWN_SUBPROCESS_ERROR_UNKNOWN;
+            proceed = false;
+        }
+
+        pid_t pid = -1;
+        int spawn_err = 0;
+        if (proceed)
+        {
+            char* argv[2];
+            argv[0] = exe_buffer;
+            argv[1] = NULL;
+            spawn_err = posix_spawn(&pid, exe_buffer, &actions, NULL, argv, environ);
+        }
+
+        if (proceed && spawn_err != 0)
+        {
+            if (out_errno != NULL)
+                *out_errno = spawn_err;
+            if (spawn_err == ENOENT)
+                res = JSL_SPAWN_SUBPROCESS_EXECUTABLE_NOT_FOUND;
+            if (spawn_err == EACCES || spawn_err == EPERM)
+                res = JSL_SPAWN_SUBPROCESS_PERMISSION_DENIED;
+            if (spawn_err != ENOENT && spawn_err != EACCES && spawn_err != EPERM)
+                res = JSL_SPAWN_SUBPROCESS_FORK_FAILED;
+            proceed = false;
+        }
+
+        if (proceed)
+        {
+            /* Parent: close the child ends of the pipes. */
+            if (need_stdin_pipe)
+                close(stdin_pipe[0]);
+            if (need_stdout_pipe)
+                close(stdout_pipe[1]);
+            if (need_stderr_pipe)
+                close(stderr_pipe[1]);
+            if (devnull_fd >= 0)
+                close(devnull_fd);
+
+            out_subprocess->process_id = pid;
+            out_subprocess->status = JSL_SUBPROCESS_STATUS_RUNNING;
+
+            if (need_stdin_pipe)
+            {
+                out_subprocess->stdin_write_fd = stdin_pipe[1];
+                out_subprocess->pending_stdin = options.stdin_memory;
+                out_subprocess->has_stdin_pipe = true;
+            }
+            if (need_stdout_pipe)
+            {
+                out_subprocess->stdout_read_fd = stdout_pipe[0];
+                out_subprocess->stdout_sink = options.stdout_sink;
+                out_subprocess->capture_stdout = true;
+            }
+            if (need_stderr_pipe)
+            {
+                out_subprocess->stderr_read_fd = stderr_pipe[0];
+                out_subprocess->stderr_sink = options.stderr_sink;
+                out_subprocess->capture_stderr = true;
+            }
+
+            res = JSL_SPAWN_SUBPROCESS_SUCCESS;
+        }
+
+        bool need_cleanup = !proceed && (res != JSL_SPAWN_SUBPROCESS_BAD_PARAMETERS);
+        if (need_cleanup)
+        {
+            if (stdin_pipe[0] >= 0) close(stdin_pipe[0]);
+            if (stdin_pipe[1] >= 0) close(stdin_pipe[1]);
+            if (stdout_pipe[0] >= 0) close(stdout_pipe[0]);
+            if (stdout_pipe[1] >= 0) close(stdout_pipe[1]);
+            if (stderr_pipe[0] >= 0) close(stderr_pipe[0]);
+            if (stderr_pipe[1] >= 0) close(stderr_pipe[1]);
+            if (devnull_fd >= 0) close(devnull_fd);
+        }
+
+        if (actions_initialized)
+            posix_spawn_file_actions_destroy(&actions);
 
     #else
         #error "Unsupported platform"

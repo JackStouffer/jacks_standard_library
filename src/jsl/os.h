@@ -670,6 +670,195 @@ JSL_WARN_UNUSED JSL_DEF JSLCopyDirectoryResultEnum jsl_copy_directory(
     int32_t* out_errno
 );
 
+/**
+* Result codes for `jsl_spawn_subprocess`.
+*/
+typedef enum
+{
+    JSL_SPAWN_SUBPROCESS_BAD_PARAMETERS = 0,
+    JSL_SPAWN_SUBPROCESS_SUCCESS,
+    JSL_SPAWN_SUBPROCESS_PATH_TOO_LONG,
+    JSL_SPAWN_SUBPROCESS_EXECUTABLE_NOT_FOUND,
+    JSL_SPAWN_SUBPROCESS_PERMISSION_DENIED,
+    JSL_SPAWN_SUBPROCESS_PIPE_FAILED,
+    JSL_SPAWN_SUBPROCESS_FORK_FAILED,
+    JSL_SPAWN_SUBPROCESS_ERROR_UNKNOWN,
+
+    JSL_SPAWN_SUBPROCESS_ENUM_COUNT
+} JSLSpawnSubprocessResultEnum;
+
+/**
+* The current state of a spawned subprocess. After a successful call to
+* `jsl_spawn_subprocess` the status is `RUNNING`. Future wait/poll
+* functions transition it to `EXITED`, `SIGNALED`, or `FAILED`.
+*/
+typedef enum
+{
+    JSL_SUBPROCESS_STATUS_NOT_STARTED = 0,
+    JSL_SUBPROCESS_STATUS_RUNNING,
+    JSL_SUBPROCESS_STATUS_EXITED,
+    JSL_SUBPROCESS_STATUS_SIGNALED,
+    JSL_SUBPROCESS_STATUS_FAILED,
+
+    JSL_SUBPROCESS_STATUS_ENUM_COUNT
+} JSLSubprocessStatusEnum;
+
+/**
+* How the child process's stdin is wired up.
+*/
+typedef enum
+{
+    /** Inherit the parent process's stdin (the default). */
+    JSL_SUBPROCESS_STDIN_INHERIT = 0,
+    /** Connect stdin to /dev/null on POSIX or NUL on Windows. */
+    JSL_SUBPROCESS_STDIN_NONE,
+    /**
+    * Provide stdin contents as an in-memory buffer. The buffer is not
+    * written by `jsl_spawn_subprocess` itself; the spawn call sets up a
+    * pipe and stores the pending data on `JSLSubprocess` so a future
+    * wait/communicate function can stream it to the child. The buffer
+    * pointed to by `stdin_memory` must remain valid until that drain
+    * step has completed.
+    */
+    JSL_SUBPROCESS_STDIN_MEMORY,
+    /** Use an existing file descriptor as the child's stdin. */
+    JSL_SUBPROCESS_STDIN_FD,
+
+    JSL_SUBPROCESS_STDIN_ENUM_COUNT
+} JSLSubprocessStdinKind;
+
+/**
+* How the child process's stdout or stderr is wired up.
+*/
+typedef enum
+{
+    /** Inherit the parent process's stream (the default). */
+    JSL_SUBPROCESS_OUTPUT_INHERIT = 0,
+    /** Discard the output by routing to /dev/null or NUL. */
+    JSL_SUBPROCESS_OUTPUT_NONE,
+    /** Redirect the output to an existing file descriptor. */
+    JSL_SUBPROCESS_OUTPUT_FD,
+    /**
+    * Capture the output to a `JSLOutputSink`. The spawn call sets up a
+    * pipe and stores the sink on `JSLSubprocess`; a future
+    * wait/communicate function reads from the pipe and forwards bytes
+    * into the sink.
+    */
+    JSL_SUBPROCESS_OUTPUT_SINK,
+
+    JSL_SUBPROCESS_OUTPUT_ENUM_COUNT
+} JSLSubprocessOutputKind;
+
+/**
+* Configuration options for `jsl_spawn_subprocess`. Zero-initialize this
+* struct and then fill in the fields you care about - any field left at
+* its zero value selects the most "do nothing special" default
+* (inheriting the parent's working directory, stdin, stdout, and stderr).
+*
+* On Windows, file descriptors are the C runtime descriptors returned by
+* functions like `_open` / `_pipe` from `<io.h>`, not raw `HANDLE`s. The
+* implementation translates them to `HANDLE`s via `_get_osfhandle` when
+* invoking `CreateProcess`.
+*/
+typedef struct JSLSpawnSubprocessOptions
+{
+    /** Path to the executable to run. Required. */
+    JSLImmutableMemory executable_path;
+
+    /** When `true`, change to `working_directory` in the child process before exec. */
+    bool change_working_directory;
+    JSLImmutableMemory working_directory;
+
+    JSLSubprocessStdinKind stdin_kind;
+    /** Used when `stdin_kind == JSL_SUBPROCESS_STDIN_MEMORY`. */
+    JSLImmutableMemory stdin_memory;
+    /** Used when `stdin_kind == JSL_SUBPROCESS_STDIN_FD`. */
+    int32_t stdin_fd;
+
+    JSLSubprocessOutputKind stdout_kind;
+    /** Used when `stdout_kind == JSL_SUBPROCESS_OUTPUT_FD`. */
+    int32_t stdout_fd;
+    /** Used when `stdout_kind == JSL_SUBPROCESS_OUTPUT_SINK`. */
+    JSLOutputSink stdout_sink;
+
+    JSLSubprocessOutputKind stderr_kind;
+    /** Used when `stderr_kind == JSL_SUBPROCESS_OUTPUT_FD`. */
+    int32_t stderr_fd;
+    /** Used when `stderr_kind == JSL_SUBPROCESS_OUTPUT_SINK`. */
+    JSLOutputSink stderr_sink;
+} JSLSpawnSubprocessOptions;
+
+/**
+* A handle to a spawned child process. Populate by passing a pointer to
+* `jsl_spawn_subprocess`. The struct keeps both the OS-level identifiers
+* (process id, and on Windows the process `HANDLE`) and the internal
+* state needed by the future wait/communicate APIs - pipe ends for any
+* captured streams, the pending stdin buffer, and the user-provided
+* sinks.
+*
+* The fields below the public `status` / `process_id` / `exit_code`
+* members are private to the implementation. Treat them as opaque.
+*/
+typedef struct JSLSubprocess
+{
+    JSLSubprocessStatusEnum status;
+
+    #if JSL_IS_WINDOWS
+        HANDLE process_handle;
+        DWORD process_id;
+    #elif JSL_IS_POSIX
+        pid_t process_id;
+    #endif
+
+    /** The child's exit status once it has exited. `-1` while still running. */
+    int32_t exit_code;
+
+    /** The signal number that terminated the child if `status == SIGNALED`. POSIX only. */
+    int32_t terminating_signal;
+
+    /* --- private state used by future wait/communicate functions --- */
+    int32_t stdin_write_fd;
+    int32_t stdout_read_fd;
+    int32_t stderr_read_fd;
+    JSLImmutableMemory pending_stdin;
+    JSLOutputSink stdout_sink;
+    JSLOutputSink stderr_sink;
+    bool has_stdin_pipe;
+    bool capture_stdout;
+    bool capture_stderr;
+} JSLSubprocess;
+
+/**
+* Spawn a new child process described by `options`.
+*
+* On success the child is running and `out_subprocess` is populated with
+* the process id and any state needed to interact with it later. The
+* function never blocks waiting for the child - it only sets up the
+* requested I/O wiring and starts the program.
+*
+* When the options request capturing stdout or stderr to a
+* `JSLOutputSink`, this call sets up the pipe but does not drain it; a
+* future wait/communicate function reads from the pipe into the sink.
+* Likewise, when stdin is provided as a `JSLImmutableMemory` buffer, the
+* spawn call sets up the pipe and stores the pending buffer on
+* `out_subprocess` for a future drain step. The buffer must remain valid
+* until that drain step has completed.
+*
+* Arguments and environment variables are not yet supported. The child
+* is invoked with `argv = { executable_path, NULL }` and inherits the
+* parent's environment.
+*
+* @param options How to spawn the child
+* @param out_subprocess Output handle, must not be null
+* @param out_errno Optional pointer that receives the system error code on failure
+* @returns A result enum describing the outcome
+*/
+JSL_WARN_UNUSED JSL_DEF JSLSpawnSubprocessResultEnum jsl_spawn_subprocess(
+    JSLSpawnSubprocessOptions options,
+    JSLSubprocess* out_subprocess,
+    int32_t* out_errno
+);
+
 
 #ifdef __cplusplus
 } /* extern "C" */
