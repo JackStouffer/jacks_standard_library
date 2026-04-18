@@ -184,6 +184,7 @@
         JSLImmutableMemory value_type_name,
         bool value_is_str,
         JSLImmutableMemory hash_function_name,
+        JSLImmutableMemory compare_function_name,
         JSLImmutableMemory* include_header_array,
         int32_t include_header_count
     );
@@ -340,6 +341,15 @@
         " * the map the value will be overwritten. If the key type for this hash map\n"
         " * is a pointer, then a NULL key is a valid key type.\n"
         " *\n"
+        "{% if key_is_struct %}\n"
+        " * With struct keys, struct padding can be filled with random-ish, garbage bytes.\n"
+        " * This will cause the hash probe to fail. It is *very* important to either \n"
+        " * 1, initialize the struct with memset to zero 2, use a canonicalization function\n"
+        " * before using the struct in the hash map or 3. use a custom comparison function\n"
+        " * (requires regenerating the source with the proper command line option). Do not\n"
+        " * rely on `{0}` init! The compiler is allowed to cheat and skip padding bytes.\n"
+        "{% endif %}\n"
+        " *\n"
         " * @param hash_map The pointer to the hash map instance to initialize\n"
         " * @param key Hash map key\n"
         " * @param value Value to store\n"
@@ -350,6 +360,8 @@
         "    {% if key_is_str %}\n"
         "    JSLImmutableMemory key,\n"
         "    JSLStringLifeTime key_lifetime,\n"
+        "    {% elif key_is_struct %}\n"
+        "    const {{ key_type_name }}* key,\n"
         "    {% else %}\n"
         "    {{ key_type_name }} key,\n"
         "    {% endif %}\n"
@@ -381,6 +393,8 @@
         "    {{ hash_map_name }}* hash_map,\n"
         "    {% if key_is_str %}\n"
         "    JSLImmutableMemory key\n"
+        "    {% elif key_is_struct %}\n"
+        "    const {{ key_type_name }}* key\n"
         "    {% else %}\n"
         "    {{ key_type_name }} key\n"
         "    {% endif %}\n"
@@ -398,6 +412,8 @@
         "    {{ hash_map_name }}* hash_map,\n"
         "    {% if key_is_str %}\n"
         "    JSLImmutableMemory key\n"
+        "    {% elif key_is_struct %}\n"
+        "    const {{ key_type_name }}* key\n"
         "    {% else %}\n"
         "    {{ key_type_name }} key\n"
         "    {% endif %}\n"
@@ -457,6 +473,8 @@
         "    {{ hash_map_name }}Iterator* iterator,\n"
         "    {% if key_is_str %}\n"
         "    JSLImmutableMemory* out_key,\n"
+        "    {% elif key_is_struct %}\n"
+        "    const {{ key_type_name }}** out_key,\n"
         "    {% else %}\n"
         "    {{ key_type_name }}* out_key,\n"
         "    {% endif %}\n"
@@ -592,6 +610,8 @@
         "    {{ hash_map_name }}* hash_map,\n"
         "    {% if key_is_str %}\n"
         "    JSLImmutableMemory key,\n"
+        "    {% elif key_is_struct %}\n"
+        "    const {{ key_type_name }}* key,\n"
         "    {% else %}\n"
         "    {{ key_type_name }} key,\n"
         "    {% endif %}\n"
@@ -602,6 +622,22 @@
         "{\n"
         "    *out_slot = -1;\n"
         "    *out_found = false;\n"
+        "\n"
+        "    {% if key_is_struct %}\n"
+        "    // In JSL_DEBUG, check that the key has zeroed struct padding to help catch\n"
+        "    // garbage byte errors\n"
+        "    #if defined(JSL_DEBUG) && ((defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 11) || (defined(__clang__) && defined(__has_builtin) && __has_builtin(__builtin_clear_padding)))\n"
+        "        {\n"
+        "            {{ key_type_name }} padding_check_copy = *key;\n"
+        "            __builtin_clear_padding(&padding_check_copy);\n"
+        "            JSL_ASSERT(\n"
+        "                JSL_MEMCMP(key, &padding_check_copy, sizeof({{ key_type_name }})) == 0\n"
+        "                && \"Hash map struct key has non-zero padding bytes. Initialize struct keys with JSL_MEMSET before setting fields.\"\n"
+        "            );\n"
+        "        }\n"
+        "    #endif\n"
+        "    {% endif %}\n"
+        "\n"
         "    {{ hash_function }};\n"
         "\n"
         "    // Avoid clashing with sentinel values\n"
@@ -688,6 +724,8 @@
         "    {% if key_is_str %}\n"
         "    JSLImmutableMemory key,\n"
         "    JSLStringLifeTime key_lifetime,\n"
+        "    {% elif key_is_struct %}\n"
+        "    const {{ key_type_name }}* key,\n"
         "    {% else %}\n"
         "    {{ key_type_name }} key,\n"
         "    {% endif %}\n"
@@ -723,6 +761,8 @@
         "            hash_map->keys_array[slot] = key;\n"
         "\n"
         "        hash_map->key_lifetime_array[slot] = key_lifetime;\n"
+        "        {% elif key_is_struct %}\n"
+        "        hash_map->keys_array[slot] = *key;\n"
         "        {% else %}\n"
         "        hash_map->keys_array[slot] = key;\n"
         "        {% endif %}\n"
@@ -779,6 +819,8 @@
         "    {{ hash_map_name }}* hash_map,\n"
         "    {% if key_is_str %}\n"
         "    JSLImmutableMemory key\n"
+        "    {% elif key_is_struct %}\n"
+        "    const {{ key_type_name }}* key\n"
         "    {% else %}\n"
         "    {{ key_type_name }} key\n"
         "    {% endif %}\n"
@@ -821,6 +863,8 @@
         "    {{ hash_map_name }}* hash_map,\n"
         "    {% if key_is_str %}\n"
         "    JSLImmutableMemory key\n"
+        "    {% elif key_is_struct %}\n"
+        "    const {{ key_type_name }}* key\n"
         "    {% else %}\n"
         "    {{ key_type_name }} key\n"
         "    {% endif %}\n"
@@ -917,6 +961,8 @@
         "    {{ hash_map_name }}Iterator* iterator,\n"
         "    {% if key_is_str %}\n"
         "    JSLImmutableMemory* out_key,\n"
+        "    {% elif key_is_struct %}\n"
+        "    const {{ key_type_name }}** out_key,\n"
         "    {% else %}\n"
         "    {{ key_type_name }}* out_key,\n"
         "    {% endif %}\n"
@@ -961,7 +1007,11 @@
         "\n"
         "    if (found_entry > -1)\n"
         "    {\n"
+        "        {% if key_is_struct %}\n"
+        "        *out_key = &iterator->hash_map->keys_array[iterator->current_slot];\n"
+        "        {% else %}\n"
         "        *out_key = iterator->hash_map->keys_array[iterator->current_slot];\n"
+        "        {% endif %}\n"
         "        *out_value = iterator->hash_map->values_array[iterator->current_slot];\n"
         "        ++iterator->current_slot;\n"
         "        found = true;\n"
@@ -2017,6 +2067,7 @@
     static JSLImmutableMemory hash_map_name_key = JSL_CSTR_INITIALIZER("hash_map_name");
     static JSLImmutableMemory key_type_name_key = JSL_CSTR_INITIALIZER("key_type_name");
     static JSLImmutableMemory key_is_str_key = JSL_CSTR_INITIALIZER("key_is_str");
+    static JSLImmutableMemory key_is_struct_key = JSL_CSTR_INITIALIZER("key_is_struct");
     static JSLImmutableMemory value_type_name_key = JSL_CSTR_INITIALIZER("value_type_name");
     static JSLImmutableMemory value_is_str_key = JSL_CSTR_INITIALIZER("value_is_str");
     static JSLImmutableMemory function_prefix_key = JSL_CSTR_INITIALIZER("function_prefix");
@@ -2469,6 +2520,24 @@
 
         jsl_output_sink_write(sink, JSL_CSTR_EXPRESSION("\n"));
 
+        bool key_is_struct = !key_is_str
+            && key_type_name.data != NULL
+            && key_type_name.data[key_type_name.length - 1] != '*'
+            && !(jsl_memory_compare(key_type_name, int32_t_str)
+                || jsl_memory_compare(key_type_name, int_str)
+                || jsl_memory_compare(key_type_name, unsigned_str)
+                || jsl_memory_compare(key_type_name, unsigned_int_str)
+                || jsl_memory_compare(key_type_name, uint32_t_str)
+                || jsl_memory_compare(key_type_name, int64_t_str)
+                || jsl_memory_compare(key_type_name, long_str)
+                || jsl_memory_compare(key_type_name, long_int_str)
+                || jsl_memory_compare(key_type_name, long_long_str)
+                || jsl_memory_compare(key_type_name, long_long_int_str)
+                || jsl_memory_compare(key_type_name, uint64_t_str)
+                || jsl_memory_compare(key_type_name, unsigned_long_str)
+                || jsl_memory_compare(key_type_name, unsigned_long_long_str)
+                || jsl_memory_compare(key_type_name, unsigned_long_long_int_str));
+
         JSLStrToStrMap map;
         jsl_str_to_str_map_init(&map, allocator, 0x123456789);
 
@@ -2494,6 +2563,15 @@
                 key_type_name_key,
                 JSL_STRING_LIFETIME_LONGER,
                 key_type_name,
+                JSL_STRING_LIFETIME_LONGER
+            );
+
+        if (key_is_struct)
+            jsl_str_to_str_map_insert(
+                &map,
+                key_is_struct_key,
+                JSL_STRING_LIFETIME_LONGER,
+                JSL_CSTR_EXPRESSION(""),
                 JSL_STRING_LIFETIME_LONGER
             );
 
@@ -2541,11 +2619,30 @@
         JSLImmutableMemory value_type_name,
         bool value_is_str,
         JSLImmutableMemory hash_function_name,
+        JSLImmutableMemory compare_function_name,
         JSLImmutableMemory* include_header_array,
         int32_t include_header_count
     )
     {
         (void) impl;
+
+        bool key_is_struct = !key_is_str
+            && key_type_name.data != NULL
+            && key_type_name.data[key_type_name.length - 1] != '*'
+            && !(jsl_memory_compare(key_type_name, int32_t_str)
+                || jsl_memory_compare(key_type_name, int_str)
+                || jsl_memory_compare(key_type_name, unsigned_str)
+                || jsl_memory_compare(key_type_name, unsigned_int_str)
+                || jsl_memory_compare(key_type_name, uint32_t_str)
+                || jsl_memory_compare(key_type_name, int64_t_str)
+                || jsl_memory_compare(key_type_name, long_str)
+                || jsl_memory_compare(key_type_name, long_int_str)
+                || jsl_memory_compare(key_type_name, long_long_str)
+                || jsl_memory_compare(key_type_name, long_long_int_str)
+                || jsl_memory_compare(key_type_name, uint64_t_str)
+                || jsl_memory_compare(key_type_name, unsigned_long_str)
+                || jsl_memory_compare(key_type_name, unsigned_long_long_str)
+                || jsl_memory_compare(key_type_name, unsigned_long_long_int_str));
 
         jsl_output_sink_write(
             sink,
@@ -2611,6 +2708,15 @@
                 JSL_STRING_LIFETIME_LONGER
             );
 
+        if (key_is_struct)
+            jsl_str_to_str_map_insert(
+                &map,
+                key_is_struct_key,
+                JSL_STRING_LIFETIME_LONGER,
+                JSL_CSTR_EXPRESSION(""),
+                JSL_STRING_LIFETIME_LONGER
+            );
+
         if (value_is_str)
             jsl_str_to_str_map_insert(
                 &map,
@@ -2644,21 +2750,21 @@
             jsl_arena_get_allocator_interface(&scratch_interface, &hash_function_scratch_arena);
 
             JSLImmutableMemory resolved_hash_function_call;
-            if (hash_function_name.data != NULL && hash_function_name.length > 0)
+            if (key_is_struct && hash_function_name.data != NULL && hash_function_name.length > 0)
             {
+                // Struct keys: custom hash signature is (const TYPE* key, uint64_t seed)
                 resolved_hash_function_call = jsl_format(
                     scratch_interface,
-                    JSL_CSTR_EXPRESSION("uint64_t hash = %y(&key, sizeof(%y), hash_map->seed)"),
-                    hash_function_name,
-                    key_type_name
+                    JSL_CSTR_EXPRESSION("*out_hash = %y(key, hash_map->seed)"),
+                    hash_function_name
                 );
             }
             else if (key_is_str)
             {
                 resolved_hash_function_call = JSL_CSTR_EXPRESSION("*out_hash = jsl__rapidhash_withSeed(key.data, (size_t) key.length, hash_map->seed)");
             }
-            else if (
-                key_type_name.data != NULL
+            else if (!key_is_struct
+                && key_type_name.data != NULL
                 && (jsl_memory_compare(key_type_name, int32_t_str)
                 || jsl_memory_compare(key_type_name, int_str)
                 || jsl_memory_compare(key_type_name, unsigned_str)
@@ -2684,9 +2790,10 @@
             }
             else
             {
+                // Struct key (no custom hash): key is already const TYPE*, no & needed
                 resolved_hash_function_call = jsl_format(
                     scratch_interface,
-                    JSL_CSTR_EXPRESSION("*out_hash = jsl__rapidhash_withSeed(&key, sizeof(%y), hash_map->seed)"),
+                    JSL_CSTR_EXPRESSION("*out_hash = jsl__rapidhash_withSeed(key, sizeof(%y), hash_map->seed)"),
                     key_type_name
                 );
             }
@@ -2710,7 +2817,8 @@
             JSLImmutableMemory resolved_key_compare;
 
             if (
-                key_type_name.data != NULL
+                !key_is_struct
+                && key_type_name.data != NULL
                 && (
                     jsl_memory_compare(key_type_name, int32_t_str)
                     || jsl_memory_compare(key_type_name, int_str)
@@ -2740,11 +2848,21 @@
             {
                 resolved_key_compare = JSL_CSTR_EXPRESSION("jsl_memory_compare(key, hash_map->keys_array[slot])");
             }
-            else
+            else if (key_is_struct && compare_function_name.data != NULL && compare_function_name.length > 0)
             {
+                // Struct key with custom compare: fn(const TYPE* a, const TYPE* b) -> bool
                 resolved_key_compare = jsl_format(
                     scratch_interface,
-                    JSL_CSTR_EXPRESSION("JSL_MEMCMP(&key, &hash_map->keys_array[slot], sizeof(%y)) == 0"),
+                    JSL_CSTR_EXPRESSION("%y(key, &hash_map->keys_array[slot])"),
+                    compare_function_name
+                );
+            }
+            else
+            {
+                // Struct key (no custom compare): key is already const TYPE*, no & needed
+                resolved_key_compare = jsl_format(
+                    scratch_interface,
+                    JSL_CSTR_EXPRESSION("JSL_MEMCMP(key, &hash_map->keys_array[slot], sizeof(%y)) == 0"),
                     key_type_name
                 );
             }

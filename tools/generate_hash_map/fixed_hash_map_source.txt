@@ -120,6 +120,8 @@ static inline void {{ function_prefix }}_probe(
     {{ hash_map_name }}* hash_map,
     {% if key_is_str %}
     JSLImmutableMemory key,
+    {% elif key_is_struct %}
+    const {{ key_type_name }}* key,
     {% else %}
     {{ key_type_name }} key,
     {% endif %}
@@ -130,6 +132,22 @@ static inline void {{ function_prefix }}_probe(
 {
     *out_slot = -1;
     *out_found = false;
+
+    {% if key_is_struct %}
+    // In JSL_DEBUG, check that the key has zeroed struct padding to help catch
+    // garbage byte errors
+    #if defined(JSL_DEBUG) && ((defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 11) || (defined(__clang__) && defined(__has_builtin) && __has_builtin(__builtin_clear_padding)))
+        {
+            {{ key_type_name }} padding_check_copy = *key;
+            __builtin_clear_padding(&padding_check_copy);
+            JSL_ASSERT(
+                JSL_MEMCMP(key, &padding_check_copy, sizeof({{ key_type_name }})) == 0
+                && "Hash map struct key has non-zero padding bytes. Initialize struct keys with JSL_MEMSET before setting fields."
+            );
+        }
+    #endif
+    {% endif %}
+
     {{ hash_function }};
 
     // Avoid clashing with sentinel values
@@ -216,6 +234,8 @@ bool {{ function_prefix }}_insert(
     {% if key_is_str %}
     JSLImmutableMemory key,
     JSLStringLifeTime key_lifetime,
+    {% elif key_is_struct %}
+    const {{ key_type_name }}* key,
     {% else %}
     {{ key_type_name }} key,
     {% endif %}
@@ -251,6 +271,8 @@ bool {{ function_prefix }}_insert(
             hash_map->keys_array[slot] = key;
 
         hash_map->key_lifetime_array[slot] = key_lifetime;
+        {% elif key_is_struct %}
+        hash_map->keys_array[slot] = *key;
         {% else %}
         hash_map->keys_array[slot] = key;
         {% endif %}
@@ -307,6 +329,8 @@ JSLImmutableMemory {{ function_prefix }}_get(
     {{ hash_map_name }}* hash_map,
     {% if key_is_str %}
     JSLImmutableMemory key
+    {% elif key_is_struct %}
+    const {{ key_type_name }}* key
     {% else %}
     {{ key_type_name }} key
     {% endif %}
@@ -349,6 +373,8 @@ bool {{ function_prefix }}_delete(
     {{ hash_map_name }}* hash_map,
     {% if key_is_str %}
     JSLImmutableMemory key
+    {% elif key_is_struct %}
+    const {{ key_type_name }}* key
     {% else %}
     {{ key_type_name }} key
     {% endif %}
@@ -445,6 +471,8 @@ bool {{ function_prefix }}_iterator_next(
     {{ hash_map_name }}Iterator* iterator,
     {% if key_is_str %}
     JSLImmutableMemory* out_key,
+    {% elif key_is_struct %}
+    const {{ key_type_name }}** out_key,
     {% else %}
     {{ key_type_name }}* out_key,
     {% endif %}
@@ -489,7 +517,11 @@ bool {{ function_prefix }}_iterator_next(
 
     if (found_entry > -1)
     {
+        {% if key_is_struct %}
+        *out_key = &iterator->hash_map->keys_array[iterator->current_slot];
+        {% else %}
         *out_key = iterator->hash_map->keys_array[iterator->current_slot];
+        {% endif %}
         *out_value = iterator->hash_map->values_array[iterator->current_slot];
         ++iterator->current_slot;
         found = true;

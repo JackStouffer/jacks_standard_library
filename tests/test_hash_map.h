@@ -5,6 +5,7 @@ void test_fixed_insert(void);
 void test_fixed_get(void);
 void test_fixed_delete(void);
 void test_fixed_iterator(void);
+void test_fixed_struct_key_padding(void);
 void test_fixed_int32_to_str_insert_overwrites(void);
 void test_fixed_str_to_int32_insert_overwrites(void);
 void test_fixed_int32_to_str_lifetime(void);
