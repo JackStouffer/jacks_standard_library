@@ -43,6 +43,26 @@
     #define _XOPEN_SOURCE 700
 #endif
 
+// On macOS/BSDs, _XOPEN_SOURCE hides non-POSIX extensions such as
+// _SC_NPROCESSORS_ONLN and MAP_ANONYMOUS/MAP_NORESERVE. _DARWIN_C_SOURCE
+// (and _BSD_SOURCE / _GNU_SOURCE on Linux/BSDs) re-exposes them.
+#if defined(__APPLE__)
+    #define _DARWIN_C_SOURCE 1
+#endif
+#if defined(__linux__) || defined(__linux)
+    #ifndef _GNU_SOURCE
+        #define _GNU_SOURCE 1
+    #endif
+#endif
+#if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__DragonFly__)
+    #ifndef _BSD_SOURCE
+        #define _BSD_SOURCE 1
+    #endif
+    #ifndef _DEFAULT_SOURCE
+        #define _DEFAULT_SOURCE 1
+    #endif
+#endif
+
 #define NOB_IMPLEMENTATION
 #include "../vendor/nob.h"
 

@@ -769,18 +769,15 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessCreateResultEnum jsl_subprocess_create(
 );
 
 /**
-* Append one or more command-line arguments to the subprocess.
+* Append one or more command-line arguments from an array of
+`JSLImmutableMemory`.
 *
 * Arguments are stored in order and will be passed to the child process
 * in the same order they were added. Each argument string is duplicated
 * into the subprocess's allocator.
 *
-* The preferred way to call this is through the `jsl_subprocess_arg` macro
-* which accepts a variadic list of `JSLImmutableMemory` values:
-*
-* ```c
-* jsl_subprocess_arg(&proc, JSL_CSTR_EXPRESSION("-o"), JSL_CSTR_EXPRESSION("output.txt"));
-* ```
+* For literal argument lists prefer the `jsl_subprocess_arg` or
+* `jsl_subprocess_arg_cstr` macros.
 *
 * @param proc  Pointer to an initialized subprocess handle
 * @param args  Array of arguments to append
@@ -793,12 +790,74 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessArgResultEnum jsl_subprocess_args(
     int64_t count
 );
 
+// Private
+//
+// Append a sentinel-terminated variadic list of `JSLImmutableMemory`
+// arguments passed by value. The trailing sentinel (data == NULL,
+// length < 0) marks the end of the list and must be present. Prefer
+// the `jsl_subprocess_arg` macro, which supplies the sentinel
+// automatically.
+//
+// Arguments are passed by value through varargs. This is portable
+// across MSVC, gcc, and clang for small standard-layout structs.
+JSLSubProcessArgResultEnum jsl__subprocess_args_va(
+    JSLSubProcess* proc,
+    ...
+);
+
+// Private
+//
+// Append a NULL-terminated variadic list of `const char*` C-string
+// arguments. The trailing NULL marks the end of the list and must be
+// present. Prefer the `jsl_subprocess_arg_cstr` macro, which supplies
+// the sentinel automatically.
+JSLSubProcessArgResultEnum jsl__subprocess_args_cstr_va(
+    JSLSubProcess* proc,
+    ...
+);
+
+// Private
+//
+// Sentinel `JSLImmutableMemory` value used to terminate the variadic
+// argument list of `jsl_subprocess_arg`. A legitimate argument always
+// has non-NULL `data`, so this pattern is unambiguous.
+#if JSL_IS_MSVC
+    #define JSL__SUBPROCESS_ARG_SENTINEL jsl_immutable_memory(NULL, -1)
+#else
+    #define JSL__SUBPROCESS_ARG_SENTINEL ((JSLImmutableMemory){ NULL, -1 })
+#endif
+
+/**
+* Append one or more command-line arguments given as `JSLImmutableMemory`
+* values. Works on all supported compilers (including MSVC) when the
+* arguments are produced by `JSL_CSTR_EXPRESSION` or any other
+* expression that yields a `JSLImmutableMemory`.
+*
+* ```c
+* JSLImmutableMemory my_flag_value = my_function();
+* jsl_subprocess_arg(&proc, JSL_CSTR_EXPRESSION("-o"), my_flag_value);
+* ```
+*
+* @param proc  Pointer to an initialized subprocess handle
+* @param ...   One or more `JSLImmutableMemory` values
+*/
 #define jsl_subprocess_arg(proc, ...) \
-    jsl_subprocess_args( \
-        (proc), \
-        (const JSLImmutableMemory[]){__VA_ARGS__}, \
-        (int64_t)(sizeof((const JSLImmutableMemory[]){__VA_ARGS__}) / sizeof(JSLImmutableMemory)) \
-    )
+    jsl__subprocess_args_va((proc), __VA_ARGS__, JSL__SUBPROCESS_ARG_SENTINEL)
+
+/**
+* Append one or more command-line arguments given as C-string literals.
+* Works on all supported compilers (including MSVC) because it does not
+* rely on compound literals.
+*
+* ```c
+* jsl_subprocess_arg_cstr(&proc, "-o", "output.txt");
+* ```
+*
+* @param proc  Pointer to an initialized subprocess handle
+* @param ...   One or more `const char*` arguments
+*/
+#define jsl_subprocess_arg_cstr(proc, ...) \
+    jsl__subprocess_args_cstr_va((proc), __VA_ARGS__, (const char*)NULL)
 
 /**
 * Set an environment variable on the subprocess.

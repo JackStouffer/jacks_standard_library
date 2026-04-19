@@ -23,6 +23,12 @@
 #include "allocator.h"
 #include "allocator_infinite_arena.h"
 
+// On macOS, strict -std=c11 hides non-POSIX mmap flags (MAP_ANON, MAP_ANONYMOUS)
+// behind _DARWIN_C_SOURCE. Must be defined before including <sys/mman.h>.
+#if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
+    #define _DARWIN_C_SOURCE 1
+#endif
+
 #include <errno.h>
 #include <stdint.h>
 #if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L
@@ -99,11 +105,19 @@ bool jsl_infinite_arena_init(JSLInfiniteArena* arena)
 
     #elif JSL_IS_POSIX
 
+        #if JSL_IS_MACOS
+            // macOS does not define MAP_NORESERVE; anonymous MAP_PRIVATE
+            // mappings are already lazily committed on first write.
+            int32_t mmap_flags = MAP_PRIVATE | MAP_ANONYMOUS;
+        #else
+            int32_t mmap_flags = MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE;
+        #endif
+
         arena->start = mmap(
             NULL,
             (size_t) JSL_TERABYTES(8L),
             PROT_READ | PROT_WRITE,
-            MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE,
+            mmap_flags,
             -1,
             0
         );

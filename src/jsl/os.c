@@ -2472,6 +2472,66 @@ JSLSubProcessArgResultEnum jsl_subprocess_args(
     return JSL_SUBPROCESS_ARG_SUCCESS;
 }
 
+JSLSubProcessArgResultEnum jsl__subprocess_args_va(
+    JSLSubProcess* proc,
+    ...
+)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL);
+
+    if (!proceed)
+        return JSL_SUBPROCESS_ARG_BAD_PARAMETERS;
+
+    JSLSubProcessArgResultEnum result = JSL_SUBPROCESS_ARG_SUCCESS;
+    va_list va;
+    va_start(va, proc);
+
+    while (proceed)
+    {
+        JSLImmutableMemory arg = va_arg(va, JSLImmutableMemory);
+        bool is_sentinel = (arg.data == NULL && arg.length < 0);
+        if (is_sentinel)
+            break;
+
+        result = jsl_subprocess_args(proc, &arg, 1);
+        proceed = (result == JSL_SUBPROCESS_ARG_SUCCESS);
+    }
+
+    va_end(va);
+    return result;
+}
+
+JSLSubProcessArgResultEnum jsl__subprocess_args_cstr_va(
+    JSLSubProcess* proc,
+    ...
+)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL);
+
+    if (!proceed)
+        return JSL_SUBPROCESS_ARG_BAD_PARAMETERS;
+
+    JSLSubProcessArgResultEnum result = JSL_SUBPROCESS_ARG_SUCCESS;
+    va_list va;
+    va_start(va, proc);
+
+    while (proceed)
+    {
+        const char* arg_cstr = va_arg(va, const char*);
+        if (arg_cstr == NULL)
+            break;
+
+        JSLImmutableMemory arg = jsl_cstr_to_memory(arg_cstr);
+        result = jsl_subprocess_args(proc, &arg, 1);
+        proceed = (result == JSL_SUBPROCESS_ARG_SUCCESS);
+    }
+
+    va_end(va);
+    return result;
+}
+
 JSLSubProcessEnvResultEnum jsl_subprocess_env(
     JSLSubProcess* proc,
     JSLImmutableMemory key,
