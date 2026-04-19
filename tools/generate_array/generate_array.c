@@ -27,6 +27,11 @@
     #define _CRT_SECURE_NO_WARNINGS
 #endif
 
+// jsl os.c requires this
+#if !defined(_WIN32) && !defined(__wasm__)
+    #define _GNU_SOURCE
+#endif
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>

@@ -37,6 +37,12 @@
  * file, so no need to
  */
 
+// nftw(3) and its flags require _XOPEN_SOURCE >= 500; must be defined before
+// any system header (including those pulled in by nob.h below).
+#if !defined(_WIN32) && !defined(__wasm__)
+    #define _XOPEN_SOURCE 700
+#endif
+
 #define NOB_IMPLEMENTATION
 #include "../vendor/nob.h"
 
@@ -47,7 +53,7 @@
 
 #include "../src/jsl/everything.c"
 
-#if JSL_IS_POSIX
+#if defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__DragonFly__)
     #include <sys/types.h>
     #include <sys/sysctl.h>
 #endif
@@ -525,6 +531,9 @@ static int32_t get_logical_processor_count(void)
             GetSystemInfo(&info);
             logical_processors = info.dwNumberOfProcessors;
         }
+
+    #elif defined(__linux__) || defined(__linux)
+        long logical_processors = sysconf(_SC_NPROCESSORS_ONLN);
 
     #elif defined(__APPLE__) || defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__DragonFly__)
         long logical_processors = sysconf(_SC_NPROCESSORS_ONLN);
@@ -1006,6 +1015,11 @@ int32_t main(int32_t argc, char **argv)
                 nob_cmd_append(&compile_command, flag);
             }
 
+            // nftw(3) and its flags require _XOPEN_SOURCE >= 500 on Linux
+            #if JSL_IS_LINUX
+                nob_cmd_append(&compile_command, "-D_XOPEN_SOURCE=700");
+            #endif
+
             // add clang warnings
             for (int32_t flag_idx = 0;; ++flag_idx)
             {
@@ -1129,6 +1143,9 @@ int32_t main(int32_t argc, char **argv)
                     "-Wextra",
                     "-pedantic",
                     "-fsanitize=address",
+                    #if JSL_IS_LINUX
+                        "-D_XOPEN_SOURCE=700",
+                    #endif
                     "-o", exe_name
                 );
 
@@ -1163,6 +1180,9 @@ int32_t main(int32_t argc, char **argv)
                     "-Wall",
                     "-Wextra",
                     "-pedantic",
+                    #if JSL_IS_LINUX
+                        "-D_XOPEN_SOURCE=700",
+                    #endif
                     "-o", exe_name
                 );
 

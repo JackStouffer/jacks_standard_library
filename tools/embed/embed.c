@@ -29,6 +29,11 @@
  *
  */
 
+// nftw(3) and its flags require _XOPEN_SOURCE >= 500
+#if !defined(_WIN32) && !defined(__wasm__)
+    #define _XOPEN_SOURCE 700
+#endif
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>

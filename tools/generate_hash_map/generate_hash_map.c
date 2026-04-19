@@ -25,6 +25,10 @@
     #define _CRT_SECURE_NO_WARNINGS
 #endif
 
+#if !defined(_WIN32) && !defined(__wasm__)
+    #define _XOPEN_SOURCE 700
+#endif
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
