@@ -55,7 +55,8 @@ static CompositeType1 make_comp1(int32_t a, int32_t b)
 
 static CompositeType2 make_comp2(int32_t a, int32_t b, bool c)
 {
-    CompositeType2 value = {0};
+    CompositeType2 value;
+    JSL_MEMSET(&value, 0, sizeof(value));
     value.a = a;
     value.b = b;
     value.c = c;

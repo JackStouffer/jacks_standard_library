@@ -1453,7 +1453,8 @@ int64_t jsl_strip_whitespace(JSLImmutableMemory* str)
 static void jsl__memory_output_sink_write(void *user, JSLImmutableMemory data)
 {
     JSLMutableMemory* buffer = (JSLMutableMemory*) user;
-    (void) jsl_memory_copy(buffer, data);
+    int64_t bytes_written = jsl_memory_copy(buffer, data);
+    (void)bytes_written;
 }
 
 JSLOutputSink jsl_memory_output_sink(JSLMutableMemory* buffer)

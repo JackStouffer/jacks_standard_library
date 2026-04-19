@@ -19,6 +19,7 @@
  * CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#define _GNU_SOURCE
 #define _CRT_SECURE_NO_WARNINGS
 
 #include <assert.h>
@@ -33,6 +34,11 @@
 #include "jsl/allocator.h"
 #include "jsl/allocator_arena.h"
 #include "jsl/os.h"
+
+#if JSL_IS_LINUX
+    #include <signal.h>
+    #include <sys/stat.h>
+#endif
 
 #include "minctest.h"
 #include "test_file_utils.h"

@@ -46,6 +46,12 @@ static inline bool {{ function_prefix }}__ensure_capacity(
             new_bytes,
             _Alignof({{ value_type_name }})
         );
+        if (new_mem != NULL)
+        {
+            size_t current_bytes = (array->length * sizeof({{ value_type_name }}));
+            size_t diff_bytes = new_bytes - current_bytes;
+            JSL_MEMSET(new_mem + current_bytes, 0, diff_bytes);
+        }
     }
     else
     {
@@ -53,7 +59,7 @@ static inline bool {{ function_prefix }}__ensure_capacity(
             array->allocator,
             new_bytes,
             _Alignof({{ value_type_name }}),
-            false
+            true
         );
     }
 

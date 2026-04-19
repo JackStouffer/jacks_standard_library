@@ -93,12 +93,68 @@ typedef struct JSLAllocatorInterface JSLAllocatorInterface;
     #define JSL__IS_WINDOWS_VAL 1
     #define JSL__IS_POSIX_VAL 0
     #define JSL__IS_WEB_ASSEMBLY_VAL 0
+    #define JSL__IS_LINUX_VAL 0
+    #define JSL__IS_MACOS_VAL 0
+    #define JSL__IS_FREE_BSD_VAL 0
+    #define JSL__IS_OPEN_BSD_VAL 0
+    #define JSL__IS_DRAGONFLY_BSD_VAL 0
 
-#elif defined(__linux__) || defined(__linux) || \
-    defined(__APPLE__) || defined(__MACH__) || \
-    defined(__FreeBSD__) || defined(__OpenBSD__) || \
-    defined(__NetBSD__) || \
-    defined(__DragonFly__) || \
+#elif defined(__linux__) || defined(__linux)
+
+    #define JSL__IS_WINDOWS_VAL 0
+    #define JSL__IS_POSIX_VAL 1
+    #define JSL__IS_WEB_ASSEMBLY_VAL 0
+    #define JSL__IS_LINUX_VAL 1
+    #define JSL__IS_MACOS_VAL 0
+    #define JSL__IS_FREE_BSD_VAL 0
+    #define JSL__IS_OPEN_BSD_VAL 0
+    #define JSL__IS_DRAGONFLY_BSD_VAL 0
+
+#elif defined(__APPLE__) || defined(__MACH__)
+
+    #define JSL__IS_WINDOWS_VAL 0
+    #define JSL__IS_POSIX_VAL 1
+    #define JSL__IS_WEB_ASSEMBLY_VAL 0
+    #define JSL__IS_LINUX_VAL 0
+    #define JSL__IS_MACOS_VAL 1
+    #define JSL__IS_FREE_BSD_VAL 0
+    #define JSL__IS_OPEN_BSD_VAL 0
+    #define JSL__IS_DRAGONFLY_BSD_VAL 0
+
+#elif defined(__FreeBSD__)
+
+    #define JSL__IS_WINDOWS_VAL 0
+    #define JSL__IS_POSIX_VAL 1
+    #define JSL__IS_WEB_ASSEMBLY_VAL 0
+    #define JSL__IS_LINUX_VAL 0
+    #define JSL__IS_MACOS_VAL 0
+    #define JSL__IS_FREE_BSD_VAL 1
+    #define JSL__IS_OPEN_BSD_VAL 0
+    #define JSL__IS_DRAGONFLY_BSD_VAL 0
+
+#elif defined(__OpenBSD__)
+
+    #define JSL__IS_WINDOWS_VAL 0
+    #define JSL__IS_POSIX_VAL 1
+    #define JSL__IS_WEB_ASSEMBLY_VAL 0
+    #define JSL__IS_LINUX_VAL 0
+    #define JSL__IS_MACOS_VAL 0
+    #define JSL__IS_FREE_BSD_VAL 0
+    #define JSL__IS_OPEN_BSD_VAL 1
+    #define JSL__IS_DRAGONFLY_BSD_VAL 0
+
+#elif defined(__DragonFly__)
+
+    #define JSL__IS_WINDOWS_VAL 0
+    #define JSL__IS_POSIX_VAL 1
+    #define JSL__IS_WEB_ASSEMBLY_VAL 0
+    #define JSL__IS_LINUX_VAL 0
+    #define JSL__IS_MACOS_VAL 0
+    #define JSL__IS_FREE_BSD_VAL 0
+    #define JSL__IS_OPEN_BSD_VAL 0
+    #define JSL__IS_DRAGONFLY_BSD_VAL 1
+
+#elif defined(__NetBSD__) || \
     defined(__sun) || defined(sun) || \
     defined(__hpux) || \
     defined(_AIX) || \
@@ -107,18 +163,33 @@ typedef struct JSLAllocatorInterface JSLAllocatorInterface;
     #define JSL__IS_WINDOWS_VAL 0
     #define JSL__IS_POSIX_VAL 1
     #define JSL__IS_WEB_ASSEMBLY_VAL 0
+    #define JSL__IS_LINUX_VAL 0
+    #define JSL__IS_MACOS_VAL 0
+    #define JSL__IS_FREE_BSD_VAL 0
+    #define JSL__IS_OPEN_BSD_VAL 0
+    #define JSL__IS_DRAGONFLY_BSD_VAL 0
 
 #elif defined(__wasm__) && defined(__wasm32__) && !defined(__wasm64__)
 
     #define JSL__IS_WINDOWS_VAL 0
     #define JSL__IS_POSIX_VAL 0
     #define JSL__IS_WEB_ASSEMBLY_VAL 1
+    #define JSL__IS_LINUX_VAL 0
+    #define JSL__IS_MACOS_VAL 0
+    #define JSL__IS_FREE_BSD_VAL 0
+    #define JSL__IS_OPEN_BSD_VAL 0
+    #define JSL__IS_DRAGONFLY_BSD_VAL 0
 
 #else
 
     #define JSL__IS_WINDOWS_VAL 0
     #define JSL__IS_POSIX_VAL 0
     #define JSL__IS_WEB_ASSEMBLY_VAL 0
+    #define JSL__IS_LINUX_VAL 0
+    #define JSL__IS_MACOS_VAL 0
+    #define JSL__IS_FREE_BSD_VAL 0
+    #define JSL__IS_OPEN_BSD_VAL 0
+    #define JSL__IS_DRAGONFLY_BSD_VAL 0
 
 #endif
 
@@ -657,6 +728,31 @@ static JSL__FORCE_INLINE JSL__UNUSED int32_t jsl__find_first_set_u64(uint64_t x)
  * If the target platform is in WebAssembly, then 1, else 0.
  */
 #define JSL_IS_WEB_ASSEMBLY JSL__IS_WEB_ASSEMBLY_VAL
+
+/**
+ * If the target platform is Linux, then 1, else 0.
+ */
+#define JSL_IS_LINUX JSL__IS_LINUX_VAL
+
+/**
+ * If the target platform is macOS, then 1, else 0.
+ */
+#define JSL_IS_MACOS JSL__IS_MACOS_VAL
+
+/**
+ * If the target platform is FreeBSD, then 1, else 0.
+ */
+#define JSL_IS_FREE_BSD JSL__IS_FREE_BSD_VAL
+
+/**
+ * If the target platform is OpenBSD, then 1, else 0.
+ */
+#define JSL_IS_OPEN_BSD JSL__IS_OPEN_BSD_VAL
+
+/**
+ * If the target platform is DragonFly BSD, then 1, else 0.
+ */
+#define JSL_IS_DRAGONFLY_BSD JSL__IS_DRAGONFLY_BSD_VAL
 
 /**
  * If the target platform is in x86, then 1, else 0.
@@ -1597,7 +1693,7 @@ JSLImmutableMemory jsl__auto_slice(JSLImmutableMemory original_memory, JSLImmuta
 JSL_DEF JSLImmutableMemory jsl_cstr_to_memory(const char* str);
 
 // private
-int64_t jsl__memory_copy(JSLMutableMemory* destination, JSLImmutableMemory source);
+JSL_WARN_UNUSED int64_t jsl__memory_copy(JSLMutableMemory* destination, JSLImmutableMemory source);
 
 /**
  * Copy the contents of `source` into `destination`.
