@@ -315,6 +315,7 @@ int main(void)
     RUN_TEST_FUNCTION("Test fixed hashmap get", test_fixed_get);
     RUN_TEST_FUNCTION("Test fixed hashmap iterator", test_fixed_iterator);
     RUN_TEST_FUNCTION("Test fixed hashmap delete", test_fixed_delete);
+    RUN_TEST_FUNCTION("Test fixed hashmap struct key padding", test_fixed_struct_key_padding);
     RUN_TEST_FUNCTION("Test fixed int32 to str insert overwrites", test_fixed_int32_to_str_insert_overwrites);
     RUN_TEST_FUNCTION("Test fixed str to int32 insert overwrites", test_fixed_str_to_int32_insert_overwrites);
     RUN_TEST_FUNCTION("Test fixed int32 to str lifetime", test_fixed_int32_to_str_lifetime);

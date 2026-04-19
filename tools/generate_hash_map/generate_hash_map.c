@@ -77,6 +77,7 @@ static int32_t entrypoint(JSLAllocatorInterface allocator, JSLCmdLineArgs* cmd)
     JSLImmutableMemory key_type = {0};
     JSLImmutableMemory value_type = {0};
     JSLImmutableMemory hash_function_name = {0};
+    JSLImmutableMemory compare_function_name = {0};
     HashMapImplementation impl = IMPL_ERROR;
     JSLImmutableMemory* header_includes = NULL;
     int32_t header_includes_count = 0;
@@ -97,6 +98,7 @@ static int32_t entrypoint(JSLAllocatorInterface allocator, JSLCmdLineArgs* cmd)
     static JSLImmutableMemory source_flag_str = JSL_CSTR_INITIALIZER("source");
     static JSLImmutableMemory add_header_flag_str = JSL_CSTR_INITIALIZER("add-header");
     static JSLImmutableMemory custom_hash_flag_str = JSL_CSTR_INITIALIZER("custom-hash");
+    static JSLImmutableMemory custom_compare_flag_str = JSL_CSTR_INITIALIZER("custom-compare");
 
     //
     // Parsing command line
@@ -111,6 +113,7 @@ static int32_t entrypoint(JSLAllocatorInterface allocator, JSLCmdLineArgs* cmd)
     jsl_cmd_line_args_pop_flag_with_value(cmd, key_type_flag_str, &key_type);
     jsl_cmd_line_args_pop_flag_with_value(cmd, value_type_flag_str, &value_type);
     jsl_cmd_line_args_pop_flag_with_value(cmd, custom_hash_flag_str, &hash_function_name);
+    jsl_cmd_line_args_pop_flag_with_value(cmd, custom_compare_flag_str, &compare_function_name);
 
     JSLImmutableMemory custom_header = {0};
     while (jsl_cmd_line_args_pop_flag_with_value(cmd, add_header_flag_str, &custom_header))
@@ -281,6 +284,7 @@ static int32_t entrypoint(JSLAllocatorInterface allocator, JSLCmdLineArgs* cmd)
             value_type,
             value_is_string,
             hash_function_name,
+            compare_function_name,
             header_includes,
             header_includes_count
         );
