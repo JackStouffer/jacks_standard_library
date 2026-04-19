@@ -103,7 +103,7 @@ bool jsl_infinite_arena_init(JSLInfiniteArena* arena)
             NULL,
             (size_t) JSL_TERABYTES(8L),
             PROT_READ | PROT_WRITE,
-            MAP_PRIVATE | MAP_ANONYMOUS,
+            MAP_PRIVATE | MAP_ANONYMOUS | MAP_NORESERVE,
             -1,
             0
         );
@@ -565,7 +565,7 @@ JSL_DEF void jsl_infinite_arena_release(JSLInfiniteArena* arena)
         #if JSL_IS_WINDOWS
             VirtualFree(arena->start, 0, MEM_RELEASE);
         #elif JSL_IS_POSIX
-            munmap(arena->start, (size_t) (arena->end - arena->current));
+            munmap(arena->start, (size_t) (arena->end - arena->start));
         #endif
 
         arena->sentinel = 0;
