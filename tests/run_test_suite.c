@@ -354,6 +354,7 @@ static UnitTestDecl unit_test_declarations[] = {
             "tests/test_intrinsics.c",
             "tests/test_str_to_str_multimap.c",
             "tests/test_string_builder.c",
+            "tests/test_subprocess.c",
             "src/jsl/everything.c",
             "tests/arrays/dynamic_comp1_array.c",
             "tests/arrays/dynamic_comp2_array.c",
@@ -654,6 +655,39 @@ int32_t main(int32_t argc, char **argv)
         );
 
         if (!nob_cmd_run(&embed_compile_command)) return 1;
+    }
+
+    /**
+     *
+     *
+     *                 SUBPROCESS TEST HELPER
+     *
+     *
+     */
+
+    {
+        nob_log(NOB_INFO, "Compiling subprocess test helper program");
+
+        #if JSL_IS_WINDOWS
+            char helper_exe_name[256] = "tests\\bin\\subprocess_helper.exe";
+        #elif JSL_IS_POSIX
+            char helper_exe_name[256] = "tests/bin/subprocess_helper";
+        #else
+            #error "Unrecognized platform. Only windows and POSIX platforms are supported."
+        #endif
+
+        Nob_Cmd helper_compile_command = {0};
+        nob_cmd_append(
+            &helper_compile_command,
+            "clang",
+            "-O0",
+            "-glldb",
+            "-std=c11",
+            "-o", helper_exe_name,
+            "tests/subprocess_helper.c"
+        );
+
+        if (!nob_cmd_run(&helper_compile_command)) return 1;
     }
 
     /**

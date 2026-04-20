@@ -54,6 +54,7 @@
 #include "test_intrinsics.h"
 #include "test_str_to_str_multimap.h"
 #include "test_string_builder.h"
+#include "test_subprocess.h"
 
 size_t ltests = 0;
 size_t lfails = 0;
@@ -433,6 +434,32 @@ int main(void)
     RUN_TEST_FUNCTION("Test command line style/reset invalid", test_cmd_line_write_style_and_reset_invalid);
     RUN_TEST_FUNCTION("Test command line reset ANSI modes", test_cmd_line_write_reset_ansi_modes);
 
+    //
+    //              Test Subprocess
+    //
+
+    RUN_TEST_FUNCTION("Test jsl_subprocess_create bad parameters", test_jsl_subprocess_create_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_create success", test_jsl_subprocess_create_success);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_args bad parameters", test_jsl_subprocess_args_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_arg macro", test_jsl_subprocess_arg_macro);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_arg_cstr macro", test_jsl_subprocess_arg_cstr_macro);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_env bad parameters", test_jsl_subprocess_env_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_change_working_directory bad parameters", test_jsl_subprocess_change_working_directory_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_set_stdin_memory bad parameters", test_jsl_subprocess_set_stdin_memory_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_set_stdin_fd bad parameters", test_jsl_subprocess_set_stdin_fd_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_set_stdout_fd bad parameters", test_jsl_subprocess_set_stdout_fd_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_set_stdout_sink bad parameters", test_jsl_subprocess_set_stdout_sink_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_set_stderr_fd bad parameters", test_jsl_subprocess_set_stderr_fd_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_set_stderr_sink bad parameters", test_jsl_subprocess_set_stderr_sink_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking bad parameters", test_jsl_subprocess_run_blocking_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking spawn failed", test_jsl_subprocess_run_blocking_spawn_failed);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking exit code", test_jsl_subprocess_run_blocking_exit_code);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking already started", test_jsl_subprocess_run_blocking_already_started);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking stdout sink", test_jsl_subprocess_run_blocking_stdout_sink);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking stderr sink", test_jsl_subprocess_run_blocking_stderr_sink);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking stdin memory", test_jsl_subprocess_run_blocking_stdin_memory);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking env var", test_jsl_subprocess_run_blocking_env_var);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking working directory", test_jsl_subprocess_run_blocking_working_directory);
 
     TEST_RESULTS();
     return lfails != 0;

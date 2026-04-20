@@ -746,7 +746,7 @@ typedef enum
 /**
 * A key-value pair representing an environment variable to be set on a
 * subprocess before it is started. Both `key` and `value` point into memory
-* owned by the `JSLSubProcess` allocator and are valid for the lifetime of
+* owned by the `JSLSubprocess` allocator and are valid for the lifetime of
 * the subprocess handle.
 */
 typedef struct JSLSubProcessEnvVar
@@ -754,6 +754,29 @@ typedef struct JSLSubProcessEnvVar
     JSLImmutableMemory key;
     JSLImmutableMemory value;
 } JSLSubProcessEnvVar;
+
+/**
+* Lifecycle status for a `JSLSubprocess`.
+*
+* `NOT_STARTED` is the state immediately after `jsl_subprocess_create`.
+* `RUNNING` is set while `jsl_subprocess_run_blocking` is executing the
+* child. `EXITED` means the child ran to completion and returned an exit
+* code (available via the `out_exit_code` parameter of the run function).
+* `KILLED_BY_SIGNAL` means the child was terminated by a signal on POSIX.
+* `FAILED_TO_START` means the run function could not launch the child
+* (pipe/fork/CreateProcess/allocation failure); in that case no exit code
+* is meaningful.
+*/
+typedef enum
+{
+    JSL_SUBPROCESS_STATUS_NOT_STARTED = 0,
+    JSL_SUBPROCESS_STATUS_RUNNING,
+    JSL_SUBPROCESS_STATUS_EXITED,
+    JSL_SUBPROCESS_STATUS_KILLED_BY_SIGNAL,
+    JSL_SUBPROCESS_STATUS_FAILED_TO_START,
+
+    JSL_SUBPROCESS_STATUS_ENUM_COUNT
+} JSLSubProcessStatusEnum;
 
 /**
 * Handle for a subprocess that has been configured but not yet started.
@@ -768,10 +791,12 @@ typedef struct JSLSubProcessEnvVar
 * `jsl_subprocess_env` are duplicated into that allocator, so the caller
 * does not need to keep the originals alive.
 */
-typedef struct JSLSubProcess
+typedef struct JSLSubprocess
 {
     uint64_t sentinel;
     JSLAllocatorInterface allocator;
+
+    JSLSubProcessStatusEnum status;
 
     JSLImmutableMemory executable;
 
@@ -796,7 +821,7 @@ typedef struct JSLSubProcess
     JSLSubProcessOutputKindEnum stderr_kind;
     int stderr_fd;
     JSLOutputSink stderr_sink;
-} JSLSubProcess;
+} JSLSubprocess;
 
 /**
 * Create a new subprocess handle for the given executable.
@@ -813,7 +838,7 @@ typedef struct JSLSubProcess
 * @returns A result enum describing the outcome
 */
 JSL_WARN_UNUSED JSL_DEF JSLSubProcessCreateResultEnum jsl_subprocess_create(
-    JSLSubProcess* proc,
+    JSLSubprocess* proc,
     JSLAllocatorInterface allocator,
     JSLImmutableMemory executable
 );
@@ -835,7 +860,7 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessCreateResultEnum jsl_subprocess_create(
 * @returns A result enum describing the outcome
 */
 JSL_WARN_UNUSED JSL_DEF JSLSubProcessArgResultEnum jsl_subprocess_args(
-    JSLSubProcess* proc,
+    JSLSubprocess* proc,
     const JSLImmutableMemory* args,
     int64_t count
 );
@@ -851,7 +876,7 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessArgResultEnum jsl_subprocess_args(
 // Arguments are passed by value through varargs. This is portable
 // across MSVC, gcc, and clang for small standard-layout structs.
 JSLSubProcessArgResultEnum jsl__subprocess_args_va(
-    JSLSubProcess* proc,
+    JSLSubprocess* proc,
     ...
 );
 
@@ -862,7 +887,7 @@ JSLSubProcessArgResultEnum jsl__subprocess_args_va(
 // present. Prefer the `jsl_subprocess_arg_cstr` macro, which supplies
 // the sentinel automatically.
 JSLSubProcessArgResultEnum jsl__subprocess_args_cstr_va(
-    JSLSubProcess* proc,
+    JSLSubprocess* proc,
     ...
 );
 
@@ -923,7 +948,7 @@ JSLSubProcessArgResultEnum jsl__subprocess_args_cstr_va(
 * @returns A result enum describing the outcome
 */
 JSL_WARN_UNUSED JSL_DEF JSLSubProcessEnvResultEnum jsl_subprocess_env(
-    JSLSubProcess* proc,
+    JSLSubprocess* proc,
     JSLImmutableMemory key,
     JSLImmutableMemory value
 );
@@ -942,7 +967,7 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessEnvResultEnum jsl_subprocess_env(
 *          path could not be duplicated into the allocator
 */
 JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_change_working_directory(
-    JSLSubProcess* proc,
+    JSLSubprocess* proc,
     JSLImmutableMemory path
 );
 
@@ -960,7 +985,7 @@ JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_change_working_directory(
 *          buffer could not be duplicated into the allocator
 */
 JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdin_memory(
-    JSLSubProcess* proc,
+    JSLSubprocess* proc,
     JSLImmutableMemory data
 );
 
@@ -979,7 +1004,7 @@ JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdin_memory(
 * @returns `true` on success, `false` if parameters were invalid
 */
 JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdin_fd(
-    JSLSubProcess* proc,
+    JSLSubprocess* proc,
     int fd
 );
 
@@ -996,7 +1021,7 @@ JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdin_fd(
 * @returns `true` on success, `false` if parameters were invalid
 */
 JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdout_fd(
-    JSLSubProcess* proc,
+    JSLSubprocess* proc,
     int fd
 );
 
@@ -1012,7 +1037,7 @@ JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdout_fd(
 * @returns `true` on success, `false` if parameters were invalid
 */
 JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdout_sink(
-    JSLSubProcess* proc,
+    JSLSubprocess* proc,
     JSLOutputSink sink
 );
 
@@ -1029,7 +1054,7 @@ JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdout_sink(
 * @returns `true` on success, `false` if parameters were invalid
 */
 JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stderr_fd(
-    JSLSubProcess* proc,
+    JSLSubprocess* proc,
     int fd
 );
 
@@ -1045,9 +1070,73 @@ JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stderr_fd(
 * @returns `true` on success, `false` if parameters were invalid
 */
 JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stderr_sink(
-    JSLSubProcess* proc,
+    JSLSubprocess* proc,
     JSLOutputSink sink
 );
+
+/**
+* TODO: docs
+*/
+typedef enum
+{
+    JSL_SUBPROCESS_RUN_BAD_PARAMETERS = 0,
+    JSL_SUBPROCESS_RUN_SUCCESS,
+    JSL_SUBPROCESS_RUN_ALREADY_STARTED,
+    JSL_SUBPROCESS_RUN_ALLOCATION_FAILED,
+    JSL_SUBPROCESS_RUN_PIPE_FAILED,
+    JSL_SUBPROCESS_RUN_SPAWN_FAILED,
+    JSL_SUBPROCESS_RUN_IO_FAILED,
+    JSL_SUBPROCESS_RUN_WAIT_FAILED,
+    JSL_SUBPROCESS_RUN_KILLED_BY_SIGNAL,
+
+    JSL_SUBPROCESS_RUN_ENUM_COUNT
+} JSLSubProcessRunResultEnum;
+
+/**
+* Start the subprocess with the previously configured executable, arguments,
+* environment, working directory, and I/O redirections, and block until it
+* terminates.
+*
+* On success `*out_exit_code` receives the child's exit code. On POSIX, if
+* the child was terminated by a signal, `JSL_SUBPROCESS_RUN_KILLED_BY_SIGNAL`
+* is returned and `*out_exit_code` receives the signal number as a negative
+* value (e.g. `-SIGTERM`). On any failure that prevents the child from being
+* launched, `out_errno` (if non-null) receives the system `errno` captured
+* at the failure site, and the subprocess status is set to
+* `JSL_SUBPROCESS_STATUS_FAILED_TO_START`.
+*
+* A subprocess may only be run once. Passing a subprocess whose status is
+* not `JSL_SUBPROCESS_STATUS_NOT_STARTED` returns
+* `JSL_SUBPROCESS_RUN_ALREADY_STARTED`.
+*
+* @param proc          Pointer to a configured subprocess handle
+* @param out_exit_code Pointer that receives the child's exit code, must not be null
+* @param out_errno     Optional pointer that receives the system errno on failure
+* @returns A result enum describing the outcome
+*/
+JSL_WARN_UNUSED JSL_DEF JSLSubProcessRunResultEnum jsl_subprocess_run_blocking(
+    JSLSubprocess* proc,
+    int32_t* out_exit_code,
+    int32_t* out_errno
+);
+
+/**
+* Release all memory allocated for the subprocess's configuration (arguments,
+* environment variables, working directory, duplicated executable path, and
+* any captured stdin buffer) and invalidate the handle by zeroing its
+* sentinel.
+*
+* Must only be called on a subprocess that is no longer running, i.e. one
+* whose status is not `JSL_SUBPROCESS_STATUS_RUNNING`. Calling this on a
+* subprocess whose `jsl_subprocess_create` call failed, or one that has
+* already been cleaned up, is a no-op.
+*
+* After this returns, the handle's sentinel is zero and all other subprocess
+* functions will reject the handle with `BAD_PARAMETERS`.
+*
+* @param proc Pointer to the subprocess handle to clean up, may be null
+*/
+JSL_DEF void jsl_subprocess_cleanup(JSLSubprocess* proc);
 
 
 #ifdef __cplusplus

@@ -29,13 +29,37 @@
 
 #include "core.h"
 #include "allocator.h"
-#include "os.h"
 
 // nftw(3) and its flags (FTW_DEPTH, FTW_PHYS, FTW_DP) require _XOPEN_SOURCE >= 500
 #if JSL_IS_LINUX
     #if !defined(_XOPEN_SOURCE) || _XOPEN_SOURCE < 500
         #error "JSL's os.c requires a _XOPEN_SOURCE > 500 to be defined before including system headers when using Linux"
     #endif
+#endif
+
+// <signal.h> on macOS uses NSIG in public extern declarations, which is
+// only exposed when _DARWIN_C_SOURCE is defined before any system header
+// is included. JSL is a source library so we cannot set this macro
+// ourselves without risk of conflicting with the host program.
+#if defined(__APPLE__)
+    #if !defined(_DARWIN_C_SOURCE)
+        #error "JSL's os.c requires _DARWIN_C_SOURCE to be defined before including system headers on macOS"
+    #endif
+#endif
+
+#include "os.h"
+
+#if JSL_IS_POSIX
+    #include <sys/wait.h>
+    #include <poll.h>
+    #include <signal.h>
+    #include <spawn.h>
+    #include <string.h>
+
+// `environ` is a POSIX global. `<unistd.h>` only declares it when the
+// program's feature-test macros ask for it, so declare it ourselves to
+// avoid depending on the surrounding program's macro setup.
+extern char** environ;
 #endif
 
 #define JSL__DIR_ITERATOR_PRIVATE_SENTINEL 9523783263672821879U
@@ -2364,7 +2388,7 @@ JSLRenameFileResultEnum jsl_rename_file(
 #define JSL__SUBPROCESS_INITIAL_CAPACITY 8
 
 JSLSubProcessCreateResultEnum jsl_subprocess_create(
-    JSLSubProcess* proc,
+    JSLSubprocess* proc,
     JSLAllocatorInterface allocator,
     JSLImmutableMemory executable
 )
@@ -2408,6 +2432,7 @@ JSLSubProcessCreateResultEnum jsl_subprocess_create(
 
     proc->sentinel = JSL__SUBPROCESS_PRIVATE_SENTINEL;
     proc->allocator = allocator;
+    proc->status = JSL_SUBPROCESS_STATUS_NOT_STARTED;
     proc->executable = exe_dup;
     proc->args = args;
     proc->args_count = 0;
@@ -2435,7 +2460,7 @@ JSLSubProcessCreateResultEnum jsl_subprocess_create(
 }
 
 JSLSubProcessArgResultEnum jsl_subprocess_args(
-    JSLSubProcess* proc,
+    JSLSubprocess* proc,
     const JSLImmutableMemory* args,
     int64_t count
 )
@@ -2488,7 +2513,7 @@ JSLSubProcessArgResultEnum jsl_subprocess_args(
 }
 
 JSLSubProcessArgResultEnum jsl__subprocess_args_va(
-    JSLSubProcess* proc,
+    JSLSubprocess* proc,
     ...
 )
 {
@@ -2518,7 +2543,7 @@ JSLSubProcessArgResultEnum jsl__subprocess_args_va(
 }
 
 JSLSubProcessArgResultEnum jsl__subprocess_args_cstr_va(
-    JSLSubProcess* proc,
+    JSLSubprocess* proc,
     ...
 )
 {
@@ -2548,7 +2573,7 @@ JSLSubProcessArgResultEnum jsl__subprocess_args_cstr_va(
 }
 
 JSLSubProcessEnvResultEnum jsl_subprocess_env(
-    JSLSubProcess* proc,
+    JSLSubprocess* proc,
     JSLImmutableMemory key,
     JSLImmutableMemory value
 )
@@ -2601,7 +2626,7 @@ JSLSubProcessEnvResultEnum jsl_subprocess_env(
 }
 
 bool jsl_subprocess_change_working_directory(
-    JSLSubProcess* proc,
+    JSLSubprocess* proc,
     JSLImmutableMemory path
 )
 {
@@ -2625,7 +2650,7 @@ bool jsl_subprocess_change_working_directory(
 }
 
 bool jsl_subprocess_set_stdin_memory(
-    JSLSubProcess* proc,
+    JSLSubprocess* proc,
     JSLImmutableMemory data
 )
 {
@@ -2653,7 +2678,7 @@ bool jsl_subprocess_set_stdin_memory(
 }
 
 bool jsl_subprocess_set_stdin_fd(
-    JSLSubProcess* proc,
+    JSLSubprocess* proc,
     int fd
 )
 {
@@ -2672,7 +2697,7 @@ bool jsl_subprocess_set_stdin_fd(
 }
 
 bool jsl_subprocess_set_stdout_fd(
-    JSLSubProcess* proc,
+    JSLSubprocess* proc,
     int fd
 )
 {
@@ -2692,7 +2717,7 @@ bool jsl_subprocess_set_stdout_fd(
 }
 
 bool jsl_subprocess_set_stdout_sink(
-    JSLSubProcess* proc,
+    JSLSubprocess* proc,
     JSLOutputSink sink
 )
 {
@@ -2711,7 +2736,7 @@ bool jsl_subprocess_set_stdout_sink(
 }
 
 bool jsl_subprocess_set_stderr_fd(
-    JSLSubProcess* proc,
+    JSLSubprocess* proc,
     int fd
 )
 {
@@ -2731,7 +2756,7 @@ bool jsl_subprocess_set_stderr_fd(
 }
 
 bool jsl_subprocess_set_stderr_sink(
-    JSLSubProcess* proc,
+    JSLSubprocess* proc,
     JSLOutputSink sink
 )
 {
@@ -2747,4 +2772,1208 @@ bool jsl_subprocess_set_stderr_sink(
     }
 
     return proceed;
+}
+
+#if JSL_IS_POSIX
+
+// Everything needed to spawn a child process and pump its I/O. Populated
+// by `jsl__subprocess_posix_prepare`, consumed by
+// `jsl__subprocess_posix_spawn` and `jsl__subprocess_posix_pump_io`.
+//
+// Designed to be reusable by a future non-blocking API: the same struct
+// can back an async start (prepare + spawn + close_child_pipe_ends,
+// returning to the caller) and a later poll/wait step.
+typedef struct JSL__SubProcessPosixLaunch
+{
+    // argv passed to posix_spawnp. NULL-terminated. All the string slots
+    // were allocated from proc->allocator.
+    char** argv;
+    int64_t argv_count; // excludes the trailing NULL
+
+    // envp passed to posix_spawnp. May alias `environ` when no custom env
+    // vars are set, or be a freshly allocated array that references both
+    // environ entries and our owned "key=value" strings.
+    char** envp;
+    bool envp_is_owned;
+    // When envp_is_owned, the strings at envp[envp_owned_start ..
+    // envp_owned_start + envp_owned_count) were allocated from
+    // proc->allocator. Entries before that range are borrowed from environ.
+    int64_t envp_owned_start;
+    int64_t envp_owned_count;
+
+    // Working directory C string, NULL to inherit the parent's cwd.
+    char* cwd;
+
+    // Pipes: [0] = read end, [1] = write end. -1 where unused.
+    int stdin_pipe[2];
+    int stdout_pipe[2];
+    int stderr_pipe[2];
+} JSL__SubProcessPosixLaunch;
+
+static void jsl__subprocess_close_fd(int* fd)
+{
+    if (*fd != -1)
+    {
+        close(*fd);
+        *fd = -1;
+    }
+}
+
+static void jsl__subprocess_posix_launch_zero(JSL__SubProcessPosixLaunch* ctx)
+{
+    ctx->argv = NULL;
+    ctx->argv_count = 0;
+    ctx->envp = NULL;
+    ctx->envp_is_owned = false;
+    ctx->envp_owned_start = 0;
+    ctx->envp_owned_count = 0;
+    ctx->cwd = NULL;
+    ctx->stdin_pipe[0] = -1;
+    ctx->stdin_pipe[1] = -1;
+    ctx->stdout_pipe[0] = -1;
+    ctx->stdout_pipe[1] = -1;
+    ctx->stderr_pipe[0] = -1;
+    ctx->stderr_pipe[1] = -1;
+}
+
+// Close every pipe end in the context. Idempotent.
+static void jsl__subprocess_posix_close_all_pipes(JSL__SubProcessPosixLaunch* ctx)
+{
+    jsl__subprocess_close_fd(&ctx->stdin_pipe[0]);
+    jsl__subprocess_close_fd(&ctx->stdin_pipe[1]);
+    jsl__subprocess_close_fd(&ctx->stdout_pipe[0]);
+    jsl__subprocess_close_fd(&ctx->stdout_pipe[1]);
+    jsl__subprocess_close_fd(&ctx->stderr_pipe[0]);
+    jsl__subprocess_close_fd(&ctx->stderr_pipe[1]);
+}
+
+// Close the pipe ends that belong to the child after a successful spawn.
+// Call this exactly once after `posix_spawnp` returns success.
+static void jsl__subprocess_posix_close_child_pipe_ends(JSL__SubProcessPosixLaunch* ctx)
+{
+    jsl__subprocess_close_fd(&ctx->stdin_pipe[0]);
+    jsl__subprocess_close_fd(&ctx->stdout_pipe[1]);
+    jsl__subprocess_close_fd(&ctx->stderr_pipe[1]);
+}
+
+// Free every allocation made by `jsl__subprocess_posix_prepare`. The
+// kernel has already copied argv/envp/cwd once posix_spawnp returns, so
+// these strings are no longer needed and can be released regardless of
+// whether the spawn succeeded.
+static void jsl__subprocess_posix_free_launch(
+    JSLSubprocess* proc,
+    JSL__SubProcessPosixLaunch* ctx
+)
+{
+    if (ctx->argv != NULL)
+    {
+        for (int64_t i = 0; i < ctx->argv_count; i++)
+        {
+            if (ctx->argv[i] != NULL)
+                (void) jsl_allocator_interface_free(proc->allocator, ctx->argv[i]);
+        }
+        (void) jsl_allocator_interface_free(proc->allocator, ctx->argv);
+        ctx->argv = NULL;
+        ctx->argv_count = 0;
+    }
+
+    if (ctx->envp_is_owned && ctx->envp != NULL)
+    {
+        for (int64_t i = 0; i < ctx->envp_owned_count; i++)
+        {
+            char* s = ctx->envp[ctx->envp_owned_start + i];
+            if (s != NULL)
+                (void) jsl_allocator_interface_free(proc->allocator, s);
+        }
+        (void) jsl_allocator_interface_free(proc->allocator, ctx->envp);
+    }
+    ctx->envp = NULL;
+    ctx->envp_is_owned = false;
+    ctx->envp_owned_start = 0;
+    ctx->envp_owned_count = 0;
+
+    if (ctx->cwd != NULL)
+    {
+        (void) jsl_allocator_interface_free(proc->allocator, ctx->cwd);
+        ctx->cwd = NULL;
+    }
+}
+
+// Build the argv array (executable + each configured arg) into ctx->argv.
+// Returns false on allocation failure. On failure the partial argv is
+// left in ctx so the caller can hand the whole context to
+// `jsl__subprocess_posix_free_launch`.
+static bool jsl__subprocess_posix_build_argv(
+    JSLSubprocess* proc,
+    JSL__SubProcessPosixLaunch* ctx
+)
+{
+    int64_t slots = proc->args_count + 2;
+    ctx->argv = (char**) jsl_allocator_interface_alloc(
+        proc->allocator,
+        slots * (int64_t) sizeof(char*),
+        JSL_DEFAULT_ALLOCATION_ALIGNMENT,
+        true
+    );
+    ctx->argv_count = slots - 1; // record early so cleanup knows how many cells to inspect
+    bool ok = (ctx->argv != NULL);
+
+    if (ok)
+    {
+        ctx->argv[0] = (char*) jsl_memory_to_cstr(proc->allocator, proc->executable);
+        ok = (ctx->argv[0] != NULL);
+    }
+
+    for (int64_t i = 0; ok && i < proc->args_count; i++)
+    {
+        ctx->argv[i + 1] = (char*) jsl_memory_to_cstr(proc->allocator, proc->args[i]);
+        ok = (ctx->argv[i + 1] != NULL);
+    }
+
+    if (ok)
+        ctx->argv[slots - 1] = NULL;
+
+    return ok;
+}
+
+// Build the envp array. If no custom env vars are configured, ctx->envp
+// aliases `environ` directly with no allocation. Otherwise we allocate an
+// array large enough for every entry in environ plus one "key=value"
+// string per configured env var, in that order.
+static bool jsl__subprocess_posix_build_envp(
+    JSLSubprocess* proc,
+    JSL__SubProcessPosixLaunch* ctx
+)
+{
+    if (proc->env_count == 0)
+    {
+        ctx->envp = environ;
+        ctx->envp_is_owned = false;
+        return true;
+    }
+
+    int64_t parent_count = 0;
+    if (environ != NULL)
+    {
+        while (environ[parent_count] != NULL)
+            parent_count++;
+    }
+
+    int64_t total = parent_count + proc->env_count + 1;
+    ctx->envp = (char**) jsl_allocator_interface_alloc(
+        proc->allocator,
+        total * (int64_t) sizeof(char*),
+        JSL_DEFAULT_ALLOCATION_ALIGNMENT,
+        true
+    );
+    ctx->envp_is_owned = true;
+    ctx->envp_owned_start = parent_count;
+    ctx->envp_owned_count = proc->env_count;
+
+    bool ok = (ctx->envp != NULL);
+    if (!ok)
+        return false;
+
+    for (int64_t i = 0; i < parent_count; i++)
+        ctx->envp[i] = environ[i];
+
+    for (int64_t i = 0; ok && i < proc->env_count; i++)
+    {
+        int64_t klen = proc->env_vars[i].key.length;
+        int64_t vlen = proc->env_vars[i].value.length;
+        int64_t total_len = klen + 1 + vlen + 1;
+        char* kv = (char*) jsl_allocator_interface_alloc(
+            proc->allocator,
+            total_len,
+            JSL_DEFAULT_ALLOCATION_ALIGNMENT,
+            false
+        );
+        ok = (kv != NULL);
+        if (ok)
+        {
+            JSL_MEMCPY(kv, proc->env_vars[i].key.data, (size_t) klen);
+            kv[klen] = '=';
+            if (vlen > 0)
+                JSL_MEMCPY(kv + klen + 1, proc->env_vars[i].value.data, (size_t) vlen);
+            kv[klen + 1 + vlen] = '\0';
+            ctx->envp[parent_count + i] = kv;
+        }
+    }
+
+    ctx->envp[total - 1] = NULL;
+    return ok;
+}
+
+static bool jsl__subprocess_posix_build_cwd(
+    JSLSubprocess* proc,
+    JSL__SubProcessPosixLaunch* ctx
+)
+{
+    bool has_cwd = (proc->working_directory.data != NULL
+        && proc->working_directory.length > 0);
+    bool ok = true;
+    if (has_cwd)
+    {
+        ctx->cwd = (char*) jsl_memory_to_cstr(proc->allocator, proc->working_directory);
+        ok = (ctx->cwd != NULL);
+    }
+    return ok;
+}
+
+static bool jsl__subprocess_posix_create_pipes(
+    JSLSubprocess* proc,
+    JSL__SubProcessPosixLaunch* ctx
+)
+{
+    bool ok = true;
+    if (proc->stdin_kind == JSL_SUBPROCESS_STDIN_MEMORY)
+        ok = (pipe(ctx->stdin_pipe) == 0);
+    if (ok && proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_SINK)
+        ok = (pipe(ctx->stdout_pipe) == 0);
+    if (ok && proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_SINK)
+        ok = (pipe(ctx->stderr_pipe) == 0);
+    return ok;
+}
+
+// Build argv/envp/cwd and create pipes. On any failure the context is
+// fully populated as far as it got and the caller is responsible for
+// calling `jsl__subprocess_posix_free_launch` to release partial
+// allocations.
+static JSLSubProcessRunResultEnum jsl__subprocess_posix_prepare(
+    JSLSubprocess* proc,
+    JSL__SubProcessPosixLaunch* ctx,
+    int32_t* out_errno
+)
+{
+    jsl__subprocess_posix_launch_zero(ctx);
+
+    JSLSubProcessRunResultEnum result = JSL_SUBPROCESS_RUN_SUCCESS;
+
+    if (!jsl__subprocess_posix_build_argv(proc, ctx))
+        result = JSL_SUBPROCESS_RUN_ALLOCATION_FAILED;
+
+    if (result == JSL_SUBPROCESS_RUN_SUCCESS
+        && !jsl__subprocess_posix_build_envp(proc, ctx))
+        result = JSL_SUBPROCESS_RUN_ALLOCATION_FAILED;
+
+    if (result == JSL_SUBPROCESS_RUN_SUCCESS
+        && !jsl__subprocess_posix_build_cwd(proc, ctx))
+        result = JSL_SUBPROCESS_RUN_ALLOCATION_FAILED;
+
+    if (result == JSL_SUBPROCESS_RUN_SUCCESS
+        && !jsl__subprocess_posix_create_pipes(proc, ctx))
+    {
+        int32_t saved = errno;
+        if (out_errno != NULL)
+            *out_errno = saved;
+        jsl__subprocess_posix_close_all_pipes(ctx);
+        result = JSL_SUBPROCESS_RUN_PIPE_FAILED;
+    }
+
+    return result;
+}
+
+// Invoke posix_spawnp using the prepared context. On success, the child
+// is running; the caller must close the child-side pipe ends (via
+// `jsl__subprocess_posix_close_child_pipe_ends`) and is responsible for
+// the pid. On failure every pipe is closed and the ctx no longer owns
+// any fds.
+static JSLSubProcessRunResultEnum jsl__subprocess_posix_spawn(
+    JSLSubprocess* proc,
+    JSL__SubProcessPosixLaunch* ctx,
+    pid_t* out_pid,
+    int32_t* out_errno
+)
+{
+    posix_spawn_file_actions_t file_actions;
+    int err = posix_spawn_file_actions_init(&file_actions);
+    if (err != 0)
+    {
+        if (out_errno != NULL)
+            *out_errno = err;
+        jsl__subprocess_posix_close_all_pipes(ctx);
+        return JSL_SUBPROCESS_RUN_ALLOCATION_FAILED;
+    }
+
+    // Stdin
+    if (err == 0 && proc->stdin_kind == JSL_SUBPROCESS_STDIN_MEMORY)
+    {
+        err = posix_spawn_file_actions_adddup2(&file_actions, ctx->stdin_pipe[0], STDIN_FILENO);
+        if (err == 0)
+            err = posix_spawn_file_actions_addclose(&file_actions, ctx->stdin_pipe[0]);
+        if (err == 0)
+            err = posix_spawn_file_actions_addclose(&file_actions, ctx->stdin_pipe[1]);
+    }
+    else if (err == 0 && proc->stdin_kind == JSL_SUBPROCESS_STDIN_FD)
+    {
+        err = posix_spawn_file_actions_adddup2(&file_actions, proc->stdin_fd, STDIN_FILENO);
+    }
+
+    // Stdout
+    if (err == 0 && proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_SINK)
+    {
+        err = posix_spawn_file_actions_adddup2(&file_actions, ctx->stdout_pipe[1], STDOUT_FILENO);
+        if (err == 0)
+            err = posix_spawn_file_actions_addclose(&file_actions, ctx->stdout_pipe[0]);
+        if (err == 0)
+            err = posix_spawn_file_actions_addclose(&file_actions, ctx->stdout_pipe[1]);
+    }
+    else if (err == 0 && proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_FD)
+    {
+        err = posix_spawn_file_actions_adddup2(&file_actions, proc->stdout_fd, STDOUT_FILENO);
+    }
+
+    // Stderr
+    if (err == 0 && proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_SINK)
+    {
+        err = posix_spawn_file_actions_adddup2(&file_actions, ctx->stderr_pipe[1], STDERR_FILENO);
+        if (err == 0)
+            err = posix_spawn_file_actions_addclose(&file_actions, ctx->stderr_pipe[0]);
+        if (err == 0)
+            err = posix_spawn_file_actions_addclose(&file_actions, ctx->stderr_pipe[1]);
+    }
+    else if (err == 0 && proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_FD)
+    {
+        err = posix_spawn_file_actions_adddup2(&file_actions, proc->stderr_fd, STDERR_FILENO);
+    }
+
+    // chdir in the child before exec. Requires glibc >= 2.29, musl >=
+    // 1.2.3, macOS >= 10.15, or a comparably recent BSD libc.
+    if (err == 0 && ctx->cwd != NULL)
+        err = posix_spawn_file_actions_addchdir_np(&file_actions, ctx->cwd);
+
+    pid_t pid = 0;
+    if (err == 0)
+    {
+        err = posix_spawnp(
+            &pid,
+            ctx->argv[0],
+            &file_actions,
+            NULL,
+            ctx->argv,
+            ctx->envp
+        );
+    }
+
+    (void) posix_spawn_file_actions_destroy(&file_actions);
+
+    if (err != 0)
+    {
+        if (out_errno != NULL)
+            *out_errno = err;
+        jsl__subprocess_posix_close_all_pipes(ctx);
+        return JSL_SUBPROCESS_RUN_SPAWN_FAILED;
+    }
+
+    *out_pid = pid;
+    return JSL_SUBPROCESS_RUN_SUCCESS;
+}
+
+// Blocking poll() loop that feeds MEMORY stdin and drains SINK
+// stdout/stderr. Returns true when every parent-side pipe end has been
+// closed cleanly, false on a poll() error (in which case out_errno is
+// set). Closes every pipe end it owns before returning.
+static bool jsl__subprocess_posix_pump_io(
+    JSLSubprocess* proc,
+    JSL__SubProcessPosixLaunch* ctx,
+    int32_t* out_errno
+)
+{
+    int stdin_write = ctx->stdin_pipe[1];
+    int stdout_read = ctx->stdout_pipe[0];
+    int stderr_read = ctx->stderr_pipe[0];
+
+    // Non-blocking stdin so a slow child can't deadlock our writes.
+    if (stdin_write != -1)
+    {
+        int flags = fcntl(stdin_write, F_GETFL, 0);
+        if (flags != -1)
+            (void) fcntl(stdin_write, F_SETFL, flags | O_NONBLOCK);
+    }
+
+    // Ignore SIGPIPE during writes so a child that closes stdin early
+    // surfaces as EPIPE instead of killing us.
+    void (*prev_sigpipe)(int) = signal(SIGPIPE, SIG_IGN);
+
+    int64_t stdin_offset = 0;
+    bool ok = true;
+
+    while (stdin_write != -1 || stdout_read != -1 || stderr_read != -1)
+    {
+        struct pollfd pfds[3];
+        int nfds = 0;
+        int stdin_idx = -1;
+        int stdout_idx = -1;
+        int stderr_idx = -1;
+
+        if (stdin_write != -1)
+        {
+            pfds[nfds].fd = stdin_write;
+            pfds[nfds].events = POLLOUT;
+            pfds[nfds].revents = 0;
+            stdin_idx = nfds++;
+        }
+        if (stdout_read != -1)
+        {
+            pfds[nfds].fd = stdout_read;
+            pfds[nfds].events = POLLIN;
+            pfds[nfds].revents = 0;
+            stdout_idx = nfds++;
+        }
+        if (stderr_read != -1)
+        {
+            pfds[nfds].fd = stderr_read;
+            pfds[nfds].events = POLLIN;
+            pfds[nfds].revents = 0;
+            stderr_idx = nfds++;
+        }
+
+        int pret = poll(pfds, (nfds_t) nfds, -1);
+        if (pret == -1)
+        {
+            if (errno == EINTR)
+                continue;
+            if (out_errno != NULL)
+                *out_errno = errno;
+            ok = false;
+            break;
+        }
+
+        if (stdin_idx != -1
+            && (pfds[stdin_idx].revents & (POLLOUT | POLLERR | POLLHUP)) != 0)
+        {
+            int64_t remaining = proc->stdin_memory.length - stdin_offset;
+            bool done = (remaining <= 0);
+            if (!done && (pfds[stdin_idx].revents & POLLOUT) != 0)
+            {
+                ssize_t w = write(
+                    stdin_write,
+                    proc->stdin_memory.data + stdin_offset,
+                    (size_t) remaining
+                );
+                if (w > 0)
+                {
+                    stdin_offset += (int64_t) w;
+                    done = (stdin_offset >= proc->stdin_memory.length);
+                }
+                else if (w == -1
+                    && errno != EAGAIN
+                    && errno != EWOULDBLOCK
+                    && errno != EINTR)
+                {
+                    done = true;
+                }
+            }
+            else if ((pfds[stdin_idx].revents & (POLLERR | POLLHUP)) != 0)
+            {
+                done = true;
+            }
+
+            if (done)
+            {
+                close(stdin_write);
+                stdin_write = -1;
+                ctx->stdin_pipe[1] = -1;
+            }
+        }
+
+        uint8_t io_buf[4096];
+
+        if (stdout_idx != -1
+            && (pfds[stdout_idx].revents & (POLLIN | POLLERR | POLLHUP)) != 0)
+        {
+            ssize_t r = read(stdout_read, io_buf, sizeof(io_buf));
+            if (r > 0)
+            {
+                jsl_output_sink_write(
+                    proc->stdout_sink,
+                    jsl_immutable_memory(io_buf, (int64_t) r)
+                );
+            }
+            else if (r == 0 || (r == -1 && errno != EINTR))
+            {
+                close(stdout_read);
+                stdout_read = -1;
+                ctx->stdout_pipe[0] = -1;
+            }
+        }
+
+        if (stderr_idx != -1
+            && (pfds[stderr_idx].revents & (POLLIN | POLLERR | POLLHUP)) != 0)
+        {
+            ssize_t r = read(stderr_read, io_buf, sizeof(io_buf));
+            if (r > 0)
+            {
+                jsl_output_sink_write(
+                    proc->stderr_sink,
+                    jsl_immutable_memory(io_buf, (int64_t) r)
+                );
+            }
+            else if (r == 0 || (r == -1 && errno != EINTR))
+            {
+                close(stderr_read);
+                stderr_read = -1;
+                ctx->stderr_pipe[0] = -1;
+            }
+        }
+    }
+
+    if (stdin_write != -1) { close(stdin_write); ctx->stdin_pipe[1] = -1; }
+    if (stdout_read != -1) { close(stdout_read); ctx->stdout_pipe[0] = -1; }
+    if (stderr_read != -1) { close(stderr_read); ctx->stderr_pipe[0] = -1; }
+
+    signal(SIGPIPE, prev_sigpipe);
+    return ok;
+}
+
+// Blocking waitpid that retries on EINTR. Translates the wait status
+// into a `JSLSubProcessRunResultEnum` and a `JSLSubProcessStatusEnum`,
+// and writes the child's exit code (or negated signal number) into
+// *out_exit_code.
+static JSLSubProcessRunResultEnum jsl__subprocess_posix_wait(
+    pid_t pid,
+    JSLSubProcessStatusEnum* out_status,
+    int32_t* out_exit_code,
+    int32_t* out_errno
+)
+{
+    int wait_status = 0;
+    pid_t wret;
+    do {
+        wret = waitpid(pid, &wait_status, 0);
+    } while (wret == -1 && errno == EINTR);
+
+    if (wret == -1)
+    {
+        if (out_errno != NULL)
+            *out_errno = errno;
+        *out_status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
+        return JSL_SUBPROCESS_RUN_WAIT_FAILED;
+    }
+
+    if (WIFEXITED(wait_status))
+    {
+        *out_exit_code = (int32_t) WEXITSTATUS(wait_status);
+        *out_status = JSL_SUBPROCESS_STATUS_EXITED;
+        return JSL_SUBPROCESS_RUN_SUCCESS;
+    }
+
+    if (WIFSIGNALED(wait_status))
+    {
+        *out_exit_code = -(int32_t) WTERMSIG(wait_status);
+        *out_status = JSL_SUBPROCESS_STATUS_KILLED_BY_SIGNAL;
+        return JSL_SUBPROCESS_RUN_KILLED_BY_SIGNAL;
+    }
+
+    *out_exit_code = -1;
+    *out_status = JSL_SUBPROCESS_STATUS_EXITED;
+    return JSL_SUBPROCESS_RUN_SUCCESS;
+}
+
+#endif
+
+#if JSL_IS_WINDOWS
+
+// Quote a single argument according to the rules parsed by the Microsoft
+// C runtime's CommandLineToArgvW. Writes the quoted form into `out`
+// (advancing it) and returns the new end pointer. Does not null-terminate.
+static char* jsl__subprocess_quote_arg_win(char* out, JSLImmutableMemory arg)
+{
+    // If the argument contains no whitespace, double quotes, or is empty,
+    // it can be used as-is. Otherwise wrap in quotes and escape.
+    bool needs_quote = (arg.length == 0);
+    for (int64_t i = 0; i < arg.length && !needs_quote; i++)
+    {
+        uint8_t c = arg.data[i];
+        if (c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '"')
+            needs_quote = true;
+    }
+
+    if (!needs_quote)
+    {
+        for (int64_t i = 0; i < arg.length; i++)
+        {
+            *out = (char) arg.data[i];
+            out++;
+        }
+        return out;
+    }
+
+    *out = '"';
+    out++;
+
+    int64_t i = 0;
+    while (i < arg.length)
+    {
+        int64_t backslashes = 0;
+        while (i < arg.length && arg.data[i] == '\\')
+        {
+            backslashes++;
+            i++;
+        }
+
+        if (i == arg.length)
+        {
+            // Trailing backslashes must be doubled before the closing quote.
+            for (int64_t j = 0; j < backslashes * 2; j++)
+            {
+                *out = '\\';
+                out++;
+            }
+            break;
+        }
+        else if (arg.data[i] == '"')
+        {
+            // Backslashes preceding a quote must be doubled, plus an extra
+            // backslash to escape the quote.
+            for (int64_t j = 0; j < backslashes * 2 + 1; j++)
+            {
+                *out = '\\';
+                out++;
+            }
+            *out = '"';
+            out++;
+            i++;
+        }
+        else
+        {
+            for (int64_t j = 0; j < backslashes; j++)
+            {
+                *out = '\\';
+                out++;
+            }
+            *out = (char) arg.data[i];
+            out++;
+            i++;
+        }
+    }
+
+    *out = '"';
+    out++;
+    return out;
+}
+
+#endif
+
+JSLSubProcessRunResultEnum jsl_subprocess_run_blocking(
+    JSLSubprocess* proc,
+    int32_t* out_exit_code,
+    int32_t* out_errno
+)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL
+        && out_exit_code != NULL);
+
+    if (!proceed)
+        return JSL_SUBPROCESS_RUN_BAD_PARAMETERS;
+
+    if (proc->status != JSL_SUBPROCESS_STATUS_NOT_STARTED)
+        return JSL_SUBPROCESS_RUN_ALREADY_STARTED;
+
+    *out_exit_code = -1;
+    if (out_errno != NULL)
+        *out_errno = 0;
+
+    JSLSubProcessRunResultEnum result = JSL_SUBPROCESS_RUN_SUCCESS;
+
+#if JSL_IS_POSIX
+
+    JSL__SubProcessPosixLaunch ctx;
+    JSLSubProcessRunResultEnum prep = jsl__subprocess_posix_prepare(proc, &ctx, out_errno);
+    if (prep != JSL_SUBPROCESS_RUN_SUCCESS)
+    {
+        jsl__subprocess_posix_free_launch(proc, &ctx);
+        proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
+        return prep;
+    }
+
+    pid_t pid = 0;
+    JSLSubProcessRunResultEnum spawn_result =
+        jsl__subprocess_posix_spawn(proc, &ctx, &pid, out_errno);
+
+    // argv/envp/cwd strings are no longer needed after posix_spawnp
+    // returns, regardless of success or failure.
+    jsl__subprocess_posix_free_launch(proc, &ctx);
+
+    if (spawn_result != JSL_SUBPROCESS_RUN_SUCCESS)
+    {
+        proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
+        return spawn_result;
+    }
+
+    proc->status = JSL_SUBPROCESS_STATUS_RUNNING;
+
+    // Parent keeps only its ends of any pipes that were created.
+    jsl__subprocess_posix_close_child_pipe_ends(&ctx);
+
+    int32_t io_errno = 0;
+    bool io_ok = jsl__subprocess_posix_pump_io(proc, &ctx, &io_errno);
+
+    JSLSubProcessRunResultEnum wait_result = jsl__subprocess_posix_wait(
+        pid,
+        &proc->status,
+        out_exit_code,
+        out_errno
+    );
+
+    if (wait_result != JSL_SUBPROCESS_RUN_SUCCESS
+        && wait_result != JSL_SUBPROCESS_RUN_KILLED_BY_SIGNAL)
+        result = wait_result;
+    else if (!io_ok)
+    {
+        if (out_errno != NULL)
+            *out_errno = io_errno;
+        result = JSL_SUBPROCESS_RUN_IO_FAILED;
+    }
+    else if (wait_result == JSL_SUBPROCESS_RUN_KILLED_BY_SIGNAL)
+    {
+        result = JSL_SUBPROCESS_RUN_KILLED_BY_SIGNAL;
+    }
+
+    return result;
+
+#elif JSL_IS_WINDOWS
+
+    // Build command line by quoting the executable and each argument
+    // separated by spaces.
+    int64_t cmdline_len = 0;
+    cmdline_len += proc->executable.length * 2 + 3; // worst case quoting
+    for (int64_t i = 0; i < proc->args_count; i++)
+        cmdline_len += 1 + proc->args[i].length * 2 + 3;
+    cmdline_len += 1; // null terminator
+
+    char* cmdline = (char*) jsl_allocator_interface_alloc(
+        proc->allocator,
+        cmdline_len,
+        JSL_DEFAULT_ALLOCATION_ALIGNMENT,
+        false
+    );
+    proceed = (cmdline != NULL);
+
+    char* cursor = cmdline;
+    if (proceed)
+    {
+        cursor = jsl__subprocess_quote_arg_win(cursor, proc->executable);
+        for (int64_t i = 0; i < proc->args_count; i++)
+        {
+            *cursor = ' ';
+            cursor++;
+            cursor = jsl__subprocess_quote_arg_win(cursor, proc->args[i]);
+        }
+        *cursor = '\0';
+    }
+
+    // Build environment block: "key=value\0key=value\0\0". If no custom
+    // env vars were set we pass NULL to inherit the parent's environment.
+    char* env_block = NULL;
+    if (proceed && proc->env_count > 0)
+    {
+        LPCH parent_env = GetEnvironmentStringsA();
+        int64_t parent_len = 0;
+        if (parent_env != NULL)
+        {
+            while (!(parent_env[parent_len] == '\0' && parent_env[parent_len + 1] == '\0'))
+                parent_len++;
+            parent_len++; // include the terminator of the last pair
+        }
+
+        int64_t extra_len = 0;
+        for (int64_t i = 0; i < proc->env_count; i++)
+            extra_len += proc->env_vars[i].key.length + 1 + proc->env_vars[i].value.length + 1;
+
+        env_block = (char*) jsl_allocator_interface_alloc(
+            proc->allocator,
+            parent_len + extra_len + 1,
+            JSL_DEFAULT_ALLOCATION_ALIGNMENT,
+            false
+        );
+        proceed = (env_block != NULL);
+
+        if (proceed)
+        {
+            char* p = env_block;
+            if (parent_env != NULL)
+            {
+                JSL_MEMCPY(p, parent_env, (size_t) parent_len);
+                p += parent_len;
+            }
+            for (int64_t i = 0; i < proc->env_count; i++)
+            {
+                JSL_MEMCPY(p, proc->env_vars[i].key.data, (size_t) proc->env_vars[i].key.length);
+                p += proc->env_vars[i].key.length;
+                *p = '=';
+                p++;
+                JSL_MEMCPY(p, proc->env_vars[i].value.data, (size_t) proc->env_vars[i].value.length);
+                p += proc->env_vars[i].value.length;
+                *p = '\0';
+                p++;
+            }
+            *p = '\0';
+        }
+
+        if (parent_env != NULL)
+            FreeEnvironmentStringsA(parent_env);
+    }
+
+    char* cwd_cstr = NULL;
+    if (proceed && proc->working_directory.data != NULL && proc->working_directory.length > 0)
+    {
+        cwd_cstr = (char*) jsl_memory_to_cstr(proc->allocator, proc->working_directory);
+        proceed = (cwd_cstr != NULL);
+    }
+
+    if (!proceed)
+    {
+        proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
+        return JSL_SUBPROCESS_RUN_ALLOCATION_FAILED;
+    }
+
+    SECURITY_ATTRIBUTES sa;
+    sa.nLength = (DWORD) sizeof(sa);
+    sa.lpSecurityDescriptor = NULL;
+    sa.bInheritHandle = TRUE;
+
+    HANDLE stdin_read = INVALID_HANDLE_VALUE;
+    HANDLE stdin_write = INVALID_HANDLE_VALUE;
+    HANDLE stdout_read = INVALID_HANDLE_VALUE;
+    HANDLE stdout_write = INVALID_HANDLE_VALUE;
+    HANDLE stderr_read = INVALID_HANDLE_VALUE;
+    HANDLE stderr_write = INVALID_HANDLE_VALUE;
+
+    bool pipes_ok = true;
+
+    if (proc->stdin_kind == JSL_SUBPROCESS_STDIN_MEMORY)
+    {
+        pipes_ok = (CreatePipe(&stdin_read, &stdin_write, &sa, 0) != 0);
+        if (pipes_ok)
+            SetHandleInformation(stdin_write, HANDLE_FLAG_INHERIT, 0);
+    }
+    if (pipes_ok && proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_SINK)
+    {
+        pipes_ok = (CreatePipe(&stdout_read, &stdout_write, &sa, 0) != 0);
+        if (pipes_ok)
+            SetHandleInformation(stdout_read, HANDLE_FLAG_INHERIT, 0);
+    }
+    if (pipes_ok && proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_SINK)
+    {
+        pipes_ok = (CreatePipe(&stderr_read, &stderr_write, &sa, 0) != 0);
+        if (pipes_ok)
+            SetHandleInformation(stderr_read, HANDLE_FLAG_INHERIT, 0);
+    }
+
+    if (!pipes_ok)
+    {
+        DWORD err = GetLastError();
+        if (out_errno != NULL)
+            *out_errno = (int32_t) err;
+        if (stdin_read  != INVALID_HANDLE_VALUE) CloseHandle(stdin_read);
+        if (stdin_write != INVALID_HANDLE_VALUE) CloseHandle(stdin_write);
+        if (stdout_read  != INVALID_HANDLE_VALUE) CloseHandle(stdout_read);
+        if (stdout_write != INVALID_HANDLE_VALUE) CloseHandle(stdout_write);
+        if (stderr_read  != INVALID_HANDLE_VALUE) CloseHandle(stderr_read);
+        if (stderr_write != INVALID_HANDLE_VALUE) CloseHandle(stderr_write);
+        proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
+        return JSL_SUBPROCESS_RUN_PIPE_FAILED;
+    }
+
+    STARTUPINFOA si;
+    ZeroMemory(&si, sizeof(si));
+    si.cb = (DWORD) sizeof(si);
+
+    bool use_stdhandles =
+        proc->stdin_kind != JSL_SUBPROCESS_STDIN_INHERIT
+        || proc->stdout_kind != JSL_SUBPROCESS_OUTPUT_INHERIT
+        || proc->stderr_kind != JSL_SUBPROCESS_OUTPUT_INHERIT;
+
+    if (use_stdhandles)
+    {
+        si.dwFlags |= STARTF_USESTDHANDLES;
+
+        if (proc->stdin_kind == JSL_SUBPROCESS_STDIN_MEMORY)
+            si.hStdInput = stdin_read;
+        else if (proc->stdin_kind == JSL_SUBPROCESS_STDIN_FD)
+            si.hStdInput = (HANDLE) _get_osfhandle(proc->stdin_fd);
+        else
+            si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
+
+        if (proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_SINK)
+            si.hStdOutput = stdout_write;
+        else if (proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_FD)
+            si.hStdOutput = (HANDLE) _get_osfhandle(proc->stdout_fd);
+        else
+            si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
+
+        if (proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_SINK)
+            si.hStdError = stderr_write;
+        else if (proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_FD)
+            si.hStdError = (HANDLE) _get_osfhandle(proc->stderr_fd);
+        else
+            si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
+    }
+
+    PROCESS_INFORMATION pi;
+    ZeroMemory(&pi, sizeof(pi));
+
+    BOOL created = CreateProcessA(
+        NULL,
+        cmdline,
+        NULL,
+        NULL,
+        use_stdhandles ? TRUE : FALSE,
+        0,
+        env_block,
+        cwd_cstr,
+        &si,
+        &pi
+    );
+
+    // Close the child-side ends we handed off.
+    if (stdin_read  != INVALID_HANDLE_VALUE) CloseHandle(stdin_read);
+    if (stdout_write != INVALID_HANDLE_VALUE) CloseHandle(stdout_write);
+    if (stderr_write != INVALID_HANDLE_VALUE) CloseHandle(stderr_write);
+
+    if (!created)
+    {
+        DWORD err = GetLastError();
+        if (out_errno != NULL)
+            *out_errno = (int32_t) err;
+        if (stdin_write  != INVALID_HANDLE_VALUE) CloseHandle(stdin_write);
+        if (stdout_read  != INVALID_HANDLE_VALUE) CloseHandle(stdout_read);
+        if (stderr_read  != INVALID_HANDLE_VALUE) CloseHandle(stderr_read);
+        proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
+        return JSL_SUBPROCESS_RUN_SPAWN_FAILED;
+    }
+
+    // I/O pump. Poll each pipe with PeekNamedPipe since Windows doesn't
+    // expose a portable equivalent of poll() for anonymous pipes.
+    int64_t stdin_offset = 0;
+    bool io_error = false;
+
+    while (stdin_write != INVALID_HANDLE_VALUE
+        || stdout_read != INVALID_HANDLE_VALUE
+        || stderr_read != INVALID_HANDLE_VALUE)
+    {
+        bool did_work = false;
+
+        if (stdin_write != INVALID_HANDLE_VALUE)
+        {
+            int64_t remaining = proc->stdin_memory.length - stdin_offset;
+            if (remaining <= 0)
+            {
+                CloseHandle(stdin_write);
+                stdin_write = INVALID_HANDLE_VALUE;
+                did_work = true;
+            }
+            else
+            {
+                DWORD to_write = (DWORD)(remaining > 4096 ? 4096 : remaining);
+                DWORD written = 0;
+                BOOL wok = WriteFile(
+                    stdin_write,
+                    proc->stdin_memory.data + stdin_offset,
+                    to_write,
+                    &written,
+                    NULL
+                );
+                if (!wok || written == 0)
+                {
+                    CloseHandle(stdin_write);
+                    stdin_write = INVALID_HANDLE_VALUE;
+                }
+                else
+                {
+                    stdin_offset += (int64_t) written;
+                }
+                did_work = true;
+            }
+        }
+
+        uint8_t io_buf[4096];
+
+        if (stdout_read != INVALID_HANDLE_VALUE)
+        {
+            DWORD avail = 0;
+            BOOL pok = PeekNamedPipe(stdout_read, NULL, 0, NULL, &avail, NULL);
+            if (!pok)
+            {
+                CloseHandle(stdout_read);
+                stdout_read = INVALID_HANDLE_VALUE;
+                did_work = true;
+            }
+            else if (avail > 0)
+            {
+                DWORD read_n = 0;
+                BOOL rok = ReadFile(stdout_read, io_buf, (DWORD) sizeof(io_buf), &read_n, NULL);
+                if (rok && read_n > 0)
+                {
+                    jsl_output_sink_write(
+                        proc->stdout_sink,
+                        jsl_immutable_memory(io_buf, (int64_t) read_n)
+                    );
+                }
+                else
+                {
+                    CloseHandle(stdout_read);
+                    stdout_read = INVALID_HANDLE_VALUE;
+                }
+                did_work = true;
+            }
+        }
+
+        if (stderr_read != INVALID_HANDLE_VALUE)
+        {
+            DWORD avail = 0;
+            BOOL pok = PeekNamedPipe(stderr_read, NULL, 0, NULL, &avail, NULL);
+            if (!pok)
+            {
+                CloseHandle(stderr_read);
+                stderr_read = INVALID_HANDLE_VALUE;
+                did_work = true;
+            }
+            else if (avail > 0)
+            {
+                DWORD read_n = 0;
+                BOOL rok = ReadFile(stderr_read, io_buf, (DWORD) sizeof(io_buf), &read_n, NULL);
+                if (rok && read_n > 0)
+                {
+                    jsl_output_sink_write(
+                        proc->stderr_sink,
+                        jsl_immutable_memory(io_buf, (int64_t) read_n)
+                    );
+                }
+                else
+                {
+                    CloseHandle(stderr_read);
+                    stderr_read = INVALID_HANDLE_VALUE;
+                }
+                did_work = true;
+            }
+        }
+
+        if (!did_work)
+        {
+            // Nothing ready on any pipe; check if the child is done. If so,
+            // drain whatever's left in the next iteration and exit.
+            DWORD wait_res = WaitForSingleObject(pi.hProcess, 5);
+            if (wait_res == WAIT_OBJECT_0)
+            {
+                // One more pass will drain any remaining buffered data via
+                // PeekNamedPipe. If PeekNamedPipe reports zero bytes and the
+                // child is gone, the next pass will see a broken pipe and
+                // close the handles.
+                if (stdout_read != INVALID_HANDLE_VALUE)
+                {
+                    DWORD avail = 0;
+                    if (!PeekNamedPipe(stdout_read, NULL, 0, NULL, &avail, NULL) || avail == 0)
+                    {
+                        CloseHandle(stdout_read);
+                        stdout_read = INVALID_HANDLE_VALUE;
+                    }
+                }
+                if (stderr_read != INVALID_HANDLE_VALUE)
+                {
+                    DWORD avail = 0;
+                    if (!PeekNamedPipe(stderr_read, NULL, 0, NULL, &avail, NULL) || avail == 0)
+                    {
+                        CloseHandle(stderr_read);
+                        stderr_read = INVALID_HANDLE_VALUE;
+                    }
+                }
+                if (stdin_write != INVALID_HANDLE_VALUE)
+                {
+                    CloseHandle(stdin_write);
+                    stdin_write = INVALID_HANDLE_VALUE;
+                }
+            }
+        }
+    }
+
+    DWORD wait_res = WaitForSingleObject(pi.hProcess, INFINITE);
+    if (wait_res == WAIT_FAILED)
+    {
+        DWORD err = GetLastError();
+        if (out_errno != NULL)
+            *out_errno = (int32_t) err;
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+        proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
+        return JSL_SUBPROCESS_RUN_WAIT_FAILED;
+    }
+
+    DWORD exit_code = 0;
+    if (!GetExitCodeProcess(pi.hProcess, &exit_code))
+    {
+        DWORD err = GetLastError();
+        if (out_errno != NULL)
+            *out_errno = (int32_t) err;
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+        proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
+        return JSL_SUBPROCESS_RUN_WAIT_FAILED;
+    }
+
+    CloseHandle(pi.hProcess);
+    CloseHandle(pi.hThread);
+
+    *out_exit_code = (int32_t) exit_code;
+    proc->status = JSL_SUBPROCESS_STATUS_EXITED;
+
+    if (io_error)
+        result = JSL_SUBPROCESS_RUN_IO_FAILED;
+
+    return result;
+
+#else
+    #error "Unsupported platform"
+#endif
+}
+
+void jsl_subprocess_cleanup(JSLSubprocess* proc)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL);
+
+    if (!proceed)
+        return;
+
+    if (proc->executable.data != NULL)
+        (void) jsl_allocator_interface_free(proc->allocator, proc->executable.data);
+
+    for (int64_t i = 0; i < proc->args_count; i++)
+    {
+        if (proc->args[i].data != NULL)
+            (void) jsl_allocator_interface_free(proc->allocator, proc->args[i].data);
+    }
+
+    if (proc->args != NULL)
+        (void) jsl_allocator_interface_free(proc->allocator, proc->args);
+
+    for (int64_t i = 0; i < proc->env_count; i++)
+    {
+        if (proc->env_vars[i].key.data != NULL)
+            (void) jsl_allocator_interface_free(proc->allocator, proc->env_vars[i].key.data);
+        if (proc->env_vars[i].value.data != NULL)
+            (void) jsl_allocator_interface_free(proc->allocator, proc->env_vars[i].value.data);
+    }
+
+    if (proc->env_vars != NULL)
+        (void) jsl_allocator_interface_free(proc->allocator, proc->env_vars);
+
+    if (proc->working_directory.data != NULL)
+        (void) jsl_allocator_interface_free(proc->allocator, proc->working_directory.data);
+
+    if (proc->stdin_kind == JSL_SUBPROCESS_STDIN_MEMORY && proc->stdin_memory.data != NULL)
+        (void) jsl_allocator_interface_free(proc->allocator, proc->stdin_memory.data);
+
+    proc->sentinel = 0;
+    proc->executable = jsl_immutable_memory(NULL, 0);
+    proc->args = NULL;
+    proc->args_count = 0;
+    proc->args_capacity = 0;
+    proc->env_vars = NULL;
+    proc->env_count = 0;
+    proc->env_capacity = 0;
+    proc->working_directory = jsl_immutable_memory(NULL, 0);
+    proc->stdin_memory = jsl_immutable_memory(NULL, 0);
 }

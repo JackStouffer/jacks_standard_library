@@ -1,0 +1,27 @@
+#ifndef TEST_SUBPROCESS_H
+#define TEST_SUBPROCESS_H
+
+void test_jsl_subprocess_create_bad_parameters(void);
+void test_jsl_subprocess_create_success(void);
+void test_jsl_subprocess_args_bad_parameters(void);
+void test_jsl_subprocess_arg_macro(void);
+void test_jsl_subprocess_arg_cstr_macro(void);
+void test_jsl_subprocess_env_bad_parameters(void);
+void test_jsl_subprocess_change_working_directory_bad_parameters(void);
+void test_jsl_subprocess_set_stdin_memory_bad_parameters(void);
+void test_jsl_subprocess_set_stdin_fd_bad_parameters(void);
+void test_jsl_subprocess_set_stdout_fd_bad_parameters(void);
+void test_jsl_subprocess_set_stdout_sink_bad_parameters(void);
+void test_jsl_subprocess_set_stderr_fd_bad_parameters(void);
+void test_jsl_subprocess_set_stderr_sink_bad_parameters(void);
+void test_jsl_subprocess_run_blocking_bad_parameters(void);
+void test_jsl_subprocess_run_blocking_spawn_failed(void);
+void test_jsl_subprocess_run_blocking_exit_code(void);
+void test_jsl_subprocess_run_blocking_already_started(void);
+void test_jsl_subprocess_run_blocking_stdout_sink(void);
+void test_jsl_subprocess_run_blocking_stderr_sink(void);
+void test_jsl_subprocess_run_blocking_stdin_memory(void);
+void test_jsl_subprocess_run_blocking_env_var(void);
+void test_jsl_subprocess_run_blocking_working_directory(void);
+
+#endif
