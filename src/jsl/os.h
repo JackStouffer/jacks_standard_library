@@ -707,6 +707,43 @@ typedef enum
 } JSLSubProcessEnvResultEnum;
 
 /**
+* How the child process's standard input stream will be supplied.
+*
+* `INHERIT` (the default) means the child reads from the parent's stdin.
+* `MEMORY` feeds a fixed byte buffer to the child's stdin and closes it
+* once the buffer is exhausted. `FD` wires up a caller-provided file
+* descriptor as the child's stdin. On Windows, `fd` is a CRT file
+* descriptor from `_open`/`_sopen_s`/`_fileno`, which can be converted to
+* a `HANDLE` with `_get_osfhandle` when the child is spawned.
+*/
+typedef enum
+{
+    JSL_SUBPROCESS_STDIN_INHERIT = 0,
+    JSL_SUBPROCESS_STDIN_MEMORY,
+    JSL_SUBPROCESS_STDIN_FD,
+
+    JSL_SUBPROCESS_STDIN_ENUM_COUNT
+} JSLSubProcessStdinKindEnum;
+
+/**
+* How the child process's stdout or stderr stream will be directed.
+*
+* `INHERIT` (the default) forwards writes to the parent's corresponding
+* standard stream. `FD` redirects writes into a caller-provided file
+* descriptor. `SINK` captures writes at run time and delivers them to a
+* `JSLOutputSink`. On Windows, `fd` is a CRT file descriptor (see the
+* notes on `JSLSubProcessStdinKindEnum`).
+*/
+typedef enum
+{
+    JSL_SUBPROCESS_OUTPUT_INHERIT = 0,
+    JSL_SUBPROCESS_OUTPUT_FD,
+    JSL_SUBPROCESS_OUTPUT_SINK,
+
+    JSL_SUBPROCESS_OUTPUT_ENUM_COUNT
+} JSLSubProcessOutputKindEnum;
+
+/**
 * A key-value pair representing an environment variable to be set on a
 * subprocess before it is started. Both `key` and `value` point into memory
 * owned by the `JSLSubProcess` allocator and are valid for the lifetime of
@@ -745,14 +782,27 @@ typedef struct JSLSubProcess
     JSLSubProcessEnvVar* env_vars;
     int64_t env_count;
     int64_t env_capacity;
+
+    JSLImmutableMemory working_directory;
+
+    JSLSubProcessStdinKindEnum stdin_kind;
+    JSLImmutableMemory stdin_memory;
+    int stdin_fd;
+
+    JSLSubProcessOutputKindEnum stdout_kind;
+    int stdout_fd;
+    JSLOutputSink stdout_sink;
+
+    JSLSubProcessOutputKindEnum stderr_kind;
+    int stderr_fd;
+    JSLOutputSink stderr_sink;
 } JSLSubProcess;
 
 /**
 * Create a new subprocess handle for the given executable.
 *
 * The handle is not started; use `jsl_subprocess_arg` and
-* `jsl_subprocess_env` to configure it, then a run function (to be
-* implemented) to actually launch the process.
+* `jsl_subprocess_env` to configure it.
 *
 * The `executable` string is duplicated into `allocator`, so the caller
 * does not need to keep the original alive.
@@ -770,7 +820,7 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessCreateResultEnum jsl_subprocess_create(
 
 /**
 * Append one or more command-line arguments from an array of
-`JSLImmutableMemory`.
+* `JSLImmutableMemory`.
 *
 * Arguments are stored in order and will be passed to the child process
 * in the same order they were added. Each argument string is duplicated
@@ -876,6 +926,127 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessEnvResultEnum jsl_subprocess_env(
     JSLSubProcess* proc,
     JSLImmutableMemory key,
     JSLImmutableMemory value
+);
+
+/**
+* Set the working directory the subprocess will be started in.
+*
+* The `path` string is duplicated into the subprocess's allocator, so the
+* caller does not need to keep the original alive. Calling this more than
+* once replaces the previously stored working directory. If this is never
+* called, the subprocess inherits the parent's working directory.
+*
+* @param proc Pointer to an initialized subprocess handle
+* @param path Working directory path to use when the process is started
+* @returns `true` on success, `false` if parameters were invalid or the
+*          path could not be duplicated into the allocator
+*/
+JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_change_working_directory(
+    JSLSubProcess* proc,
+    JSLImmutableMemory path
+);
+
+/**
+* Configure the subprocess to read its standard input from a byte buffer.
+*
+* At run time the buffer is fed to the child's stdin and the stream is
+* closed once fully written. The buffer is duplicated into the subprocess's
+* allocator, so the caller does not need to keep the original memory alive.
+* Replaces any previously configured stdin source.
+*
+* @param proc Pointer to an initialized subprocess handle
+* @param data Bytes to feed to the child's stdin; must have non-null `data`
+* @returns `true` on success, `false` if parameters were invalid or the
+*          buffer could not be duplicated into the allocator
+*/
+JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdin_memory(
+    JSLSubProcess* proc,
+    JSLImmutableMemory data
+);
+
+/**
+* Configure the subprocess to read its standard input from the given file
+* descriptor.
+*
+* The descriptor is used as-is when the child is spawned. JSL does not
+* close or duplicate the descriptor; the caller is responsible for its
+* lifetime. On Windows, `fd` must be a CRT file descriptor (see
+* `JSLSubProcessStdinKindEnum`). Replaces any previously configured stdin
+* source.
+*
+* @param proc Pointer to an initialized subprocess handle
+* @param fd   Caller-owned file descriptor to use as the child's stdin
+* @returns `true` on success, `false` if parameters were invalid
+*/
+JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdin_fd(
+    JSLSubProcess* proc,
+    int fd
+);
+
+/**
+* Redirect the subprocess's standard output into the given file descriptor.
+*
+* The descriptor is used as-is when the child is spawned. JSL does not
+* close or duplicate the descriptor; the caller is responsible for its
+* lifetime. On Windows, `fd` must be a CRT file descriptor. Replaces any
+* previously configured stdout destination.
+*
+* @param proc Pointer to an initialized subprocess handle
+* @param fd   Caller-owned file descriptor to receive the child's stdout
+* @returns `true` on success, `false` if parameters were invalid
+*/
+JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdout_fd(
+    JSLSubProcess* proc,
+    int fd
+);
+
+/**
+* Capture the subprocess's standard output into the given output sink.
+*
+* Writes produced by the child are forwarded to `sink.write_fp` while the
+* process runs. The sink's `write_fp` must be non-null. Replaces any
+* previously configured stdout destination.
+*
+* @param proc Pointer to an initialized subprocess handle
+* @param sink Output sink that receives the child's stdout
+* @returns `true` on success, `false` if parameters were invalid
+*/
+JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdout_sink(
+    JSLSubProcess* proc,
+    JSLOutputSink sink
+);
+
+/**
+* Redirect the subprocess's standard error into the given file descriptor.
+*
+* The descriptor is used as-is when the child is spawned. JSL does not
+* close or duplicate the descriptor; the caller is responsible for its
+* lifetime. On Windows, `fd` must be a CRT file descriptor. Replaces any
+* previously configured stderr destination.
+*
+* @param proc Pointer to an initialized subprocess handle
+* @param fd   Caller-owned file descriptor to receive the child's stderr
+* @returns `true` on success, `false` if parameters were invalid
+*/
+JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stderr_fd(
+    JSLSubProcess* proc,
+    int fd
+);
+
+/**
+* Capture the subprocess's standard error into the given output sink.
+*
+* Writes produced by the child are forwarded to `sink.write_fp` while the
+* process runs. The sink's `write_fp` must be non-null. Replaces any
+* previously configured stderr destination.
+*
+* @param proc Pointer to an initialized subprocess handle
+* @param sink Output sink that receives the child's stderr
+* @returns `true` on success, `false` if parameters were invalid
+*/
+JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stderr_sink(
+    JSLSubProcess* proc,
+    JSLOutputSink sink
 );
 
 

@@ -2415,6 +2415,21 @@ JSLSubProcessCreateResultEnum jsl_subprocess_create(
     proc->env_vars = env_vars;
     proc->env_count = 0;
     proc->env_capacity = JSL__SUBPROCESS_INITIAL_CAPACITY;
+    proc->working_directory = jsl_immutable_memory(NULL, 0);
+
+    proc->stdin_kind = JSL_SUBPROCESS_STDIN_INHERIT;
+    proc->stdin_memory = jsl_immutable_memory(NULL, 0);
+    proc->stdin_fd = -1;
+
+    proc->stdout_kind = JSL_SUBPROCESS_OUTPUT_INHERIT;
+    proc->stdout_fd = -1;
+    proc->stdout_sink.write_fp = NULL;
+    proc->stdout_sink.user_data = NULL;
+
+    proc->stderr_kind = JSL_SUBPROCESS_OUTPUT_INHERIT;
+    proc->stderr_fd = -1;
+    proc->stderr_sink.write_fp = NULL;
+    proc->stderr_sink.user_data = NULL;
 
     return JSL_SUBPROCESS_CREATE_SUCCESS;
 }
@@ -2583,4 +2598,153 @@ JSLSubProcessEnvResultEnum jsl_subprocess_env(
     proc->env_count++;
 
     return JSL_SUBPROCESS_ENV_SUCCESS;
+}
+
+bool jsl_subprocess_change_working_directory(
+    JSLSubProcess* proc,
+    JSLImmutableMemory path
+)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL
+        && path.data != NULL
+        && path.length > 0);
+
+    JSLImmutableMemory path_dup = {0};
+
+    if (proceed)
+    {
+        path_dup = jsl_duplicate(proc->allocator, path);
+        proceed = (path_dup.data != NULL);
+    }
+
+    if (proceed)
+        proc->working_directory = path_dup;
+
+    return proceed;
+}
+
+bool jsl_subprocess_set_stdin_memory(
+    JSLSubProcess* proc,
+    JSLImmutableMemory data
+)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL
+        && data.data != NULL
+        && data.length >= 0);
+
+    JSLImmutableMemory data_dup = jsl_immutable_memory(NULL, 0);
+
+    if (proceed && data.length > 0)
+    {
+        data_dup = jsl_duplicate(proc->allocator, data);
+        proceed = (data_dup.data != NULL);
+    }
+
+    if (proceed)
+    {
+        proc->stdin_kind = JSL_SUBPROCESS_STDIN_MEMORY;
+        proc->stdin_memory = data_dup;
+        proc->stdin_fd = -1;
+    }
+
+    return proceed;
+}
+
+bool jsl_subprocess_set_stdin_fd(
+    JSLSubProcess* proc,
+    int fd
+)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL
+        && fd >= 0);
+
+    if (proceed)
+    {
+        proc->stdin_kind = JSL_SUBPROCESS_STDIN_FD;
+        proc->stdin_fd = fd;
+        proc->stdin_memory = jsl_immutable_memory(NULL, 0);
+    }
+
+    return proceed;
+}
+
+bool jsl_subprocess_set_stdout_fd(
+    JSLSubProcess* proc,
+    int fd
+)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL
+        && fd >= 0);
+
+    if (proceed)
+    {
+        proc->stdout_kind = JSL_SUBPROCESS_OUTPUT_FD;
+        proc->stdout_fd = fd;
+        proc->stdout_sink.write_fp = NULL;
+        proc->stdout_sink.user_data = NULL;
+    }
+
+    return proceed;
+}
+
+bool jsl_subprocess_set_stdout_sink(
+    JSLSubProcess* proc,
+    JSLOutputSink sink
+)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL
+        && sink.write_fp != NULL);
+
+    if (proceed)
+    {
+        proc->stdout_kind = JSL_SUBPROCESS_OUTPUT_SINK;
+        proc->stdout_sink = sink;
+        proc->stdout_fd = -1;
+    }
+
+    return proceed;
+}
+
+bool jsl_subprocess_set_stderr_fd(
+    JSLSubProcess* proc,
+    int fd
+)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL
+        && fd >= 0);
+
+    if (proceed)
+    {
+        proc->stderr_kind = JSL_SUBPROCESS_OUTPUT_FD;
+        proc->stderr_fd = fd;
+        proc->stderr_sink.write_fp = NULL;
+        proc->stderr_sink.user_data = NULL;
+    }
+
+    return proceed;
+}
+
+bool jsl_subprocess_set_stderr_sink(
+    JSLSubProcess* proc,
+    JSLOutputSink sink
+)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL
+        && sink.write_fp != NULL);
+
+    if (proceed)
+    {
+        proc->stderr_kind = JSL_SUBPROCESS_OUTPUT_SINK;
+        proc->stderr_sink = sink;
+        proc->stderr_fd = -1;
+    }
+
+    return proceed;
 }
