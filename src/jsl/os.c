@@ -22,6 +22,8 @@
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdint.h>
+#include <stdlib.h>
+#include <limits.h>
 
 #if !defined(__STDC_VERSION__) || __STDC_VERSION__ < 202311L
     #include <stdbool.h>
@@ -2434,6 +2436,8 @@ JSLSubProcessCreateResultEnum jsl_subprocess_create(
     proc->sentinel = JSL__SUBPROCESS_PRIVATE_SENTINEL;
     proc->allocator = allocator;
     proc->status = JSL_SUBPROCESS_STATUS_NOT_STARTED;
+    proc->exit_code = -1;
+    proc->last_errno = 0;
     proc->executable = exe_dup;
     proc->args = args;
     proc->args_count = 0;
@@ -3620,6 +3624,153 @@ static JSLSubProcessResultEnum jsl__subprocess_posix_poll(
     return JSL_SUBPROCESS_SUCCESS;
 }
 
+// Global SIGCHLD self-pipe state. Lazy-initialized on first call to
+// `jsl_subprocess_background_wait`. The previous SIGCHLD handler (if
+// any) is saved so our handler can chain to it, keeping us polite to
+// host programs that already listen for child termination.
+static int jsl__sigchld_pipe[2] = {-1, -1};
+static volatile sig_atomic_t jsl__sigchld_installed = 0;
+static struct sigaction jsl__sigchld_prev_action;
+
+static void jsl__sigchld_handler(int signum, siginfo_t* info, void* context)
+{
+    int saved_errno = errno;
+    if (jsl__sigchld_pipe[1] != -1)
+    {
+        uint8_t byte = 1;
+        ssize_t n;
+        do {
+            n = write(jsl__sigchld_pipe[1], &byte, 1);
+        } while (n == -1 && errno == EINTR);
+        // EAGAIN is fine: the pipe already carries a pending byte.
+        (void) n;
+    }
+
+    // Chain to prior handler if the host installed one.
+    if ((jsl__sigchld_prev_action.sa_flags & SA_SIGINFO) != 0)
+    {
+        if (jsl__sigchld_prev_action.sa_sigaction != NULL)
+            jsl__sigchld_prev_action.sa_sigaction(signum, info, context);
+    }
+    else
+    {
+        void (*prev)(int) = jsl__sigchld_prev_action.sa_handler;
+        if (prev != SIG_DFL && prev != SIG_IGN && prev != NULL)
+            prev(signum);
+    }
+
+    errno = saved_errno;
+}
+
+// Best-effort idempotent init of the SIGCHLD self-pipe. Returns true
+// when the pipe is ready. Caller is expected to still be able to
+// `waitpid(pid, WNOHANG)` all children; the self-pipe only nudges the
+// event loop awake and does not replace `waitpid`.
+static bool jsl__sigchld_ensure_installed(int32_t* out_errno)
+{
+    if (jsl__sigchld_installed)
+        return true;
+
+    int pipe_fds[2] = {-1, -1};
+    if (pipe(pipe_fds) != 0)
+    {
+        if (out_errno != NULL)
+            *out_errno = errno;
+        return false;
+    }
+
+    for (int i = 0; i < 2; i++)
+    {
+        int flags = fcntl(pipe_fds[i], F_GETFL, 0);
+        if (flags != -1)
+            (void) fcntl(pipe_fds[i], F_SETFL, flags | O_NONBLOCK);
+        int fdflags = fcntl(pipe_fds[i], F_GETFD, 0);
+        if (fdflags != -1)
+            (void) fcntl(pipe_fds[i], F_SETFD, fdflags | FD_CLOEXEC);
+    }
+
+    struct sigaction sa;
+    memset(&sa, 0, sizeof(sa));
+    sa.sa_sigaction = jsl__sigchld_handler;
+    sa.sa_flags = SA_SIGINFO | SA_NOCLDSTOP | SA_RESTART;
+    sigemptyset(&sa.sa_mask);
+
+    if (sigaction(SIGCHLD, &sa, &jsl__sigchld_prev_action) != 0)
+    {
+        if (out_errno != NULL)
+            *out_errno = errno;
+        close(pipe_fds[0]);
+        close(pipe_fds[1]);
+        return false;
+    }
+
+    jsl__sigchld_pipe[0] = pipe_fds[0];
+    jsl__sigchld_pipe[1] = pipe_fds[1];
+    jsl__sigchld_installed = 1;
+    return true;
+}
+
+// Read everything currently buffered in the self-pipe. Used to clear
+// the fd so the next SIGCHLD notification wakes us again.
+static void jsl__sigchld_drain(void)
+{
+    if (jsl__sigchld_pipe[0] == -1)
+        return;
+    uint8_t scratch[64];
+    for (;;)
+    {
+        ssize_t n = read(jsl__sigchld_pipe[0], scratch, sizeof(scratch));
+        if (n == -1)
+        {
+            if (errno == EINTR)
+                continue;
+            break;
+        }
+        if (n == 0)
+            break;
+    }
+}
+
+// One non-blocking wait on the proc's pid. Updates proc->status and
+// proc->exit_code when the child is observed to have terminated.
+// Returns true if the proc is (now) terminal, false if still running.
+static bool jsl__subprocess_posix_reap_nohang(JSLSubprocess* proc)
+{
+    if (proc->status == JSL_SUBPROCESS_STATUS_EXITED
+        || proc->status == JSL_SUBPROCESS_STATUS_KILLED_BY_SIGNAL)
+        return true;
+
+    if (proc->pid <= 0)
+        return false;
+
+    int wait_status = 0;
+    pid_t wret;
+    do {
+        wret = waitpid((pid_t) proc->pid, &wait_status, WNOHANG);
+    } while (wret == -1 && errno == EINTR);
+
+    if (wret <= 0)
+        return false;
+
+    if (WIFEXITED(wait_status))
+    {
+        proc->exit_code = (int32_t) WEXITSTATUS(wait_status);
+        proc->status = JSL_SUBPROCESS_STATUS_EXITED;
+    }
+    else if (WIFSIGNALED(wait_status))
+    {
+        proc->exit_code = -(int32_t) WTERMSIG(wait_status);
+        proc->status = JSL_SUBPROCESS_STATUS_KILLED_BY_SIGNAL;
+    }
+    else
+    {
+        proc->exit_code = -1;
+        proc->status = JSL_SUBPROCESS_STATUS_EXITED;
+    }
+    proc->pid = 0;
+    return true;
+}
+
 #endif
 
 #if JSL_IS_WINDOWS
@@ -4206,13 +4357,11 @@ static JSLSubProcessResultEnum jsl__subprocess_win_poll(
 
 JSLSubProcessResultEnum jsl_subprocess_run_blocking(
     JSLSubprocess* proc,
-    int32_t* out_exit_code,
     int32_t* out_errno
 )
 {
     bool proceed = (proc != NULL
-        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL
-        && out_exit_code != NULL);
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL);
 
     if (!proceed)
         return JSL_SUBPROCESS_BAD_PARAMETERS;
@@ -4220,7 +4369,7 @@ JSLSubProcessResultEnum jsl_subprocess_run_blocking(
     if (proc->status != JSL_SUBPROCESS_STATUS_NOT_STARTED)
         return JSL_SUBPROCESS_ALREADY_STARTED;
 
-    *out_exit_code = -1;
+    proc->exit_code = -1;
     if (out_errno != NULL)
         *out_errno = 0;
 
@@ -4262,7 +4411,7 @@ JSLSubProcessResultEnum jsl_subprocess_run_blocking(
     JSLSubProcessResultEnum wait_result = jsl__subprocess_posix_wait(
         pid,
         &proc->status,
-        out_exit_code,
+        &proc->exit_code,
         out_errno
     );
 
@@ -4478,7 +4627,7 @@ JSLSubProcessResultEnum jsl_subprocess_run_blocking(
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
 
-    *out_exit_code = (int32_t) exit_code;
+    proc->exit_code = (int32_t) exit_code;
     proc->status = JSL_SUBPROCESS_STATUS_EXITED;
 
     if (io_error)
@@ -4611,13 +4760,24 @@ JSLSubProcessResultEnum jsl_subprocess_background_poll(
     if (out_errno != NULL)
         *out_errno = 0;
 
+    int32_t local_errno = 0;
+    JSLSubProcessResultEnum r;
 #if JSL_IS_POSIX
-    return jsl__subprocess_posix_poll(proc, timeout_ms, out_status, out_exit_code, out_errno);
+    r = jsl__subprocess_posix_poll(proc, timeout_ms, out_status, &proc->exit_code, &local_errno);
 #elif JSL_IS_WINDOWS
-    return jsl__subprocess_win_poll(proc, timeout_ms, out_status, out_exit_code, out_errno);
+    r = jsl__subprocess_win_poll(proc, timeout_ms, out_status, &proc->exit_code, &local_errno);
 #else
     #error "Unsupported platform"
 #endif
+
+    *out_exit_code = proc->exit_code;
+    if (local_errno != 0)
+    {
+        proc->last_errno = local_errno;
+        if (out_errno != NULL)
+            *out_errno = local_errno;
+    }
+    return r;
 }
 
 JSLSubProcessResultEnum jsl_subprocess_background_send_stdin(
@@ -4635,13 +4795,23 @@ JSLSubProcessResultEnum jsl_subprocess_background_send_stdin(
     if (out_errno != NULL)
         *out_errno = 0;
 
+    int32_t local_errno = 0;
+    JSLSubProcessResultEnum r;
 #if JSL_IS_POSIX
-    return jsl__subprocess_posix_pump_stdin_once(proc, out_errno);
+    r = jsl__subprocess_posix_pump_stdin_once(proc, &local_errno);
 #elif JSL_IS_WINDOWS
-    return jsl__subprocess_win_pump_stdin_once(proc, out_errno);
+    r = jsl__subprocess_win_pump_stdin_once(proc, &local_errno);
 #else
     #error "Unsupported platform"
 #endif
+
+    if (local_errno != 0)
+    {
+        proc->last_errno = local_errno;
+        if (out_errno != NULL)
+            *out_errno = local_errno;
+    }
+    return r;
 }
 
 JSLSubProcessResultEnum jsl_subprocess_background_receive_output(
@@ -4659,13 +4829,23 @@ JSLSubProcessResultEnum jsl_subprocess_background_receive_output(
     if (out_errno != NULL)
         *out_errno = 0;
 
+    int32_t local_errno = 0;
+    JSLSubProcessResultEnum r;
 #if JSL_IS_POSIX
-    return jsl__subprocess_posix_pump_output_once(proc, out_errno);
+    r = jsl__subprocess_posix_pump_output_once(proc, &local_errno);
 #elif JSL_IS_WINDOWS
-    return jsl__subprocess_win_pump_output_once(proc, out_errno);
+    r = jsl__subprocess_win_pump_output_once(proc, &local_errno);
 #else
     #error "Unsupported platform"
 #endif
+
+    if (local_errno != 0)
+    {
+        proc->last_errno = local_errno;
+        if (out_errno != NULL)
+            *out_errno = local_errno;
+    }
+    return r;
 }
 
 JSLSubProcessResultEnum jsl_subprocess_background_kill(
@@ -4712,6 +4892,515 @@ JSLSubProcessResultEnum jsl_subprocess_background_kill(
 #else
     #error "Unsupported platform"
 #endif
+}
+
+// Per-proc bookkeeping used inside `jsl_subprocess_background_wait`.
+// Tracks whether a given proc is still part of the wait set and, on
+// POSIX, whether the stdin pump has finished. Lives on the stack inside
+// the wait function so nothing here persists past the call.
+typedef struct JSL__SubProcessWaitSlot
+{
+    // Index back into the caller's array. -1 means "slot is unused".
+    int32_t index;
+    // Ignored procs (bad sentinel, not background, not running) keep
+    // `ignored == true`. They are never touched by the wait loop.
+    bool ignored;
+    // Whether this proc is still counted toward completion. Starts true
+    // for valid-running procs. Cleared when the proc hits terminal or
+    // is dropped due to repeated pump errors.
+    bool still_waiting;
+    // True when a pump operation on this proc reported IO_FAILED. The
+    // proc is removed from the wait set but the loop continues for its
+    // siblings.
+    bool io_failed;
+} JSL__SubProcessWaitSlot;
+
+// Current monotonic time in milliseconds. Used to implement the
+// finite-timeout deadline arithmetic of `jsl_subprocess_background_wait`.
+static int64_t jsl__monotonic_ms(void)
+{
+#if JSL_IS_POSIX
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
+        return 0;
+    return ((int64_t) ts.tv_sec) * 1000 + ((int64_t) ts.tv_nsec) / 1000000;
+#elif JSL_IS_WINDOWS
+    return (int64_t) GetTickCount64();
+#else
+    return 0;
+#endif
+}
+
+JSLSubProcessResultEnum jsl_subprocess_background_wait(
+    JSLSubprocess* procs,
+    int32_t count,
+    int32_t timeout_ms,
+    int32_t* out_errno
+)
+{
+    if (procs == NULL || count <= 0)
+        return JSL_SUBPROCESS_BAD_PARAMETERS;
+
+    if (out_errno != NULL)
+        *out_errno = 0;
+
+    // First pass: classify every proc as ignored, already-terminal, or
+    // still-running. Only still-running procs contribute to the wait
+    // set; already-terminal is silently treated as "done".
+    int64_t slot_bytes = (int64_t) sizeof(JSL__SubProcessWaitSlot) * count;
+    JSL__SubProcessWaitSlot stack_slots[16];
+    JSL__SubProcessWaitSlot* slots = NULL;
+    bool slots_on_heap = false;
+
+    if ((size_t) slot_bytes <= sizeof(stack_slots))
+        slots = stack_slots;
+    else
+    {
+        slots = (JSL__SubProcessWaitSlot*) malloc((size_t) slot_bytes);
+        if (slots == NULL)
+            return JSL_SUBPROCESS_ALLOCATION_FAILED;
+        slots_on_heap = true;
+    }
+
+    int32_t waiting_count = 0;
+
+    for (int32_t i = 0; i < count; i++)
+    {
+        slots[i].index = i;
+        slots[i].ignored = true;
+        slots[i].still_waiting = false;
+        slots[i].io_failed = false;
+
+        JSLSubprocess* p = &procs[i];
+
+        bool good_sentinel =
+            (p != NULL && p->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL);
+        if (!good_sentinel || !p->is_background)
+            continue;
+
+        if (p->status == JSL_SUBPROCESS_STATUS_EXITED
+            || p->status == JSL_SUBPROCESS_STATUS_KILLED_BY_SIGNAL)
+        {
+            // Terminal on entry: counted as trivially satisfied.
+            slots[i].ignored = false;
+            slots[i].still_waiting = false;
+            continue;
+        }
+
+        if (p->status != JSL_SUBPROCESS_STATUS_RUNNING)
+            continue;
+
+        slots[i].ignored = false;
+        slots[i].still_waiting = true;
+        waiting_count++;
+    }
+
+    JSLSubProcessResultEnum final_result = JSL_SUBPROCESS_SUCCESS;
+    bool any_io_failed = false;
+
+    if (waiting_count == 0)
+    {
+        if (slots_on_heap)
+            free(slots);
+        return JSL_SUBPROCESS_SUCCESS;
+    }
+
+#if JSL_IS_POSIX
+
+    int32_t sigpipe_errno = 0;
+    if (!jsl__sigchld_ensure_installed(&sigpipe_errno))
+    {
+        if (out_errno != NULL)
+            *out_errno = sigpipe_errno;
+        if (slots_on_heap)
+            free(slots);
+        return JSL_SUBPROCESS_WAIT_FAILED;
+    }
+
+    // Pre-reap: a SIGCHLD may have already been delivered and the
+    // self-pipe byte has been consumed by a previous wait. Do a single
+    // non-blocking waitpid sweep so we start from a correct view.
+    for (int32_t i = 0; i < count; i++)
+    {
+        if (!slots[i].still_waiting)
+            continue;
+        if (jsl__subprocess_posix_reap_nohang(&procs[i]))
+        {
+            slots[i].still_waiting = false;
+            waiting_count--;
+        }
+    }
+
+    // Opportunistic first drain: if a child already printed something
+    // before we got here, flush it so the caller's sinks are accurate
+    // even if every proc was already terminal.
+    for (int32_t i = 0; i < count; i++)
+    {
+        if (slots[i].ignored)
+            continue;
+        JSLSubprocess* p = &procs[i];
+        int32_t pump_errno = 0;
+        JSLSubProcessResultEnum pr = jsl__subprocess_posix_pump_output_once(p, &pump_errno);
+        if (pr == JSL_SUBPROCESS_IO_FAILED)
+        {
+            p->last_errno = pump_errno;
+            slots[i].io_failed = true;
+            any_io_failed = true;
+        }
+    }
+
+    bool infinite = (timeout_ms < 0);
+    int64_t deadline = infinite ? 0 : jsl__monotonic_ms() + (int64_t) timeout_ms;
+    int64_t max_fds = 3 * (int64_t) count + 1;
+    struct pollfd* pfds = (struct pollfd*) malloc((size_t) max_fds * sizeof(struct pollfd));
+    // Stash per-proc fd indices so we don't re-scan the array after
+    // ppoll returns.
+    int* stdin_idx = (int*) malloc((size_t) count * sizeof(int));
+    int* stdout_idx = (int*) malloc((size_t) count * sizeof(int));
+    int* stderr_idx = (int*) malloc((size_t) count * sizeof(int));
+    if (pfds == NULL || stdin_idx == NULL || stdout_idx == NULL || stderr_idx == NULL)
+    {
+        free(pfds);
+        free(stdin_idx);
+        free(stdout_idx);
+        free(stderr_idx);
+        if (slots_on_heap)
+            free(slots);
+        return JSL_SUBPROCESS_ALLOCATION_FAILED;
+    }
+
+    // Ignore SIGPIPE for the duration of the wait so a child closing its
+    // stdin early surfaces as EPIPE instead of killing us.
+    void (*prev_sigpipe)(int) = signal(SIGPIPE, SIG_IGN);
+
+    while (waiting_count > 0)
+    {
+        int nfds = 0;
+        for (int32_t i = 0; i < count; i++)
+        {
+            stdin_idx[i] = -1;
+            stdout_idx[i] = -1;
+            stderr_idx[i] = -1;
+
+            if (!slots[i].still_waiting || slots[i].io_failed)
+                continue;
+
+            JSLSubprocess* p = &procs[i];
+            if (p->stdin_kind == JSL_SUBPROCESS_STDIN_MEMORY
+                && p->stdin_write_fd != -1)
+            {
+                pfds[nfds].fd = p->stdin_write_fd;
+                pfds[nfds].events = POLLOUT;
+                pfds[nfds].revents = 0;
+                stdin_idx[i] = nfds;
+                nfds++;
+            }
+            if (p->stdout_kind == JSL_SUBPROCESS_OUTPUT_SINK
+                && p->stdout_read_fd != -1
+                && !p->stdout_eof_seen)
+            {
+                pfds[nfds].fd = p->stdout_read_fd;
+                pfds[nfds].events = POLLIN;
+                pfds[nfds].revents = 0;
+                stdout_idx[i] = nfds;
+                nfds++;
+            }
+            if (p->stderr_kind == JSL_SUBPROCESS_OUTPUT_SINK
+                && p->stderr_read_fd != -1
+                && !p->stderr_eof_seen)
+            {
+                pfds[nfds].fd = p->stderr_read_fd;
+                pfds[nfds].events = POLLIN;
+                pfds[nfds].revents = 0;
+                stderr_idx[i] = nfds;
+                nfds++;
+            }
+        }
+
+        int self_pipe_idx = nfds;
+        pfds[nfds].fd = jsl__sigchld_pipe[0];
+        pfds[nfds].events = POLLIN;
+        pfds[nfds].revents = 0;
+        nfds++;
+
+        int wait_ms;
+        if (infinite)
+            wait_ms = -1;
+        else
+        {
+            int64_t remaining = deadline - jsl__monotonic_ms();
+            if (remaining <= 0)
+                wait_ms = 0;
+            else if (remaining > (int64_t) INT_MAX)
+                wait_ms = INT_MAX;
+            else
+                wait_ms = (int) remaining;
+        }
+
+        int pret = poll(pfds, (nfds_t) nfds, wait_ms);
+
+        if (pret == -1)
+        {
+            if (errno == EINTR)
+                continue;
+            int32_t saved = errno;
+            if (out_errno != NULL)
+                *out_errno = saved;
+            signal(SIGPIPE, prev_sigpipe);
+            free(pfds);
+            free(stdin_idx);
+            free(stdout_idx);
+            free(stderr_idx);
+            if (slots_on_heap)
+                free(slots);
+            return JSL_SUBPROCESS_WAIT_FAILED;
+        }
+
+        bool sigchld_woke = (pret > 0
+            && self_pipe_idx >= 0
+            && (pfds[self_pipe_idx].revents & POLLIN) != 0);
+
+        if (sigchld_woke)
+            jsl__sigchld_drain();
+
+        // Pump ready pipes. Every wake gets a full sweep rather than
+        // only the fds that signalled, because a child that printed
+        // while ppoll was unblocked by SIGCHLD still has readable data.
+        for (int32_t i = 0; i < count; i++)
+        {
+            if (!slots[i].still_waiting || slots[i].io_failed)
+                continue;
+
+            JSLSubprocess* p = &procs[i];
+
+            if (stdin_idx[i] != -1
+                && (pfds[stdin_idx[i]].revents & (POLLOUT | POLLERR | POLLHUP)) != 0)
+            {
+                int32_t e = 0;
+                (void) jsl__subprocess_posix_pump_stdin_once(p, &e);
+                if (e != 0)
+                    p->last_errno = e;
+            }
+
+            if (p->stdout_kind == JSL_SUBPROCESS_OUTPUT_SINK
+                || p->stderr_kind == JSL_SUBPROCESS_OUTPUT_SINK)
+            {
+                int32_t e = 0;
+                JSLSubProcessResultEnum pr = jsl__subprocess_posix_pump_output_once(p, &e);
+                if (pr == JSL_SUBPROCESS_IO_FAILED)
+                {
+                    p->last_errno = e;
+                    slots[i].io_failed = true;
+                    any_io_failed = true;
+                    slots[i].still_waiting = false;
+                    waiting_count--;
+                }
+                else if (e != 0)
+                {
+                    p->last_errno = e;
+                }
+            }
+        }
+
+        // SIGCHLD wake or opportunistic reap: try non-blocking waitpid
+        // for every still-running proc. Also reap on non-sigchld wakes
+        // because EOF on a pipe often precedes our signal.
+        for (int32_t i = 0; i < count; i++)
+        {
+            if (!slots[i].still_waiting)
+                continue;
+            if (jsl__subprocess_posix_reap_nohang(&procs[i]))
+            {
+                slots[i].still_waiting = false;
+                waiting_count--;
+                // One last drain so anything buffered on a now-closed
+                // pipe makes it to the caller's sink.
+                int32_t e = 0;
+                (void) jsl__subprocess_posix_pump_output_once(&procs[i], &e);
+                if (e != 0)
+                    procs[i].last_errno = e;
+            }
+        }
+
+        if (waiting_count == 0)
+            break;
+
+        if (!infinite && jsl__monotonic_ms() >= deadline)
+        {
+            final_result = JSL_SUBPROCESS_TIMEOUT_REACHED;
+            break;
+        }
+
+        // `timeout_ms == 0` single-shot semantics: one cycle then
+        // return. If every remaining proc is still running we report
+        // TIMEOUT_REACHED so the caller can distinguish that from
+        // "everything finished in one ppoll tick".
+        if (!infinite && timeout_ms == 0 && waiting_count > 0)
+        {
+            final_result = JSL_SUBPROCESS_TIMEOUT_REACHED;
+            break;
+        }
+    }
+
+    signal(SIGPIPE, prev_sigpipe);
+    free(pfds);
+    free(stdin_idx);
+    free(stdout_idx);
+    free(stderr_idx);
+
+#elif JSL_IS_WINDOWS
+
+    // Windows wait strategy: short-poll with `WaitForMultipleObjectsEx`
+    // over process handles (up to 64 per call), pumping each proc's
+    // stdin / stdout / stderr between waits. This does not use the
+    // plan's overlapped-pipes approach; the pipe pump uses the
+    // existing anonymous-pipe `PeekNamedPipe` path. It satisfies the
+    // functional contract at the cost of a small (10ms) timer floor
+    // per batching round when procs are idle.
+    const DWORD rotation_slice_ms = 10;
+    const int32_t max_procs_per_batch = 60;
+
+    int64_t ms_deadline = 0;
+    bool infinite = (timeout_ms < 0);
+    if (!infinite)
+        ms_deadline = jsl__monotonic_ms() + (int64_t) timeout_ms;
+
+    HANDLE handles[64];
+    int32_t handle_to_slot[64];
+
+    while (waiting_count > 0)
+    {
+        // Pump every still-waiting proc (stdin + stdout/stderr).
+        for (int32_t i = 0; i < count; i++)
+        {
+            if (!slots[i].still_waiting || slots[i].io_failed)
+                continue;
+            JSLSubprocess* p = &procs[i];
+
+            int32_t e = 0;
+            (void) jsl__subprocess_win_pump_stdin_once(p, &e);
+            if (e != 0) p->last_errno = e;
+
+            e = 0;
+            JSLSubProcessResultEnum pr = jsl__subprocess_win_pump_output_once(p, &e);
+            if (pr == JSL_SUBPROCESS_IO_FAILED)
+            {
+                p->last_errno = e;
+                slots[i].io_failed = true;
+                any_io_failed = true;
+                slots[i].still_waiting = false;
+                waiting_count--;
+            }
+            else if (e != 0)
+            {
+                p->last_errno = e;
+            }
+        }
+
+        if (waiting_count == 0)
+            break;
+
+        // Build one batch of up to `max_procs_per_batch` handles to
+        // wait on.
+        DWORD batch_count = 0;
+        int32_t scanned = 0;
+        for (int32_t i = 0; i < count && batch_count < (DWORD) max_procs_per_batch; i++)
+        {
+            if (!slots[i].still_waiting) continue;
+            if (procs[i].process_handle == NULL
+                || procs[i].process_handle == INVALID_HANDLE_VALUE)
+                continue;
+            handles[batch_count] = procs[i].process_handle;
+            handle_to_slot[batch_count] = i;
+            batch_count++;
+            scanned++;
+        }
+
+        if (batch_count == 0)
+            break;
+
+        DWORD per_round_timeout;
+        if (infinite)
+            per_round_timeout = rotation_slice_ms;
+        else
+        {
+            int64_t remaining = ms_deadline - jsl__monotonic_ms();
+            if (remaining <= 0)
+            {
+                final_result = JSL_SUBPROCESS_TIMEOUT_REACHED;
+                break;
+            }
+            if (remaining > (int64_t) rotation_slice_ms)
+                per_round_timeout = rotation_slice_ms;
+            else
+                per_round_timeout = (DWORD) remaining;
+        }
+
+        DWORD wret = WaitForMultipleObjectsEx(
+            batch_count, handles, FALSE, per_round_timeout, FALSE
+        );
+
+        if (wret == WAIT_FAILED)
+        {
+            DWORD err = GetLastError();
+            if (out_errno != NULL)
+                *out_errno = (int32_t) err;
+            if (slots_on_heap)
+                free(slots);
+            return JSL_SUBPROCESS_WAIT_FAILED;
+        }
+
+        if (wret >= WAIT_OBJECT_0 && wret < WAIT_OBJECT_0 + batch_count)
+        {
+            int32_t idx = handle_to_slot[wret - WAIT_OBJECT_0];
+            JSLSubprocess* p = &procs[idx];
+            DWORD code = 0;
+            if (GetExitCodeProcess(p->process_handle, &code))
+            {
+                p->exit_code = (int32_t) code;
+                p->status = JSL_SUBPROCESS_STATUS_EXITED;
+            }
+            else
+            {
+                p->exit_code = -1;
+                p->status = JSL_SUBPROCESS_STATUS_EXITED;
+            }
+            // One last drain for this proc.
+            int32_t e = 0;
+            (void) jsl__subprocess_win_pump_output_once(p, &e);
+            if (e != 0) p->last_errno = e;
+            slots[idx].still_waiting = false;
+            waiting_count--;
+        }
+        // WAIT_TIMEOUT just means "no activity this slice" — keep
+        // rotating. Other WAIT_ABANDONED* codes are not produced for
+        // process handles.
+
+        if (!infinite && jsl__monotonic_ms() >= ms_deadline)
+        {
+            if (waiting_count > 0)
+                final_result = JSL_SUBPROCESS_TIMEOUT_REACHED;
+            break;
+        }
+
+        if (!infinite && timeout_ms == 0 && waiting_count > 0)
+        {
+            final_result = JSL_SUBPROCESS_TIMEOUT_REACHED;
+            break;
+        }
+    }
+
+#else
+    #error "Unsupported platform"
+#endif
+
+    if (slots_on_heap)
+        free(slots);
+
+    if (final_result == JSL_SUBPROCESS_SUCCESS && any_io_failed)
+        final_result = JSL_SUBPROCESS_IO_FAILED;
+
+    return final_result;
 }
 
 void jsl_subprocess_cleanup(JSLSubprocess* proc)

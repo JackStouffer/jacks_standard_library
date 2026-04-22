@@ -29,6 +29,12 @@
     #define _XOPEN_SOURCE 700
 #endif
 
+// <signal.h> on macOS references NSIG in public extern declarations,
+// which is only exposed when _DARWIN_C_SOURCE is defined.
+#if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
+    #define _DARWIN_C_SOURCE 1
+#endif
+
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>

@@ -30,5 +30,12 @@ void test_jsl_subprocess_background_stderr_sink(void);
 void test_jsl_subprocess_background_stdin_memory(void);
 void test_jsl_subprocess_background_env_var(void);
 void test_jsl_subprocess_background_kill(void);
+void test_jsl_subprocess_background_wait_bad_parameters(void);
+void test_jsl_subprocess_background_wait_all_ignored(void);
+void test_jsl_subprocess_background_wait_pre_exited(void);
+void test_jsl_subprocess_background_wait_many_healthy(void);
+void test_jsl_subprocess_background_wait_timeout(void);
+void test_jsl_subprocess_background_wait_heavy_stdout(void);
+void test_jsl_subprocess_background_wait_single_stdin_memory(void);
 
 #endif

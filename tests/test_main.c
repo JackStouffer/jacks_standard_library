@@ -467,6 +467,13 @@ int main(void)
     RUN_TEST_FUNCTION("Test jsl_subprocess background stdin memory", test_jsl_subprocess_background_stdin_memory);
     RUN_TEST_FUNCTION("Test jsl_subprocess background env var", test_jsl_subprocess_background_env_var);
     RUN_TEST_FUNCTION("Test jsl_subprocess background kill", test_jsl_subprocess_background_kill);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_background_wait bad parameters", test_jsl_subprocess_background_wait_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_background_wait all ignored", test_jsl_subprocess_background_wait_all_ignored);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_background_wait pre-exited", test_jsl_subprocess_background_wait_pre_exited);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_background_wait many healthy", test_jsl_subprocess_background_wait_many_healthy);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_background_wait timeout", test_jsl_subprocess_background_wait_timeout);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_background_wait heavy stdout", test_jsl_subprocess_background_wait_heavy_stdout);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_background_wait single stdin", test_jsl_subprocess_background_wait_single_stdin_memory);
 
     TEST_RESULTS();
     return lfails != 0;

@@ -761,11 +761,11 @@ typedef struct JSLSubProcessEnvVar
 * `NOT_STARTED` is the state immediately after `jsl_subprocess_create`.
 * `RUNNING` is set while `jsl_subprocess_run_blocking` is executing the
 * child. `EXITED` means the child ran to completion and returned an exit
-* code (available via the `out_exit_code` parameter of the run function).
-* `KILLED_BY_SIGNAL` means the child was terminated by a signal on POSIX.
-* `FAILED_TO_START` means the run function could not launch the child
-* (pipe/fork/CreateProcess/allocation failure); in that case no exit code
-* is meaningful.
+* code (available via `proc->exit_code`). `KILLED_BY_SIGNAL` means the
+* child was terminated by a signal on POSIX and `proc->exit_code` holds
+* the negated signal number. `FAILED_TO_START` means the run function
+* could not launch the child (pipe/fork/CreateProcess/allocation
+* failure); in that case no exit code is meaningful.
 */
 typedef enum
 {
@@ -797,6 +797,17 @@ typedef struct JSLSubprocess
     JSLAllocatorInterface allocator;
 
     JSLSubProcessStatusEnum status;
+
+    // Exit code of the child process. Only meaningful once `status` is
+    // `EXITED` (exit code) or `KILLED_BY_SIGNAL` (negated signal number on
+    // POSIX). Populated by any API that observes the child's termination:
+    // `jsl_subprocess_run_blocking`, `jsl_subprocess_background_poll`,
+    // and `jsl_subprocess_background_wait`.
+    int32_t exit_code;
+
+    // Last OS errno observed on any pump/wait operation affecting this
+    // proc. Zero if none. Written by `jsl_subprocess_background_*`.
+    int32_t last_errno;
 
     JSLImmutableMemory executable;
 
@@ -939,8 +950,6 @@ JSLSubProcessArgResultEnum jsl__subprocess_args_cstr_va(
 
 /**
 * Append one or more command-line arguments given as C-string literals.
-* Works on all supported compilers (including MSVC) because it does not
-* rely on compound literals.
 *
 * ```c
 * jsl_subprocess_arg_cstr(&proc, "-o", "output.txt");
@@ -1106,6 +1115,7 @@ typedef enum
     JSL_SUBPROCESS_IO_FAILED,
     JSL_SUBPROCESS_WAIT_FAILED,
     JSL_SUBPROCESS_KILLED_BY_SIGNAL,
+    JSL_SUBPROCESS_TIMEOUT_REACHED,
 
     JSL_SUBPROCESS_ENUM_COUNT
 } JSLSubProcessResultEnum;
@@ -1115,9 +1125,9 @@ typedef enum
 * environment, working directory, and I/O redirections, and block until it
 * terminates.
 *
-* On success `*out_exit_code` receives the child's exit code. On POSIX, if
+* On success `proc->exit_code` receives the child's exit code. On POSIX, if
 * the child was terminated by a signal, `JSL_SUBPROCESS_KILLED_BY_SIGNAL`
-* is returned and `*out_exit_code` receives the signal number as a negative
+* is returned and `proc->exit_code` receives the signal number as a negative
 * value (e.g. `-SIGTERM`). On any failure that prevents the child from being
 * launched, `out_errno` (if non-null) receives the system `errno` captured
 * at the failure site, and the subprocess status is set to
@@ -1127,14 +1137,35 @@ typedef enum
 * not `JSL_SUBPROCESS_STATUS_NOT_STARTED` returns
 * `JSL_SUBPROCESS_ALREADY_STARTED`.
 *
+* Example — feed stdin, capture stdout/stderr:
+*
+* ```c
+* JSLStringBuilder stdout_sb, stderr_sb;
+* jsl_string_builder_init(&stdout_sb, out_alloc, 4096);
+* jsl_string_builder_init(&stderr_sb, err_alloc, 4096);
+*
+* JSLSubprocess proc = {0};
+* jsl_subprocess_create(&proc, alloc, jsl_cstr_to_memory("my-tool"));
+* jsl_subprocess_set_stdin_memory(&proc, jsl_cstr_to_memory("input data\n"));
+* jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&stdout_sb));
+* jsl_subprocess_set_stderr_sink(&proc, jsl_string_builder_output_sink(&stderr_sb));
+*
+* jsl_subprocess_run_blocking(&proc, NULL);
+*
+* JSLImmutableMemory out = jsl_string_builder_get_string(&stdout_sb);
+* JSLImmutableMemory err = jsl_string_builder_get_string(&stderr_sb);
+*
+* // use out, err, proc.exit_code ...
+*
+* jsl_subprocess_cleanup(&proc);
+* ```
+*
 * @param proc          Pointer to a configured subprocess handle
-* @param out_exit_code Pointer that receives the child's exit code, must not be null
 * @param out_errno     Optional pointer that receives the system errno on failure
 * @returns A result enum describing the outcome
 */
 JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_run_blocking(
     JSLSubprocess* proc,
-    int32_t* out_exit_code,
     int32_t* out_errno
 );
 
@@ -1150,6 +1181,41 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_run_blocking(
 * A subprocess may only be started once. Passing a handle whose status is
 * not `JSL_SUBPROCESS_STATUS_NOT_STARTED` returns
 * `JSL_SUBPROCESS_ALREADY_STARTED`.
+*
+* Example — feed stdin, capture stdout/stderr, poll with a 20 ms timeout:
+*
+* ```c
+* JSLStringBuilder stdout_sb, stderr_sb;
+* jsl_string_builder_init(&stdout_sb, out_alloc, 4096);
+* jsl_string_builder_init(&stderr_sb, err_alloc, 4096);
+*
+* JSLSubprocess proc;
+* jsl_subprocess_create(&proc, alloc, jsl_cstr_to_memory("my-tool"));
+* jsl_subprocess_set_stdin_memory(&proc, jsl_cstr_to_memory("input data\n"));
+* jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&stdout_sb));
+* jsl_subprocess_set_stderr_sink(&proc, jsl_string_builder_output_sink(&stderr_sb));
+*
+* jsl_subprocess_background_start(&proc, NULL);
+*
+* JSLSubProcessStatusEnum status = JSL_SUBPROCESS_STATUS_RUNNING;
+* int32_t exit_code = -1;
+* bool running = true;
+* while (running)
+* {
+*     jsl_subprocess_background_send_stdin(&proc, NULL);
+*     jsl_subprocess_background_receive_output(&proc, NULL);
+*     jsl_subprocess_background_poll(&proc, 20, &status, &exit_code, NULL);
+*     running = status == JSL_SUBPROCESS_STATUS_RUNNING;
+* }
+* // Final drain: scoop up any output buffered after the child exited.
+* jsl_subprocess_background_receive_output(&proc, NULL);
+*
+* JSLImmutableMemory out = jsl_string_builder_get_string(&stdout_sb);
+* JSLImmutableMemory err = jsl_string_builder_get_string(&stderr_sb);
+* // use out, err, exit_code ...
+*
+* jsl_subprocess_cleanup(&proc);
+* ```
 */
 JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_start(
     JSLSubprocess* proc,
@@ -1223,6 +1289,61 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_receiv
 */
 JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_kill(
     JSLSubprocess* proc,
+    int32_t* out_errno
+);
+
+/**
+* Block the calling thread until every valid running background
+* subprocess in `procs[0 .. count-1]` has terminated, the optional
+* timeout elapses, or a fatal wait error occurs. While waiting, this
+* function continuously pumps each proc's stdin and drains stdout/
+* stderr into their configured sinks, so callers do not need to spin
+* their own loop.
+*
+* A proc is *ignored* (not counted toward completion, not touched) if
+* any of:
+*   - its sentinel check fails (uninitialized / already cleaned up),
+*   - it is not a background proc (`is_background == false`),
+*   - its status is not `RUNNING` AND not already terminal.
+*
+* Procs already in `EXITED` / `KILLED_BY_SIGNAL` are considered
+* trivially satisfied and skipped silently. If every proc is ignored
+* the function returns `SUCCESS` immediately.
+*
+* On return:
+*   - SUCCESS: every valid proc reached a terminal status; inspect
+*     `procs[i].status` and `procs[i].exit_code` per proc.
+*   - TIMEOUT_REACHED: at least one valid proc was still RUNNING when
+*     the timeout expired; those procs are left running and the caller
+*     is responsible for killing or continuing to wait.
+*   - IO_FAILED: at least one proc's stdin/stdout/stderr pump errored
+*     during the loop; the errored proc(s) have `last_errno` set and
+*     are removed from the wait set (but the loop continues for the
+*     others). Inspect each proc to find which.
+*   - WAIT_FAILED: the platform wait primitive itself failed. `*out_errno`
+*     carries the OS error; per-proc state is indeterminate.
+*   - BAD_PARAMETERS: `procs == NULL` or `count <= 0`.
+*
+* `timeout_ms`:
+*   -  0: poll once and return (essentially non-blocking).
+*   - >0: wait up to that many milliseconds.
+*   - <0: wait forever.
+*
+* `out_errno` may be NULL. It only receives top-level wait-primitive
+* errnos; per-proc pump errnos land on `procs[i].last_errno`.
+*
+* There is no caller-visible cap on `count`. On Windows the
+* implementation batches internally into groups of at most 16 procs at
+* a time to stay under the `WaitForMultipleObjects` 64-handle ceiling;
+* callers do not observe group boundaries.
+*
+* The caller remains responsible for calling `jsl_subprocess_cleanup`
+* on each proc after this function returns.
+*/
+JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_wait(
+    JSLSubprocess* procs,
+    int32_t count,
+    int32_t timeout_ms,
     int32_t* out_errno
 );
 

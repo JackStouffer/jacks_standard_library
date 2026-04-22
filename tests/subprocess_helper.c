@@ -12,6 +12,8 @@
  *   helper cat               -> copy stdin to stdout until EOF
  *   helper stderr OUT ERR    -> write OUT to stdout, ERR to stderr, exit 0
  *   helper cwd               -> write current working directory to stdout
+ *   helper sleep MS          -> sleep MS milliseconds then exit 0
+ *   helper spew N            -> write "x" to stdout N times then exit 0
  */
 
 #define _CRT_SECURE_NO_WARNINGS
@@ -24,10 +26,20 @@
     #include <direct.h>
     #include <io.h>
     #include <fcntl.h>
+    #include <windows.h>
     #define HELPER_GETCWD _getcwd
+    static void helper_sleep_ms(int ms) { Sleep((DWORD) ms); }
 #else
     #include <unistd.h>
+    #include <time.h>
     #define HELPER_GETCWD getcwd
+    static void helper_sleep_ms(int ms)
+    {
+        struct timespec ts;
+        ts.tv_sec  = ms / 1000;
+        ts.tv_nsec = ((long) ms % 1000L) * 1000000L;
+        nanosleep(&ts, NULL);
+    }
 #endif
 
 int main(int argc, char** argv)
@@ -98,6 +110,19 @@ int main(int argc, char** argv)
         if (HELPER_GETCWD(buffer, sizeof(buffer)) == NULL)
             return 4;
         fputs(buffer, stdout);
+    }
+    else if (strcmp(command, "sleep") == 0)
+    {
+        int ms = (argc >= 3) ? atoi(argv[2]) : 0;
+        if (ms < 0) ms = 0;
+        helper_sleep_ms(ms);
+    }
+    else if (strcmp(command, "spew") == 0)
+    {
+        int n = (argc >= 3) ? atoi(argv[2]) : 0;
+        if (n < 0) n = 0;
+        for (int i = 0; i < n; ++i)
+            fputc('x', stdout);
     }
     else
     {
