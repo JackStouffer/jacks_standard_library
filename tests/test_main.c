@@ -460,6 +460,13 @@ int main(void)
     RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking stdin memory", test_jsl_subprocess_run_blocking_stdin_memory);
     RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking env var", test_jsl_subprocess_run_blocking_env_var);
     RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking working directory", test_jsl_subprocess_run_blocking_working_directory);
+    RUN_TEST_FUNCTION("Test jsl_subprocess background bad parameters", test_jsl_subprocess_background_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_subprocess background already started", test_jsl_subprocess_background_already_started);
+    RUN_TEST_FUNCTION("Test jsl_subprocess background stdout sink", test_jsl_subprocess_background_stdout_sink);
+    RUN_TEST_FUNCTION("Test jsl_subprocess background stderr sink", test_jsl_subprocess_background_stderr_sink);
+    RUN_TEST_FUNCTION("Test jsl_subprocess background stdin memory", test_jsl_subprocess_background_stdin_memory);
+    RUN_TEST_FUNCTION("Test jsl_subprocess background env var", test_jsl_subprocess_background_env_var);
+    RUN_TEST_FUNCTION("Test jsl_subprocess background kill", test_jsl_subprocess_background_kill);
 
     TEST_RESULTS();
     return lfails != 0;

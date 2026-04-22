@@ -55,6 +55,7 @@
     #include <signal.h>
     #include <spawn.h>
     #include <string.h>
+    #include <time.h>
 
 // `environ` is a POSIX global. `<unistd.h>` only declares it when the
 // program's feature-test macros ask for it, so declare it ourselves to
@@ -2456,6 +2457,22 @@ JSLSubProcessCreateResultEnum jsl_subprocess_create(
     proc->stderr_sink.write_fp = NULL;
     proc->stderr_sink.user_data = NULL;
 
+    proc->is_background = false;
+    proc->stdin_write_offset = 0;
+    proc->stdout_eof_seen = false;
+    proc->stderr_eof_seen = false;
+#if JSL_IS_WINDOWS
+    proc->process_handle = INVALID_HANDLE_VALUE;
+    proc->stdin_write_handle = INVALID_HANDLE_VALUE;
+    proc->stdout_read_handle = INVALID_HANDLE_VALUE;
+    proc->stderr_read_handle = INVALID_HANDLE_VALUE;
+#elif JSL_IS_POSIX
+    proc->pid = 0;
+    proc->stdin_write_fd = -1;
+    proc->stdout_read_fd = -1;
+    proc->stderr_read_fd = -1;
+#endif
+
     return JSL_SUBPROCESS_CREATE_SUCCESS;
 }
 
@@ -3039,7 +3056,7 @@ static bool jsl__subprocess_posix_create_pipes(
 // fully populated as far as it got and the caller is responsible for
 // calling `jsl__subprocess_posix_free_launch` to release partial
 // allocations.
-static JSLSubProcessRunResultEnum jsl__subprocess_posix_prepare(
+static JSLSubProcessResultEnum jsl__subprocess_posix_prepare(
     JSLSubprocess* proc,
     JSL__SubProcessPosixLaunch* ctx,
     int32_t* out_errno
@@ -3047,27 +3064,27 @@ static JSLSubProcessRunResultEnum jsl__subprocess_posix_prepare(
 {
     jsl__subprocess_posix_launch_zero(ctx);
 
-    JSLSubProcessRunResultEnum result = JSL_SUBPROCESS_RUN_SUCCESS;
+    JSLSubProcessResultEnum result = JSL_SUBPROCESS_SUCCESS;
 
     if (!jsl__subprocess_posix_build_argv(proc, ctx))
-        result = JSL_SUBPROCESS_RUN_ALLOCATION_FAILED;
+        result = JSL_SUBPROCESS_ALLOCATION_FAILED;
 
-    if (result == JSL_SUBPROCESS_RUN_SUCCESS
+    if (result == JSL_SUBPROCESS_SUCCESS
         && !jsl__subprocess_posix_build_envp(proc, ctx))
-        result = JSL_SUBPROCESS_RUN_ALLOCATION_FAILED;
+        result = JSL_SUBPROCESS_ALLOCATION_FAILED;
 
-    if (result == JSL_SUBPROCESS_RUN_SUCCESS
+    if (result == JSL_SUBPROCESS_SUCCESS
         && !jsl__subprocess_posix_build_cwd(proc, ctx))
-        result = JSL_SUBPROCESS_RUN_ALLOCATION_FAILED;
+        result = JSL_SUBPROCESS_ALLOCATION_FAILED;
 
-    if (result == JSL_SUBPROCESS_RUN_SUCCESS
+    if (result == JSL_SUBPROCESS_SUCCESS
         && !jsl__subprocess_posix_create_pipes(proc, ctx))
     {
         int32_t saved = errno;
         if (out_errno != NULL)
             *out_errno = saved;
         jsl__subprocess_posix_close_all_pipes(ctx);
-        result = JSL_SUBPROCESS_RUN_PIPE_FAILED;
+        result = JSL_SUBPROCESS_PIPE_FAILED;
     }
 
     return result;
@@ -3078,7 +3095,7 @@ static JSLSubProcessRunResultEnum jsl__subprocess_posix_prepare(
 // `jsl__subprocess_posix_close_child_pipe_ends`) and is responsible for
 // the pid. On failure every pipe is closed and the ctx no longer owns
 // any fds.
-static JSLSubProcessRunResultEnum jsl__subprocess_posix_spawn(
+static JSLSubProcessResultEnum jsl__subprocess_posix_spawn(
     JSLSubprocess* proc,
     JSL__SubProcessPosixLaunch* ctx,
     pid_t* out_pid,
@@ -3092,7 +3109,7 @@ static JSLSubProcessRunResultEnum jsl__subprocess_posix_spawn(
         if (out_errno != NULL)
             *out_errno = err;
         jsl__subprocess_posix_close_all_pipes(ctx);
-        return JSL_SUBPROCESS_RUN_ALLOCATION_FAILED;
+        return JSL_SUBPROCESS_ALLOCATION_FAILED;
     }
 
     // Stdin
@@ -3162,11 +3179,11 @@ static JSLSubProcessRunResultEnum jsl__subprocess_posix_spawn(
         if (out_errno != NULL)
             *out_errno = err;
         jsl__subprocess_posix_close_all_pipes(ctx);
-        return JSL_SUBPROCESS_RUN_SPAWN_FAILED;
+        return JSL_SUBPROCESS_SPAWN_FAILED;
     }
 
     *out_pid = pid;
-    return JSL_SUBPROCESS_RUN_SUCCESS;
+    return JSL_SUBPROCESS_SUCCESS;
 }
 
 // Blocking poll() loop that feeds MEMORY stdin and drains SINK
@@ -3327,10 +3344,10 @@ static bool jsl__subprocess_posix_pump_io(
 }
 
 // Blocking waitpid that retries on EINTR. Translates the wait status
-// into a `JSLSubProcessRunResultEnum` and a `JSLSubProcessStatusEnum`,
+// into a `JSLSubProcessResultEnum` and a `JSLSubProcessStatusEnum`,
 // and writes the child's exit code (or negated signal number) into
 // *out_exit_code.
-static JSLSubProcessRunResultEnum jsl__subprocess_posix_wait(
+static JSLSubProcessResultEnum jsl__subprocess_posix_wait(
     pid_t pid,
     JSLSubProcessStatusEnum* out_status,
     int32_t* out_exit_code,
@@ -3348,26 +3365,259 @@ static JSLSubProcessRunResultEnum jsl__subprocess_posix_wait(
         if (out_errno != NULL)
             *out_errno = errno;
         *out_status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
-        return JSL_SUBPROCESS_RUN_WAIT_FAILED;
+        return JSL_SUBPROCESS_WAIT_FAILED;
     }
 
     if (WIFEXITED(wait_status))
     {
         *out_exit_code = (int32_t) WEXITSTATUS(wait_status);
         *out_status = JSL_SUBPROCESS_STATUS_EXITED;
-        return JSL_SUBPROCESS_RUN_SUCCESS;
+        return JSL_SUBPROCESS_SUCCESS;
     }
 
     if (WIFSIGNALED(wait_status))
     {
         *out_exit_code = -(int32_t) WTERMSIG(wait_status);
         *out_status = JSL_SUBPROCESS_STATUS_KILLED_BY_SIGNAL;
-        return JSL_SUBPROCESS_RUN_KILLED_BY_SIGNAL;
+        return JSL_SUBPROCESS_KILLED_BY_SIGNAL;
     }
 
     *out_exit_code = -1;
     *out_status = JSL_SUBPROCESS_STATUS_EXITED;
-    return JSL_SUBPROCESS_RUN_SUCCESS;
+    return JSL_SUBPROCESS_SUCCESS;
+}
+
+// Set O_NONBLOCK on a file descriptor. Silent on failure — the caller
+// only needs best-effort non-blocking behavior here.
+static void jsl__subprocess_posix_set_nonblocking(int fd)
+{
+    if (fd != -1)
+    {
+        int flags = fcntl(fd, F_GETFL, 0);
+        if (flags != -1)
+            (void) fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+    }
+}
+
+// One non-blocking write of the next chunk of stdin_memory to the child.
+// Closes the parent-side write fd when the buffer is fully written or the
+// child has closed its read end.
+static JSLSubProcessResultEnum jsl__subprocess_posix_pump_stdin_once(
+    JSLSubprocess* proc,
+    int32_t* out_errno
+)
+{
+    if (proc->stdin_kind != JSL_SUBPROCESS_STDIN_MEMORY
+        || proc->stdin_write_fd == -1)
+        return JSL_SUBPROCESS_SUCCESS;
+
+    int64_t remaining = proc->stdin_memory.length - proc->stdin_write_offset;
+    if (remaining <= 0)
+    {
+        jsl__subprocess_close_fd(&proc->stdin_write_fd);
+        return JSL_SUBPROCESS_SUCCESS;
+    }
+
+    void (*prev_sigpipe)(int) = signal(SIGPIPE, SIG_IGN);
+
+    ssize_t w = write(
+        proc->stdin_write_fd,
+        proc->stdin_memory.data + proc->stdin_write_offset,
+        (size_t) remaining
+    );
+    int saved_errno = errno;
+
+    signal(SIGPIPE, prev_sigpipe);
+
+    bool close_pipe = false;
+    if (w > 0)
+    {
+        proc->stdin_write_offset += (int64_t) w;
+        if (proc->stdin_write_offset >= proc->stdin_memory.length)
+            close_pipe = true;
+    }
+    else if (w == -1
+        && saved_errno != EAGAIN
+        && saved_errno != EWOULDBLOCK
+        && saved_errno != EINTR)
+    {
+        // EPIPE / other write errors: child closed stdin or pipe is broken.
+        // Treat as "we're done with stdin"; not reported as an error.
+        close_pipe = true;
+    }
+
+    if (close_pipe)
+        jsl__subprocess_close_fd(&proc->stdin_write_fd);
+
+    (void) out_errno;
+    return JSL_SUBPROCESS_SUCCESS;
+}
+
+// Read once from a single read-end pipe into its sink. Closes the fd and
+// sets *eof_seen on EOF or non-retryable error. Returns IO_FAILED only on
+// non-retryable read errors.
+static JSLSubProcessResultEnum jsl__subprocess_posix_drain_one(
+    int* fd_ptr,
+    JSLOutputSink sink,
+    bool* eof_seen,
+    int32_t* out_errno
+)
+{
+    if (*fd_ptr == -1 || *eof_seen)
+        return JSL_SUBPROCESS_SUCCESS;
+
+    uint8_t io_buf[4096];
+    ssize_t r = read(*fd_ptr, io_buf, sizeof(io_buf));
+    int saved_errno = errno;
+
+    JSLSubProcessResultEnum result = JSL_SUBPROCESS_SUCCESS;
+
+    if (r > 0)
+    {
+        jsl_output_sink_write(sink, jsl_immutable_memory(io_buf, (int64_t) r));
+    }
+    else if (r == 0)
+    {
+        jsl__subprocess_close_fd(fd_ptr);
+        *eof_seen = true;
+    }
+    else if (r == -1
+        && saved_errno != EAGAIN
+        && saved_errno != EWOULDBLOCK
+        && saved_errno != EINTR)
+    {
+        if (out_errno != NULL)
+            *out_errno = saved_errno;
+        jsl__subprocess_close_fd(fd_ptr);
+        *eof_seen = true;
+        result = JSL_SUBPROCESS_IO_FAILED;
+    }
+
+    return result;
+}
+
+// One non-blocking drain pass over stdout and stderr. Reads whatever is
+// available right now in one pass per stream.
+static JSLSubProcessResultEnum jsl__subprocess_posix_pump_output_once(
+    JSLSubprocess* proc,
+    int32_t* out_errno
+)
+{
+    JSLSubProcessResultEnum result = JSL_SUBPROCESS_SUCCESS;
+
+    if (proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_SINK)
+    {
+        JSLSubProcessResultEnum r = jsl__subprocess_posix_drain_one(
+            &proc->stdout_read_fd,
+            proc->stdout_sink,
+            &proc->stdout_eof_seen,
+            out_errno
+        );
+        if (r != JSL_SUBPROCESS_SUCCESS)
+            result = r;
+    }
+
+    if (proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_SINK)
+    {
+        JSLSubProcessResultEnum r = jsl__subprocess_posix_drain_one(
+            &proc->stderr_read_fd,
+            proc->stderr_sink,
+            &proc->stderr_eof_seen,
+            result == JSL_SUBPROCESS_SUCCESS ? out_errno : NULL
+        );
+        if (r != JSL_SUBPROCESS_SUCCESS && result == JSL_SUBPROCESS_SUCCESS)
+            result = r;
+    }
+
+    return result;
+}
+
+// Non-blocking / bounded-wait status check for a background subprocess.
+// Returns SUCCESS and sets out_status to the current status. The status
+// on the struct is also updated when the child is observed to have
+// exited or been signaled.
+static JSLSubProcessResultEnum jsl__subprocess_posix_poll(
+    JSLSubprocess* proc,
+    int32_t timeout_ms,
+    JSLSubProcessStatusEnum* out_status,
+    int32_t* out_exit_code,
+    int32_t* out_errno
+)
+{
+    // Already reaped — idempotent.
+    if (proc->status == JSL_SUBPROCESS_STATUS_EXITED
+        || proc->status == JSL_SUBPROCESS_STATUS_KILLED_BY_SIGNAL)
+    {
+        *out_status = proc->status;
+        return JSL_SUBPROCESS_SUCCESS;
+    }
+
+    int wait_status = 0;
+    pid_t wret = 0;
+
+    if (timeout_ms < 0)
+    {
+        do {
+            wret = waitpid((pid_t) proc->pid, &wait_status, 0);
+        } while (wret == -1 && errno == EINTR);
+    }
+    else
+    {
+        // Non-blocking or bounded poll.
+        int64_t elapsed_ms = 0;
+        for (;;)
+        {
+            do {
+                wret = waitpid((pid_t) proc->pid, &wait_status, WNOHANG);
+            } while (wret == -1 && errno == EINTR);
+
+            if (wret != 0)
+                break;
+            if (timeout_ms == 0 || elapsed_ms >= timeout_ms)
+                break;
+
+            struct timespec ts;
+            ts.tv_sec = 0;
+            ts.tv_nsec = 1000000L; // 1 ms
+            (void) nanosleep(&ts, NULL);
+            elapsed_ms += 1;
+        }
+    }
+
+    if (wret == -1)
+    {
+        if (out_errno != NULL)
+            *out_errno = errno;
+        *out_status = proc->status;
+        return JSL_SUBPROCESS_WAIT_FAILED;
+    }
+
+    if (wret == 0)
+    {
+        // Still running.
+        *out_status = proc->status;
+        return JSL_SUBPROCESS_SUCCESS;
+    }
+
+    if (WIFEXITED(wait_status))
+    {
+        *out_exit_code = (int32_t) WEXITSTATUS(wait_status);
+        proc->status = JSL_SUBPROCESS_STATUS_EXITED;
+    }
+    else if (WIFSIGNALED(wait_status))
+    {
+        *out_exit_code = -(int32_t) WTERMSIG(wait_status);
+        proc->status = JSL_SUBPROCESS_STATUS_KILLED_BY_SIGNAL;
+    }
+    else
+    {
+        *out_exit_code = -1;
+        proc->status = JSL_SUBPROCESS_STATUS_EXITED;
+    }
+
+    proc->pid = 0;
+    *out_status = proc->status;
+    return JSL_SUBPROCESS_SUCCESS;
 }
 
 #endif
@@ -3453,230 +3703,258 @@ static char* jsl__subprocess_quote_arg_win(char* out, JSLImmutableMemory arg)
     return out;
 }
 
-#endif
+typedef struct JSL__SubProcessWindowsLaunch
+{
+    char* cmdline;
+    char* env_block;
+    char* cwd_cstr;
+    HANDLE stdin_read;
+    HANDLE stdin_write;
+    HANDLE stdout_read;
+    HANDLE stdout_write;
+    HANDLE stderr_read;
+    HANDLE stderr_write;
+} JSL__SubProcessWindowsLaunch;
 
-JSLSubProcessRunResultEnum jsl_subprocess_run_blocking(
+static void jsl__subprocess_win_launch_zero(JSL__SubProcessWindowsLaunch* ctx)
+{
+    ctx->cmdline = NULL;
+    ctx->env_block = NULL;
+    ctx->cwd_cstr = NULL;
+    ctx->stdin_read = INVALID_HANDLE_VALUE;
+    ctx->stdin_write = INVALID_HANDLE_VALUE;
+    ctx->stdout_read = INVALID_HANDLE_VALUE;
+    ctx->stdout_write = INVALID_HANDLE_VALUE;
+    ctx->stderr_read = INVALID_HANDLE_VALUE;
+    ctx->stderr_write = INVALID_HANDLE_VALUE;
+}
+
+static void jsl__subprocess_win_close_handle(HANDLE* h)
+{
+    if (*h != INVALID_HANDLE_VALUE && *h != NULL)
+    {
+        CloseHandle(*h);
+        *h = INVALID_HANDLE_VALUE;
+    }
+}
+
+static void jsl__subprocess_win_close_all_pipes(JSL__SubProcessWindowsLaunch* ctx)
+{
+    jsl__subprocess_win_close_handle(&ctx->stdin_read);
+    jsl__subprocess_win_close_handle(&ctx->stdin_write);
+    jsl__subprocess_win_close_handle(&ctx->stdout_read);
+    jsl__subprocess_win_close_handle(&ctx->stdout_write);
+    jsl__subprocess_win_close_handle(&ctx->stderr_read);
+    jsl__subprocess_win_close_handle(&ctx->stderr_write);
+}
+
+static void jsl__subprocess_win_close_child_pipe_ends(JSL__SubProcessWindowsLaunch* ctx)
+{
+    jsl__subprocess_win_close_handle(&ctx->stdin_read);
+    jsl__subprocess_win_close_handle(&ctx->stdout_write);
+    jsl__subprocess_win_close_handle(&ctx->stderr_write);
+}
+
+static void jsl__subprocess_win_free_launch(
     JSLSubprocess* proc,
-    int32_t* out_exit_code,
-    int32_t* out_errno
+    JSL__SubProcessWindowsLaunch* ctx
 )
 {
-    bool proceed = (proc != NULL
-        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL
-        && out_exit_code != NULL);
-
-    if (!proceed)
-        return JSL_SUBPROCESS_RUN_BAD_PARAMETERS;
-
-    if (proc->status != JSL_SUBPROCESS_STATUS_NOT_STARTED)
-        return JSL_SUBPROCESS_RUN_ALREADY_STARTED;
-
-    *out_exit_code = -1;
-    if (out_errno != NULL)
-        *out_errno = 0;
-
-    JSLSubProcessRunResultEnum result = JSL_SUBPROCESS_RUN_SUCCESS;
-
-#if JSL_IS_POSIX
-
-    JSL__SubProcessPosixLaunch ctx;
-    JSLSubProcessRunResultEnum prep = jsl__subprocess_posix_prepare(proc, &ctx, out_errno);
-    if (prep != JSL_SUBPROCESS_RUN_SUCCESS)
+    if (ctx->cmdline != NULL)
     {
-        jsl__subprocess_posix_free_launch(proc, &ctx);
-        proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
-        return prep;
+        (void) jsl_allocator_interface_free(proc->allocator, ctx->cmdline);
+        ctx->cmdline = NULL;
     }
-
-    pid_t pid = 0;
-    JSLSubProcessRunResultEnum spawn_result =
-        jsl__subprocess_posix_spawn(proc, &ctx, &pid, out_errno);
-
-    // argv/envp/cwd strings are no longer needed after posix_spawnp
-    // returns, regardless of success or failure.
-    jsl__subprocess_posix_free_launch(proc, &ctx);
-
-    if (spawn_result != JSL_SUBPROCESS_RUN_SUCCESS)
+    if (ctx->env_block != NULL)
     {
-        proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
-        return spawn_result;
+        (void) jsl_allocator_interface_free(proc->allocator, ctx->env_block);
+        ctx->env_block = NULL;
     }
-
-    proc->status = JSL_SUBPROCESS_STATUS_RUNNING;
-
-    // Parent keeps only its ends of any pipes that were created.
-    jsl__subprocess_posix_close_child_pipe_ends(&ctx);
-
-    int32_t io_errno = 0;
-    bool io_ok = jsl__subprocess_posix_pump_io(proc, &ctx, &io_errno);
-
-    JSLSubProcessRunResultEnum wait_result = jsl__subprocess_posix_wait(
-        pid,
-        &proc->status,
-        out_exit_code,
-        out_errno
-    );
-
-    if (wait_result != JSL_SUBPROCESS_RUN_SUCCESS
-        && wait_result != JSL_SUBPROCESS_RUN_KILLED_BY_SIGNAL)
-        result = wait_result;
-    else if (!io_ok)
+    if (ctx->cwd_cstr != NULL)
     {
-        if (out_errno != NULL)
-            *out_errno = io_errno;
-        result = JSL_SUBPROCESS_RUN_IO_FAILED;
+        (void) jsl_allocator_interface_free(proc->allocator, ctx->cwd_cstr);
+        ctx->cwd_cstr = NULL;
     }
-    else if (wait_result == JSL_SUBPROCESS_RUN_KILLED_BY_SIGNAL)
-    {
-        result = JSL_SUBPROCESS_RUN_KILLED_BY_SIGNAL;
-    }
+}
 
-    return result;
-
-#elif JSL_IS_WINDOWS
-
-    // Build command line by quoting the executable and each argument
-    // separated by spaces.
+static bool jsl__subprocess_win_build_cmdline(
+    JSLSubprocess* proc,
+    JSL__SubProcessWindowsLaunch* ctx
+)
+{
     int64_t cmdline_len = 0;
-    cmdline_len += proc->executable.length * 2 + 3; // worst case quoting
+    cmdline_len += proc->executable.length * 2 + 3;
     for (int64_t i = 0; i < proc->args_count; i++)
         cmdline_len += 1 + proc->args[i].length * 2 + 3;
-    cmdline_len += 1; // null terminator
+    cmdline_len += 1;
 
-    char* cmdline = (char*) jsl_allocator_interface_alloc(
+    ctx->cmdline = (char*) jsl_allocator_interface_alloc(
         proc->allocator,
         cmdline_len,
         JSL_DEFAULT_ALLOCATION_ALIGNMENT,
         false
     );
-    proceed = (cmdline != NULL);
+    if (ctx->cmdline == NULL)
+        return false;
 
-    char* cursor = cmdline;
-    if (proceed)
+    char* cursor = jsl__subprocess_quote_arg_win(ctx->cmdline, proc->executable);
+    for (int64_t i = 0; i < proc->args_count; i++)
     {
-        cursor = jsl__subprocess_quote_arg_win(cursor, proc->executable);
-        for (int64_t i = 0; i < proc->args_count; i++)
-        {
-            *cursor = ' ';
-            cursor++;
-            cursor = jsl__subprocess_quote_arg_win(cursor, proc->args[i]);
-        }
-        *cursor = '\0';
+        *cursor = ' ';
+        cursor++;
+        cursor = jsl__subprocess_quote_arg_win(cursor, proc->args[i]);
+    }
+    *cursor = '\0';
+    return true;
+}
+
+static bool jsl__subprocess_win_build_env_block(
+    JSLSubprocess* proc,
+    JSL__SubProcessWindowsLaunch* ctx
+)
+{
+    if (proc->env_count == 0)
+        return true;
+
+    LPCH parent_env = GetEnvironmentStringsA();
+    int64_t parent_len = 0;
+    if (parent_env != NULL)
+    {
+        while (!(parent_env[parent_len] == '\0' && parent_env[parent_len + 1] == '\0'))
+            parent_len++;
+        parent_len++;
     }
 
-    // Build environment block: "key=value\0key=value\0\0". If no custom
-    // env vars were set we pass NULL to inherit the parent's environment.
-    char* env_block = NULL;
-    if (proceed && proc->env_count > 0)
+    int64_t extra_len = 0;
+    for (int64_t i = 0; i < proc->env_count; i++)
+        extra_len += proc->env_vars[i].key.length + 1 + proc->env_vars[i].value.length + 1;
+
+    ctx->env_block = (char*) jsl_allocator_interface_alloc(
+        proc->allocator,
+        parent_len + extra_len + 1,
+        JSL_DEFAULT_ALLOCATION_ALIGNMENT,
+        false
+    );
+    bool ok = (ctx->env_block != NULL);
+
+    if (ok)
     {
-        LPCH parent_env = GetEnvironmentStringsA();
-        int64_t parent_len = 0;
+        char* p = ctx->env_block;
         if (parent_env != NULL)
         {
-            while (!(parent_env[parent_len] == '\0' && parent_env[parent_len + 1] == '\0'))
-                parent_len++;
-            parent_len++; // include the terminator of the last pair
+            JSL_MEMCPY(p, parent_env, (size_t) parent_len);
+            p += parent_len;
         }
-
-        int64_t extra_len = 0;
         for (int64_t i = 0; i < proc->env_count; i++)
-            extra_len += proc->env_vars[i].key.length + 1 + proc->env_vars[i].value.length + 1;
-
-        env_block = (char*) jsl_allocator_interface_alloc(
-            proc->allocator,
-            parent_len + extra_len + 1,
-            JSL_DEFAULT_ALLOCATION_ALIGNMENT,
-            false
-        );
-        proceed = (env_block != NULL);
-
-        if (proceed)
         {
-            char* p = env_block;
-            if (parent_env != NULL)
-            {
-                JSL_MEMCPY(p, parent_env, (size_t) parent_len);
-                p += parent_len;
-            }
-            for (int64_t i = 0; i < proc->env_count; i++)
-            {
-                JSL_MEMCPY(p, proc->env_vars[i].key.data, (size_t) proc->env_vars[i].key.length);
-                p += proc->env_vars[i].key.length;
-                *p = '=';
-                p++;
-                JSL_MEMCPY(p, proc->env_vars[i].value.data, (size_t) proc->env_vars[i].value.length);
-                p += proc->env_vars[i].value.length;
-                *p = '\0';
-                p++;
-            }
+            JSL_MEMCPY(p, proc->env_vars[i].key.data, (size_t) proc->env_vars[i].key.length);
+            p += proc->env_vars[i].key.length;
+            *p = '=';
+            p++;
+            JSL_MEMCPY(p, proc->env_vars[i].value.data, (size_t) proc->env_vars[i].value.length);
+            p += proc->env_vars[i].value.length;
             *p = '\0';
+            p++;
         }
-
-        if (parent_env != NULL)
-            FreeEnvironmentStringsA(parent_env);
+        *p = '\0';
     }
 
-    char* cwd_cstr = NULL;
-    if (proceed && proc->working_directory.data != NULL && proc->working_directory.length > 0)
-    {
-        cwd_cstr = (char*) jsl_memory_to_cstr(proc->allocator, proc->working_directory);
-        proceed = (cwd_cstr != NULL);
-    }
+    if (parent_env != NULL)
+        FreeEnvironmentStringsA(parent_env);
 
-    if (!proceed)
-    {
-        proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
-        return JSL_SUBPROCESS_RUN_ALLOCATION_FAILED;
-    }
+    return ok;
+}
 
+static bool jsl__subprocess_win_build_cwd(
+    JSLSubprocess* proc,
+    JSL__SubProcessWindowsLaunch* ctx
+)
+{
+    if (proc->working_directory.data == NULL || proc->working_directory.length == 0)
+        return true;
+
+    ctx->cwd_cstr = (char*) jsl_memory_to_cstr(proc->allocator, proc->working_directory);
+    return ctx->cwd_cstr != NULL;
+}
+
+static bool jsl__subprocess_win_create_pipes(
+    JSLSubprocess* proc,
+    JSL__SubProcessWindowsLaunch* ctx
+)
+{
     SECURITY_ATTRIBUTES sa;
     sa.nLength = (DWORD) sizeof(sa);
     sa.lpSecurityDescriptor = NULL;
     sa.bInheritHandle = TRUE;
 
-    HANDLE stdin_read = INVALID_HANDLE_VALUE;
-    HANDLE stdin_write = INVALID_HANDLE_VALUE;
-    HANDLE stdout_read = INVALID_HANDLE_VALUE;
-    HANDLE stdout_write = INVALID_HANDLE_VALUE;
-    HANDLE stderr_read = INVALID_HANDLE_VALUE;
-    HANDLE stderr_write = INVALID_HANDLE_VALUE;
-
-    bool pipes_ok = true;
-
+    bool ok = true;
     if (proc->stdin_kind == JSL_SUBPROCESS_STDIN_MEMORY)
     {
-        pipes_ok = (CreatePipe(&stdin_read, &stdin_write, &sa, 0) != 0);
-        if (pipes_ok)
-            SetHandleInformation(stdin_write, HANDLE_FLAG_INHERIT, 0);
+        ok = (CreatePipe(&ctx->stdin_read, &ctx->stdin_write, &sa, 0) != 0);
+        if (ok)
+            SetHandleInformation(ctx->stdin_write, HANDLE_FLAG_INHERIT, 0);
     }
-    if (pipes_ok && proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_SINK)
+    if (ok && proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_SINK)
     {
-        pipes_ok = (CreatePipe(&stdout_read, &stdout_write, &sa, 0) != 0);
-        if (pipes_ok)
-            SetHandleInformation(stdout_read, HANDLE_FLAG_INHERIT, 0);
+        ok = (CreatePipe(&ctx->stdout_read, &ctx->stdout_write, &sa, 0) != 0);
+        if (ok)
+            SetHandleInformation(ctx->stdout_read, HANDLE_FLAG_INHERIT, 0);
     }
-    if (pipes_ok && proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_SINK)
+    if (ok && proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_SINK)
     {
-        pipes_ok = (CreatePipe(&stderr_read, &stderr_write, &sa, 0) != 0);
-        if (pipes_ok)
-            SetHandleInformation(stderr_read, HANDLE_FLAG_INHERIT, 0);
+        ok = (CreatePipe(&ctx->stderr_read, &ctx->stderr_write, &sa, 0) != 0);
+        if (ok)
+            SetHandleInformation(ctx->stderr_read, HANDLE_FLAG_INHERIT, 0);
     }
+    return ok;
+}
 
-    if (!pipes_ok)
+static JSLSubProcessResultEnum jsl__subprocess_win_prepare(
+    JSLSubprocess* proc,
+    JSL__SubProcessWindowsLaunch* ctx,
+    int32_t* out_errno
+)
+{
+    jsl__subprocess_win_launch_zero(ctx);
+
+    JSLSubProcessResultEnum result = JSL_SUBPROCESS_SUCCESS;
+
+    if (!jsl__subprocess_win_build_cmdline(proc, ctx))
+        result = JSL_SUBPROCESS_ALLOCATION_FAILED;
+
+    if (result == JSL_SUBPROCESS_SUCCESS
+        && !jsl__subprocess_win_build_env_block(proc, ctx))
+        result = JSL_SUBPROCESS_ALLOCATION_FAILED;
+
+    if (result == JSL_SUBPROCESS_SUCCESS
+        && !jsl__subprocess_win_build_cwd(proc, ctx))
+        result = JSL_SUBPROCESS_ALLOCATION_FAILED;
+
+    if (result == JSL_SUBPROCESS_SUCCESS
+        && !jsl__subprocess_win_create_pipes(proc, ctx))
     {
         DWORD err = GetLastError();
         if (out_errno != NULL)
             *out_errno = (int32_t) err;
-        if (stdin_read  != INVALID_HANDLE_VALUE) CloseHandle(stdin_read);
-        if (stdin_write != INVALID_HANDLE_VALUE) CloseHandle(stdin_write);
-        if (stdout_read  != INVALID_HANDLE_VALUE) CloseHandle(stdout_read);
-        if (stdout_write != INVALID_HANDLE_VALUE) CloseHandle(stdout_write);
-        if (stderr_read  != INVALID_HANDLE_VALUE) CloseHandle(stderr_read);
-        if (stderr_write != INVALID_HANDLE_VALUE) CloseHandle(stderr_write);
-        proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
-        return JSL_SUBPROCESS_RUN_PIPE_FAILED;
+        jsl__subprocess_win_close_all_pipes(ctx);
+        result = JSL_SUBPROCESS_PIPE_FAILED;
     }
 
+    return result;
+}
+
+// Invoke CreateProcessA using the prepared context. On success, the child
+// is running and *out_pi receives the process/thread handles. The caller
+// must close the child-side pipe ends via `_close_child_pipe_ends` and is
+// responsible for closing pi.hThread when it is no longer needed. On
+// failure, every pipe handle is closed.
+static JSLSubProcessResultEnum jsl__subprocess_win_spawn(
+    JSLSubprocess* proc,
+    JSL__SubProcessWindowsLaunch* ctx,
+    PROCESS_INFORMATION* out_pi,
+    int32_t* out_errno
+)
+{
     STARTUPINFOA si;
     ZeroMemory(&si, sizeof(si));
     si.cb = (DWORD) sizeof(si);
@@ -3691,59 +3969,349 @@ JSLSubProcessRunResultEnum jsl_subprocess_run_blocking(
         si.dwFlags |= STARTF_USESTDHANDLES;
 
         if (proc->stdin_kind == JSL_SUBPROCESS_STDIN_MEMORY)
-            si.hStdInput = stdin_read;
+            si.hStdInput = ctx->stdin_read;
         else if (proc->stdin_kind == JSL_SUBPROCESS_STDIN_FD)
             si.hStdInput = (HANDLE) _get_osfhandle(proc->stdin_fd);
         else
             si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
 
         if (proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_SINK)
-            si.hStdOutput = stdout_write;
+            si.hStdOutput = ctx->stdout_write;
         else if (proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_FD)
             si.hStdOutput = (HANDLE) _get_osfhandle(proc->stdout_fd);
         else
             si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
 
         if (proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_SINK)
-            si.hStdError = stderr_write;
+            si.hStdError = ctx->stderr_write;
         else if (proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_FD)
             si.hStdError = (HANDLE) _get_osfhandle(proc->stderr_fd);
         else
             si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
     }
 
-    PROCESS_INFORMATION pi;
-    ZeroMemory(&pi, sizeof(pi));
+    ZeroMemory(out_pi, sizeof(*out_pi));
 
     BOOL created = CreateProcessA(
         NULL,
-        cmdline,
+        ctx->cmdline,
         NULL,
         NULL,
         use_stdhandles ? TRUE : FALSE,
         0,
-        env_block,
-        cwd_cstr,
+        ctx->env_block,
+        ctx->cwd_cstr,
         &si,
-        &pi
+        out_pi
     );
-
-    // Close the child-side ends we handed off.
-    if (stdin_read  != INVALID_HANDLE_VALUE) CloseHandle(stdin_read);
-    if (stdout_write != INVALID_HANDLE_VALUE) CloseHandle(stdout_write);
-    if (stderr_write != INVALID_HANDLE_VALUE) CloseHandle(stderr_write);
 
     if (!created)
     {
         DWORD err = GetLastError();
         if (out_errno != NULL)
             *out_errno = (int32_t) err;
-        if (stdin_write  != INVALID_HANDLE_VALUE) CloseHandle(stdin_write);
-        if (stdout_read  != INVALID_HANDLE_VALUE) CloseHandle(stdout_read);
-        if (stderr_read  != INVALID_HANDLE_VALUE) CloseHandle(stderr_read);
-        proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
-        return JSL_SUBPROCESS_RUN_SPAWN_FAILED;
+        jsl__subprocess_win_close_all_pipes(ctx);
+        return JSL_SUBPROCESS_SPAWN_FAILED;
     }
+
+    return JSL_SUBPROCESS_SUCCESS;
+}
+
+// One non-blocking write of up to a fixed chunk of stdin_memory to the
+// child's stdin handle. Closes the parent-side write handle when the
+// buffer is fully written or the write fails.
+static JSLSubProcessResultEnum jsl__subprocess_win_pump_stdin_once(
+    JSLSubprocess* proc,
+    int32_t* out_errno
+)
+{
+    (void) out_errno;
+
+    if (proc->stdin_kind != JSL_SUBPROCESS_STDIN_MEMORY
+        || proc->stdin_write_handle == INVALID_HANDLE_VALUE)
+        return JSL_SUBPROCESS_SUCCESS;
+
+    int64_t remaining = proc->stdin_memory.length - proc->stdin_write_offset;
+    if (remaining <= 0)
+    {
+        jsl__subprocess_win_close_handle(&proc->stdin_write_handle);
+        return JSL_SUBPROCESS_SUCCESS;
+    }
+
+    DWORD to_write = (DWORD)(remaining > 4096 ? 4096 : remaining);
+    DWORD written = 0;
+    BOOL wok = WriteFile(
+        proc->stdin_write_handle,
+        proc->stdin_memory.data + proc->stdin_write_offset,
+        to_write,
+        &written,
+        NULL
+    );
+
+    if (!wok || written == 0)
+    {
+        jsl__subprocess_win_close_handle(&proc->stdin_write_handle);
+    }
+    else
+    {
+        proc->stdin_write_offset += (int64_t) written;
+        if (proc->stdin_write_offset >= proc->stdin_memory.length)
+            jsl__subprocess_win_close_handle(&proc->stdin_write_handle);
+    }
+
+    return JSL_SUBPROCESS_SUCCESS;
+}
+
+// Drain whatever is currently buffered on a single pipe handle into its
+// sink. Uses PeekNamedPipe to avoid blocking.
+static JSLSubProcessResultEnum jsl__subprocess_win_drain_one(
+    HANDLE* h_ptr,
+    JSLOutputSink sink,
+    bool* eof_seen,
+    int32_t* out_errno
+)
+{
+    if (*h_ptr == INVALID_HANDLE_VALUE || *eof_seen)
+        return JSL_SUBPROCESS_SUCCESS;
+
+    DWORD avail = 0;
+    BOOL pok = PeekNamedPipe(*h_ptr, NULL, 0, NULL, &avail, NULL);
+    if (!pok)
+    {
+        DWORD err = GetLastError();
+        // ERROR_BROKEN_PIPE = clean EOF; other errors are real failures.
+        jsl__subprocess_win_close_handle(h_ptr);
+        *eof_seen = true;
+        if (err != ERROR_BROKEN_PIPE && err != ERROR_HANDLE_EOF)
+        {
+            if (out_errno != NULL)
+                *out_errno = (int32_t) err;
+            return JSL_SUBPROCESS_IO_FAILED;
+        }
+        return JSL_SUBPROCESS_SUCCESS;
+    }
+
+    if (avail == 0)
+        return JSL_SUBPROCESS_SUCCESS;
+
+    uint8_t io_buf[4096];
+    DWORD to_read = avail > (DWORD) sizeof(io_buf) ? (DWORD) sizeof(io_buf) : avail;
+    DWORD read_n = 0;
+    BOOL rok = ReadFile(*h_ptr, io_buf, to_read, &read_n, NULL);
+
+    if (rok && read_n > 0)
+    {
+        jsl_output_sink_write(sink, jsl_immutable_memory(io_buf, (int64_t) read_n));
+    }
+    else
+    {
+        DWORD err = GetLastError();
+        jsl__subprocess_win_close_handle(h_ptr);
+        *eof_seen = true;
+        if (!rok && err != ERROR_BROKEN_PIPE && err != ERROR_HANDLE_EOF)
+        {
+            if (out_errno != NULL)
+                *out_errno = (int32_t) err;
+            return JSL_SUBPROCESS_IO_FAILED;
+        }
+    }
+
+    return JSL_SUBPROCESS_SUCCESS;
+}
+
+static JSLSubProcessResultEnum jsl__subprocess_win_pump_output_once(
+    JSLSubprocess* proc,
+    int32_t* out_errno
+)
+{
+    JSLSubProcessResultEnum result = JSL_SUBPROCESS_SUCCESS;
+
+    if (proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_SINK)
+    {
+        JSLSubProcessResultEnum r = jsl__subprocess_win_drain_one(
+            &proc->stdout_read_handle,
+            proc->stdout_sink,
+            &proc->stdout_eof_seen,
+            out_errno
+        );
+        if (r != JSL_SUBPROCESS_SUCCESS)
+            result = r;
+    }
+
+    if (proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_SINK)
+    {
+        JSLSubProcessResultEnum r = jsl__subprocess_win_drain_one(
+            &proc->stderr_read_handle,
+            proc->stderr_sink,
+            &proc->stderr_eof_seen,
+            result == JSL_SUBPROCESS_SUCCESS ? out_errno : NULL
+        );
+        if (r != JSL_SUBPROCESS_SUCCESS && result == JSL_SUBPROCESS_SUCCESS)
+            result = r;
+    }
+
+    return result;
+}
+
+static JSLSubProcessResultEnum jsl__subprocess_win_poll(
+    JSLSubprocess* proc,
+    int32_t timeout_ms,
+    JSLSubProcessStatusEnum* out_status,
+    int32_t* out_exit_code,
+    int32_t* out_errno
+)
+{
+    if (proc->status == JSL_SUBPROCESS_STATUS_EXITED
+        || proc->status == JSL_SUBPROCESS_STATUS_KILLED_BY_SIGNAL)
+    {
+        *out_status = proc->status;
+        return JSL_SUBPROCESS_SUCCESS;
+    }
+
+    DWORD wait_ms = (timeout_ms < 0) ? INFINITE : (DWORD) timeout_ms;
+    DWORD wait_res = WaitForSingleObject(proc->process_handle, wait_ms);
+
+    if (wait_res == WAIT_TIMEOUT)
+    {
+        *out_status = proc->status;
+        return JSL_SUBPROCESS_SUCCESS;
+    }
+
+    if (wait_res == WAIT_FAILED)
+    {
+        DWORD err = GetLastError();
+        if (out_errno != NULL)
+            *out_errno = (int32_t) err;
+        *out_status = proc->status;
+        return JSL_SUBPROCESS_WAIT_FAILED;
+    }
+
+    DWORD exit_code = 0;
+    if (!GetExitCodeProcess(proc->process_handle, &exit_code))
+    {
+        DWORD err = GetLastError();
+        if (out_errno != NULL)
+            *out_errno = (int32_t) err;
+        *out_status = proc->status;
+        return JSL_SUBPROCESS_WAIT_FAILED;
+    }
+
+    *out_exit_code = (int32_t) exit_code;
+    proc->status = JSL_SUBPROCESS_STATUS_EXITED;
+    *out_status = proc->status;
+    return JSL_SUBPROCESS_SUCCESS;
+}
+
+#endif
+
+JSLSubProcessResultEnum jsl_subprocess_run_blocking(
+    JSLSubprocess* proc,
+    int32_t* out_exit_code,
+    int32_t* out_errno
+)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL
+        && out_exit_code != NULL);
+
+    if (!proceed)
+        return JSL_SUBPROCESS_BAD_PARAMETERS;
+
+    if (proc->status != JSL_SUBPROCESS_STATUS_NOT_STARTED)
+        return JSL_SUBPROCESS_ALREADY_STARTED;
+
+    *out_exit_code = -1;
+    if (out_errno != NULL)
+        *out_errno = 0;
+
+    JSLSubProcessResultEnum result = JSL_SUBPROCESS_SUCCESS;
+
+#if JSL_IS_POSIX
+
+    JSL__SubProcessPosixLaunch ctx;
+    JSLSubProcessResultEnum prep = jsl__subprocess_posix_prepare(proc, &ctx, out_errno);
+    if (prep != JSL_SUBPROCESS_SUCCESS)
+    {
+        jsl__subprocess_posix_free_launch(proc, &ctx);
+        proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
+        return prep;
+    }
+
+    pid_t pid = 0;
+    JSLSubProcessResultEnum spawn_result =
+        jsl__subprocess_posix_spawn(proc, &ctx, &pid, out_errno);
+
+    // argv/envp/cwd strings are no longer needed after posix_spawnp
+    // returns, regardless of success or failure.
+    jsl__subprocess_posix_free_launch(proc, &ctx);
+
+    if (spawn_result != JSL_SUBPROCESS_SUCCESS)
+    {
+        proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
+        return spawn_result;
+    }
+
+    proc->status = JSL_SUBPROCESS_STATUS_RUNNING;
+
+    // Parent keeps only its ends of any pipes that were created.
+    jsl__subprocess_posix_close_child_pipe_ends(&ctx);
+
+    int32_t io_errno = 0;
+    bool io_ok = jsl__subprocess_posix_pump_io(proc, &ctx, &io_errno);
+
+    JSLSubProcessResultEnum wait_result = jsl__subprocess_posix_wait(
+        pid,
+        &proc->status,
+        out_exit_code,
+        out_errno
+    );
+
+    if (wait_result != JSL_SUBPROCESS_SUCCESS
+        && wait_result != JSL_SUBPROCESS_KILLED_BY_SIGNAL)
+        result = wait_result;
+    else if (!io_ok)
+    {
+        if (out_errno != NULL)
+            *out_errno = io_errno;
+        result = JSL_SUBPROCESS_IO_FAILED;
+    }
+    else if (wait_result == JSL_SUBPROCESS_KILLED_BY_SIGNAL)
+    {
+        result = JSL_SUBPROCESS_KILLED_BY_SIGNAL;
+    }
+
+    return result;
+
+#elif JSL_IS_WINDOWS
+
+    JSL__SubProcessWindowsLaunch ctx;
+    JSLSubProcessResultEnum prep = jsl__subprocess_win_prepare(proc, &ctx, out_errno);
+    if (prep != JSL_SUBPROCESS_SUCCESS)
+    {
+        jsl__subprocess_win_free_launch(proc, &ctx);
+        proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
+        return prep;
+    }
+
+    PROCESS_INFORMATION pi;
+    JSLSubProcessResultEnum spawn_result =
+        jsl__subprocess_win_spawn(proc, &ctx, &pi, out_errno);
+
+    jsl__subprocess_win_free_launch(proc, &ctx);
+
+    if (spawn_result != JSL_SUBPROCESS_SUCCESS)
+    {
+        proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
+        return spawn_result;
+    }
+
+    proc->status = JSL_SUBPROCESS_STATUS_RUNNING;
+
+    jsl__subprocess_win_close_child_pipe_ends(&ctx);
+
+    HANDLE stdin_write = ctx.stdin_write;
+    HANDLE stdout_read = ctx.stdout_read;
+    HANDLE stderr_read = ctx.stderr_read;
 
     // I/O pump. Poll each pipe with PeekNamedPipe since Windows doesn't
     // expose a portable equivalent of poll() for anonymous pipes.
@@ -3853,15 +4421,9 @@ JSLSubProcessRunResultEnum jsl_subprocess_run_blocking(
 
         if (!did_work)
         {
-            // Nothing ready on any pipe; check if the child is done. If so,
-            // drain whatever's left in the next iteration and exit.
             DWORD wait_res = WaitForSingleObject(pi.hProcess, 5);
             if (wait_res == WAIT_OBJECT_0)
             {
-                // One more pass will drain any remaining buffered data via
-                // PeekNamedPipe. If PeekNamedPipe reports zero bytes and the
-                // child is gone, the next pass will see a broken pipe and
-                // close the handles.
                 if (stdout_read != INVALID_HANDLE_VALUE)
                 {
                     DWORD avail = 0;
@@ -3898,7 +4460,7 @@ JSLSubProcessRunResultEnum jsl_subprocess_run_blocking(
         CloseHandle(pi.hProcess);
         CloseHandle(pi.hThread);
         proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
-        return JSL_SUBPROCESS_RUN_WAIT_FAILED;
+        return JSL_SUBPROCESS_WAIT_FAILED;
     }
 
     DWORD exit_code = 0;
@@ -3910,7 +4472,7 @@ JSLSubProcessRunResultEnum jsl_subprocess_run_blocking(
         CloseHandle(pi.hProcess);
         CloseHandle(pi.hThread);
         proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
-        return JSL_SUBPROCESS_RUN_WAIT_FAILED;
+        return JSL_SUBPROCESS_WAIT_FAILED;
     }
 
     CloseHandle(pi.hProcess);
@@ -3920,10 +4482,233 @@ JSLSubProcessRunResultEnum jsl_subprocess_run_blocking(
     proc->status = JSL_SUBPROCESS_STATUS_EXITED;
 
     if (io_error)
-        result = JSL_SUBPROCESS_RUN_IO_FAILED;
+        result = JSL_SUBPROCESS_IO_FAILED;
 
     return result;
 
+#else
+    #error "Unsupported platform"
+#endif
+}
+
+
+JSLSubProcessResultEnum jsl_subprocess_background_start(
+    JSLSubprocess* proc,
+    int32_t* out_errno
+)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL);
+
+    if (!proceed)
+        return JSL_SUBPROCESS_BAD_PARAMETERS;
+
+    if (proc->status != JSL_SUBPROCESS_STATUS_NOT_STARTED)
+        return JSL_SUBPROCESS_ALREADY_STARTED;
+
+    if (out_errno != NULL)
+        *out_errno = 0;
+
+#if JSL_IS_POSIX
+
+    JSL__SubProcessPosixLaunch ctx;
+    JSLSubProcessResultEnum prep = jsl__subprocess_posix_prepare(proc, &ctx, out_errno);
+    if (prep != JSL_SUBPROCESS_SUCCESS)
+    {
+        jsl__subprocess_posix_free_launch(proc, &ctx);
+        proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
+        return prep;
+    }
+
+    pid_t pid = 0;
+    JSLSubProcessResultEnum spawn_result =
+        jsl__subprocess_posix_spawn(proc, &ctx, &pid, out_errno);
+
+    jsl__subprocess_posix_free_launch(proc, &ctx);
+
+    if (spawn_result != JSL_SUBPROCESS_SUCCESS)
+    {
+        proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
+        return spawn_result;
+    }
+
+    // Transfer parent-side pipe fds onto the subprocess struct, then
+    // close the child-side ends.
+    jsl__subprocess_posix_close_child_pipe_ends(&ctx);
+
+    proc->pid = (int32_t) pid;
+    proc->stdin_write_fd = ctx.stdin_pipe[1];
+    proc->stdout_read_fd = ctx.stdout_pipe[0];
+    proc->stderr_read_fd = ctx.stderr_pipe[0];
+
+    // Non-blocking on all parent-side pipe ends so `pump_*` never blocks.
+    jsl__subprocess_posix_set_nonblocking(proc->stdin_write_fd);
+    jsl__subprocess_posix_set_nonblocking(proc->stdout_read_fd);
+    jsl__subprocess_posix_set_nonblocking(proc->stderr_read_fd);
+
+    proc->status = JSL_SUBPROCESS_STATUS_RUNNING;
+    proc->is_background = true;
+    return JSL_SUBPROCESS_SUCCESS;
+
+#elif JSL_IS_WINDOWS
+
+    JSL__SubProcessWindowsLaunch ctx;
+    JSLSubProcessResultEnum prep = jsl__subprocess_win_prepare(proc, &ctx, out_errno);
+    if (prep != JSL_SUBPROCESS_SUCCESS)
+    {
+        jsl__subprocess_win_free_launch(proc, &ctx);
+        proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
+        return prep;
+    }
+
+    PROCESS_INFORMATION pi;
+    JSLSubProcessResultEnum spawn_result =
+        jsl__subprocess_win_spawn(proc, &ctx, &pi, out_errno);
+
+    jsl__subprocess_win_free_launch(proc, &ctx);
+
+    if (spawn_result != JSL_SUBPROCESS_SUCCESS)
+    {
+        proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
+        return spawn_result;
+    }
+
+    jsl__subprocess_win_close_child_pipe_ends(&ctx);
+
+    proc->process_handle = pi.hProcess;
+    CloseHandle(pi.hThread);
+
+    proc->stdin_write_handle = ctx.stdin_write;
+    proc->stdout_read_handle = ctx.stdout_read;
+    proc->stderr_read_handle = ctx.stderr_read;
+
+    proc->status = JSL_SUBPROCESS_STATUS_RUNNING;
+    proc->is_background = true;
+    return JSL_SUBPROCESS_SUCCESS;
+
+#else
+    #error "Unsupported platform"
+#endif
+}
+
+JSLSubProcessResultEnum jsl_subprocess_background_poll(
+    JSLSubprocess* proc,
+    int32_t timeout_ms,
+    JSLSubProcessStatusEnum* out_status,
+    int32_t* out_exit_code,
+    int32_t* out_errno
+)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL
+        && out_status != NULL
+        && out_exit_code != NULL
+        && proc->is_background);
+
+    if (!proceed)
+        return JSL_SUBPROCESS_BAD_PARAMETERS;
+
+    if (out_errno != NULL)
+        *out_errno = 0;
+
+#if JSL_IS_POSIX
+    return jsl__subprocess_posix_poll(proc, timeout_ms, out_status, out_exit_code, out_errno);
+#elif JSL_IS_WINDOWS
+    return jsl__subprocess_win_poll(proc, timeout_ms, out_status, out_exit_code, out_errno);
+#else
+    #error "Unsupported platform"
+#endif
+}
+
+JSLSubProcessResultEnum jsl_subprocess_background_send_stdin(
+    JSLSubprocess* proc,
+    int32_t* out_errno
+)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL
+        && proc->is_background);
+
+    if (!proceed)
+        return JSL_SUBPROCESS_BAD_PARAMETERS;
+
+    if (out_errno != NULL)
+        *out_errno = 0;
+
+#if JSL_IS_POSIX
+    return jsl__subprocess_posix_pump_stdin_once(proc, out_errno);
+#elif JSL_IS_WINDOWS
+    return jsl__subprocess_win_pump_stdin_once(proc, out_errno);
+#else
+    #error "Unsupported platform"
+#endif
+}
+
+JSLSubProcessResultEnum jsl_subprocess_background_receive_output(
+    JSLSubprocess* proc,
+    int32_t* out_errno
+)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL
+        && proc->is_background);
+
+    if (!proceed)
+        return JSL_SUBPROCESS_BAD_PARAMETERS;
+
+    if (out_errno != NULL)
+        *out_errno = 0;
+
+#if JSL_IS_POSIX
+    return jsl__subprocess_posix_pump_output_once(proc, out_errno);
+#elif JSL_IS_WINDOWS
+    return jsl__subprocess_win_pump_output_once(proc, out_errno);
+#else
+    #error "Unsupported platform"
+#endif
+}
+
+JSLSubProcessResultEnum jsl_subprocess_background_kill(
+    JSLSubprocess* proc,
+    int32_t* out_errno
+)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL
+        && proc->is_background);
+
+    if (!proceed)
+        return JSL_SUBPROCESS_BAD_PARAMETERS;
+
+    if (out_errno != NULL)
+        *out_errno = 0;
+
+    if (proc->status == JSL_SUBPROCESS_STATUS_EXITED
+        || proc->status == JSL_SUBPROCESS_STATUS_KILLED_BY_SIGNAL)
+        return JSL_SUBPROCESS_SUCCESS;
+
+#if JSL_IS_POSIX
+    if (proc->pid > 0 && kill((pid_t) proc->pid, SIGKILL) == -1)
+    {
+        // ESRCH means the process has already gone; treat as success.
+        if (errno != ESRCH)
+        {
+            if (out_errno != NULL)
+                *out_errno = errno;
+            return JSL_SUBPROCESS_WAIT_FAILED;
+        }
+    }
+    return JSL_SUBPROCESS_SUCCESS;
+#elif JSL_IS_WINDOWS
+    if (proc->process_handle != INVALID_HANDLE_VALUE
+        && !TerminateProcess(proc->process_handle, 1))
+    {
+        DWORD err = GetLastError();
+        if (out_errno != NULL)
+            *out_errno = (int32_t) err;
+        return JSL_SUBPROCESS_WAIT_FAILED;
+    }
+    return JSL_SUBPROCESS_SUCCESS;
 #else
     #error "Unsupported platform"
 #endif
@@ -3965,6 +4750,46 @@ void jsl_subprocess_cleanup(JSLSubprocess* proc)
 
     if (proc->stdin_kind == JSL_SUBPROCESS_STDIN_MEMORY && proc->stdin_memory.data != NULL)
         (void) jsl_allocator_interface_free(proc->allocator, proc->stdin_memory.data);
+
+    if (proc->is_background)
+    {
+        #if JSL_IS_WINDOWS
+            if (proc->stdin_write_handle != NULL && proc->stdin_write_handle != INVALID_HANDLE_VALUE)
+                CloseHandle(proc->stdin_write_handle);
+            if (proc->stdout_read_handle != NULL && proc->stdout_read_handle != INVALID_HANDLE_VALUE)
+                CloseHandle(proc->stdout_read_handle);
+            if (proc->stderr_read_handle != NULL && proc->stderr_read_handle != INVALID_HANDLE_VALUE)
+                CloseHandle(proc->stderr_read_handle);
+            if (proc->process_handle != NULL && proc->process_handle != INVALID_HANDLE_VALUE)
+            {
+                if (proc->status == JSL_SUBPROCESS_STATUS_RUNNING)
+                    TerminateProcess(proc->process_handle, 1);
+                CloseHandle(proc->process_handle);
+            }
+            proc->stdin_write_handle = INVALID_HANDLE_VALUE;
+            proc->stdout_read_handle = INVALID_HANDLE_VALUE;
+            proc->stderr_read_handle = INVALID_HANDLE_VALUE;
+            proc->process_handle = INVALID_HANDLE_VALUE;
+        #elif JSL_IS_POSIX
+            if (proc->pid > 0 && proc->status == JSL_SUBPROCESS_STATUS_RUNNING)
+            {
+                kill(proc->pid, SIGKILL);
+                int status_code = 0;
+                (void) waitpid(proc->pid, &status_code, 0);
+            }
+            if (proc->stdin_write_fd >= 0)
+                close(proc->stdin_write_fd);
+            if (proc->stdout_read_fd >= 0)
+                close(proc->stdout_read_fd);
+            if (proc->stderr_read_fd >= 0)
+                close(proc->stderr_read_fd);
+            proc->stdin_write_fd = -1;
+            proc->stdout_read_fd = -1;
+            proc->stderr_read_fd = -1;
+            proc->pid = 0;
+        #endif
+        proc->is_background = false;
+    }
 
     proc->sentinel = 0;
     proc->executable = jsl_immutable_memory(NULL, 0);

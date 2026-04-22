@@ -23,5 +23,12 @@ void test_jsl_subprocess_run_blocking_stderr_sink(void);
 void test_jsl_subprocess_run_blocking_stdin_memory(void);
 void test_jsl_subprocess_run_blocking_env_var(void);
 void test_jsl_subprocess_run_blocking_working_directory(void);
+void test_jsl_subprocess_background_bad_parameters(void);
+void test_jsl_subprocess_background_already_started(void);
+void test_jsl_subprocess_background_stdout_sink(void);
+void test_jsl_subprocess_background_stderr_sink(void);
+void test_jsl_subprocess_background_stdin_memory(void);
+void test_jsl_subprocess_background_env_var(void);
+void test_jsl_subprocess_background_kill(void);
 
 #endif

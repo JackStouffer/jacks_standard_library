@@ -821,6 +821,24 @@ typedef struct JSLSubprocess
     JSLSubProcessOutputKindEnum stderr_kind;
     int stderr_fd;
     JSLOutputSink stderr_sink;
+
+    // Background-mode runtime state. Zero / -1 / INVALID_HANDLE_VALUE when
+    // the process was not started via `jsl_subprocess_background_start`.
+    bool is_background;
+    int64_t stdin_write_offset;
+    bool stdout_eof_seen;
+    bool stderr_eof_seen;
+#if JSL_IS_WINDOWS
+    HANDLE process_handle;
+    HANDLE stdin_write_handle;
+    HANDLE stdout_read_handle;
+    HANDLE stderr_read_handle;
+#elif JSL_IS_POSIX
+    int32_t pid;
+    int stdin_write_fd;
+    int stdout_read_fd;
+    int stderr_read_fd;
+#endif
 } JSLSubprocess;
 
 /**
@@ -1079,18 +1097,18 @@ JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stderr_sink(
 */
 typedef enum
 {
-    JSL_SUBPROCESS_RUN_BAD_PARAMETERS = 0,
-    JSL_SUBPROCESS_RUN_SUCCESS,
-    JSL_SUBPROCESS_RUN_ALREADY_STARTED,
-    JSL_SUBPROCESS_RUN_ALLOCATION_FAILED,
-    JSL_SUBPROCESS_RUN_PIPE_FAILED,
-    JSL_SUBPROCESS_RUN_SPAWN_FAILED,
-    JSL_SUBPROCESS_RUN_IO_FAILED,
-    JSL_SUBPROCESS_RUN_WAIT_FAILED,
-    JSL_SUBPROCESS_RUN_KILLED_BY_SIGNAL,
+    JSL_SUBPROCESS_BAD_PARAMETERS = 0,
+    JSL_SUBPROCESS_SUCCESS,
+    JSL_SUBPROCESS_ALREADY_STARTED,
+    JSL_SUBPROCESS_ALLOCATION_FAILED,
+    JSL_SUBPROCESS_PIPE_FAILED,
+    JSL_SUBPROCESS_SPAWN_FAILED,
+    JSL_SUBPROCESS_IO_FAILED,
+    JSL_SUBPROCESS_WAIT_FAILED,
+    JSL_SUBPROCESS_KILLED_BY_SIGNAL,
 
-    JSL_SUBPROCESS_RUN_ENUM_COUNT
-} JSLSubProcessRunResultEnum;
+    JSL_SUBPROCESS_ENUM_COUNT
+} JSLSubProcessResultEnum;
 
 /**
 * Start the subprocess with the previously configured executable, arguments,
@@ -1098,7 +1116,7 @@ typedef enum
 * terminates.
 *
 * On success `*out_exit_code` receives the child's exit code. On POSIX, if
-* the child was terminated by a signal, `JSL_SUBPROCESS_RUN_KILLED_BY_SIGNAL`
+* the child was terminated by a signal, `JSL_SUBPROCESS_KILLED_BY_SIGNAL`
 * is returned and `*out_exit_code` receives the signal number as a negative
 * value (e.g. `-SIGTERM`). On any failure that prevents the child from being
 * launched, `out_errno` (if non-null) receives the system `errno` captured
@@ -1107,16 +1125,104 @@ typedef enum
 *
 * A subprocess may only be run once. Passing a subprocess whose status is
 * not `JSL_SUBPROCESS_STATUS_NOT_STARTED` returns
-* `JSL_SUBPROCESS_RUN_ALREADY_STARTED`.
+* `JSL_SUBPROCESS_ALREADY_STARTED`.
 *
 * @param proc          Pointer to a configured subprocess handle
 * @param out_exit_code Pointer that receives the child's exit code, must not be null
 * @param out_errno     Optional pointer that receives the system errno on failure
 * @returns A result enum describing the outcome
 */
-JSL_WARN_UNUSED JSL_DEF JSLSubProcessRunResultEnum jsl_subprocess_run_blocking(
+JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_run_blocking(
     JSLSubprocess* proc,
     int32_t* out_exit_code,
+    int32_t* out_errno
+);
+
+/**
+* Spawn the previously-configured child and return immediately.
+*
+* On success, the process is running and the subprocess handle carries the
+* OS-level pid/HANDLE and parent-side pipe fds/handles needed for the other
+* background-mode functions. On failure, the subprocess status is set to
+* `JSL_SUBPROCESS_STATUS_FAILED_TO_START`, `is_background` stays `false`,
+* and no OS resources are leaked.
+*
+* A subprocess may only be started once. Passing a handle whose status is
+* not `JSL_SUBPROCESS_STATUS_NOT_STARTED` returns
+* `JSL_SUBPROCESS_ALREADY_STARTED`.
+*/
+JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_start(
+    JSLSubprocess* proc,
+    int32_t* out_errno
+);
+
+/**
+* Non-blocking lifecycle status check for a background subprocess.
+*
+* Writes the current lifecycle state to `*out_status`. When the status is
+* `EXITED` or `KILLED_BY_SIGNAL`, also writes `*out_exit_code` (exit code
+* on EXITED, negated signal number on KILLED_BY_SIGNAL; -1 on Windows for
+* abnormal termination).
+*
+* `timeout_ms` semantics:
+*   - 0: purely non-blocking; returns immediately with current status.
+*   - > 0: block up to that many milliseconds waiting for a state change.
+*   - < 0: block until the child exits.
+*
+* Returns `JSL_SUBPROCESS_BAD_PARAMETERS` if the subprocess was not started
+* via `jsl_subprocess_background_start`. Idempotent once the child has
+* exited: subsequent calls re-write the same status and exit code.
+*/
+JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_poll(
+    JSLSubprocess* proc,
+    int32_t timeout_ms,
+    JSLSubProcessStatusEnum* out_status,
+    int32_t* out_exit_code,
+    int32_t* out_errno
+);
+
+/**
+* Non-blocking write of the next chunk of `stdin_memory` to the child.
+*
+* No-op if stdin_kind != `STDIN_MEMORY`, if the buffer is already drained,
+* or if the write end has already been closed. When the buffer is fully
+* written OR the child has closed its read end, closes the parent-side
+* write end. Safe to call repeatedly. Returns `BAD_PARAMETERS` if the
+* subprocess is not a background one.
+*/
+JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_send_stdin(
+    JSLSubprocess* proc,
+    int32_t* out_errno
+);
+
+/**
+* Non-blocking drain of stdout and stderr pipes into their configured
+* `JSLOutputSink`s. Reads whatever is currently buffered, up to an internal
+* 4 KiB scratch buffer per stream per call. On EOF the parent-side read
+* end is closed and the corresponding `*_eof_seen` flag is set.
+*
+* Returns `BAD_PARAMETERS` if the subprocess is not a background one.
+* Returns `IO_FAILED` if a non-retryable read error occurs.
+*
+* The caller is responsible for calling this often enough that a chatty
+* child does not fill the kernel pipe buffer and block.
+*/
+JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_receive_output(
+    JSLSubprocess* proc,
+    int32_t* out_errno
+);
+
+/**
+* Forcefully terminate the child: SIGKILL on POSIX, TerminateProcess on
+* Windows. The signal is sent only — the caller must continue polling
+* until the status transitions to `EXITED` / `KILLED_BY_SIGNAL`, and must
+* continue pumping output to drain the pipes.
+*
+* Returns `SUCCESS` if the process has already exited (no-op). Returns
+* `BAD_PARAMETERS` if the subprocess is not a background one.
+*/
+JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_kill(
+    JSLSubprocess* proc,
     int32_t* out_errno
 );
 
