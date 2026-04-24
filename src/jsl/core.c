@@ -578,9 +578,239 @@ bool jsl_memory_cstr_compare(JSLImmutableMemory string, const char* cstr)
         return -1;
     }
 
-#elif defined(__ARM_NEON) || defined(__ARM_NEON__)
+    #define JSL__HAS_SIMD_SUBSTRING_SEARCH 1
+    #define JSL__SIMD_SUBSTRING_SEARCH jsl__avx2_substring_search
+    #define JSL__SIMD_SUBSTRING_MIN_LEN 64
 
-    // TODO: incomplete
+#elif defined(__aarch64__)
+
+    /* 16-byte compare result (lanes of 0x00 / 0xff) packed into a 64-bit
+     * word via the vshrn_n_u16 nibble trick: each input byte becomes a
+     * nibble (0x0 or 0xf) in the output, so byte index = CTZ(word) >> 2. */
+    static JSL__FORCE_INLINE uint64_t jsl__neon_mask_u64(uint8x16_t v)
+    {
+        uint8x8_t packed = vshrn_n_u16(vreinterpretq_u16_u8(v), 4);
+        return vget_lane_u64(vreinterpret_u64_u8(packed), 0);
+    }
+
+    static JSL__FORCE_INLINE int64_t jsl__neon_substring_search(JSLImmutableMemory string, JSLImmutableMemory substring)
+    {
+        /**
+         * From http://0x80.pl/notesen/2016-11-28-simd-strfind.html
+         *
+         * Copyright (c) 2008-2016, Wojciech Muła
+         * All rights reserved.
+         *
+         * Redistribution and use in source and binary forms, with or without
+         * modification, are permitted provided that the following conditions are
+         * met:
+         *
+         * 1. Redistributions of source code must retain the above copyright
+         * notice, this list of conditions and the following disclaimer.
+         *
+         * 2. Redistributions in binary form must reproduce the above copyright
+         * notice, this list of conditions and the following disclaimer in the
+         * documentation and/or other materials provided with the distribution.
+         *
+         * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+         * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+         * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+         * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+         * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+         * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+         * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+         * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+         * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+         * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+         * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+        */
+
+        int64_t i = 0;
+        int64_t substring_end_index = substring.length - 1;
+
+        uint8x16_t first = vdupq_n_u8(substring.data[0]);
+        uint8x16_t last  = vdupq_n_u8(substring.data[substring_end_index]);
+
+        int64_t stopping_point = string.length - substring_end_index - 32;
+        for (; i <= stopping_point; i += 32)
+        {
+            uint8x16_t block_first1 = vld1q_u8(string.data + i);
+            uint8x16_t block_last1  = vld1q_u8(string.data + i + substring_end_index);
+
+            uint8x16_t block_first2 = vld1q_u8(string.data + i + 16);
+            uint8x16_t block_last2  = vld1q_u8(string.data + i + substring_end_index + 16);
+
+            uint8x16_t eq1 = vandq_u8(vceqq_u8(block_first1, first), vceqq_u8(block_last1, last));
+            uint8x16_t eq2 = vandq_u8(vceqq_u8(block_first2, first), vceqq_u8(block_last2, last));
+
+            uint64_t mask1 = jsl__neon_mask_u64(eq1);
+            uint64_t mask2 = jsl__neon_mask_u64(eq2);
+
+            while (mask1 != 0)
+            {
+                int32_t bit_position = JSL_PLATFORM_COUNT_TRAILING_ZEROS64(mask1);
+                int64_t byte_offset = (int64_t) bit_position >> 2;
+
+                int32_t memcmp_res = JSL_MEMCMP(
+                    string.data + i + byte_offset + 1,
+                    substring.data + 1,
+                    (size_t) (substring.length - 2)
+                );
+                if (memcmp_res == 0)
+                {
+                    return i + byte_offset;
+                }
+
+                /* Each candidate byte is a 0xf nibble; clear the whole nibble. */
+                mask1 ^= ((uint64_t) 0xfULL) << (uint32_t) bit_position;
+            }
+
+            while (mask2 != 0)
+            {
+                int32_t bit_position = JSL_PLATFORM_COUNT_TRAILING_ZEROS64(mask2);
+                int64_t byte_offset = (int64_t) bit_position >> 2;
+
+                int32_t memcmp_res = JSL_MEMCMP(
+                    string.data + i + 16 + byte_offset + 1,
+                    substring.data + 1,
+                    (size_t) (substring.length - 2)
+                );
+                if (memcmp_res == 0)
+                {
+                    return i + 16 + byte_offset;
+                }
+
+                mask2 ^= ((uint64_t) 0xfULL) << (uint32_t) bit_position;
+            }
+        }
+
+        stopping_point = string.length - substring.length;
+        for (; i <= stopping_point; ++i)
+        {
+            if (string.data[i] == substring.data[0] &&
+                string.data[i + substring_end_index] == substring.data[substring_end_index])
+            {
+                if (substring.length <= 2)
+                    return i;
+
+                int32_t memcmp_res = JSL_MEMCMP(
+                    string.data + i + 1,
+                    substring.data + 1,
+                    (size_t) (substring.length - 2)
+                );
+                if (memcmp_res == 0)
+                    return i;
+            }
+        }
+
+        return -1;
+    }
+
+    #define JSL__HAS_SIMD_SUBSTRING_SEARCH 1
+    #define JSL__SIMD_SUBSTRING_SEARCH jsl__neon_substring_search
+    #define JSL__SIMD_SUBSTRING_MIN_LEN 16
+
+#elif defined(__wasm_simd128__)
+
+    static JSL__FORCE_INLINE int64_t jsl__wasm_simd128_substring_search(JSLImmutableMemory string, JSLImmutableMemory substring)
+    {
+        /**
+         * From http://0x80.pl/notesen/2016-11-28-simd-strfind.html
+         *
+         * Copyright (c) 2008-2016, Wojciech Muła
+         * All rights reserved.
+         *
+         * Redistribution and use in source and binary forms, with or without
+         * modification, are permitted provided that the following conditions are
+         * met:
+         *
+         * 1. Redistributions of source code must retain the above copyright
+         * notice, this list of conditions and the following disclaimer.
+         *
+         * 2. Redistributions in binary form must reproduce the above copyright
+         * notice, this list of conditions and the following disclaimer in the
+         * documentation and/or other materials provided with the distribution.
+         *
+         * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+         * IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+         * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+         * PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+         * HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+         * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+         * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+         * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+         * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+         * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+         * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+        */
+
+        int64_t i = 0;
+        int64_t substring_end_index = substring.length - 1;
+
+        v128_t first = wasm_i8x16_splat((int8_t) substring.data[0]);
+        v128_t last  = wasm_i8x16_splat((int8_t) substring.data[substring_end_index]);
+
+        int64_t stopping_point = string.length - substring_end_index - 32;
+        for (; i <= stopping_point; i += 32)
+        {
+            v128_t block_first1 = wasm_v128_load(string.data + i);
+            v128_t block_last1  = wasm_v128_load(string.data + i + substring_end_index);
+
+            v128_t block_first2 = wasm_v128_load(string.data + i + 16);
+            v128_t block_last2  = wasm_v128_load(string.data + i + substring_end_index + 16);
+
+            uint32_t mask1 = (uint32_t) wasm_i8x16_bitmask(
+                wasm_v128_and(wasm_i8x16_eq(block_first1, first),
+                              wasm_i8x16_eq(block_last1, last)));
+            uint32_t mask2 = (uint32_t) wasm_i8x16_bitmask(
+                wasm_v128_and(wasm_i8x16_eq(block_first2, first),
+                              wasm_i8x16_eq(block_last2, last)));
+
+            uint32_t mask = mask1 | (mask2 << 16);
+
+            while (mask != 0)
+            {
+                int32_t bit_position = JSL_PLATFORM_COUNT_TRAILING_ZEROS(mask);
+
+                int32_t memcmp_res = JSL_MEMCMP(
+                    string.data + i + bit_position + 1,
+                    substring.data + 1,
+                    (size_t) (substring.length - 2)
+                );
+                if (memcmp_res == 0)
+                {
+                    return i + bit_position;
+                }
+
+                mask &= (mask - 1);
+            }
+        }
+
+        stopping_point = string.length - substring.length;
+        for (; i <= stopping_point; ++i)
+        {
+            if (string.data[i] == substring.data[0] &&
+                string.data[i + substring_end_index] == substring.data[substring_end_index])
+            {
+                if (substring.length <= 2)
+                    return i;
+
+                int32_t memcmp_res = JSL_MEMCMP(
+                    string.data + i + 1,
+                    substring.data + 1,
+                    (size_t) (substring.length - 2)
+                );
+                if (memcmp_res == 0)
+                    return i;
+            }
+        }
+
+        return -1;
+    }
+
+    #define JSL__HAS_SIMD_SUBSTRING_SEARCH 1
+    #define JSL__SIMD_SUBSTRING_SEARCH jsl__wasm_simd128_substring_search
+    #define JSL__SIMD_SUBSTRING_MIN_LEN 16
 
 #endif
 
@@ -734,9 +964,9 @@ int64_t jsl_substring_search(JSLImmutableMemory string, JSLImmutableMemory subst
     }
     else
     {
-        #ifdef __AVX2__
-            if (string.length >= 64)
-                return jsl__avx2_substring_search(string, substring);
+        #ifdef JSL__HAS_SIMD_SUBSTRING_SEARCH
+            if (string.length >= JSL__SIMD_SUBSTRING_MIN_LEN)
+                return JSL__SIMD_SUBSTRING_SEARCH(string, substring);
             else
                 return jsl__substring_search(string, substring);
         #else
@@ -744,6 +974,12 @@ int64_t jsl_substring_search(JSLImmutableMemory string, JSLImmutableMemory subst
         #endif
     }
 }
+
+#ifdef JSL__HAS_SIMD_SUBSTRING_SEARCH
+    #undef JSL__HAS_SIMD_SUBSTRING_SEARCH
+    #undef JSL__SIMD_SUBSTRING_SEARCH
+    #undef JSL__SIMD_SUBSTRING_MIN_LEN
+#endif
 
 int64_t jsl_index_of(JSLImmutableMemory string, uint8_t item)
 {
