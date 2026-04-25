@@ -2470,6 +2470,16 @@ JSLSubProcessCreateResultEnum jsl_subprocess_create(
     proc->stdin_write_handle = INVALID_HANDLE_VALUE;
     proc->stdout_read_handle = INVALID_HANDLE_VALUE;
     proc->stderr_read_handle = INVALID_HANDLE_VALUE;
+    ZeroMemory(&proc->stdin_write_overlapped, sizeof(proc->stdin_write_overlapped));
+    ZeroMemory(&proc->stdout_read_overlapped, sizeof(proc->stdout_read_overlapped));
+    ZeroMemory(&proc->stderr_read_overlapped, sizeof(proc->stderr_read_overlapped));
+    proc->stdin_write_event = NULL;
+    proc->stdout_read_event = NULL;
+    proc->stderr_read_event = NULL;
+    proc->stdin_write_pending = false;
+    proc->stdout_read_pending = false;
+    proc->stderr_read_pending = false;
+    proc->stdin_write_buffer_len = 0;
 #elif JSL_IS_POSIX
     proc->pid = 0;
     proc->stdin_write_fd = -1;
@@ -3865,6 +3875,12 @@ typedef struct JSL__SubProcessWindowsLaunch
     HANDLE stdout_write;
     HANDLE stderr_read;
     HANDLE stderr_write;
+    // Manual-reset events paired with the overlapped parent ends. Only
+    // the parent-side reads/writes are overlapped; the child ends are
+    // opened for synchronous I/O.
+    HANDLE stdin_write_event;
+    HANDLE stdout_read_event;
+    HANDLE stderr_read_event;
 } JSL__SubProcessWindowsLaunch;
 
 static void jsl__subprocess_win_launch_zero(JSL__SubProcessWindowsLaunch* ctx)
@@ -3878,6 +3894,9 @@ static void jsl__subprocess_win_launch_zero(JSL__SubProcessWindowsLaunch* ctx)
     ctx->stdout_write = INVALID_HANDLE_VALUE;
     ctx->stderr_read = INVALID_HANDLE_VALUE;
     ctx->stderr_write = INVALID_HANDLE_VALUE;
+    ctx->stdin_write_event = NULL;
+    ctx->stdout_read_event = NULL;
+    ctx->stderr_read_event = NULL;
 }
 
 static void jsl__subprocess_win_close_handle(HANDLE* h)
@@ -3889,6 +3908,15 @@ static void jsl__subprocess_win_close_handle(HANDLE* h)
     }
 }
 
+static void jsl__subprocess_win_close_event(HANDLE* h)
+{
+    if (*h != NULL && *h != INVALID_HANDLE_VALUE)
+    {
+        CloseHandle(*h);
+        *h = NULL;
+    }
+}
+
 static void jsl__subprocess_win_close_all_pipes(JSL__SubProcessWindowsLaunch* ctx)
 {
     jsl__subprocess_win_close_handle(&ctx->stdin_read);
@@ -3897,6 +3925,131 @@ static void jsl__subprocess_win_close_all_pipes(JSL__SubProcessWindowsLaunch* ct
     jsl__subprocess_win_close_handle(&ctx->stdout_write);
     jsl__subprocess_win_close_handle(&ctx->stderr_read);
     jsl__subprocess_win_close_handle(&ctx->stderr_write);
+    jsl__subprocess_win_close_event(&ctx->stdin_write_event);
+    jsl__subprocess_win_close_event(&ctx->stdout_read_event);
+    jsl__subprocess_win_close_event(&ctx->stderr_read_event);
+}
+
+// Create one named, overlapped pipe pair. The parent-end handle is
+// returned non-inheritable and overlapped; the child-end handle is
+// returned inheritable and synchronous.
+//
+// `parent_writes`: if true, parent writes / child reads (stdin pipe).
+// If false, parent reads / child writes (stdout/stderr pipes).
+// `dir_tag`: short string ("in"/"out"/"err") embedded in the pipe name.
+//
+// On success, `*out_parent`, `*out_child`, and `*out_event` hold fresh
+// handles; on failure, any handle that was opened along the way is
+// closed and `*out_errno` receives `GetLastError()`.
+static bool jsl__subprocess_win_create_pipe(
+    bool parent_writes,
+    const char* dir_tag,
+    HANDLE* out_parent,
+    HANDLE* out_child,
+    HANDLE* out_event,
+    int32_t* out_errno
+)
+{
+    static volatile LONG pipe_name_counter = 0;
+
+    *out_parent = INVALID_HANDLE_VALUE;
+    *out_child = INVALID_HANDLE_VALUE;
+    *out_event = NULL;
+
+    const DWORD pipe_buffer_bytes = 64 * 1024;
+    DWORD pid = GetCurrentProcessId();
+
+    HANDLE parent = INVALID_HANDLE_VALUE;
+    char name_buf[128];
+
+    // Retry a small bounded number of times in case someone else grabbed
+    // the same name between our counter bump and CreateNamedPipeA.
+    for (int attempt = 0; attempt < 3 && parent == INVALID_HANDLE_VALUE; attempt++)
+    {
+        LONG id = InterlockedIncrement(&pipe_name_counter);
+        (void) snprintf(
+            name_buf, sizeof(name_buf),
+            "\\\\.\\pipe\\jsl-subprocess-%lu-%ld-%s",
+            (unsigned long) pid, (long) id, dir_tag
+        );
+
+        DWORD open_mode =
+            (parent_writes ? PIPE_ACCESS_OUTBOUND : PIPE_ACCESS_INBOUND)
+            | FILE_FLAG_OVERLAPPED;
+        DWORD pipe_mode = PIPE_TYPE_BYTE | PIPE_READMODE_BYTE | PIPE_WAIT;
+
+        HANDLE h = CreateNamedPipeA(
+            name_buf,
+            open_mode,
+            pipe_mode,
+            1, // nMaxInstances
+            pipe_buffer_bytes, // nOutBufferSize
+            pipe_buffer_bytes, // nInBufferSize
+            0, // default timeout
+            NULL // parent end is not inheritable
+        );
+
+        if (h == INVALID_HANDLE_VALUE)
+        {
+            DWORD err = GetLastError();
+            if (err != ERROR_PIPE_BUSY && err != ERROR_ACCESS_DENIED)
+            {
+                if (out_errno != NULL)
+                    *out_errno = (int32_t) err;
+                return false;
+            }
+            continue;
+        }
+
+        parent = h;
+    }
+
+    if (parent == INVALID_HANDLE_VALUE)
+    {
+        if (out_errno != NULL)
+            *out_errno = (int32_t) ERROR_PIPE_BUSY;
+        return false;
+    }
+
+    SECURITY_ATTRIBUTES sa;
+    sa.nLength = (DWORD) sizeof(sa);
+    sa.lpSecurityDescriptor = NULL;
+    sa.bInheritHandle = TRUE;
+
+    HANDLE child = CreateFileA(
+        name_buf,
+        parent_writes ? GENERIC_READ : GENERIC_WRITE,
+        0,
+        &sa,
+        OPEN_EXISTING,
+        FILE_ATTRIBUTE_NORMAL,
+        NULL
+    );
+
+    if (child == INVALID_HANDLE_VALUE)
+    {
+        DWORD err = GetLastError();
+        if (out_errno != NULL)
+            *out_errno = (int32_t) err;
+        CloseHandle(parent);
+        return false;
+    }
+
+    HANDLE event = CreateEventA(NULL, TRUE, FALSE, NULL);
+    if (event == NULL)
+    {
+        DWORD err = GetLastError();
+        if (out_errno != NULL)
+            *out_errno = (int32_t) err;
+        CloseHandle(parent);
+        CloseHandle(child);
+        return false;
+    }
+
+    *out_parent = parent;
+    *out_child = child;
+    *out_event = event;
+    return true;
 }
 
 static void jsl__subprocess_win_close_child_pipe_ends(JSL__SubProcessWindowsLaunch* ctx)
@@ -4030,32 +4183,34 @@ static bool jsl__subprocess_win_build_cwd(
 
 static bool jsl__subprocess_win_create_pipes(
     JSLSubprocess* proc,
-    JSL__SubProcessWindowsLaunch* ctx
+    JSL__SubProcessWindowsLaunch* ctx,
+    int32_t* out_errno
 )
 {
-    SECURITY_ATTRIBUTES sa;
-    sa.nLength = (DWORD) sizeof(sa);
-    sa.lpSecurityDescriptor = NULL;
-    sa.bInheritHandle = TRUE;
-
     bool ok = true;
     if (proc->stdin_kind == JSL_SUBPROCESS_STDIN_MEMORY)
     {
-        ok = (CreatePipe(&ctx->stdin_read, &ctx->stdin_write, &sa, 0) != 0);
-        if (ok)
-            SetHandleInformation(ctx->stdin_write, HANDLE_FLAG_INHERIT, 0);
+        ok = jsl__subprocess_win_create_pipe(
+            true, "in",
+            &ctx->stdin_write, &ctx->stdin_read, &ctx->stdin_write_event,
+            out_errno
+        );
     }
     if (ok && proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_SINK)
     {
-        ok = (CreatePipe(&ctx->stdout_read, &ctx->stdout_write, &sa, 0) != 0);
-        if (ok)
-            SetHandleInformation(ctx->stdout_read, HANDLE_FLAG_INHERIT, 0);
+        ok = jsl__subprocess_win_create_pipe(
+            false, "out",
+            &ctx->stdout_read, &ctx->stdout_write, &ctx->stdout_read_event,
+            out_errno
+        );
     }
     if (ok && proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_SINK)
     {
-        ok = (CreatePipe(&ctx->stderr_read, &ctx->stderr_write, &sa, 0) != 0);
-        if (ok)
-            SetHandleInformation(ctx->stderr_read, HANDLE_FLAG_INHERIT, 0);
+        ok = jsl__subprocess_win_create_pipe(
+            false, "err",
+            &ctx->stderr_read, &ctx->stderr_write, &ctx->stderr_read_event,
+            out_errno
+        );
     }
     return ok;
 }
@@ -4082,11 +4237,8 @@ static JSLSubProcessResultEnum jsl__subprocess_win_prepare(
         result = JSL_SUBPROCESS_ALLOCATION_FAILED;
 
     if (result == JSL_SUBPROCESS_SUCCESS
-        && !jsl__subprocess_win_create_pipes(proc, ctx))
+        && !jsl__subprocess_win_create_pipes(proc, ctx, out_errno))
     {
-        DWORD err = GetLastError();
-        if (out_errno != NULL)
-            *out_errno = (int32_t) err;
         jsl__subprocess_win_close_all_pipes(ctx);
         result = JSL_SUBPROCESS_PIPE_FAILED;
     }
@@ -4168,20 +4320,62 @@ static JSLSubProcessResultEnum jsl__subprocess_win_spawn(
     return JSL_SUBPROCESS_SUCCESS;
 }
 
-// One non-blocking write of up to a fixed chunk of stdin_memory to the
-// child's stdin handle. Closes the parent-side write handle when the
-// buffer is fully written or the write fails.
+// Overlapped stdin pump. Drives the write side of the child's stdin
+// pipe through a two-state machine: no op pending → kick one, op
+// pending → check completion. Returns SUCCESS in the normal case and
+// also when an op is still in flight. Returns IO_FAILED with errno on
+// real write failures. Treats broken-pipe as "child closed stdin" and
+// reports it as a normal end-of-stdin (no error).
 static JSLSubProcessResultEnum jsl__subprocess_win_pump_stdin_once(
     JSLSubprocess* proc,
     int32_t* out_errno
 )
 {
-    (void) out_errno;
-
     if (proc->stdin_kind != JSL_SUBPROCESS_STDIN_MEMORY
         || proc->stdin_write_handle == INVALID_HANDLE_VALUE)
         return JSL_SUBPROCESS_SUCCESS;
 
+    // Loop so that sync completions roll straight into the next
+    // WriteFile; each iteration either returns (pending / done / EOF /
+    // error) or sync-completes and tries again.
+    for (;;)
+    {
+
+    // State B: an op is already in flight; see if it completed.
+    if (proc->stdin_write_pending)
+    {
+        DWORD bytes = 0;
+        BOOL ok = GetOverlappedResult(
+            proc->stdin_write_handle,
+            &proc->stdin_write_overlapped,
+            &bytes,
+            FALSE
+        );
+        if (!ok)
+        {
+            DWORD err = GetLastError();
+            if (err == ERROR_IO_INCOMPLETE)
+                return JSL_SUBPROCESS_SUCCESS;
+
+            proc->stdin_write_pending = false;
+            if (err == ERROR_BROKEN_PIPE || err == ERROR_NO_DATA)
+            {
+                // Child closed its stdin: end of writes.
+                jsl__subprocess_win_close_handle(&proc->stdin_write_handle);
+                return JSL_SUBPROCESS_SUCCESS;
+            }
+            if (out_errno != NULL)
+                *out_errno = (int32_t) err;
+            jsl__subprocess_win_close_handle(&proc->stdin_write_handle);
+            return JSL_SUBPROCESS_IO_FAILED;
+        }
+
+        proc->stdin_write_offset += (int64_t) bytes;
+        proc->stdin_write_pending = false;
+        // Fall through to state A to kick the next chunk if any.
+    }
+
+    // State A: nothing pending. Either close (done) or start a new write.
     int64_t remaining = proc->stdin_memory.length - proc->stdin_write_offset;
     if (remaining <= 0)
     {
@@ -4189,34 +4383,78 @@ static JSLSubProcessResultEnum jsl__subprocess_win_pump_stdin_once(
         return JSL_SUBPROCESS_SUCCESS;
     }
 
-    DWORD to_write = (DWORD)(remaining > 4096 ? 4096 : remaining);
-    DWORD written = 0;
+    DWORD chunk =
+        (DWORD)(remaining > (int64_t) sizeof(proc->stdin_write_buffer)
+            ? (int64_t) sizeof(proc->stdin_write_buffer)
+            : remaining);
+
+    JSL_MEMCPY(
+        proc->stdin_write_buffer,
+        proc->stdin_memory.data + proc->stdin_write_offset,
+        chunk
+    );
+    proc->stdin_write_buffer_len = chunk;
+
+    ZeroMemory(&proc->stdin_write_overlapped, sizeof(proc->stdin_write_overlapped));
+    proc->stdin_write_overlapped.hEvent = proc->stdin_write_event;
+
     BOOL wok = WriteFile(
         proc->stdin_write_handle,
-        proc->stdin_memory.data + proc->stdin_write_offset,
-        to_write,
-        &written,
-        NULL
+        proc->stdin_write_buffer,
+        chunk,
+        NULL,
+        &proc->stdin_write_overlapped
     );
 
-    if (!wok || written == 0)
+    if (wok)
+    {
+        // Completed synchronously. Advance and continue: if more data
+        // remains, kick the next write this same call so we always
+        // leave an op pending on the handle (or close it).
+        DWORD bytes = 0;
+        (void) GetOverlappedResult(
+            proc->stdin_write_handle,
+            &proc->stdin_write_overlapped,
+            &bytes,
+            FALSE
+        );
+        proc->stdin_write_offset += (int64_t) bytes;
+        proc->stdin_write_pending = false;
+        continue;
+    }
+
+    DWORD err = GetLastError();
+    if (err == ERROR_IO_PENDING)
+    {
+        proc->stdin_write_pending = true;
+        return JSL_SUBPROCESS_SUCCESS;
+    }
+    if (err == ERROR_BROKEN_PIPE || err == ERROR_NO_DATA)
     {
         jsl__subprocess_win_close_handle(&proc->stdin_write_handle);
-    }
-    else
-    {
-        proc->stdin_write_offset += (int64_t) written;
-        if (proc->stdin_write_offset >= proc->stdin_memory.length)
-            jsl__subprocess_win_close_handle(&proc->stdin_write_handle);
+        return JSL_SUBPROCESS_SUCCESS;
     }
 
-    return JSL_SUBPROCESS_SUCCESS;
+    if (out_errno != NULL)
+        *out_errno = (int32_t) err;
+    jsl__subprocess_win_close_handle(&proc->stdin_write_handle);
+    return JSL_SUBPROCESS_IO_FAILED;
+    } // for(;;)
 }
 
-// Drain whatever is currently buffered on a single pipe handle into its
-// sink. Uses PeekNamedPipe to avoid blocking.
-static JSLSubProcessResultEnum jsl__subprocess_win_drain_one(
+// One pump of an output stream (stdout or stderr) using overlapped I/O.
+// Drains any completed read into the sink and always leaves an op
+// pending on the handle when the handle is still open, so the event
+// loop has something to wait on. Returns IO_FAILED on real read
+// failures; EOF (ERROR_BROKEN_PIPE / ERROR_HANDLE_EOF) is a normal
+// termination.
+static JSLSubProcessResultEnum jsl__subprocess_win_pump_output_stream(
     HANDLE* h_ptr,
+    OVERLAPPED* ov,
+    HANDLE ev,
+    bool* pending,
+    uint8_t* buffer,
+    DWORD buffer_size,
     JSLOutputSink sink,
     bool* eof_seen,
     int32_t* out_errno
@@ -4225,49 +4463,78 @@ static JSLSubProcessResultEnum jsl__subprocess_win_drain_one(
     if (*h_ptr == INVALID_HANDLE_VALUE || *eof_seen)
         return JSL_SUBPROCESS_SUCCESS;
 
-    DWORD avail = 0;
-    BOOL pok = PeekNamedPipe(*h_ptr, NULL, 0, NULL, &avail, NULL);
-    if (!pok)
+    // Loop: drain completions, then kick the next read. Bounded by
+    // each iteration either returning immediately (pending/EOF/error)
+    // or completing synchronously and trying again.
+    for (;;)
     {
+        if (*pending)
+        {
+            DWORD bytes = 0;
+            BOOL ok = GetOverlappedResult(*h_ptr, ov, &bytes, FALSE);
+            if (!ok)
+            {
+                DWORD err = GetLastError();
+                if (err == ERROR_IO_INCOMPLETE)
+                    return JSL_SUBPROCESS_SUCCESS;
+
+                *pending = false;
+                if (err == ERROR_BROKEN_PIPE || err == ERROR_HANDLE_EOF)
+                {
+                    jsl__subprocess_win_close_handle(h_ptr);
+                    *eof_seen = true;
+                    return JSL_SUBPROCESS_SUCCESS;
+                }
+                if (out_errno != NULL)
+                    *out_errno = (int32_t) err;
+                jsl__subprocess_win_close_handle(h_ptr);
+                *eof_seen = true;
+                return JSL_SUBPROCESS_IO_FAILED;
+            }
+
+            *pending = false;
+            if (bytes == 0)
+            {
+                // Zero-byte completion on a byte-mode pipe means EOF.
+                jsl__subprocess_win_close_handle(h_ptr);
+                *eof_seen = true;
+                return JSL_SUBPROCESS_SUCCESS;
+            }
+            jsl_output_sink_write(sink, jsl_immutable_memory(buffer, (int64_t) bytes));
+            // Fall through to kick another read.
+        }
+
+        ZeroMemory(ov, sizeof(*ov));
+        ov->hEvent = ev;
+
+        BOOL rok = ReadFile(*h_ptr, buffer, buffer_size, NULL, ov);
+        if (rok)
+        {
+            // Completed synchronously. Mark pending so the completion
+            // branch above consumes it on the next iteration.
+            *pending = true;
+            continue;
+        }
+
         DWORD err = GetLastError();
-        // ERROR_BROKEN_PIPE = clean EOF; other errors are real failures.
+        if (err == ERROR_IO_PENDING)
+        {
+            *pending = true;
+            return JSL_SUBPROCESS_SUCCESS;
+        }
+        if (err == ERROR_BROKEN_PIPE || err == ERROR_HANDLE_EOF)
+        {
+            jsl__subprocess_win_close_handle(h_ptr);
+            *eof_seen = true;
+            return JSL_SUBPROCESS_SUCCESS;
+        }
+
+        if (out_errno != NULL)
+            *out_errno = (int32_t) err;
         jsl__subprocess_win_close_handle(h_ptr);
         *eof_seen = true;
-        if (err != ERROR_BROKEN_PIPE && err != ERROR_HANDLE_EOF)
-        {
-            if (out_errno != NULL)
-                *out_errno = (int32_t) err;
-            return JSL_SUBPROCESS_IO_FAILED;
-        }
-        return JSL_SUBPROCESS_SUCCESS;
+        return JSL_SUBPROCESS_IO_FAILED;
     }
-
-    if (avail == 0)
-        return JSL_SUBPROCESS_SUCCESS;
-
-    uint8_t io_buf[4096];
-    DWORD to_read = avail > (DWORD) sizeof(io_buf) ? (DWORD) sizeof(io_buf) : avail;
-    DWORD read_n = 0;
-    BOOL rok = ReadFile(*h_ptr, io_buf, to_read, &read_n, NULL);
-
-    if (rok && read_n > 0)
-    {
-        jsl_output_sink_write(sink, jsl_immutable_memory(io_buf, (int64_t) read_n));
-    }
-    else
-    {
-        DWORD err = GetLastError();
-        jsl__subprocess_win_close_handle(h_ptr);
-        *eof_seen = true;
-        if (!rok && err != ERROR_BROKEN_PIPE && err != ERROR_HANDLE_EOF)
-        {
-            if (out_errno != NULL)
-                *out_errno = (int32_t) err;
-            return JSL_SUBPROCESS_IO_FAILED;
-        }
-    }
-
-    return JSL_SUBPROCESS_SUCCESS;
 }
 
 static JSLSubProcessResultEnum jsl__subprocess_win_pump_output_once(
@@ -4279,8 +4546,13 @@ static JSLSubProcessResultEnum jsl__subprocess_win_pump_output_once(
 
     if (proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_SINK)
     {
-        JSLSubProcessResultEnum r = jsl__subprocess_win_drain_one(
+        JSLSubProcessResultEnum r = jsl__subprocess_win_pump_output_stream(
             &proc->stdout_read_handle,
+            &proc->stdout_read_overlapped,
+            proc->stdout_read_event,
+            &proc->stdout_read_pending,
+            proc->stdout_read_buffer,
+            (DWORD) sizeof(proc->stdout_read_buffer),
             proc->stdout_sink,
             &proc->stdout_eof_seen,
             out_errno
@@ -4291,8 +4563,13 @@ static JSLSubProcessResultEnum jsl__subprocess_win_pump_output_once(
 
     if (proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_SINK)
     {
-        JSLSubProcessResultEnum r = jsl__subprocess_win_drain_one(
+        JSLSubProcessResultEnum r = jsl__subprocess_win_pump_output_stream(
             &proc->stderr_read_handle,
+            &proc->stderr_read_overlapped,
+            proc->stderr_read_event,
+            &proc->stderr_read_pending,
+            proc->stderr_read_buffer,
+            (DWORD) sizeof(proc->stderr_read_buffer),
             proc->stderr_sink,
             &proc->stderr_eof_seen,
             result == JSL_SUBPROCESS_SUCCESS ? out_errno : NULL
@@ -4458,180 +4735,187 @@ JSLSubProcessResultEnum jsl_subprocess_run_blocking(
 
     jsl__subprocess_win_close_child_pipe_ends(&ctx);
 
-    HANDLE stdin_write = ctx.stdin_write;
-    HANDLE stdout_read = ctx.stdout_read;
-    HANDLE stderr_read = ctx.stderr_read;
+    // Hand the parent pipe ends + overlapped events off to `proc` so the
+    // shared overlapped pump helpers can drive them. `run_blocking`
+    // cleans them up itself below — it does not flip `is_background`.
+    proc->stdin_write_handle = ctx.stdin_write;
+    proc->stdout_read_handle = ctx.stdout_read;
+    proc->stderr_read_handle = ctx.stderr_read;
+    proc->stdin_write_event = ctx.stdin_write_event;
+    proc->stdout_read_event = ctx.stdout_read_event;
+    proc->stderr_read_event = ctx.stderr_read_event;
+    proc->stdin_write_offset = 0;
+    proc->stdin_write_pending = false;
+    proc->stdout_read_pending = false;
+    proc->stderr_read_pending = false;
+    proc->stdout_eof_seen = false;
+    proc->stderr_eof_seen = false;
 
-    // I/O pump. Poll each pipe with PeekNamedPipe since Windows doesn't
-    // expose a portable equivalent of poll() for anonymous pipes.
-    int64_t stdin_offset = 0;
+    int32_t io_errno = 0;
     bool io_error = false;
+    bool process_exited = false;
 
-    while (stdin_write != INVALID_HANDLE_VALUE
-        || stdout_read != INVALID_HANDLE_VALUE
-        || stderr_read != INVALID_HANDLE_VALUE)
+    for (;;)
     {
-        bool did_work = false;
+        // Kick-or-progress each pipe. Successful calls leave a pending
+        // op on each still-open stream, whose event we can wait on.
+        int32_t e = 0;
+        (void) jsl__subprocess_win_pump_stdin_once(proc, &e);
+        if (e != 0 && !io_error) { io_error = true; io_errno = e; }
 
-        if (stdin_write != INVALID_HANDLE_VALUE)
+        e = 0;
+        JSLSubProcessResultEnum pr = jsl__subprocess_win_pump_output_once(proc, &e);
+        if (pr == JSL_SUBPROCESS_IO_FAILED && !io_error)
         {
-            int64_t remaining = proc->stdin_memory.length - stdin_offset;
-            if (remaining <= 0)
-            {
-                CloseHandle(stdin_write);
-                stdin_write = INVALID_HANDLE_VALUE;
-                did_work = true;
-            }
-            else
-            {
-                DWORD to_write = (DWORD)(remaining > 4096 ? 4096 : remaining);
-                DWORD written = 0;
-                BOOL wok = WriteFile(
-                    stdin_write,
-                    proc->stdin_memory.data + stdin_offset,
-                    to_write,
-                    &written,
-                    NULL
-                );
-                if (!wok || written == 0)
-                {
-                    CloseHandle(stdin_write);
-                    stdin_write = INVALID_HANDLE_VALUE;
-                }
-                else
-                {
-                    stdin_offset += (int64_t) written;
-                }
-                did_work = true;
-            }
+            io_error = true;
+            io_errno = e;
         }
 
-        uint8_t io_buf[4096];
+        // Build the wait set: process handle first, then any pending
+        // pipe events. Exiting the loop via "all pipes closed" is fine;
+        // the final WaitForSingleObject below harvests the exit code.
+        HANDLE handles[4];
+        DWORD n = 0;
+        handles[n++] = pi.hProcess;
 
-        if (stdout_read != INVALID_HANDLE_VALUE)
+        if (proc->stdin_write_handle != INVALID_HANDLE_VALUE
+            && proc->stdin_write_pending)
+            handles[n++] = proc->stdin_write_event;
+
+        if (proc->stdout_read_handle != INVALID_HANDLE_VALUE
+            && proc->stdout_read_pending)
+            handles[n++] = proc->stdout_read_event;
+
+        if (proc->stderr_read_handle != INVALID_HANDLE_VALUE
+            && proc->stderr_read_pending)
+            handles[n++] = proc->stderr_read_event;
+
+        DWORD wret = WaitForMultipleObjects(n, handles, FALSE, INFINITE);
+
+        if (wret == WAIT_FAILED)
         {
-            DWORD avail = 0;
-            BOOL pok = PeekNamedPipe(stdout_read, NULL, 0, NULL, &avail, NULL);
-            if (!pok)
-            {
-                CloseHandle(stdout_read);
-                stdout_read = INVALID_HANDLE_VALUE;
-                did_work = true;
-            }
-            else if (avail > 0)
-            {
-                DWORD read_n = 0;
-                BOOL rok = ReadFile(stdout_read, io_buf, (DWORD) sizeof(io_buf), &read_n, NULL);
-                if (rok && read_n > 0)
-                {
-                    jsl_output_sink_write(
-                        proc->stdout_sink,
-                        jsl_immutable_memory(io_buf, (int64_t) read_n)
-                    );
-                }
-                else
-                {
-                    CloseHandle(stdout_read);
-                    stdout_read = INVALID_HANDLE_VALUE;
-                }
-                did_work = true;
-            }
+            DWORD err = GetLastError();
+            if (!io_error) { io_error = true; io_errno = (int32_t) err; }
+            break;
         }
 
-        if (stderr_read != INVALID_HANDLE_VALUE)
+        if (wret == WAIT_OBJECT_0)
         {
-            DWORD avail = 0;
-            BOOL pok = PeekNamedPipe(stderr_read, NULL, 0, NULL, &avail, NULL);
-            if (!pok)
-            {
-                CloseHandle(stderr_read);
-                stderr_read = INVALID_HANDLE_VALUE;
-                did_work = true;
-            }
-            else if (avail > 0)
-            {
-                DWORD read_n = 0;
-                BOOL rok = ReadFile(stderr_read, io_buf, (DWORD) sizeof(io_buf), &read_n, NULL);
-                if (rok && read_n > 0)
-                {
-                    jsl_output_sink_write(
-                        proc->stderr_sink,
-                        jsl_immutable_memory(io_buf, (int64_t) read_n)
-                    );
-                }
-                else
-                {
-                    CloseHandle(stderr_read);
-                    stderr_read = INVALID_HANDLE_VALUE;
-                }
-                did_work = true;
-            }
+            // Process exited. Fall through to final drain.
+            process_exited = true;
+            break;
         }
 
-        if (!did_work)
+        // Some pipe event fired. Next loop iteration's pump calls
+        // consume the completion.
+    }
+
+    // Final drain: after the process is gone, whatever remained buffered
+    // in the pipes is still readable until EOF. Loop until both output
+    // streams report EOF and stdin is closed.
+    if (process_exited)
+    {
+        for (;;)
         {
-            DWORD wait_res = WaitForSingleObject(pi.hProcess, 5);
-            if (wait_res == WAIT_OBJECT_0)
+            bool anything_open =
+                proc->stdin_write_handle != INVALID_HANDLE_VALUE
+                || (proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_SINK
+                    && !proc->stdout_eof_seen
+                    && proc->stdout_read_handle != INVALID_HANDLE_VALUE)
+                || (proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_SINK
+                    && !proc->stderr_eof_seen
+                    && proc->stderr_read_handle != INVALID_HANDLE_VALUE);
+            if (!anything_open)
+                break;
+
+            int32_t e = 0;
+            (void) jsl__subprocess_win_pump_stdin_once(proc, &e);
+            if (e != 0 && !io_error) { io_error = true; io_errno = e; }
+
+            e = 0;
+            JSLSubProcessResultEnum pr = jsl__subprocess_win_pump_output_once(proc, &e);
+            if (pr == JSL_SUBPROCESS_IO_FAILED && !io_error)
             {
-                if (stdout_read != INVALID_HANDLE_VALUE)
-                {
-                    DWORD avail = 0;
-                    if (!PeekNamedPipe(stdout_read, NULL, 0, NULL, &avail, NULL) || avail == 0)
-                    {
-                        CloseHandle(stdout_read);
-                        stdout_read = INVALID_HANDLE_VALUE;
-                    }
-                }
-                if (stderr_read != INVALID_HANDLE_VALUE)
-                {
-                    DWORD avail = 0;
-                    if (!PeekNamedPipe(stderr_read, NULL, 0, NULL, &avail, NULL) || avail == 0)
-                    {
-                        CloseHandle(stderr_read);
-                        stderr_read = INVALID_HANDLE_VALUE;
-                    }
-                }
-                if (stdin_write != INVALID_HANDLE_VALUE)
-                {
-                    CloseHandle(stdin_write);
-                    stdin_write = INVALID_HANDLE_VALUE;
-                }
+                io_error = true;
+                io_errno = e;
             }
+
+            HANDLE handles[3];
+            DWORD n = 0;
+            if (proc->stdin_write_handle != INVALID_HANDLE_VALUE
+                && proc->stdin_write_pending)
+                handles[n++] = proc->stdin_write_event;
+            if (proc->stdout_read_handle != INVALID_HANDLE_VALUE
+                && proc->stdout_read_pending)
+                handles[n++] = proc->stdout_read_event;
+            if (proc->stderr_read_handle != INVALID_HANDLE_VALUE
+                && proc->stderr_read_pending)
+                handles[n++] = proc->stderr_read_event;
+            if (n == 0)
+                break;
+
+            (void) WaitForMultipleObjects(n, handles, FALSE, 5000);
         }
     }
 
+    // Harvest exit code. The process handle is the only thing we still
+    // need to block on; the pumping loop may have exited because all
+    // pipes closed while the process was still alive.
     DWORD wait_res = WaitForSingleObject(pi.hProcess, INFINITE);
+    DWORD exit_code = 0;
+    JSLSubProcessResultEnum wait_status = JSL_SUBPROCESS_SUCCESS;
     if (wait_res == WAIT_FAILED)
     {
-        DWORD err = GetLastError();
         if (out_errno != NULL)
-            *out_errno = (int32_t) err;
-        CloseHandle(pi.hProcess);
-        CloseHandle(pi.hThread);
-        proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
-        return JSL_SUBPROCESS_WAIT_FAILED;
+            *out_errno = (int32_t) GetLastError();
+        wait_status = JSL_SUBPROCESS_WAIT_FAILED;
+    }
+    else if (!GetExitCodeProcess(pi.hProcess, &exit_code))
+    {
+        if (out_errno != NULL)
+            *out_errno = (int32_t) GetLastError();
+        wait_status = JSL_SUBPROCESS_WAIT_FAILED;
     }
 
-    DWORD exit_code = 0;
-    if (!GetExitCodeProcess(pi.hProcess, &exit_code))
-    {
-        DWORD err = GetLastError();
-        if (out_errno != NULL)
-            *out_errno = (int32_t) err;
-        CloseHandle(pi.hProcess);
-        CloseHandle(pi.hThread);
-        proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
-        return JSL_SUBPROCESS_WAIT_FAILED;
-    }
+    // Tear down handles/events owned by run_blocking.
+    if (proc->stdin_write_pending
+        && proc->stdin_write_handle != INVALID_HANDLE_VALUE)
+        CancelIoEx(proc->stdin_write_handle, &proc->stdin_write_overlapped);
+    if (proc->stdout_read_pending
+        && proc->stdout_read_handle != INVALID_HANDLE_VALUE)
+        CancelIoEx(proc->stdout_read_handle, &proc->stdout_read_overlapped);
+    if (proc->stderr_read_pending
+        && proc->stderr_read_handle != INVALID_HANDLE_VALUE)
+        CancelIoEx(proc->stderr_read_handle, &proc->stderr_read_overlapped);
+
+    jsl__subprocess_win_close_handle(&proc->stdin_write_handle);
+    jsl__subprocess_win_close_handle(&proc->stdout_read_handle);
+    jsl__subprocess_win_close_handle(&proc->stderr_read_handle);
+    jsl__subprocess_win_close_event(&proc->stdin_write_event);
+    jsl__subprocess_win_close_event(&proc->stdout_read_event);
+    jsl__subprocess_win_close_event(&proc->stderr_read_event);
+    proc->stdin_write_pending = false;
+    proc->stdout_read_pending = false;
+    proc->stderr_read_pending = false;
 
     CloseHandle(pi.hProcess);
     CloseHandle(pi.hThread);
+
+    if (wait_status != JSL_SUBPROCESS_SUCCESS)
+    {
+        proc->status = JSL_SUBPROCESS_STATUS_FAILED_TO_START;
+        return wait_status;
+    }
 
     proc->exit_code = (int32_t) exit_code;
     proc->status = JSL_SUBPROCESS_STATUS_EXITED;
 
     if (io_error)
+    {
+        if (out_errno != NULL)
+            *out_errno = io_errno;
         result = JSL_SUBPROCESS_IO_FAILED;
+    }
 
     return result;
 
@@ -4730,6 +5014,9 @@ JSLSubProcessResultEnum jsl_subprocess_background_start(
     proc->stdin_write_handle = ctx.stdin_write;
     proc->stdout_read_handle = ctx.stdout_read;
     proc->stderr_read_handle = ctx.stderr_read;
+    proc->stdin_write_event = ctx.stdin_write_event;
+    proc->stdout_read_event = ctx.stdout_read_event;
+    proc->stderr_read_event = ctx.stderr_read_event;
 
     proc->status = JSL_SUBPROCESS_STATUS_RUNNING;
     proc->is_background = true;
@@ -5250,78 +5537,169 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
 
 #elif JSL_IS_WINDOWS
 
-    // Windows wait strategy: short-poll with `WaitForMultipleObjectsEx`
-    // over process handles (up to 64 per call), pumping each proc's
-    // stdin / stdout / stderr between waits. This does not use the
-    // plan's overlapped-pipes approach; the pipe pump uses the
-    // existing anonymous-pipe `PeekNamedPipe` path. It satisfies the
-    // functional contract at the cost of a small (10ms) timer floor
-    // per batching round when procs are idle.
-    const DWORD rotation_slice_ms = 10;
-    const int32_t max_procs_per_batch = 60;
+    // Windows event-driven wait: up to 16 procs per group, each
+    // contributing up to 4 handles (process + stdin-write event +
+    // stdout-read event + stderr-read event), for a maximum wait set
+    // of 64 — the `WaitForMultipleObjectsEx` ceiling. When more than
+    // one group is needed, rotate every 50 ms so no group starves.
+    const int32_t group_size = 16;
+    const DWORD rotation_slice_ms = 50;
 
     int64_t ms_deadline = 0;
     bool infinite = (timeout_ms < 0);
     if (!infinite)
         ms_deadline = jsl__monotonic_ms() + (int64_t) timeout_ms;
 
-    HANDLE handles[64];
-    int32_t handle_to_slot[64];
+    // Prime: kick a pending read on each still-running proc so the
+    // event-driven loop has something to wait on.
+    for (int32_t i = 0; i < count; i++)
+    {
+        if (!slots[i].still_waiting)
+            continue;
+        JSLSubprocess* p = &procs[i];
+
+        int32_t e = 0;
+        (void) jsl__subprocess_win_pump_stdin_once(p, &e);
+        if (e != 0) p->last_errno = e;
+
+        e = 0;
+        JSLSubProcessResultEnum pr = jsl__subprocess_win_pump_output_once(p, &e);
+        if (pr == JSL_SUBPROCESS_IO_FAILED)
+        {
+            p->last_errno = e;
+            slots[i].io_failed = true;
+            any_io_failed = true;
+        }
+        else if (e != 0)
+        {
+            p->last_errno = e;
+        }
+    }
+
+    // Classification of each wait-set slot. We keep one parallel array
+    // alongside `handles[]` so that when `WaitForMultipleObjectsEx`
+    // reports index `i`, we can look up (a) which proc it belongs to
+    // and (b) which kind of handle it was (process exit, stdin write,
+    // stdout read, stderr read).
+    enum {
+        JSL__WIN_WAIT_KIND_PROCESS = 0,
+        JSL__WIN_WAIT_KIND_STDIN_WRITE,
+        JSL__WIN_WAIT_KIND_STDOUT_READ,
+        JSL__WIN_WAIT_KIND_STDERR_READ
+    };
+
+    HANDLE handles[MAXIMUM_WAIT_OBJECTS];
+    int32_t handle_to_slot[MAXIMUM_WAIT_OBJECTS];
+    int32_t handle_kind[MAXIMUM_WAIT_OBJECTS];
+
+    int32_t num_groups = (waiting_count + group_size - 1) / group_size;
+    if (num_groups < 1)
+        num_groups = 1;
+    int32_t current_group = 0;
 
     while (waiting_count > 0)
     {
-        // Pump every still-waiting proc (stdin + stdout/stderr).
-        for (int32_t i = 0; i < count; i++)
+        // Identify which procs fall into the current group: the
+        // `group_size` still-waiting procs starting at the
+        // `current_group`-th group boundary.
+        int32_t group_start = current_group * group_size;
+        int32_t group_member = 0;
+        int32_t n_running_in_group = 0;
+        DWORD n_handles = 0;
+
+        for (int32_t i = 0;
+            i < count && n_handles + 4 <= MAXIMUM_WAIT_OBJECTS;
+            i++)
         {
-            if (!slots[i].still_waiting || slots[i].io_failed)
+            if (!slots[i].still_waiting)
                 continue;
+
+            if (group_member < group_start)
+            {
+                group_member++;
+                continue;
+            }
+            if (group_member >= group_start + group_size)
+                break;
+            group_member++;
+
             JSLSubprocess* p = &procs[i];
 
-            int32_t e = 0;
-            (void) jsl__subprocess_win_pump_stdin_once(p, &e);
-            if (e != 0) p->last_errno = e;
-
-            e = 0;
-            JSLSubProcessResultEnum pr = jsl__subprocess_win_pump_output_once(p, &e);
-            if (pr == JSL_SUBPROCESS_IO_FAILED)
-            {
-                p->last_errno = e;
-                slots[i].io_failed = true;
-                any_io_failed = true;
-                slots[i].still_waiting = false;
-                waiting_count--;
-            }
-            else if (e != 0)
-            {
-                p->last_errno = e;
-            }
-        }
-
-        if (waiting_count == 0)
-            break;
-
-        // Build one batch of up to `max_procs_per_batch` handles to
-        // wait on.
-        DWORD batch_count = 0;
-        int32_t scanned = 0;
-        for (int32_t i = 0; i < count && batch_count < (DWORD) max_procs_per_batch; i++)
-        {
-            if (!slots[i].still_waiting) continue;
-            if (procs[i].process_handle == NULL
-                || procs[i].process_handle == INVALID_HANDLE_VALUE)
+            if (p->process_handle == NULL
+                || p->process_handle == INVALID_HANDLE_VALUE)
                 continue;
-            handles[batch_count] = procs[i].process_handle;
-            handle_to_slot[batch_count] = i;
-            batch_count++;
-            scanned++;
+
+            handles[n_handles] = p->process_handle;
+            handle_to_slot[n_handles] = i;
+            handle_kind[n_handles] = JSL__WIN_WAIT_KIND_PROCESS;
+            n_handles++;
+            n_running_in_group++;
+
+            if (!slots[i].io_failed
+                && p->stdin_write_handle != INVALID_HANDLE_VALUE
+                && p->stdin_write_pending
+                && p->stdin_write_event != NULL)
+            {
+                handles[n_handles] = p->stdin_write_event;
+                handle_to_slot[n_handles] = i;
+                handle_kind[n_handles] = JSL__WIN_WAIT_KIND_STDIN_WRITE;
+                n_handles++;
+            }
+
+            if (!slots[i].io_failed
+                && p->stdout_read_handle != INVALID_HANDLE_VALUE
+                && p->stdout_read_pending
+                && p->stdout_read_event != NULL)
+            {
+                handles[n_handles] = p->stdout_read_event;
+                handle_to_slot[n_handles] = i;
+                handle_kind[n_handles] = JSL__WIN_WAIT_KIND_STDOUT_READ;
+                n_handles++;
+            }
+
+            if (!slots[i].io_failed
+                && p->stderr_read_handle != INVALID_HANDLE_VALUE
+                && p->stderr_read_pending
+                && p->stderr_read_event != NULL)
+            {
+                handles[n_handles] = p->stderr_read_event;
+                handle_to_slot[n_handles] = i;
+                handle_kind[n_handles] = JSL__WIN_WAIT_KIND_STDERR_READ;
+                n_handles++;
+            }
         }
 
-        if (batch_count == 0)
-            break;
+        if (n_handles == 0 || n_running_in_group == 0)
+        {
+            // Nothing in this group (already-drained after prior
+            // iterations). Advance rotation.
+            current_group = (current_group + 1) % (num_groups > 0 ? num_groups : 1);
+            // If every group is empty we'd loop forever — break out.
+            if (waiting_count == 0)
+                break;
+            // Cheap guard: if there is genuinely no running proc with a
+            // live process handle anywhere, bail.
+            bool any = false;
+            for (int32_t j = 0; j < count; j++)
+            {
+                if (slots[j].still_waiting
+                    && procs[j].process_handle != NULL
+                    && procs[j].process_handle != INVALID_HANDLE_VALUE)
+                {
+                    any = true;
+                    break;
+                }
+            }
+            if (!any)
+                break;
+            continue;
+        }
 
-        DWORD per_round_timeout;
+        DWORD per_wait_timeout;
         if (infinite)
-            per_round_timeout = rotation_slice_ms;
+        {
+            per_wait_timeout = (num_groups > 1) ? rotation_slice_ms : INFINITE;
+        }
         else
         {
             int64_t remaining = ms_deadline - jsl__monotonic_ms();
@@ -5330,14 +5708,19 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
                 final_result = JSL_SUBPROCESS_TIMEOUT_REACHED;
                 break;
             }
-            if (remaining > (int64_t) rotation_slice_ms)
-                per_round_timeout = rotation_slice_ms;
-            else
-                per_round_timeout = (DWORD) remaining;
+            DWORD cap = (num_groups > 1)
+                ? rotation_slice_ms
+                : (remaining > (int64_t) INFINITE ? INFINITE : (DWORD) remaining);
+            if (num_groups > 1 && remaining < (int64_t) cap)
+                cap = (DWORD) remaining;
+            per_wait_timeout = cap;
         }
 
+        if (timeout_ms == 0)
+            per_wait_timeout = 0;
+
         DWORD wret = WaitForMultipleObjectsEx(
-            batch_count, handles, FALSE, per_round_timeout, FALSE
+            n_handles, handles, FALSE, per_wait_timeout, FALSE
         );
 
         if (wret == WAIT_FAILED)
@@ -5350,43 +5733,112 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
             return JSL_SUBPROCESS_WAIT_FAILED;
         }
 
-        if (wret >= WAIT_OBJECT_0 && wret < WAIT_OBJECT_0 + batch_count)
+        if (wret >= WAIT_OBJECT_0 && wret < WAIT_OBJECT_0 + n_handles)
         {
-            int32_t idx = handle_to_slot[wret - WAIT_OBJECT_0];
-            JSLSubprocess* p = &procs[idx];
-            DWORD code = 0;
-            if (GetExitCodeProcess(p->process_handle, &code))
+            int32_t idx = (int32_t)(wret - WAIT_OBJECT_0);
+            int32_t slot_idx = handle_to_slot[idx];
+            int32_t kind = handle_kind[idx];
+            JSLSubprocess* p = &procs[slot_idx];
+
+            if (kind == JSL__WIN_WAIT_KIND_PROCESS)
             {
-                p->exit_code = (int32_t) code;
-                p->status = JSL_SUBPROCESS_STATUS_EXITED;
+                DWORD code = 0;
+                if (GetExitCodeProcess(p->process_handle, &code))
+                {
+                    p->exit_code = (int32_t) code;
+                    p->status = JSL_SUBPROCESS_STATUS_EXITED;
+                }
+                else
+                {
+                    p->exit_code = -1;
+                    p->status = JSL_SUBPROCESS_STATUS_EXITED;
+                }
+
+                // Drain any remaining output. The pipe may carry
+                // buffered bytes that arrived before the process
+                // handle transitioned.
+                int32_t e = 0;
+                JSLSubProcessResultEnum pr =
+                    jsl__subprocess_win_pump_output_once(p, &e);
+                if (pr == JSL_SUBPROCESS_IO_FAILED)
+                {
+                    p->last_errno = e;
+                    slots[slot_idx].io_failed = true;
+                    any_io_failed = true;
+                }
+                else if (e != 0)
+                {
+                    p->last_errno = e;
+                }
+
+                slots[slot_idx].still_waiting = false;
+                waiting_count--;
             }
             else
             {
-                p->exit_code = -1;
-                p->status = JSL_SUBPROCESS_STATUS_EXITED;
+                // Pipe event fired; drive the pump which will consume
+                // the completion and issue the next op.
+                int32_t e = 0;
+                if (kind == JSL__WIN_WAIT_KIND_STDIN_WRITE)
+                {
+                    (void) jsl__subprocess_win_pump_stdin_once(p, &e);
+                    if (e != 0) p->last_errno = e;
+                }
+                else
+                {
+                    JSLSubProcessResultEnum pr =
+                        jsl__subprocess_win_pump_output_once(p, &e);
+                    if (pr == JSL_SUBPROCESS_IO_FAILED)
+                    {
+                        p->last_errno = e;
+                        slots[slot_idx].io_failed = true;
+                        any_io_failed = true;
+                    }
+                    else if (e != 0)
+                    {
+                        p->last_errno = e;
+                    }
+                }
             }
-            // One last drain for this proc.
-            int32_t e = 0;
-            (void) jsl__subprocess_win_pump_output_once(p, &e);
-            if (e != 0) p->last_errno = e;
-            slots[idx].still_waiting = false;
-            waiting_count--;
         }
-        // WAIT_TIMEOUT just means "no activity this slice" — keep
-        // rotating. Other WAIT_ABANDONED* codes are not produced for
-        // process handles.
-
-        if (!infinite && jsl__monotonic_ms() >= ms_deadline)
+        else if (wret == WAIT_TIMEOUT)
         {
-            if (waiting_count > 0)
-                final_result = JSL_SUBPROCESS_TIMEOUT_REACHED;
-            break;
+            // No activity in this slice. Rotate to the next group.
+            if (num_groups > 1)
+                current_group = (current_group + 1) % num_groups;
+
+            if (!infinite && jsl__monotonic_ms() >= ms_deadline)
+            {
+                if (waiting_count > 0)
+                    final_result = JSL_SUBPROCESS_TIMEOUT_REACHED;
+                break;
+            }
+
+            if (timeout_ms == 0)
+            {
+                if (waiting_count > 0)
+                    final_result = JSL_SUBPROCESS_TIMEOUT_REACHED;
+                break;
+            }
+        }
+        else
+        {
+            // WAIT_ABANDONED_* should not happen with processes/events.
+            if (out_errno != NULL)
+                *out_errno = (int32_t) wret;
+            if (slots_on_heap)
+                free(slots);
+            return JSL_SUBPROCESS_WAIT_FAILED;
         }
 
-        if (!infinite && timeout_ms == 0 && waiting_count > 0)
+        // Recompute group count if waiting_count shrank past a boundary.
+        int32_t new_num_groups = (waiting_count + group_size - 1) / group_size;
+        if (new_num_groups < 1) new_num_groups = 1;
+        if (new_num_groups != num_groups)
         {
-            final_result = JSL_SUBPROCESS_TIMEOUT_REACHED;
-            break;
+            num_groups = new_num_groups;
+            if (current_group >= num_groups)
+                current_group = 0;
         }
     }
 
@@ -5443,12 +5895,37 @@ void jsl_subprocess_cleanup(JSLSubprocess* proc)
     if (proc->is_background)
     {
         #if JSL_IS_WINDOWS
+            // Cancel any in-flight overlapped ops before closing the
+            // underlying pipe handles. `CancelIoEx` may report
+            // `ERROR_NOT_FOUND` if the op already completed; that's
+            // fine. Close the paired event handle after the pipe.
+            if (proc->stdin_write_pending
+                && proc->stdin_write_handle != NULL
+                && proc->stdin_write_handle != INVALID_HANDLE_VALUE)
+                CancelIoEx(proc->stdin_write_handle, &proc->stdin_write_overlapped);
+            if (proc->stdout_read_pending
+                && proc->stdout_read_handle != NULL
+                && proc->stdout_read_handle != INVALID_HANDLE_VALUE)
+                CancelIoEx(proc->stdout_read_handle, &proc->stdout_read_overlapped);
+            if (proc->stderr_read_pending
+                && proc->stderr_read_handle != NULL
+                && proc->stderr_read_handle != INVALID_HANDLE_VALUE)
+                CancelIoEx(proc->stderr_read_handle, &proc->stderr_read_overlapped);
+
             if (proc->stdin_write_handle != NULL && proc->stdin_write_handle != INVALID_HANDLE_VALUE)
                 CloseHandle(proc->stdin_write_handle);
             if (proc->stdout_read_handle != NULL && proc->stdout_read_handle != INVALID_HANDLE_VALUE)
                 CloseHandle(proc->stdout_read_handle);
             if (proc->stderr_read_handle != NULL && proc->stderr_read_handle != INVALID_HANDLE_VALUE)
                 CloseHandle(proc->stderr_read_handle);
+
+            if (proc->stdin_write_event != NULL && proc->stdin_write_event != INVALID_HANDLE_VALUE)
+                CloseHandle(proc->stdin_write_event);
+            if (proc->stdout_read_event != NULL && proc->stdout_read_event != INVALID_HANDLE_VALUE)
+                CloseHandle(proc->stdout_read_event);
+            if (proc->stderr_read_event != NULL && proc->stderr_read_event != INVALID_HANDLE_VALUE)
+                CloseHandle(proc->stderr_read_event);
+
             if (proc->process_handle != NULL && proc->process_handle != INVALID_HANDLE_VALUE)
             {
                 if (proc->status == JSL_SUBPROCESS_STATUS_RUNNING)
@@ -5458,6 +5935,12 @@ void jsl_subprocess_cleanup(JSLSubprocess* proc)
             proc->stdin_write_handle = INVALID_HANDLE_VALUE;
             proc->stdout_read_handle = INVALID_HANDLE_VALUE;
             proc->stderr_read_handle = INVALID_HANDLE_VALUE;
+            proc->stdin_write_event = NULL;
+            proc->stdout_read_event = NULL;
+            proc->stderr_read_event = NULL;
+            proc->stdin_write_pending = false;
+            proc->stdout_read_pending = false;
+            proc->stderr_read_pending = false;
             proc->process_handle = INVALID_HANDLE_VALUE;
         #elif JSL_IS_POSIX
             if (proc->pid > 0 && proc->status == JSL_SUBPROCESS_STATUS_RUNNING)

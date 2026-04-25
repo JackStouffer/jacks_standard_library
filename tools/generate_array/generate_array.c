@@ -264,7 +264,7 @@ static int32_t entrypoint(JSLAllocatorInterface allocator, JSLCmdLineArgs* cmd)
         jsl_infinite_arena_get_allocator_interface(&allocator, &arena);
 
         JSLCmdLineArgs cmd;
-        jsl_cmd_line_args_init(&cmd, &allocator);
+        jsl_cmd_line_args_init(&cmd, allocator);
         JSLImmutableMemory error_message = {0};
         if (!jsl_cmd_line_args_parse_wide(&cmd, argc, argv, &error_message))
         {

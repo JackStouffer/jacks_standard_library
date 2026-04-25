@@ -89,14 +89,14 @@ JSL_DEF void jsl_libc_allocator_init(JSLLibcAllocator* allocator);
  * Create a `JSLAllocatorInterface` that routes allocations through the
  * libc allocator.
  *
- * The returned interface is valid as long as `allocator` remains alive.
+ * The returned allocator is valid as long as `allocator` remains alive.
  *
- * @param interface Output allocator interface.
+ * @param allocator Output allocator allocator.
  * @param allocator The libc allocator used for all callbacks.
  */
 JSL_DEF void jsl_libc_allocator_get_allocator_interface(
-    JSLAllocatorInterface* interface,
-    JSLLibcAllocator* allocator
+    JSLAllocatorInterface* allocator,
+    JSLLibcAllocator* libc_alloc
 );
 
 /**

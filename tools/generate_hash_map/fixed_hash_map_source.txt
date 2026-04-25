@@ -136,15 +136,28 @@ static inline void {{ function_prefix }}_probe(
     {% if key_is_struct %}
     // In JSL_DEBUG, check that the key has zeroed struct padding to help catch
     // garbage byte errors
-    #if defined(JSL_DEBUG) && ((defined(__GNUC__) && !defined(__clang__) && __GNUC__ >= 11) || (defined(__clang__) && defined(__has_builtin) && __has_builtin(__builtin_clear_padding)))
-        {
-            {{ key_type_name }} padding_check_copy = *key;
-            __builtin_clear_padding(&padding_check_copy);
-            JSL_ASSERT(
-                JSL_MEMCMP(key, &padding_check_copy, sizeof({{ key_type_name }})) == 0
-                && "Hash map struct key has non-zero padding bytes. Initialize struct keys with JSL_MEMSET before setting fields."
-            );
-        }
+    #if defined(JSL_DEBUG)
+        #ifdef __clang__
+            #if __has_builtin(__builtin_clear_padding)
+                {
+                    {{ key_type_name }} padding_check_copy = *key;
+                    __builtin_clear_padding(&padding_check_copy);
+                    JSL_ASSERT(
+                        JSL_MEMCMP(key, &padding_check_copy, sizeof({{ key_type_name }})) == 0
+                        && "Hash map struct key has non-zero padding bytes. Initialize struct keys with JSL_MEMSET before setting fields."
+                    );
+                }
+            #endif
+        #elif defined(__GNUC__) && __GNUC__ >= 11
+            {
+                {{ key_type_name }} padding_check_copy = *key;
+                __builtin_clear_padding(&padding_check_copy);
+                JSL_ASSERT(
+                    JSL_MEMCMP(key, &padding_check_copy, sizeof({{ key_type_name }})) == 0
+                    && "Hash map struct key has non-zero padding bytes. Initialize struct keys with JSL_MEMSET before setting fields."
+                );
+            }
+        #endif
     #endif
     {% endif %}
 

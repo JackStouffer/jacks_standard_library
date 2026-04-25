@@ -1160,3 +1160,95 @@ void test_jsl_subprocess_background_wait_single_stdin_memory(void)
     jsl_subprocess_cleanup(&proc);
     jsl_libc_allocator_free_all(&backing);
 }
+
+void test_jsl_subprocess_run_blocking_spew_large(void)
+{
+    // Exercises the "drain after the process handle signalled" step of
+    // the overlapped run_blocking loop. 200 KB is well beyond the 64 KiB
+    // pipe buffer, so completion will often race ahead of the final
+    // reader and leave bytes queued on the pipe once the child exits.
+    const int payload_bytes = 200000;
+
+    JSLLibcAllocator backing;
+    JSLSubprocess proc;
+    TEST_BOOL(make_helper(&proc, &backing));
+
+    char count_str[32];
+    snprintf(count_str, sizeof(count_str), "%d", payload_bytes);
+    TEST_INT32_EQUAL(
+        jsl_subprocess_arg_cstr(&proc, "spew", count_str),
+        JSL_SUBPROCESS_ARG_SUCCESS
+    );
+
+    JSLLibcAllocator sb_backing;
+    JSLAllocatorInterface sb_iface = test_libc_allocator_interface(&sb_backing);
+    JSLStringBuilder sb;
+    TEST_BOOL(jsl_string_builder_init(&sb, sb_iface, 4096));
+    TEST_BOOL(jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&sb)));
+
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(&proc, NULL);
+    TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
+    TEST_INT32_EQUAL(proc.exit_code, 0);
+
+    JSLImmutableMemory out = jsl_string_builder_get_string(&sb);
+    TEST_INT64_EQUAL(out.length, (int64_t) payload_bytes);
+
+    jsl_string_builder_free(&sb);
+    jsl_libc_allocator_free_all(&sb_backing);
+    jsl_subprocess_cleanup(&proc);
+    jsl_libc_allocator_free_all(&backing);
+}
+
+void test_jsl_subprocess_background_wait_17_procs_event_driven(void)
+{
+    // 17 procs is one more than the Windows group-size cap of 16, so
+    // this shakes out group-rotation fairness: every group must make
+    // forward progress, none may starve. The procs are tiny (`echo ok`)
+    // so completion well inside the 5s budget is the real assertion.
+    enum { N = 17 };
+    JSLLibcAllocator backing[N];
+    JSLLibcAllocator sb_backing[N];
+    JSLSubprocess procs[N];
+    JSLStringBuilder sbs[N];
+
+    for (int i = 0; i < N; i++)
+    {
+        TEST_BOOL(make_helper(&procs[i], &backing[i]));
+        TEST_INT32_EQUAL(
+            jsl_subprocess_arg_cstr(&procs[i], "echo", "ok"),
+            JSL_SUBPROCESS_ARG_SUCCESS
+        );
+
+        JSLAllocatorInterface sb_iface = test_libc_allocator_interface(&sb_backing[i]);
+        TEST_BOOL(jsl_string_builder_init(&sbs[i], sb_iface, 32));
+        TEST_BOOL(jsl_subprocess_set_stdout_sink(
+            &procs[i], jsl_string_builder_output_sink(&sbs[i])
+        ));
+
+        TEST_INT32_EQUAL(
+            jsl_subprocess_background_start(&procs[i], NULL),
+            JSL_SUBPROCESS_SUCCESS
+        );
+    }
+
+    JSLSubProcessResultEnum r = jsl_subprocess_background_wait(procs, N, 5000, NULL);
+    TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
+
+    for (int i = 0; i < N; i++)
+    {
+        TEST_INT32_EQUAL(procs[i].status, JSL_SUBPROCESS_STATUS_EXITED);
+        TEST_INT32_EQUAL(procs[i].exit_code, 0);
+        JSLImmutableMemory out = jsl_string_builder_get_string(&sbs[i]);
+        TEST_INT64_EQUAL(out.length, 3); // "ok\n"
+        if (out.length == 3)
+            TEST_BUFFERS_EQUAL(out.data, "ok\n", 3);
+    }
+
+    for (int i = 0; i < N; i++)
+    {
+        jsl_string_builder_free(&sbs[i]);
+        jsl_libc_allocator_free_all(&sb_backing[i]);
+        jsl_subprocess_cleanup(&procs[i]);
+        jsl_libc_allocator_free_all(&backing[i]);
+    }
+}

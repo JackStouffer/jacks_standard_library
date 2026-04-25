@@ -85,7 +85,7 @@ extern "C" {
 
 #else
 
-    #error "os.h: Unsupported OS detected. The JSL OS interface is for POSIX and Windows systems only."
+    #error "os.h: Unsupported OS detected. The JSL OS allocator is for POSIX and Windows systems only."
 
 #endif
 
@@ -844,6 +844,27 @@ typedef struct JSLSubprocess
     HANDLE stdin_write_handle;
     HANDLE stdout_read_handle;
     HANDLE stderr_read_handle;
+
+    // Overlapped-I/O state for the three parent-side pipe ends. The
+    // parent ends are opened with FILE_FLAG_OVERLAPPED so that readiness
+    // can participate in WaitForMultipleObjectsEx. Each pipe has its own
+    // OVERLAPPED struct, manual-reset event, pending flag, and a fixed
+    // scratch buffer whose lifetime is the subprocess lifetime.
+    OVERLAPPED stdin_write_overlapped;
+    HANDLE stdin_write_event;
+    bool stdin_write_pending;
+    DWORD stdin_write_buffer_len;
+    uint8_t stdin_write_buffer[4096];
+
+    OVERLAPPED stdout_read_overlapped;
+    HANDLE stdout_read_event;
+    bool stdout_read_pending;
+    uint8_t stdout_read_buffer[4096];
+
+    OVERLAPPED stderr_read_overlapped;
+    HANDLE stderr_read_event;
+    bool stderr_read_pending;
+    uint8_t stderr_read_buffer[4096];
 #elif JSL_IS_POSIX
     int32_t pid;
     int stdin_write_fd;

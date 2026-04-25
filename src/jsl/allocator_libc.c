@@ -164,18 +164,18 @@ static bool jsl__libc_create_child(void* ctx, JSLAllocatorInterface* child)
 }
 
 void jsl_libc_allocator_get_allocator_interface(
-    JSLAllocatorInterface* interface,
-    JSLLibcAllocator* allocator
+    JSLAllocatorInterface* allocator,
+    JSLLibcAllocator* libc_alloc
 )
 {
     jsl_allocator_interface_init(
-        interface,
+        allocator,
         jsl__libc_alloc_interface_alloc,
         jsl__libc_alloc_interface_realloc,
         jsl__libc_alloc_interface_free,
         jsl__libc_alloc_interface_free_all,
         jsl__libc_create_child,
-        allocator
+        libc_alloc
     );
 }
 

@@ -474,6 +474,8 @@ int main(void)
     RUN_TEST_FUNCTION("Test jsl_subprocess_background_wait timeout", test_jsl_subprocess_background_wait_timeout);
     RUN_TEST_FUNCTION("Test jsl_subprocess_background_wait heavy stdout", test_jsl_subprocess_background_wait_heavy_stdout);
     RUN_TEST_FUNCTION("Test jsl_subprocess_background_wait single stdin", test_jsl_subprocess_background_wait_single_stdin_memory);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking spew large", test_jsl_subprocess_run_blocking_spew_large);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_background_wait 17 procs event-driven", test_jsl_subprocess_background_wait_17_procs_event_driven);
 
     TEST_RESULTS();
     return lfails != 0;
