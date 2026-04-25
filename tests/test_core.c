@@ -547,6 +547,211 @@ void test_jsl_substring_search(void)
         int64_t res = jsl_substring_search(long_str, substring);
         TEST_INT64_EQUAL(res, (int64_t) 0);
     }
+
+    /* SIMD activation boundary: string.length = 15, 16, 17. On NEON/WASM
+     * SIMD engages at >= 16; at 15 it falls through to BNDM/Sunday. */
+    {
+        JSLImmutableMemory string = JSL_CSTR_INITIALIZER("aaaaaaabcXaaaaa"); /* len 15 */
+        JSLImmutableMemory substring = JSL_CSTR_INITIALIZER("abc");
+        int64_t res = jsl_substring_search(string, substring);
+        TEST_INT64_EQUAL(res, (int64_t) 6);
+    }
+
+    {
+        JSLImmutableMemory string = JSL_CSTR_INITIALIZER("aaaaaaabcXaaaaaa"); /* len 16 */
+        JSLImmutableMemory substring = JSL_CSTR_INITIALIZER("abc");
+        int64_t res = jsl_substring_search(string, substring);
+        TEST_INT64_EQUAL(res, (int64_t) 6);
+    }
+
+    {
+        JSLImmutableMemory string = JSL_CSTR_INITIALIZER("aaaaaaabcXaaaaaaa"); /* len 17 */
+        JSLImmutableMemory substring = JSL_CSTR_INITIALIZER("abc");
+        int64_t res = jsl_substring_search(string, substring);
+        TEST_INT64_EQUAL(res, (int64_t) 6);
+    }
+
+    /* Unroll boundary: 31, 32, 33 -- transition between SIMD main loop
+     * and scalar tail. */
+    {
+        JSLImmutableMemory string = JSL_CSTR_INITIALIZER("ppppppppppppppppppppppppppabcde"); /* len 31 */
+        JSLImmutableMemory substring = JSL_CSTR_INITIALIZER("abcde");
+        int64_t res = jsl_substring_search(string, substring);
+        TEST_INT64_EQUAL(res, (int64_t) 26);
+    }
+
+    {
+        JSLImmutableMemory string = JSL_CSTR_INITIALIZER("pppppppppppppppppppppppppppabcde"); /* len 32 */
+        JSLImmutableMemory substring = JSL_CSTR_INITIALIZER("abcde");
+        int64_t res = jsl_substring_search(string, substring);
+        TEST_INT64_EQUAL(res, (int64_t) 27);
+    }
+
+    {
+        JSLImmutableMemory string = JSL_CSTR_INITIALIZER("ppppppppppppppppppppppppppppabcde"); /* len 33 */
+        JSLImmutableMemory substring = JSL_CSTR_INITIALIZER("abcde");
+        int64_t res = jsl_substring_search(string, substring);
+        TEST_INT64_EQUAL(res, (int64_t) 28);
+    }
+
+    /* AVX2 activation boundary: 63, 64, 65. */
+    {
+        JSLImmutableMemory string = JSL_CSTR_INITIALIZER(
+            "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqabcde"); /* len 63 */
+        JSLImmutableMemory substring = JSL_CSTR_INITIALIZER("abcde");
+        int64_t res = jsl_substring_search(string, substring);
+        TEST_INT64_EQUAL(res, (int64_t) 58);
+    }
+
+    {
+        JSLImmutableMemory string = JSL_CSTR_INITIALIZER(
+            "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqabcde"); /* len 64 */
+        JSLImmutableMemory substring = JSL_CSTR_INITIALIZER("abcde");
+        int64_t res = jsl_substring_search(string, substring);
+        TEST_INT64_EQUAL(res, (int64_t) 59);
+    }
+
+    {
+        JSLImmutableMemory string = JSL_CSTR_INITIALIZER(
+            "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqabcde"); /* len 65 */
+        JSLImmutableMemory substring = JSL_CSTR_INITIALIZER("abcde");
+        int64_t res = jsl_substring_search(string, substring);
+        TEST_INT64_EQUAL(res, (int64_t) 60);
+    }
+
+    /* Match at the first byte of each SIMD block (i == 0, 16, 32). */
+    {
+        JSLImmutableMemory string = JSL_CSTR_INITIALIZER(
+            "abcXeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"); /* len 40, match at 0 */
+        JSLImmutableMemory substring = JSL_CSTR_INITIALIZER("abc");
+        int64_t res = jsl_substring_search(string, substring);
+        TEST_INT64_EQUAL(res, (int64_t) 0);
+    }
+
+    {
+        JSLImmutableMemory string = JSL_CSTR_INITIALIZER(
+            "eeeeeeeeeeeeeeeeabcXeeeeeeeeeeeeeeeeeeeeeeee"); /* len 44, match at 16 */
+        JSLImmutableMemory substring = JSL_CSTR_INITIALIZER("abc");
+        int64_t res = jsl_substring_search(string, substring);
+        TEST_INT64_EQUAL(res, (int64_t) 16);
+    }
+
+    {
+        JSLImmutableMemory string = JSL_CSTR_INITIALIZER(
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeabcXeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"); /* len 68, match at 32 */
+        JSLImmutableMemory substring = JSL_CSTR_INITIALIZER("abc");
+        int64_t res = jsl_substring_search(string, substring);
+        TEST_INT64_EQUAL(res, (int64_t) 32);
+    }
+
+    /* Match at last valid start position -- exercises the scalar tail. */
+    {
+        JSLImmutableMemory string = JSL_CSTR_INITIALIZER(
+            "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeabc"); /* len 54, match at 51 */
+        JSLImmutableMemory substring = JSL_CSTR_INITIALIZER("abc");
+        int64_t res = jsl_substring_search(string, substring);
+        TEST_INT64_EQUAL(res, (int64_t) 51);
+    }
+
+    /* False-positive first+last match in a SIMD block: first char 'a'
+     * and last char 'z' collide at offset 0, but the interior bytes
+     * ("____") don't match "bcxy". The real match is at offset 16. */
+    {
+        JSLImmutableMemory string = JSL_CSTR_INITIALIZER(
+            "a____z__________abcxyz__________________"); /* len 40 */
+        JSLImmutableMemory substring = JSL_CSTR_INITIALIZER("abcxyz");
+        int64_t res = jsl_substring_search(string, substring);
+        TEST_INT64_EQUAL(res, (int64_t) 16);
+    }
+
+    /* Multiple candidates in one SIMD word -- confirms the mask-clearing
+     * loop walks every candidate. */
+    {
+        JSLImmutableMemory string = JSL_CSTR_INITIALIZER(
+            "yyyyyyyyyyyyyyyyyyyyyyyyyyyyyyabyyyyyyyy"); /* len 40, "ab" at 30 */
+        JSLImmutableMemory substring = JSL_CSTR_INITIALIZER("ab");
+        int64_t res = jsl_substring_search(string, substring);
+        TEST_INT64_EQUAL(res, (int64_t) 30);
+    }
+
+    {
+        JSLImmutableMemory string = JSL_CSTR_INITIALIZER(
+            "ababababababababababababababababababababab"); /* len 42, "ab" at 0 */
+        JSLImmutableMemory substring = JSL_CSTR_INITIALIZER("ab");
+        int64_t res = jsl_substring_search(string, substring);
+        TEST_INT64_EQUAL(res, (int64_t) 0);
+    }
+
+    /* Needle length exactly 2 with first/last chars in SIMD block. */
+    {
+        JSLImmutableMemory string = JSL_CSTR_INITIALIZER(
+            "zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzab"); /* len 39, "ab" at 37 */
+        JSLImmutableMemory substring = JSL_CSTR_INITIALIZER("ab");
+        int64_t res = jsl_substring_search(string, substring);
+        TEST_INT64_EQUAL(res, (int64_t) 37);
+    }
+
+    /* Needle lengths 16 and 17. */
+    {
+        JSLImmutableMemory string = JSL_CSTR_INITIALIZER(
+            "zzzzzzzzabcdefghijklmnopzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"); /* len 56 */
+        JSLImmutableMemory substring = JSL_CSTR_INITIALIZER("abcdefghijklmnop"); /* len 16 */
+        int64_t res = jsl_substring_search(string, substring);
+        TEST_INT64_EQUAL(res, (int64_t) 8);
+    }
+
+    {
+        JSLImmutableMemory string = JSL_CSTR_INITIALIZER(
+            "zzzzzzzzabcdefghijklmnopqzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz"); /* len 57 */
+        JSLImmutableMemory substring = JSL_CSTR_INITIALIZER("abcdefghijklmnopq"); /* len 17 */
+        int64_t res = jsl_substring_search(string, substring);
+        TEST_INT64_EQUAL(res, (int64_t) 8);
+    }
+
+    /* Needle lengths 32 and 33 -- BNDM boundary for fallback paths. */
+    {
+        JSLImmutableMemory string = JSL_CSTR_INITIALIZER(
+            "yyyyabcdefghijklmnopqrstuvwxyz012345yyyyyyyyyyyyyyyyyyyyyyyyyyyy"); /* len 64 */
+        JSLImmutableMemory substring = JSL_CSTR_INITIALIZER("abcdefghijklmnopqrstuvwxyz012345"); /* len 32 */
+        int64_t res = jsl_substring_search(string, substring);
+        TEST_INT64_EQUAL(res, (int64_t) 4);
+    }
+
+    {
+        JSLImmutableMemory string = JSL_CSTR_INITIALIZER(
+            "yyyyabcdefghijklmnopqrstuvwxyz0123456yyyyyyyyyyyyyyyyyyyyyyyyyyyy"); /* len 65 */
+        JSLImmutableMemory substring = JSL_CSTR_INITIALIZER("abcdefghijklmnopqrstuvwxyz0123456"); /* len 33 */
+        int64_t res = jsl_substring_search(string, substring);
+        TEST_INT64_EQUAL(res, (int64_t) 4);
+    }
+
+    /* Needle lengths 64 and 65 -- BNDM <-> Sunday transition at m=64. */
+    {
+        JSLImmutableMemory string = JSL_CSTR_INITIALIZER(
+            "zzzzabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ01zzzz"); /* len 72 */
+        JSLImmutableMemory substring = JSL_CSTR_INITIALIZER(
+            "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ01"); /* len 64 */
+        int64_t res = jsl_substring_search(string, substring);
+        TEST_INT64_EQUAL(res, (int64_t) 4);
+    }
+
+    {
+        JSLImmutableMemory string = JSL_CSTR_INITIALIZER(
+            "zzzzabcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ012zzzz"); /* len 73 */
+        JSLImmutableMemory substring = JSL_CSTR_INITIALIZER(
+            "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ012"); /* len 65 */
+        int64_t res = jsl_substring_search(string, substring);
+        TEST_INT64_EQUAL(res, (int64_t) 4);
+    }
+
+    /* No match in a long string -- SIMD loop + scalar tail both return -1. */
+    {
+        JSLImmutableMemory string = JSL_CSTR_INITIALIZER(
+            "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq"); /* len 80 */
+        JSLImmutableMemory substring = JSL_CSTR_INITIALIZER("xyz");
+        int64_t res = jsl_substring_search(string, substring);
+        TEST_INT64_EQUAL(res, (int64_t) -1);
+    }
 }
 
 void test_jsl_index_of(void)
