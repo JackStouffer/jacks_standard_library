@@ -1171,7 +1171,7 @@ typedef enum
 * jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&stdout_sb));
 * jsl_subprocess_set_stderr_sink(&proc, jsl_string_builder_output_sink(&stderr_sb));
 *
-* jsl_subprocess_run_blocking(&proc, NULL);
+* jsl_subprocess_run_blocking(&proc, -1, NULL);
 *
 * JSLImmutableMemory out = jsl_string_builder_get_string(&stdout_sb);
 * JSLImmutableMemory err = jsl_string_builder_get_string(&stderr_sb);
@@ -1181,12 +1181,25 @@ typedef enum
 * jsl_subprocess_cleanup(&proc);
 * ```
 *
+* `timeout_ms` semantics (matching `jsl_subprocess_background_wait`):
+*   - < 0: wait forever for the child to terminate.
+*   -   0: poll once; if the child has not already exited, kill it.
+*   - > 0: wait up to that many milliseconds.
+*
+* When the timeout expires before the child terminates, the child is
+* forcefully killed (SIGKILL on POSIX, TerminateProcess on Windows),
+* I/O is drained, the child is reaped, and `JSL_SUBPROCESS_TIMEOUT_REACHED`
+* is returned. `proc->status` is set to `JSL_SUBPROCESS_STATUS_KILLED_BY_SIGNAL`
+* and `proc->exit_code` reflects the kill.
+*
 * @param proc          Pointer to a configured subprocess handle
+* @param timeout_ms    Maximum time to wait for the child, in milliseconds
 * @param out_errno     Optional pointer that receives the system errno on failure
 * @returns A result enum describing the outcome
 */
 JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_run_blocking(
     JSLSubprocess* proc,
+    int32_t timeout_ms,
     int32_t* out_errno
 );
 

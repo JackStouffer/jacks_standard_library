@@ -281,13 +281,13 @@ void test_jsl_subprocess_run_blocking_bad_parameters(void)
     JSLSubprocess proc;
     TEST_BOOL(make_helper(&proc, &backing));
 
-    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(NULL, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(NULL, -1, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_BAD_PARAMETERS);
 
     // Bad sentinel
     JSLSubprocess bogus;
     memset(&bogus, 0, sizeof(bogus));
-    r = jsl_subprocess_run_blocking(&bogus, NULL);
+    r = jsl_subprocess_run_blocking(&bogus, -1, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_BAD_PARAMETERS);
 
     jsl_subprocess_cleanup(&proc);
@@ -310,6 +310,7 @@ void test_jsl_subprocess_run_blocking_spawn_failed(void)
     int32_t errno_out = 0;
     JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(
         &proc,
+        -1,
         &errno_out
     );
 
@@ -340,7 +341,7 @@ void test_jsl_subprocess_run_blocking_exit_code(void)
 
     int32_t errno_out = 0;
     JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(
-        &proc, &errno_out
+        &proc, -1, &errno_out
     );
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
     TEST_INT32_EQUAL(proc.exit_code, 7);
@@ -361,10 +362,10 @@ void test_jsl_subprocess_run_blocking_already_started(void)
         JSL_SUBPROCESS_ARG_SUCCESS
     );
 
-    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(&proc, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(&proc, -1, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
 
-    r = jsl_subprocess_run_blocking(&proc, NULL);
+    r = jsl_subprocess_run_blocking(&proc, -1, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_ALREADY_STARTED);
 
     jsl_subprocess_cleanup(&proc);
@@ -390,7 +391,7 @@ void test_jsl_subprocess_run_blocking_stdout_sink(void)
 
     TEST_BOOL(jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&sb)));
 
-    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(&proc, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(&proc, -1, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
     TEST_INT32_EQUAL(proc.exit_code, 0);
 
@@ -430,7 +431,7 @@ void test_jsl_subprocess_run_blocking_stderr_sink(void)
     TEST_BOOL(jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&sb_out)));
     TEST_BOOL(jsl_subprocess_set_stderr_sink(&proc, jsl_string_builder_output_sink(&sb_err)));
 
-    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(&proc, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(&proc, -1, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
     TEST_INT32_EQUAL(proc.exit_code, 0);
 
@@ -474,7 +475,7 @@ void test_jsl_subprocess_run_blocking_stdin_memory(void)
     TEST_BOOL(jsl_string_builder_init(&sb, sb_iface, 64));
     TEST_BOOL(jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&sb)));
 
-    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(&proc, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(&proc, -1, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
     TEST_INT32_EQUAL(proc.exit_code, 0);
 
@@ -515,7 +516,7 @@ void test_jsl_subprocess_run_blocking_env_var(void)
     TEST_BOOL(jsl_string_builder_init(&sb, sb_iface, 64));
     TEST_BOOL(jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&sb)));
 
-    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(&proc, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(&proc, -1, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
     TEST_INT32_EQUAL(proc.exit_code, 0);
 
@@ -898,7 +899,7 @@ void test_jsl_subprocess_run_blocking_working_directory(void)
     TEST_BOOL(jsl_string_builder_init(&sb, sb_iface, 64));
     TEST_BOOL(jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&sb)));
 
-    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(&proc, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(&proc, -1, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
     TEST_INT32_EQUAL(proc.exit_code, 0);
 
@@ -1186,7 +1187,7 @@ void test_jsl_subprocess_run_blocking_spew_large(void)
     TEST_BOOL(jsl_string_builder_init(&sb, sb_iface, 4096));
     TEST_BOOL(jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&sb)));
 
-    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(&proc, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(&proc, -1, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
     TEST_INT32_EQUAL(proc.exit_code, 0);
 

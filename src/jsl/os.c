@@ -2805,6 +2805,23 @@ bool jsl_subprocess_set_stderr_sink(
     return proceed;
 }
 
+// Current monotonic time in milliseconds. Used to implement the
+// finite-timeout deadline arithmetic shared by `jsl_subprocess_run_blocking`
+// and `jsl_subprocess_background_wait`.
+static int64_t jsl__monotonic_ms(void)
+{
+#if JSL_IS_POSIX
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
+        return 0;
+    return ((int64_t) ts.tv_sec) * 1000 + ((int64_t) ts.tv_nsec) / 1000000;
+#elif JSL_IS_WINDOWS
+    return (int64_t) GetTickCount64();
+#else
+    return 0;
+#endif
+}
+
 #if JSL_IS_POSIX
 
 // Everything needed to spawn a child process and pump its I/O. Populated
@@ -3204,15 +3221,27 @@ static JSLSubProcessResultEnum jsl__subprocess_posix_spawn(
 // stdout/stderr. Returns true when every parent-side pipe end has been
 // closed cleanly, false on a poll() error (in which case out_errno is
 // set). Closes every pipe end it owns before returning.
+// `deadline_ms` is an absolute monotonic-clock deadline (from
+// `jsl__monotonic_ms()`). Pass < 0 for "no deadline". When the deadline
+// expires before all pipes are closed, `*out_timed_out` is set to true
+// and the loop returns early; the caller is expected to kill the child
+// and reap it.
 static bool jsl__subprocess_posix_pump_io(
     JSLSubprocess* proc,
     JSL__SubProcessPosixLaunch* ctx,
+    int64_t deadline_ms,
+    bool* out_timed_out,
     int32_t* out_errno
 )
 {
     int stdin_write = ctx->stdin_pipe[1];
     int stdout_read = ctx->stdout_pipe[0];
     int stderr_read = ctx->stderr_pipe[0];
+
+    if (out_timed_out != NULL)
+        *out_timed_out = false;
+
+    bool infinite = (deadline_ms < 0);
 
     // Non-blocking stdin so a slow child can't deadlock our writes.
     if (stdin_write != -1)
@@ -3228,6 +3257,7 @@ static bool jsl__subprocess_posix_pump_io(
 
     int64_t stdin_offset = 0;
     bool ok = true;
+    bool timed_out = false;
 
     while (stdin_write != -1 || stdout_read != -1 || stderr_read != -1)
     {
@@ -3259,7 +3289,21 @@ static bool jsl__subprocess_posix_pump_io(
             stderr_idx = nfds++;
         }
 
-        int pret = poll(pfds, (nfds_t) nfds, -1);
+        int wait_ms;
+        if (infinite)
+            wait_ms = -1;
+        else
+        {
+            int64_t remaining = deadline_ms - jsl__monotonic_ms();
+            if (remaining <= 0)
+                wait_ms = 0;
+            else if (remaining > (int64_t) INT_MAX)
+                wait_ms = INT_MAX;
+            else
+                wait_ms = (int) remaining;
+        }
+
+        int pret = poll(pfds, (nfds_t) nfds, wait_ms);
         if (pret == -1)
         {
             if (errno == EINTR)
@@ -3267,6 +3311,13 @@ static bool jsl__subprocess_posix_pump_io(
             if (out_errno != NULL)
                 *out_errno = errno;
             ok = false;
+            break;
+        }
+
+        if (pret == 0 && !infinite)
+        {
+            // Deadline reached before any fd became ready.
+            timed_out = true;
             break;
         }
 
@@ -3349,11 +3400,20 @@ static bool jsl__subprocess_posix_pump_io(
         }
     }
 
-    if (stdin_write != -1) { close(stdin_write); ctx->stdin_pipe[1] = -1; }
-    if (stdout_read != -1) { close(stdout_read); ctx->stdout_pipe[0] = -1; }
-    if (stderr_read != -1) { close(stderr_read); ctx->stderr_pipe[0] = -1; }
+    // On a timeout, leave parent-side pipe ends open so the caller can
+    // do a final post-kill drain. They are closed by the next pump pass
+    // or by the close-on-exit logic in run_blocking.
+    if (!timed_out)
+    {
+        if (stdin_write != -1) { close(stdin_write); ctx->stdin_pipe[1] = -1; }
+        if (stdout_read != -1) { close(stdout_read); ctx->stdout_pipe[0] = -1; }
+        if (stderr_read != -1) { close(stderr_read); ctx->stderr_pipe[0] = -1; }
+    }
 
     signal(SIGPIPE, prev_sigpipe);
+
+    if (out_timed_out != NULL)
+        *out_timed_out = timed_out;
     return ok;
 }
 
@@ -4634,6 +4694,7 @@ static JSLSubProcessResultEnum jsl__subprocess_win_poll(
 
 JSLSubProcessResultEnum jsl_subprocess_run_blocking(
     JSLSubprocess* proc,
+    int32_t timeout_ms,
     int32_t* out_errno
 )
 {
@@ -4651,6 +4712,7 @@ JSLSubProcessResultEnum jsl_subprocess_run_blocking(
         *out_errno = 0;
 
     JSLSubProcessResultEnum result = JSL_SUBPROCESS_SUCCESS;
+    bool infinite_timeout = (timeout_ms < 0);
 
 #if JSL_IS_POSIX
 
@@ -4682,28 +4744,100 @@ JSLSubProcessResultEnum jsl_subprocess_run_blocking(
     // Parent keeps only its ends of any pipes that were created.
     jsl__subprocess_posix_close_child_pipe_ends(&ctx);
 
-    int32_t io_errno = 0;
-    bool io_ok = jsl__subprocess_posix_pump_io(proc, &ctx, &io_errno);
+    int64_t deadline_ms = infinite_timeout
+        ? -1
+        : jsl__monotonic_ms() + (int64_t) timeout_ms;
 
-    JSLSubProcessResultEnum wait_result = jsl__subprocess_posix_wait(
-        pid,
-        &proc->status,
-        &proc->exit_code,
-        out_errno
+    int32_t io_errno = 0;
+    bool pipes_timed_out = false;
+    bool io_ok = jsl__subprocess_posix_pump_io(
+        proc,
+        &ctx,
+        deadline_ms,
+        &pipes_timed_out,
+        &io_errno
     );
 
-    if (wait_result != JSL_SUBPROCESS_SUCCESS
-        && wait_result != JSL_SUBPROCESS_KILLED_BY_SIGNAL)
-        result = wait_result;
-    else if (!io_ok)
+    bool timeout_reached = false;
+
+    if (pipes_timed_out)
+    {
+        // Pipes still had work but the deadline expired: kill, drain
+        // briefly, then reap.
+        timeout_reached = true;
+        if (pid > 0)
+            (void) kill(pid, SIGKILL);
+        // Best-effort final drain so any output already in the kernel
+        // pipe buffers reaches the caller's sinks. SIGKILL closes the
+        // child's fds so this terminates quickly.
+        bool dummy = false;
+        (void) jsl__subprocess_posix_pump_io(proc, &ctx, -1, &dummy, NULL);
+    }
+    else if (!infinite_timeout)
+    {
+        // Pipes closed but the child may still be alive (e.g. closed its
+        // own stdout/stderr without exiting). Bound the reap by the
+        // remaining time.
+        int64_t remaining = deadline_ms - jsl__monotonic_ms();
+        int32_t bounded = remaining <= 0
+            ? 0
+            : (remaining > (int64_t) INT32_MAX
+                ? INT32_MAX
+                : (int32_t) remaining);
+
+        JSLSubProcessStatusEnum tmp_status = proc->status;
+        int32_t tmp_exit = -1;
+        JSLSubProcessResultEnum poll_r = jsl__subprocess_posix_poll(
+            proc,
+            bounded,
+            &tmp_status,
+            &tmp_exit,
+            out_errno
+        );
+        if (poll_r != JSL_SUBPROCESS_SUCCESS
+            && poll_r != JSL_SUBPROCESS_KILLED_BY_SIGNAL)
+        {
+            return poll_r;
+        }
+        if (tmp_status == JSL_SUBPROCESS_STATUS_RUNNING)
+        {
+            timeout_reached = true;
+            (void) kill(pid, SIGKILL);
+        }
+        else
+        {
+            proc->exit_code = tmp_exit;
+            if (tmp_status == JSL_SUBPROCESS_STATUS_KILLED_BY_SIGNAL)
+                result = JSL_SUBPROCESS_KILLED_BY_SIGNAL;
+        }
+    }
+
+    if (timeout_reached || infinite_timeout
+        || (proc->status == JSL_SUBPROCESS_STATUS_RUNNING))
+    {
+        // Either no deadline applied, or we just sent SIGKILL and need
+        // to harvest the exit status.
+        JSLSubProcessResultEnum wait_result = jsl__subprocess_posix_wait(
+            pid,
+            &proc->status,
+            &proc->exit_code,
+            out_errno
+        );
+        if (wait_result != JSL_SUBPROCESS_SUCCESS
+            && wait_result != JSL_SUBPROCESS_KILLED_BY_SIGNAL)
+            result = wait_result;
+        else if (wait_result == JSL_SUBPROCESS_KILLED_BY_SIGNAL
+            && !timeout_reached)
+            result = JSL_SUBPROCESS_KILLED_BY_SIGNAL;
+    }
+
+    if (timeout_reached)
+        result = JSL_SUBPROCESS_TIMEOUT_REACHED;
+    else if (result == JSL_SUBPROCESS_SUCCESS && !io_ok)
     {
         if (out_errno != NULL)
             *out_errno = io_errno;
         result = JSL_SUBPROCESS_IO_FAILED;
-    }
-    else if (wait_result == JSL_SUBPROCESS_KILLED_BY_SIGNAL)
-    {
-        result = JSL_SUBPROCESS_KILLED_BY_SIGNAL;
     }
 
     return result;
@@ -4754,6 +4888,11 @@ JSLSubProcessResultEnum jsl_subprocess_run_blocking(
     int32_t io_errno = 0;
     bool io_error = false;
     bool process_exited = false;
+    bool timeout_reached = false;
+
+    int64_t deadline_ms = infinite_timeout
+        ? 0
+        : jsl__monotonic_ms() + (int64_t) timeout_ms;
 
     for (;;)
     {
@@ -4790,12 +4929,37 @@ JSLSubProcessResultEnum jsl_subprocess_run_blocking(
             && proc->stderr_read_pending)
             handles[n++] = proc->stderr_read_event;
 
-        DWORD wret = WaitForMultipleObjects(n, handles, FALSE, INFINITE);
+        DWORD wait_ms;
+        if (infinite_timeout)
+            wait_ms = INFINITE;
+        else
+        {
+            int64_t remaining = deadline_ms - jsl__monotonic_ms();
+            if (remaining <= 0)
+                wait_ms = 0;
+            else if (remaining > (int64_t) (MAXDWORD - 1))
+                wait_ms = MAXDWORD - 1;
+            else
+                wait_ms = (DWORD) remaining;
+        }
+
+        DWORD wret = WaitForMultipleObjects(n, handles, FALSE, wait_ms);
 
         if (wret == WAIT_FAILED)
         {
             DWORD err = GetLastError();
             if (!io_error) { io_error = true; io_errno = (int32_t) err; }
+            break;
+        }
+
+        if (wret == WAIT_TIMEOUT)
+        {
+            timeout_reached = true;
+            (void) TerminateProcess(pi.hProcess, 1);
+            // Wait for the kill to land so the next pump pass can drain
+            // any final output and the exit code is harvestable.
+            (void) WaitForSingleObject(pi.hProcess, INFINITE);
+            process_exited = true;
             break;
         }
 
@@ -4908,9 +5072,14 @@ JSLSubProcessResultEnum jsl_subprocess_run_blocking(
     }
 
     proc->exit_code = (int32_t) exit_code;
-    proc->status = JSL_SUBPROCESS_STATUS_EXITED;
+    if (timeout_reached)
+        proc->status = JSL_SUBPROCESS_STATUS_KILLED_BY_SIGNAL;
+    else
+        proc->status = JSL_SUBPROCESS_STATUS_EXITED;
 
-    if (io_error)
+    if (timeout_reached)
+        result = JSL_SUBPROCESS_TIMEOUT_REACHED;
+    else if (io_error)
     {
         if (out_errno != NULL)
             *out_errno = io_errno;
@@ -5201,22 +5370,6 @@ typedef struct JSL__SubProcessWaitSlot
     // siblings.
     bool io_failed;
 } JSL__SubProcessWaitSlot;
-
-// Current monotonic time in milliseconds. Used to implement the
-// finite-timeout deadline arithmetic of `jsl_subprocess_background_wait`.
-static int64_t jsl__monotonic_ms(void)
-{
-#if JSL_IS_POSIX
-    struct timespec ts;
-    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
-        return 0;
-    return ((int64_t) ts.tv_sec) * 1000 + ((int64_t) ts.tv_nsec) / 1000000;
-#elif JSL_IS_WINDOWS
-    return (int64_t) GetTickCount64();
-#else
-    return 0;
-#endif
-}
 
 JSLSubProcessResultEnum jsl_subprocess_background_wait(
     JSLSubprocess* procs,
