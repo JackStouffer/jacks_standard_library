@@ -3586,9 +3586,12 @@ static JSLSubProcessResultEnum jsl__subprocess_posix_pump_stdin_once(
     return JSL_SUBPROCESS_SUCCESS;
 }
 
-// Read once from a single read-end pipe into its sink. Closes the fd and
-// sets *eof_seen on EOF or non-retryable error. Returns IO_FAILED only on
-// non-retryable read errors.
+// Drain a single read-end pipe into its sink, reading until the kernel
+// buffer is empty (EAGAIN/EWOULDBLOCK), EOF, or a non-retryable error.
+// Closes the fd and sets *eof_seen on EOF or non-retryable error. Returns
+// IO_FAILED only on non-retryable read errors. Looping (rather than a
+// single read) is required so post-reap drains don't silently truncate
+// children that buffered more than 4 KiB before exiting.
 static JSLSubProcessResultEnum jsl__subprocess_posix_drain_one(
     int* fd_ptr,
     JSLOutputSink sink,
@@ -3596,34 +3599,43 @@ static JSLSubProcessResultEnum jsl__subprocess_posix_drain_one(
     int32_t* out_errno
 )
 {
-    if (*fd_ptr == -1 || *eof_seen)
-        return JSL_SUBPROCESS_SUCCESS;
-
-    uint8_t io_buf[4096];
-    ssize_t r = read(*fd_ptr, io_buf, sizeof(io_buf));
-    int saved_errno = errno;
-
     JSLSubProcessResultEnum result = JSL_SUBPROCESS_SUCCESS;
+    bool keep_reading = (*fd_ptr != -1) && !*eof_seen;
 
-    if (r > 0)
+    while (keep_reading)
     {
-        jsl_output_sink_write(sink, jsl_immutable_memory(io_buf, (int64_t) r));
-    }
-    else if (r == 0)
-    {
-        jsl__subprocess_close_fd(fd_ptr);
-        *eof_seen = true;
-    }
-    else if (r == -1
-        && saved_errno != EAGAIN
-        && saved_errno != EWOULDBLOCK
-        && saved_errno != EINTR)
-    {
-        if (out_errno != NULL)
-            *out_errno = saved_errno;
-        jsl__subprocess_close_fd(fd_ptr);
-        *eof_seen = true;
-        result = JSL_SUBPROCESS_IO_FAILED;
+        uint8_t io_buf[4096];
+        ssize_t r = read(*fd_ptr, io_buf, sizeof(io_buf));
+        int saved_errno = errno;
+
+        if (r > 0)
+        {
+            jsl_output_sink_write(sink, jsl_immutable_memory(io_buf, (int64_t) r));
+        }
+        else if (r == 0)
+        {
+            jsl__subprocess_close_fd(fd_ptr);
+            *eof_seen = true;
+            keep_reading = false;
+        }
+        else if (r == -1 && saved_errno == EINTR)
+        {
+            // retry
+        }
+        else if (r == -1
+            && (saved_errno == EAGAIN || saved_errno == EWOULDBLOCK))
+        {
+            keep_reading = false;
+        }
+        else
+        {
+            if (out_errno != NULL)
+                *out_errno = saved_errno;
+            jsl__subprocess_close_fd(fd_ptr);
+            *eof_seen = true;
+            result = JSL_SUBPROCESS_IO_FAILED;
+            keep_reading = false;
+        }
     }
 
     return result;
@@ -4779,6 +4791,111 @@ static JSLSubProcessResultEnum jsl__subprocess_win_pump_output_once(
             result = r;
     }
 
+    return result;
+}
+
+// Final drain after the child has exited. Called only from the
+// process-exit branch of `jsl_subprocess_background_wait` (the
+// `WIN_WAIT_KIND_PROCESS` arm of the WaitForMultipleObjectsEx loop).
+//
+// The bug being defended against: process termination and pending
+// overlapped pipe I/O are independent kernel events. Closing the
+// child's write end of the pipe (which happens during process
+// termination) eventually completes the parent's pending ReadFile with
+// either the buffered bytes or ERROR_BROKEN_PIPE — but Windows does
+// not guarantee that completion is delivered to user mode before the
+// process handle becomes signalled. So when WaitForMultipleObjectsEx
+// returns the process handle, a still-in-flight `ReadFile` may answer
+// `GetOverlappedResult(..., FALSE)` with ERROR_IO_INCOMPLETE for a
+// short window. The plain pump treats that as "nothing to do, come
+// back later" — but the multi-proc event loop will not come back: it
+// drops `still_waiting` and proceeds to cleanup, where `CancelIoEx`
+// then discards the bytes the child already wrote.
+//
+// Fix: for each pending op, call `GetOverlappedResult(..., TRUE)` to
+// block until the IRP is finalized. The write end is gone, so this
+// resolves promptly with either bytes or ERROR_BROKEN_PIPE (no
+// further data can ever appear). Then loop `pump_output_once`, which
+// will now see a real completion via its own
+// `GetOverlappedResult(..., FALSE)` call (`GetOverlappedResult` is
+// idempotent on a completed op), consume the bytes into the sink, and
+// kick the next read — which immediately reports EOF.
+//
+// The `safety` counter is paranoia against an unforeseen "always
+// pending" loop; under normal operation termination is reached via the
+// EOF path inside one or two iterations.
+//
+// Note: not exercised by a regression test because reproducing the
+// race deterministically would need OS-level fault injection. The
+// existing `heavy_stdout` and `spew_large` tests cover the common
+// (non-racy) drain path. If touching this function, re-read the
+// non-blocking pump in `jsl__subprocess_win_pump_output_stream` first
+// — both must stay in agreement about which OVERLAPPED states are
+// transient vs terminal.
+static JSLSubProcessResultEnum jsl__subprocess_win_finalize_pending_reads(
+    JSLSubprocess* p,
+    int32_t* out_errno
+)
+{
+    JSLSubProcessResultEnum result = JSL_SUBPROCESS_SUCCESS;
+    int32_t safety = 0;
+    for (;;)
+    {
+        bool anything_open =
+            (p->stdout_kind == JSL_SUBPROCESS_OUTPUT_SINK
+                && !p->stdout_eof_seen
+                && p->stdout_read_handle != INVALID_HANDLE_VALUE)
+            || (p->stderr_kind == JSL_SUBPROCESS_OUTPUT_SINK
+                && !p->stderr_eof_seen
+                && p->stderr_read_handle != INVALID_HANDLE_VALUE);
+        if (!anything_open)
+            break;
+        if (++safety > 1024)
+            break;
+
+        int32_t e = 0;
+        JSLSubProcessResultEnum pr = jsl__subprocess_win_pump_output_once(p, &e);
+        if (pr == JSL_SUBPROCESS_IO_FAILED)
+        {
+            if (out_errno != NULL && *out_errno == 0)
+                *out_errno = e;
+            result = JSL_SUBPROCESS_IO_FAILED;
+            break;
+        }
+        if (e != 0 && out_errno != NULL && *out_errno == 0)
+            *out_errno = e;
+
+        // Block on whatever the pump left pending. After the wait
+        // returns, the OVERLAPPED carries a real result and the next
+        // pump pass will consume it (no ERROR_IO_INCOMPLETE).
+        bool any_pending = false;
+        if (p->stdout_read_pending
+            && p->stdout_read_handle != INVALID_HANDLE_VALUE)
+        {
+            DWORD bytes = 0;
+            (void) GetOverlappedResult(
+                p->stdout_read_handle,
+                &p->stdout_read_overlapped,
+                &bytes,
+                TRUE
+            );
+            any_pending = true;
+        }
+        if (p->stderr_read_pending
+            && p->stderr_read_handle != INVALID_HANDLE_VALUE)
+        {
+            DWORD bytes = 0;
+            (void) GetOverlappedResult(
+                p->stderr_read_handle,
+                &p->stderr_read_overlapped,
+                &bytes,
+                TRUE
+            );
+            any_pending = true;
+        }
+        if (!any_pending)
+            break;
+    }
     return result;
 }
 
@@ -6048,12 +6165,19 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
                     p->status = JSL_SUBPROCESS_STATUS_EXITED;
                 }
 
-                // Drain any remaining output. The pipe may carry
-                // buffered bytes that arrived before the process
-                // handle transitioned.
+                // Drain any remaining output. Must use the blocking
+                // finalizer, not a plain pump pass: process exit can
+                // signal ahead of the pending read's IRP completion,
+                // so the non-blocking
+                // `GetOverlappedResult(..., FALSE)` inside the pump
+                // would return ERROR_IO_INCOMPLETE and the bytes the
+                // child wrote just before exit would be lost when
+                // cleanup later cancels the op via `CancelIoEx`. See
+                // the long comment on `finalize_pending_reads` for
+                // the full rationale.
                 int32_t e = 0;
                 JSLSubProcessResultEnum pr =
-                    jsl__subprocess_win_pump_output_once(p, &e);
+                    jsl__subprocess_win_finalize_pending_reads(p, &e);
                 if (pr == JSL_SUBPROCESS_IO_FAILED)
                 {
                     p->last_errno = e;
