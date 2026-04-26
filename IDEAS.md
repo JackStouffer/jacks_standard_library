@@ -43,3 +43,47 @@ Smaller things
 - The argv variadic macro relies on a (NULL, -1) sentinel — fine, but a 0-arg call (jsl_subprocess_arg(&p)) will produce a confusing error. Consider a _clear_args for that intent.
 - set_stdin_fd doesn't say when the fd is consumed and when the caller may close it. Spell out: "fd must remain open until run_blocking/background_start returns."
 - Background-mode *_eof_seen and stdin_write_offset are visible struct fields; if they're not part of the API, hide them behind jsl__ or note they're internal.
+# Subprocess 
+
+  - Merge stderr into stdout (the 2>&1 case) — common enough to deserve a flag rather than making users build the dup themselves.
+  - Capture-to-arena-buffer helper: 90% of SINK users want "give me the output as JSLImmutableMemory". A thin wrapper around the sink machinery pays for
+  itself.
+  - Optional: DISCARD output kind (open /dev/null/NUL internally). Minor, but a lot of callers want silence and it's a papercut to do by hand.
+
+  Smaller notes on what's already there. Documenting the Windows arg-quoting rules the implementation follows (MSDN CommandLineToArgvW conventions) is worth
+   it — callers get bitten by this constantly. And for the streaming-stdin case (feed bytes to a live child over time), MEMORY isn't enough; you'd want
+  either a stdin FD the caller writes to, or a stdin-sink-as-callback. Probably a v2 concern.
+
+# Builder
+
+  OS utility functions in builder.h with no JSL equivalent
+
+  Filesystem:
+  - nob_needs_rebuild / nob_needs_rebuild1 (builder.h:694, 695) — mtime comparison
+
+  Path manipulation:
+  - nob_path_name (builder.h:692)
+  - nob_temp_dir_name (builder.h:700)
+  - nob_temp_file_name (builder.h:701)
+  - nob_temp_file_ext (builder.h:702)
+
+  Process / current working directory / executable:
+  - nob_get_current_dir_temp (builder.h:697)
+  - nob_set_current_dir (builder.h:698)
+  - nob_temp_running_executable_path (builder.h:703)
+  - nob_nprocs (builder.h:529)
+
+  File descriptors / pipes:
+  - nob_fd_close (builder.h:405)
+  - nob_pipe_create (builder.h:412)
+
+  Process spawn/wait:
+  - nob_proc_wait (builder.h:421)
+  - nob_procs_wait (builder.h:424)
+  - nob_procs_flush (builder.h:427)
+  - nob_procs_wait_and_reset (builder.h:431)
+  - nob_procs_append_with_flush (builder.h:435)
+
+  Self-rebuild / win32:
+  - nob__go_rebuild_urself (builder.h:803)
+  - nob_win32_error_message (builder.h:872)
