@@ -3563,6 +3563,7 @@ static JSLSubProcessResultEnum jsl__subprocess_posix_pump_stdin_once(
     signal(SIGPIPE, prev_sigpipe);
 
     bool close_pipe = false;
+    JSLSubProcessResultEnum result = JSL_SUBPROCESS_SUCCESS;
     if (w > 0)
     {
         proc->stdin_write_offset += (int64_t) w;
@@ -3570,20 +3571,29 @@ static JSLSubProcessResultEnum jsl__subprocess_posix_pump_stdin_once(
             close_pipe = true;
     }
     else if (w == -1
+        && (saved_errno == EPIPE
+            || saved_errno == ENOTCONN
+            || saved_errno == ECONNRESET))
+    {
+        // Child closed its read end of stdin. Not reported as an error.
+        close_pipe = true;
+    }
+    else if (w == -1
         && saved_errno != EAGAIN
         && saved_errno != EWOULDBLOCK
         && saved_errno != EINTR)
     {
-        // EPIPE / other write errors: child closed stdin or pipe is broken.
-        // Treat as "we're done with stdin"; not reported as an error.
+        // Real write failure: propagate so callers can surface it.
+        if (out_errno != NULL)
+            *out_errno = saved_errno;
         close_pipe = true;
+        result = JSL_SUBPROCESS_IO_FAILED;
     }
 
     if (close_pipe)
         jsl__subprocess_close_fd(&proc->stdin_write_fd);
 
-    (void) out_errno;
-    return JSL_SUBPROCESS_SUCCESS;
+    return result;
 }
 
 // Drain a single read-end pipe into its sink, reading until the kernel
@@ -5642,6 +5652,23 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
     if (out_errno != NULL)
         *out_errno = 0;
 
+    // Pick an allocator from the first proc whose sentinel is valid. If
+    // every proc has a bad sentinel there is nothing to wait on, so the
+    // caller gets a trivial success without any allocation.
+    JSLAllocatorInterface allocator = {0};
+    bool have_allocator = false;
+    for (int32_t i = 0; i < count; i++)
+    {
+        if (procs[i].sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL)
+        {
+            allocator = procs[i].allocator;
+            have_allocator = true;
+            break;
+        }
+    }
+    if (!have_allocator)
+        return JSL_SUBPROCESS_SUCCESS;
+
     // First pass: classify every proc as ignored, already-terminal, or
     // still-running. Only still-running procs contribute to the wait
     // set; already-terminal is silently treated as "done".
@@ -5654,7 +5681,9 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
         slots = stack_slots;
     else
     {
-        slots = (JSL__SubProcessWaitSlot*) malloc((size_t) slot_bytes);
+        slots = (JSL__SubProcessWaitSlot*) jsl_allocator_interface_alloc(
+            allocator, slot_bytes, JSL_DEFAULT_ALLOCATION_ALIGNMENT, false
+        );
         if (slots == NULL)
             return JSL_SUBPROCESS_ALLOCATION_FAILED;
         slots_on_heap = true;
@@ -5696,10 +5725,23 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
     JSLSubProcessResultEnum final_result = JSL_SUBPROCESS_SUCCESS;
     bool any_io_failed = false;
 
-    if (waiting_count == 0)
+    // No still-waiting procs *and* no terminal-but-non-ignored procs
+    // means every proc was rejected by the classifier — nothing to do.
+    // When `waiting_count == 0` but some procs are non-ignored
+    // (already-terminal at entry), fall through so the platform-
+    // specific drain pass below picks up any output the child wrote
+    // before exiting. Each platform's main loop is gated on
+    // `waiting_count > 0`, so this only runs the drain.
+    int32_t non_ignored = 0;
+    for (int32_t i = 0; i < count; i++)
+    {
+        if (!slots[i].ignored)
+            non_ignored++;
+    }
+    if (non_ignored == 0)
     {
         if (slots_on_heap)
-            free(slots);
+            (void) jsl_allocator_interface_free(allocator, slots);
         return JSL_SUBPROCESS_SUCCESS;
     }
 
@@ -5711,7 +5753,7 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
         if (out_errno != NULL)
             *out_errno = sigpipe_errno;
         if (slots_on_heap)
-            free(slots);
+            (void) jsl_allocator_interface_free(allocator, slots);
         return JSL_SUBPROCESS_WAIT_FAILED;
     }
 
@@ -5750,20 +5792,32 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
     bool infinite = (timeout_ms < 0);
     int64_t deadline = infinite ? 0 : jsl__monotonic_ms() + (int64_t) timeout_ms;
     int64_t max_fds = 3 * (int64_t) count + 1;
-    struct pollfd* pfds = (struct pollfd*) malloc((size_t) max_fds * sizeof(struct pollfd));
+    struct pollfd* pfds = (struct pollfd*) jsl_allocator_interface_alloc(
+        allocator, max_fds * (int64_t) sizeof(struct pollfd),
+        JSL_DEFAULT_ALLOCATION_ALIGNMENT, false
+    );
     // Stash per-proc fd indices so we don't re-scan the array after
     // ppoll returns.
-    int* stdin_idx = (int*) malloc((size_t) count * sizeof(int));
-    int* stdout_idx = (int*) malloc((size_t) count * sizeof(int));
-    int* stderr_idx = (int*) malloc((size_t) count * sizeof(int));
+    int* stdin_idx = (int*) jsl_allocator_interface_alloc(
+        allocator, (int64_t) count * (int64_t) sizeof(int),
+        JSL_DEFAULT_ALLOCATION_ALIGNMENT, false
+    );
+    int* stdout_idx = (int*) jsl_allocator_interface_alloc(
+        allocator, (int64_t) count * (int64_t) sizeof(int),
+        JSL_DEFAULT_ALLOCATION_ALIGNMENT, false
+    );
+    int* stderr_idx = (int*) jsl_allocator_interface_alloc(
+        allocator, (int64_t) count * (int64_t) sizeof(int),
+        JSL_DEFAULT_ALLOCATION_ALIGNMENT, false
+    );
     if (pfds == NULL || stdin_idx == NULL || stdout_idx == NULL || stderr_idx == NULL)
     {
-        free(pfds);
-        free(stdin_idx);
-        free(stdout_idx);
-        free(stderr_idx);
+        (void) jsl_allocator_interface_free(allocator, pfds);
+        (void) jsl_allocator_interface_free(allocator, stdin_idx);
+        (void) jsl_allocator_interface_free(allocator, stdout_idx);
+        (void) jsl_allocator_interface_free(allocator, stderr_idx);
         if (slots_on_heap)
-            free(slots);
+            (void) jsl_allocator_interface_free(allocator, slots);
         return JSL_SUBPROCESS_ALLOCATION_FAILED;
     }
 
@@ -5845,12 +5899,12 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
             if (out_errno != NULL)
                 *out_errno = saved;
             signal(SIGPIPE, prev_sigpipe);
-            free(pfds);
-            free(stdin_idx);
-            free(stdout_idx);
-            free(stderr_idx);
+            (void) jsl_allocator_interface_free(allocator, pfds);
+            (void) jsl_allocator_interface_free(allocator, stdin_idx);
+            (void) jsl_allocator_interface_free(allocator, stdout_idx);
+            (void) jsl_allocator_interface_free(allocator, stderr_idx);
             if (slots_on_heap)
-                free(slots);
+                (void) jsl_allocator_interface_free(allocator, slots);
             return JSL_SUBPROCESS_WAIT_FAILED;
         }
 
@@ -5941,10 +5995,10 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
     }
 
     signal(SIGPIPE, prev_sigpipe);
-    free(pfds);
-    free(stdin_idx);
-    free(stdout_idx);
-    free(stderr_idx);
+    (void) jsl_allocator_interface_free(allocator, pfds);
+    (void) jsl_allocator_interface_free(allocator, stdin_idx);
+    (void) jsl_allocator_interface_free(allocator, stdout_idx);
+    (void) jsl_allocator_interface_free(allocator, stderr_idx);
 
 #elif JSL_IS_WINDOWS
 
@@ -5961,11 +6015,17 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
     if (!infinite)
         ms_deadline = jsl__monotonic_ms() + (int64_t) timeout_ms;
 
-    // Prime: kick a pending read on each still-running proc so the
-    // event-driven loop has something to wait on.
+    // Prime: kick a pending read on each non-ignored proc so the
+    // event-driven loop has something to wait on. Already-terminal
+    // procs (`still_waiting == false`, `ignored == false`) also get a
+    // full blocking drain here — without it, output the child wrote
+    // and then exited before this call would be silently dropped
+    // (e.g. when the caller polled the proc to EXITED before calling
+    // wait, then the main `while (waiting_count > 0)` loop never runs
+    // and cleanup `CancelIoEx`s the pending read).
     for (int32_t i = 0; i < count; i++)
     {
-        if (!slots[i].still_waiting)
+        if (slots[i].ignored)
             continue;
         JSLSubprocess* p = &procs[i];
 
@@ -5973,17 +6033,44 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
         (void) jsl__subprocess_win_pump_stdin_once(p, &e);
         if (e != 0) p->last_errno = e;
 
-        e = 0;
-        JSLSubProcessResultEnum pr = jsl__subprocess_win_pump_output_once(p, &e);
-        if (pr == JSL_SUBPROCESS_IO_FAILED)
+        if (slots[i].still_waiting)
         {
-            p->last_errno = e;
-            slots[i].io_failed = true;
-            any_io_failed = true;
+            e = 0;
+            JSLSubProcessResultEnum pr = jsl__subprocess_win_pump_output_once(p, &e);
+            if (pr == JSL_SUBPROCESS_IO_FAILED)
+            {
+                p->last_errno = e;
+                slots[i].io_failed = true;
+                any_io_failed = true;
+            }
+            else if (e != 0)
+            {
+                p->last_errno = e;
+            }
         }
-        else if (e != 0)
+        else
         {
-            p->last_errno = e;
+            // Already-terminal: the proc's write end is gone, so
+            // finalize_pending_reads will resolve every outstanding
+            // read promptly with either bytes or ERROR_BROKEN_PIPE.
+            // Using the blocking finalizer (rather than a single
+            // pump_output_once kick) is required because overlapped
+            // reads on byte pipes typically return ERROR_IO_PENDING
+            // even when data is available, and the main wait loop
+            // won't run for these procs.
+            e = 0;
+            JSLSubProcessResultEnum pr =
+                jsl__subprocess_win_finalize_pending_reads(p, &e);
+            if (pr == JSL_SUBPROCESS_IO_FAILED)
+            {
+                p->last_errno = e;
+                slots[i].io_failed = true;
+                any_io_failed = true;
+            }
+            else if (e != 0)
+            {
+                p->last_errno = e;
+            }
         }
     }
 
@@ -6119,9 +6206,14 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
                 final_result = JSL_SUBPROCESS_TIMEOUT_REACHED;
                 break;
             }
+            // Clamp to INFINITE - 1: passing INFINITE to
+            // WaitForMultipleObjectsEx means "no timeout", which would
+            // turn a finite (but very large) caller-requested wait into
+            // a wait-forever. The outer deadline check at the top of
+            // this loop will re-evaluate `remaining` on the next pass.
             DWORD cap = (num_groups > 1)
                 ? rotation_slice_ms
-                : (remaining > (int64_t) INFINITE ? INFINITE : (DWORD) remaining);
+                : (remaining >= (int64_t) INFINITE ? (INFINITE - 1) : (DWORD) remaining);
             if (num_groups > 1 && remaining < (int64_t) cap)
                 cap = (DWORD) remaining;
             per_wait_timeout = cap;
@@ -6140,7 +6232,7 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
             if (out_errno != NULL)
                 *out_errno = (int32_t) err;
             if (slots_on_heap)
-                free(slots);
+                (void) jsl_allocator_interface_free(allocator, slots);
             return JSL_SUBPROCESS_WAIT_FAILED;
         }
 
@@ -6245,7 +6337,7 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
             if (out_errno != NULL)
                 *out_errno = (int32_t) wret;
             if (slots_on_heap)
-                free(slots);
+                (void) jsl_allocator_interface_free(allocator, slots);
             return JSL_SUBPROCESS_WAIT_FAILED;
         }
 
@@ -6258,6 +6350,17 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
             if (current_group >= num_groups)
                 current_group = 0;
         }
+
+        // `timeout_ms == 0` single-shot semantics: one cycle then
+        // return. Mirrors the POSIX branch. Without this, a chatty
+        // child whose handles keep signalling would never produce a
+        // WAIT_TIMEOUT and the loop would run well past one tick.
+        if (!infinite && timeout_ms == 0)
+        {
+            if (waiting_count > 0)
+                final_result = JSL_SUBPROCESS_TIMEOUT_REACHED;
+            break;
+        }
     }
 
 #else
@@ -6265,7 +6368,7 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
 #endif
 
     if (slots_on_heap)
-        free(slots);
+        (void) jsl_allocator_interface_free(allocator, slots);
 
     if (final_result == JSL_SUBPROCESS_SUCCESS && any_io_failed)
         final_result = JSL_SUBPROCESS_IO_FAILED;

@@ -1182,6 +1182,75 @@ void test_jsl_subprocess_background_wait_post_exit_drain(void)
     jsl_libc_allocator_free_all(&backing);
 }
 
+void test_jsl_subprocess_background_wait_drain_after_poll_exited(void)
+{
+    // Regression test: caller polls until the proc is observed as
+    // EXITED, then calls background_wait expecting it to drain any
+    // remaining buffered output. On Windows the prime-pump loop used
+    // `still_waiting` as its predicate, which is `false` for
+    // already-terminal procs after the first-pass classifier — so the
+    // drain pass never ran and the buffered bytes were silently lost.
+    // POSIX correctly uses `!ignored` for its opportunistic drain, so
+    // this scenario only fails on Windows pre-fix.
+    const int payload_bytes = 16384;
+
+    JSLLibcAllocator backing;
+    JSLSubprocess proc;
+    TEST_BOOL(make_helper(&proc, &backing));
+
+    char count_str[32];
+    snprintf(count_str, sizeof(count_str), "%d", payload_bytes);
+    TEST_INT32_EQUAL(
+        jsl_subprocess_arg_cstr(&proc, "spew", count_str),
+        JSL_SUBPROCESS_ARG_SUCCESS
+    );
+
+    JSLLibcAllocator sb_backing;
+    JSLAllocatorInterface sb_iface = test_libc_allocator_interface(&sb_backing);
+    JSLStringBuilder sb;
+    TEST_BOOL(jsl_string_builder_init(&sb, sb_iface, 4096));
+    TEST_BOOL(jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&sb)));
+
+    TEST_INT32_EQUAL(
+        jsl_subprocess_background_start(&proc, NULL),
+        JSL_SUBPROCESS_SUCCESS
+    );
+
+    // Poll until the proc is observed terminal. This transitions
+    // proc->status to EXITED before background_wait is ever called,
+    // which is the exact precondition that triggers the bug. Caller
+    // intentionally does NOT call receive_output here — the contract
+    // under test is that background_wait performs a final drain.
+    JSLSubProcessStatusEnum status = JSL_SUBPROCESS_STATUS_RUNNING;
+    int32_t exit_code = -1;
+    int32_t poll_deadline_ms = 5000;
+    int32_t step_ms = 50;
+    int32_t waited_ms = 0;
+    while (status != JSL_SUBPROCESS_STATUS_EXITED
+        && status != JSL_SUBPROCESS_STATUS_KILLED_BY_SIGNAL
+        && waited_ms < poll_deadline_ms)
+    {
+        JSLSubProcessResultEnum pr = jsl_subprocess_background_poll(
+            &proc, step_ms, &status, &exit_code, NULL
+        );
+        TEST_INT32_EQUAL(pr, JSL_SUBPROCESS_SUCCESS);
+        waited_ms += step_ms;
+    }
+    TEST_INT32_EQUAL(status, JSL_SUBPROCESS_STATUS_EXITED);
+    TEST_INT32_EQUAL(proc.status, JSL_SUBPROCESS_STATUS_EXITED);
+
+    JSLSubProcessResultEnum r = jsl_subprocess_background_wait(&proc, 1, 5000, NULL);
+    TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
+
+    JSLImmutableMemory out = jsl_string_builder_get_string(&sb);
+    TEST_INT64_EQUAL(out.length, (int64_t) payload_bytes);
+
+    jsl_string_builder_free(&sb);
+    jsl_libc_allocator_free_all(&sb_backing);
+    jsl_subprocess_cleanup(&proc);
+    jsl_libc_allocator_free_all(&backing);
+}
+
 void test_jsl_subprocess_background_wait_single_stdin_memory(void)
 {
     // Exercise the stdin-pump path inside `background_wait`. Feed a

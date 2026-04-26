@@ -37,6 +37,7 @@ void test_jsl_subprocess_background_wait_many_healthy(void);
 void test_jsl_subprocess_background_wait_timeout(void);
 void test_jsl_subprocess_background_wait_heavy_stdout(void);
 void test_jsl_subprocess_background_wait_post_exit_drain(void);
+void test_jsl_subprocess_background_wait_drain_after_poll_exited(void);
 void test_jsl_subprocess_background_wait_single_stdin_memory(void);
 void test_jsl_subprocess_run_blocking_spew_large(void);
 void test_jsl_subprocess_background_wait_17_procs_event_driven(void);

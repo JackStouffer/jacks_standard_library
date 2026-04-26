@@ -1202,6 +1202,10 @@ typedef enum
 * not `JSL_SUBPROCESS_STATUS_NOT_STARTED` returns
 * `JSL_SUBPROCESS_ALREADY_STARTED`.
 *
+* Not thread safe: only one thread may operate on a given `JSLSubprocess`
+* at a time. Concurrent calls into any subprocess API on the same handle
+* are undefined behavior.
+*
 * Example — feed stdin, capture stdout/stderr:
 *
 * ```c
@@ -1417,6 +1421,10 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_kill(
 *
 * The caller remains responsible for calling `jsl_subprocess_cleanup`
 * on each proc after this function returns.
+*
+* Not thread safe: only one thread may operate on a given `JSLSubprocess`
+* at a time. Each proc in `procs` must not be touched by any other thread
+* (including via other subprocess APIs) for the duration of this call.
 */
 JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_wait(
     JSLSubprocess* procs,
