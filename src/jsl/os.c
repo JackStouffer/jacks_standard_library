@@ -2727,6 +2727,21 @@ bool jsl_subprocess_set_stdin_fd(
     return proceed;
 }
 
+bool jsl_subprocess_set_stdin_null(JSLSubprocess* proc)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL);
+
+    if (proceed)
+    {
+        proc->stdin_kind = JSL_SUBPROCESS_STDIN_NULL;
+        proc->stdin_memory = jsl_immutable_memory(NULL, 0);
+        proc->stdin_fd = -1;
+    }
+
+    return proceed;
+}
+
 bool jsl_subprocess_set_stdout_fd(
     JSLSubprocess* proc,
     int fd
@@ -2800,6 +2815,38 @@ bool jsl_subprocess_set_stderr_sink(
         proc->stderr_kind = JSL_SUBPROCESS_OUTPUT_SINK;
         proc->stderr_sink = sink;
         proc->stderr_fd = -1;
+    }
+
+    return proceed;
+}
+
+bool jsl_subprocess_set_stdout_null(JSLSubprocess* proc)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL);
+
+    if (proceed)
+    {
+        proc->stdout_kind = JSL_SUBPROCESS_OUTPUT_NULL;
+        proc->stdout_fd = -1;
+        proc->stdout_sink.write_fp = NULL;
+        proc->stdout_sink.user_data = NULL;
+    }
+
+    return proceed;
+}
+
+bool jsl_subprocess_set_stderr_null(JSLSubprocess* proc)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL);
+
+    if (proceed)
+    {
+        proc->stderr_kind = JSL_SUBPROCESS_OUTPUT_NULL;
+        proc->stderr_fd = -1;
+        proc->stderr_sink.write_fp = NULL;
+        proc->stderr_sink.user_data = NULL;
     }
 
     return proceed;
@@ -3156,6 +3203,10 @@ static JSLSubProcessResultEnum jsl__subprocess_posix_spawn(
     {
         err = posix_spawn_file_actions_adddup2(&file_actions, proc->stdin_fd, STDIN_FILENO);
     }
+    else if (err == 0 && proc->stdin_kind == JSL_SUBPROCESS_STDIN_NULL)
+    {
+        err = posix_spawn_file_actions_addopen(&file_actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0);
+    }
 
     // Stdout
     if (err == 0 && proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_SINK)
@@ -3170,6 +3221,10 @@ static JSLSubProcessResultEnum jsl__subprocess_posix_spawn(
     {
         err = posix_spawn_file_actions_adddup2(&file_actions, proc->stdout_fd, STDOUT_FILENO);
     }
+    else if (err == 0 && proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_NULL)
+    {
+        err = posix_spawn_file_actions_addopen(&file_actions, STDOUT_FILENO, "/dev/null", O_WRONLY, 0);
+    }
 
     // Stderr
     if (err == 0 && proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_SINK)
@@ -3183,6 +3238,10 @@ static JSLSubProcessResultEnum jsl__subprocess_posix_spawn(
     else if (err == 0 && proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_FD)
     {
         err = posix_spawn_file_actions_adddup2(&file_actions, proc->stderr_fd, STDERR_FILENO);
+    }
+    else if (err == 0 && proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_NULL)
+    {
+        err = posix_spawn_file_actions_addopen(&file_actions, STDERR_FILENO, "/dev/null", O_WRONLY, 0);
     }
 
     // chdir in the child before exec. Requires glibc >= 2.29, musl >=
@@ -4327,14 +4386,43 @@ static JSLSubProcessResultEnum jsl__subprocess_win_spawn(
         || proc->stdout_kind != JSL_SUBPROCESS_OUTPUT_INHERIT
         || proc->stderr_kind != JSL_SUBPROCESS_OUTPUT_INHERIT;
 
+    HANDLE stdin_null = INVALID_HANDLE_VALUE;
+    HANDLE stdout_null = INVALID_HANDLE_VALUE;
+    HANDLE stderr_null = INVALID_HANDLE_VALUE;
+    bool null_open_failed = false;
+    DWORD null_open_err = 0;
+
     if (use_stdhandles)
     {
         si.dwFlags |= STARTF_USESTDHANDLES;
+
+        SECURITY_ATTRIBUTES null_sa;
+        null_sa.nLength = (DWORD) sizeof(null_sa);
+        null_sa.lpSecurityDescriptor = NULL;
+        null_sa.bInheritHandle = TRUE;
 
         if (proc->stdin_kind == JSL_SUBPROCESS_STDIN_MEMORY)
             si.hStdInput = ctx->stdin_read;
         else if (proc->stdin_kind == JSL_SUBPROCESS_STDIN_FD)
             si.hStdInput = (HANDLE) _get_osfhandle(proc->stdin_fd);
+        else if (proc->stdin_kind == JSL_SUBPROCESS_STDIN_NULL)
+        {
+            stdin_null = CreateFileA(
+                "NUL",
+                GENERIC_READ,
+                FILE_SHARE_READ | FILE_SHARE_WRITE,
+                &null_sa,
+                OPEN_EXISTING,
+                FILE_ATTRIBUTE_NORMAL,
+                NULL
+            );
+            if (stdin_null == INVALID_HANDLE_VALUE)
+            {
+                null_open_failed = true;
+                null_open_err = GetLastError();
+            }
+            si.hStdInput = stdin_null;
+        }
         else
             si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
 
@@ -4342,6 +4430,24 @@ static JSLSubProcessResultEnum jsl__subprocess_win_spawn(
             si.hStdOutput = ctx->stdout_write;
         else if (proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_FD)
             si.hStdOutput = (HANDLE) _get_osfhandle(proc->stdout_fd);
+        else if (proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_NULL)
+        {
+            stdout_null = CreateFileA(
+                "NUL",
+                GENERIC_WRITE,
+                FILE_SHARE_READ | FILE_SHARE_WRITE,
+                &null_sa,
+                OPEN_EXISTING,
+                FILE_ATTRIBUTE_NORMAL,
+                NULL
+            );
+            if (stdout_null == INVALID_HANDLE_VALUE)
+            {
+                null_open_failed = true;
+                null_open_err = GetLastError();
+            }
+            si.hStdOutput = stdout_null;
+        }
         else
             si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
 
@@ -4349,30 +4455,65 @@ static JSLSubProcessResultEnum jsl__subprocess_win_spawn(
             si.hStdError = ctx->stderr_write;
         else if (proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_FD)
             si.hStdError = (HANDLE) _get_osfhandle(proc->stderr_fd);
+        else if (proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_NULL)
+        {
+            stderr_null = CreateFileA(
+                "NUL",
+                GENERIC_WRITE,
+                FILE_SHARE_READ | FILE_SHARE_WRITE,
+                &null_sa,
+                OPEN_EXISTING,
+                FILE_ATTRIBUTE_NORMAL,
+                NULL
+            );
+            if (stderr_null == INVALID_HANDLE_VALUE)
+            {
+                null_open_failed = true;
+                null_open_err = GetLastError();
+            }
+            si.hStdError = stderr_null;
+        }
         else
             si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
     }
 
     ZeroMemory(out_pi, sizeof(*out_pi));
 
-    BOOL created = CreateProcessA(
-        NULL,
-        ctx->cmdline,
-        NULL,
-        NULL,
-        use_stdhandles ? TRUE : FALSE,
-        0,
-        ctx->env_block,
-        ctx->cwd_cstr,
-        &si,
-        out_pi
-    );
+    BOOL created = FALSE;
+    if (!null_open_failed)
+    {
+        created = CreateProcessA(
+            NULL,
+            ctx->cmdline,
+            NULL,
+            NULL,
+            use_stdhandles ? TRUE : FALSE,
+            0,
+            ctx->env_block,
+            ctx->cwd_cstr,
+            &si,
+            out_pi
+        );
+    }
+
+    DWORD create_err = created ? 0 : GetLastError();
+
+    jsl__subprocess_win_close_handle(&stdin_null);
+    jsl__subprocess_win_close_handle(&stdout_null);
+    jsl__subprocess_win_close_handle(&stderr_null);
+
+    if (null_open_failed)
+    {
+        if (out_errno != NULL)
+            *out_errno = (int32_t) null_open_err;
+        jsl__subprocess_win_close_all_pipes(ctx);
+        return JSL_SUBPROCESS_SPAWN_FAILED;
+    }
 
     if (!created)
     {
-        DWORD err = GetLastError();
         if (out_errno != NULL)
-            *out_errno = (int32_t) err;
+            *out_errno = (int32_t) create_err;
         jsl__subprocess_win_close_all_pipes(ctx);
         return JSL_SUBPROCESS_SPAWN_FAILED;
     }

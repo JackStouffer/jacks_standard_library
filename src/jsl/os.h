@@ -721,6 +721,7 @@ typedef enum
     JSL_SUBPROCESS_STDIN_INHERIT = 0,
     JSL_SUBPROCESS_STDIN_MEMORY,
     JSL_SUBPROCESS_STDIN_FD,
+    JSL_SUBPROCESS_STDIN_NULL,
 
     JSL_SUBPROCESS_STDIN_ENUM_COUNT
 } JSLSubProcessStdinKindEnum;
@@ -739,6 +740,7 @@ typedef enum
     JSL_SUBPROCESS_OUTPUT_INHERIT = 0,
     JSL_SUBPROCESS_OUTPUT_FD,
     JSL_SUBPROCESS_OUTPUT_SINK,
+    JSL_SUBPROCESS_OUTPUT_NULL,
 
     JSL_SUBPROCESS_OUTPUT_ENUM_COUNT
 } JSLSubProcessOutputKindEnum;
@@ -1057,6 +1059,20 @@ JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdin_fd(
 );
 
 /**
+* Configure the subprocess to read its standard input from the platform's
+* null device (`/dev/null` on POSIX, `NUL` on Windows).
+*
+* The child observes an immediately-closed, empty stdin: any read returns
+* end-of-file. Replaces any previously configured stdin source.
+*
+* @param proc Pointer to an initialized subprocess handle
+* @returns `true` on success, `false` if parameters were invalid
+*/
+JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdin_null(
+    JSLSubprocess* proc
+);
+
+/**
 * Redirect the subprocess's standard output into the given file descriptor.
 *
 * The descriptor is used as-is when the child is spawned. JSL does not
@@ -1120,6 +1136,34 @@ JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stderr_fd(
 JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stderr_sink(
     JSLSubprocess* proc,
     JSLOutputSink sink
+);
+
+/**
+* Discard the subprocess's standard output.
+*
+* The child's stdout is redirected to the platform's null device
+* (`/dev/null` on POSIX, `NUL` on Windows). Replaces any previously
+* configured stdout destination.
+*
+* @param proc Pointer to an initialized subprocess handle
+* @returns `true` on success, `false` if parameters were invalid
+*/
+JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdout_null(
+    JSLSubprocess* proc
+);
+
+/**
+* Discard the subprocess's standard error.
+*
+* The child's stderr is redirected to the platform's null device
+* (`/dev/null` on POSIX, `NUL` on Windows). Replaces any previously
+* configured stderr destination.
+*
+* @param proc Pointer to an initialized subprocess handle
+* @returns `true` on success, `false` if parameters were invalid
+*/
+JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stderr_null(
+    JSLSubprocess* proc
 );
 
 /**
