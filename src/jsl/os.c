@@ -5381,6 +5381,16 @@ JSLSubProcessResultEnum jsl_subprocess_background_start(
 
 #if JSL_IS_POSIX
 
+    // Install the SIGCHLD handler before posix_spawnp so that if the
+    // host had set SIGCHLD to SIG_IGN, the kernel does not auto-reap
+    // this child and leave a later waitpid() returning ECHILD — which
+    // the reap path would misread as "still running" and hang
+    // jsl_subprocess_background_wait. Best-effort: a failure here is
+    // recovered by jsl_subprocess_background_wait, which retries.
+    (void) jsl__sigchld_ensure_installed(out_errno);
+    if (out_errno != NULL)
+        *out_errno = 0;
+
     JSL__SubProcessPosixLaunch ctx;
     JSLSubProcessResultEnum prep = jsl__subprocess_posix_prepare(proc, &ctx, out_errno);
     if (prep != JSL_SUBPROCESS_SUCCESS)
@@ -5786,6 +5796,13 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
             p->last_errno = pump_errno;
             slots[i].io_failed = true;
             any_io_failed = true;
+            // Pre-reap above may have already cleared still_waiting
+            // for terminal procs; only decrement once.
+            if (slots[i].still_waiting)
+            {
+                slots[i].still_waiting = false;
+                waiting_count--;
+            }
         }
     }
 
@@ -6042,6 +6059,8 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
                 p->last_errno = e;
                 slots[i].io_failed = true;
                 any_io_failed = true;
+                slots[i].still_waiting = false;
+                waiting_count--;
             }
             else if (e != 0)
             {
@@ -6303,6 +6322,8 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
                         p->last_errno = e;
                         slots[slot_idx].io_failed = true;
                         any_io_failed = true;
+                        slots[slot_idx].still_waiting = false;
+                        waiting_count--;
                     }
                     else if (e != 0)
                     {
