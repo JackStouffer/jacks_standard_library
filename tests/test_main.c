@@ -478,6 +478,12 @@ int main(void)
     RUN_TEST_FUNCTION("Test jsl_subprocess_background_wait single stdin", test_jsl_subprocess_background_wait_single_stdin_memory);
     RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking spew large", test_jsl_subprocess_run_blocking_spew_large);
     RUN_TEST_FUNCTION("Test jsl_subprocess_background_wait 17 procs event-driven", test_jsl_subprocess_background_wait_17_procs_event_driven);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking multi mixed exits", test_jsl_subprocess_run_blocking_multi_mixed_exits);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking multi already started rejects all", test_jsl_subprocess_run_blocking_multi_already_started_rejects_all);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking multi partial spawn failure", test_jsl_subprocess_run_blocking_multi_partial_spawn_failure);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking multi timeout kills all", test_jsl_subprocess_run_blocking_multi_timeout_kills_all);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking multi heterogeneous I/O", test_jsl_subprocess_run_blocking_multi_heterogeneous_io);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking multi 17 procs", test_jsl_subprocess_run_blocking_multi_17_procs);
 
     TEST_RESULTS();
     return lfails != 0;

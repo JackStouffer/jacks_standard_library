@@ -761,8 +761,10 @@ typedef struct JSLSubProcessEnvVar
 * Lifecycle status for a `JSLSubprocess`.
 *
 * `NOT_STARTED` is the state immediately after `jsl_subprocess_create`.
-* `RUNNING` is set while `jsl_subprocess_run_blocking` is executing the
-* child. `EXITED` means the child ran to completion and returned an exit
+* `RUNNING` is set while a child is alive — during
+* `jsl_subprocess_run_blocking`'s wait loop, or after
+* `jsl_subprocess_background_start` returns and before the child is
+* observed to have terminated. `EXITED` means the child ran to completion and returned an exit
 * code (available via `proc->exit_code`). `KILLED_BY_SIGNAL` means the
 * child was terminated by a signal on POSIX and `proc->exit_code` holds
 * the negated signal number. `FAILED_TO_START` means the run function
@@ -1186,27 +1188,36 @@ typedef enum
 } JSLSubProcessResultEnum;
 
 /**
-* Start the subprocess with the previously configured executable, arguments,
-* environment, working directory, and I/O redirections, and block until it
-* terminates.
+* Spawn every proc in `procs[0 .. count-1]` and block until they all
+* terminate, the optional timeout elapses, or a fatal wait error
+* occurs. Each proc must have been configured via `jsl_subprocess_create`
+* and the usual setters; none may have been started yet.
 *
-* On success `proc->exit_code` receives the child's exit code. On POSIX, if
-* the child was terminated by a signal, `JSL_SUBPROCESS_KILLED_BY_SIGNAL`
-* is returned and `proc->exit_code` receives the signal number as a negative
-* value (e.g. `-SIGTERM`). On any failure that prevents the child from being
-* launched, `out_errno` (if non-null) receives the system `errno` captured
-* at the failure site, and the subprocess status is set to
-* `JSL_SUBPROCESS_STATUS_FAILED_TO_START`.
+* On success, every proc's `status` is `EXITED` (or `KILLED_BY_SIGNAL`
+* on POSIX, when the child died from a signal) and `exit_code` carries
+* the child's exit code (negated signal number on POSIX kill; -1 on
+* Windows abnormal termination). Per-proc pump errors are recorded on
+* `procs[i].last_errno`.
 *
-* A subprocess may only be run once. Passing a subprocess whose status is
-* not `JSL_SUBPROCESS_STATUS_NOT_STARTED` returns
-* `JSL_SUBPROCESS_ALREADY_STARTED`.
+* Pre-flight rejection (no children are spawned):
+*   - `procs == NULL` or `count <= 0` → `BAD_PARAMETERS`.
+*   - any `procs[i].sentinel` is invalid → `BAD_PARAMETERS`.
+*   - any `procs[i].status` is not `NOT_STARTED` → `ALREADY_STARTED`.
+*
+* If the pre-flight passes, the call attempts to spawn every proc.
+* A per-proc spawn or pre-spawn failure (pipe creation, allocation,
+* posix_spawnp / CreateProcess error) marks that proc as
+* `FAILED_TO_START` with `last_errno` set, but does *not* abort the
+* batch — siblings still run to completion. If at least one proc
+* failed this way, the call returns `SPAWN_FAILED` (unless a
+* higher-priority code wins, see below).
 *
 * Not thread safe: only one thread may operate on a given `JSLSubprocess`
-* at a time. Concurrent calls into any subprocess API on the same handle
-* are undefined behavior.
+* at a time. None of the procs in `procs` may be touched by any other
+* thread (including via other subprocess APIs) for the duration of this
+* call.
 *
-* Example — feed stdin, capture stdout/stderr:
+* Example — feed stdin, capture stdout/stderr for a single proc:
 *
 * ```c
 * JSLStringBuilder stdout_sb, stderr_sb;
@@ -1219,7 +1230,7 @@ typedef enum
 * jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&stdout_sb));
 * jsl_subprocess_set_stderr_sink(&proc, jsl_string_builder_output_sink(&stderr_sb));
 *
-* jsl_subprocess_run_blocking(&proc, -1, NULL);
+* jsl_subprocess_run_blocking(&proc, 1, -1, NULL);
 *
 * JSLImmutableMemory out = jsl_string_builder_get_string(&stdout_sb);
 * JSLImmutableMemory err = jsl_string_builder_get_string(&stderr_sb);
@@ -1229,24 +1240,66 @@ typedef enum
 * jsl_subprocess_cleanup(&proc);
 * ```
 *
-* `timeout_ms` semantics (matching `jsl_subprocess_background_wait`):
-*   - < 0: wait forever for the child to terminate.
-*   -   0: poll once; if the child has not already exited, kill it.
+* `timeout_ms` semantics (single shared deadline across the whole batch):
+*   - < 0: wait forever for every child to terminate.
+*   -   0: single-shot — pump once; any proc still running afterwards
+*           is killed and reaped.
 *   - > 0: wait up to that many milliseconds.
 *
-* When the timeout expires before the child terminates, the child is
-* forcefully killed (SIGKILL on POSIX, TerminateProcess on Windows),
-* I/O is drained, the child is reaped, and `JSL_SUBPROCESS_TIMEOUT_REACHED`
-* is returned. `proc->status` is set to `JSL_SUBPROCESS_STATUS_KILLED_BY_SIGNAL`
-* and `proc->exit_code` reflects the kill.
+* When the deadline expires while at least one child is still running,
+* every still-running child is forcefully killed (SIGKILL on POSIX,
+* TerminateProcess on Windows), its I/O is drained, and it is reaped
+* before this function returns. So on `TIMEOUT_REACHED`, every proc
+* the call spawned is in a terminal state — the caller does not need
+* to follow up with a kill or another wait.
 *
-* @param proc          Pointer to a configured subprocess handle
-* @param timeout_ms    Maximum time to wait for the child, in milliseconds
-* @param out_errno     Optional pointer that receives the system errno on failure
+* Return value (in priority order, highest first):
+*   - `BAD_PARAMETERS` / `ALREADY_STARTED` / `ALLOCATION_FAILED` —
+*     pre-flight rejection; no children are spawned.
+*   - `WAIT_FAILED` — the platform wait primitive itself failed
+*     (`*out_errno` carries the OS error). Per-proc state is
+*     indeterminate.
+*   - `TIMEOUT_REACHED` — at least one proc was still running when the
+*     deadline expired; those procs have been killed and reaped.
+*   - `SPAWN_FAILED` — at least one proc failed to launch; surviving
+*     procs ran to completion. Inspect each proc's `status` and
+*     `last_errno` to find which failed and why.
+*   - `IO_FAILED` — at least one proc's stdin/stdout/stderr pump
+*     failed during the wait; affected procs have `last_errno` set.
+*   - `SUCCESS` — every proc reached a terminal status without any
+*     of the above. Inspect each `procs[i].status` (`EXITED` /
+*     `KILLED_BY_SIGNAL`) and `exit_code` per proc — a child that
+*     exited with a non-zero code or died from a signal still yields
+*     `SUCCESS` here.
+*
+* `out_errno` may be NULL. It only receives top-level wait-primitive
+* errnos; per-proc pump errnos land on `procs[i].last_errno`.
+*
+* On Windows the implementation batches internally into groups of at
+* most 16 procs at a time to stay under the `WaitForMultipleObjectsEx`
+* 64-handle ceiling; callers do not observe group boundaries.
+*
+* The caller remains responsible for calling `jsl_subprocess_cleanup`
+* on each proc after this function returns.
+*
+* Note: this is not equivalent to a series of `background_start` +
+* `background_wait` calls. Differences:
+*   - `run_blocking` spawns each child itself; `background_wait`
+*     requires procs already started via `background_start`.
+*   - On timeout, `run_blocking` kills, drains, and reaps every
+*     still-running child; `background_wait` leaves them running
+*     and returns `TIMEOUT_REACHED` for the caller to handle.
+*
+* @param procs       Pointer to an array of configured subprocess handles
+* @param count       Number of elements in `procs`
+* @param timeout_ms  Maximum time to wait for the children, in milliseconds
+* @param out_errno   Optional pointer that receives the system errno on
+*                    a top-level wait failure
 * @returns A result enum describing the outcome
 */
 JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_run_blocking(
-    JSLSubprocess* proc,
+    JSLSubprocess* procs,
+    int32_t count,
     int32_t timeout_ms,
     int32_t* out_errno
 );
