@@ -5797,7 +5797,7 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
         JSL_DEFAULT_ALLOCATION_ALIGNMENT, false
     );
     // Stash per-proc fd indices so we don't re-scan the array after
-    // ppoll returns.
+    // poll returns.
     int* stdin_idx = (int*) jsl_allocator_interface_alloc(
         allocator, (int64_t) count * (int64_t) sizeof(int),
         JSL_DEFAULT_ALLOCATION_ALIGNMENT, false
@@ -5917,7 +5917,7 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
 
         // Pump ready pipes. Every wake gets a full sweep rather than
         // only the fds that signalled, because a child that printed
-        // while ppoll was unblocked by SIGCHLD still has readable data.
+        // while poll was unblocked by SIGCHLD still has readable data.
         for (int32_t i = 0; i < count; i++)
         {
             if (!slots[i].still_waiting || slots[i].io_failed)
@@ -5986,7 +5986,7 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
         // `timeout_ms == 0` single-shot semantics: one cycle then
         // return. If every remaining proc is still running we report
         // TIMEOUT_REACHED so the caller can distinguish that from
-        // "everything finished in one ppoll tick".
+        // "everything finished in one poll tick".
         if (!infinite && timeout_ms == 0 && waiting_count > 0)
         {
             final_result = JSL_SUBPROCESS_TIMEOUT_REACHED;
