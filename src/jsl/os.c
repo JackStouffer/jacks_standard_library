@@ -5470,26 +5470,45 @@ JSLSubProcessResultEnum jsl_subprocess_run_blocking(
                 continue;
             JSLSubprocess* p = &procs[i];
 
-            (void) WaitForSingleObject(p->process_handle, INFINITE);
+            // Bound the wait. TerminateProcess is best-effort and
+            // asynchronous; if it fails (debugger attached, exit already
+            // in progress, …) an INFINITE wait would wedge the call and
+            // silently break the "all procs terminal on TIMEOUT_REACHED"
+            // contract. Mirror the POSIX path's bounded poll.
+            DWORD wret = WaitForSingleObject(p->process_handle, 1000);
+            bool reaped = (wret == WAIT_OBJECT_0);
 
-            int32_t e = 0;
-            JSLSubProcessResultEnum pr =
-                jsl__subprocess_win_finalize_pending_reads(p, &e);
-            if (pr == JSL_SUBPROCESS_IO_FAILED)
+            if (reaped)
             {
-                p->last_errno = e;
-                any_io_failed = true;
-            }
-            else if (e != 0)
-            {
-                p->last_errno = e;
-            }
+                int32_t e = 0;
+                JSLSubProcessResultEnum pr =
+                    jsl__subprocess_win_finalize_pending_reads(p, &e);
+                if (pr == JSL_SUBPROCESS_IO_FAILED)
+                {
+                    p->last_errno = e;
+                    any_io_failed = true;
+                }
+                else if (e != 0)
+                {
+                    p->last_errno = e;
+                }
 
-            DWORD code = 0;
-            if (GetExitCodeProcess(p->process_handle, &code))
-                p->exit_code = (int32_t) code;
+                DWORD code = 0;
+                if (GetExitCodeProcess(p->process_handle, &code))
+                    p->exit_code = (int32_t) code;
+                else
+                    p->exit_code = -1;
+            }
             else
+            {
+                // Process did not die. Skip finalize_pending_reads — it
+                // calls GetOverlappedResult with bWait=TRUE and would
+                // hang on pipes the still-live child still holds open.
+                // The teardown loop below will CancelIoEx those reads.
                 p->exit_code = -1;
+                wait_failed = true;
+                wait_failed_errno = (int32_t) GetLastError();
+            }
             // Killed by us — report KILLED_BY_SIGNAL on the proc, mirroring
             // single-proc run_blocking's old behavior on Windows timeout.
             p->status = JSL_SUBPROCESS_STATUS_KILLED_BY_SIGNAL;
