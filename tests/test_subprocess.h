@@ -41,5 +41,11 @@ void test_jsl_subprocess_background_wait_drain_after_poll_exited(void);
 void test_jsl_subprocess_background_wait_single_stdin_memory(void);
 void test_jsl_subprocess_run_blocking_spew_large(void);
 void test_jsl_subprocess_background_wait_17_procs_event_driven(void);
+void test_jsl_subprocess_run_blocking_multi_mixed_exits(void);
+void test_jsl_subprocess_run_blocking_multi_already_started_rejects_all(void);
+void test_jsl_subprocess_run_blocking_multi_partial_spawn_failure(void);
+void test_jsl_subprocess_run_blocking_multi_timeout_kills_all(void);
+void test_jsl_subprocess_run_blocking_multi_heterogeneous_io(void);
+void test_jsl_subprocess_run_blocking_multi_17_procs(void);
 
 #endif
