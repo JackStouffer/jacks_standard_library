@@ -3615,6 +3615,18 @@ static bool jsl__sigchld_ensure_installed(int32_t* out_errno)
     return true;
 }
 
+// Append the SIGCHLD self-pipe read end to a pollfd array. Returns the
+// index it was placed at and bumps `*nfds`.
+static int jsl__sigchld_pollfd_append(struct pollfd* pfds, int* nfds)
+{
+    int idx = *nfds;
+    pfds[idx].fd = jsl__sigchld_pipe[0];
+    pfds[idx].events = POLLIN;
+    pfds[idx].revents = 0;
+    *nfds = idx + 1;
+    return idx;
+}
+
 // Read everything currently buffered in the self-pipe. Used to clear
 // the fd so the next SIGCHLD notification wakes us again.
 static void jsl__sigchld_drain(void)
@@ -4714,7 +4726,20 @@ static JSLSubProcessResultEnum jsl__subprocess_win_poll(
 
 #endif
 
+// Round still_running_count up to a group count, clamped at >= 1 so the
+// outer loop always has at least one group to schedule.
+static int32_t jsl__subprocess_compute_num_groups(
+    int32_t still_running_count, int32_t group_size
+)
+{
+    int32_t n = (still_running_count + group_size - 1) / group_size;
+    if (n < 1)
+        n = 1;
+    return n;
+}
+
 JSLSubProcessResultEnum jsl_subprocess_run_blocking(
+    JSLAllocatorInterface allocator,
     JSLSubprocess* procs,
     int32_t count,
     int32_t timeout_ms,
@@ -4741,10 +4766,6 @@ JSLSubProcessResultEnum jsl_subprocess_run_blocking(
         if (procs[i].status != JSL_SUBPROCESS_STATUS_NOT_STARTED)
             return JSL_SUBPROCESS_ALREADY_STARTED;
     }
-
-    // Use the first proc's allocator for short-lived helper allocations.
-    // Every proc carries its own; one is sufficient.
-    JSLAllocatorInterface allocator = procs[0].allocator;
 
     for (int32_t i = 0; i < count; i++)
     {
@@ -4778,16 +4799,16 @@ JSLSubProcessResultEnum jsl_subprocess_run_blocking(
         allocator, max_fds * (int64_t) sizeof(struct pollfd),
         JSL_DEFAULT_ALLOCATION_ALIGNMENT, false
     );
-    int* stdin_idx = (int*) jsl_allocator_interface_alloc(
-        allocator, (int64_t) count * (int64_t) sizeof(int),
+    int32_t* stdin_idx = (int32_t*) jsl_allocator_interface_alloc(
+        allocator, (int64_t) count * (int64_t) sizeof(int32_t),
         JSL_DEFAULT_ALLOCATION_ALIGNMENT, false
     );
-    int* stdout_idx = (int*) jsl_allocator_interface_alloc(
-        allocator, (int64_t) count * (int64_t) sizeof(int),
+    int32_t* stdout_idx = (int32_t*) jsl_allocator_interface_alloc(
+        allocator, (int64_t) count * (int64_t) sizeof(int32_t),
         JSL_DEFAULT_ALLOCATION_ALIGNMENT, false
     );
-    int* stderr_idx = (int*) jsl_allocator_interface_alloc(
-        allocator, (int64_t) count * (int64_t) sizeof(int),
+    int32_t* stderr_idx = (int32_t*) jsl_allocator_interface_alloc(
+        allocator, (int64_t) count * (int64_t) sizeof(int32_t),
         JSL_DEFAULT_ALLOCATION_ALIGNMENT, false
     );
     if (pfds == NULL || stdin_idx == NULL || stdout_idx == NULL || stderr_idx == NULL)
@@ -4902,11 +4923,7 @@ JSLSubProcessResultEnum jsl_subprocess_run_blocking(
             }
         }
 
-        int self_pipe_idx = nfds;
-        pfds[nfds].fd = jsl__sigchld_pipe[0];
-        pfds[nfds].events = POLLIN;
-        pfds[nfds].revents = 0;
-        nfds++;
+        int self_pipe_idx = jsl__sigchld_pollfd_append(pfds, &nfds);
 
         int wait_ms;
         if (infinite)
@@ -5045,11 +5062,7 @@ JSLSubProcessResultEnum jsl_subprocess_run_blocking(
                 }
             }
 
-            int self_pipe_idx = nfds;
-            pfds[nfds].fd = jsl__sigchld_pipe[0];
-            pfds[nfds].events = POLLIN;
-            pfds[nfds].revents = 0;
-            nfds++;
+            int self_pipe_idx = jsl__sigchld_pollfd_append(pfds, &nfds);
 
             // Bounded — SIGKILL has been sent so the children should die
             // quickly. The bound only guards against stuck zombies.
@@ -5190,11 +5203,21 @@ JSLSubProcessResultEnum jsl_subprocess_run_blocking(
         still_running_count++;
     }
 
-    // Event-driven wait, batching into groups of 16 procs (each may
-    // contribute up to 4 handles) to stay under the 64-handle ceiling
-    // of WaitForMultipleObjectsEx. Mirrors background_wait's rotation
-    // so no group starves while another blocks.
-    const int32_t group_size = 16;
+    // Event-driven wait, batching procs into groups so that each batch's
+    // handle count stays under WaitForMultipleObjectsEx's MAXIMUM_WAIT_OBJECTS
+    // (64) ceiling. Each proc may contribute up to 4 handles (process exit +
+    // stdin write + stdout read + stderr read), so group_size * 4 must equal
+    // MAXIMUM_WAIT_OBJECTS. Rotation mirrors background_wait so no group
+    // starves while another blocks.
+    enum {
+        JSL__WIN_RB_HANDLES_PER_PROC = 4,
+        JSL__WIN_RB_GROUP_SIZE = MAXIMUM_WAIT_OBJECTS / JSL__WIN_RB_HANDLES_PER_PROC
+    };
+    _Static_assert(
+        JSL__WIN_RB_GROUP_SIZE * JSL__WIN_RB_HANDLES_PER_PROC == MAXIMUM_WAIT_OBJECTS,
+        "group_size must saturate the WaitForMultipleObjectsEx handle ceiling"
+    );
+    const int32_t group_size = JSL__WIN_RB_GROUP_SIZE;
     const DWORD rotation_slice_ms = 50;
 
     bool infinite = (timeout_ms < 0);
@@ -5235,9 +5258,8 @@ JSLSubProcessResultEnum jsl_subprocess_run_blocking(
         }
     }
 
-    int32_t num_groups = (still_running_count + group_size - 1) / group_size;
-    if (num_groups < 1)
-        num_groups = 1;
+    int32_t num_groups =
+        jsl__subprocess_compute_num_groups(still_running_count, group_size);
     int32_t current_group = 0;
 
     while (still_running_count > 0)
@@ -5362,47 +5384,50 @@ JSLSubProcessResultEnum jsl_subprocess_run_blocking(
 
         if (wret >= WAIT_OBJECT_0 && wret < WAIT_OBJECT_0 + n_handles)
         {
-            int32_t idx = (int32_t)(wret - WAIT_OBJECT_0);
-            int32_t slot_idx = handle_to_slot[idx];
-            int32_t kind = handle_kind[idx];
-            JSLSubprocess* p = &procs[slot_idx];
+            // WaitForMultipleObjectsEx with bWaitAll=FALSE only reports
+            // the lowest signalled handle. With many concurrent procs and
+            // pipes that produces one-event-per-iteration and an O(N)
+            // handle-table rebuild between each. Walk the rest of the
+            // batch with a non-blocking poll and drain anything else
+            // already signalled before re-arming.
+            int32_t primary_idx = (int32_t)(wret - WAIT_OBJECT_0);
 
-            if (kind == JSL__WIN_RB_KIND_PROCESS)
+            for (int32_t idx = 0; idx < (int32_t) n_handles; idx++)
             {
-                DWORD code = 0;
-                if (GetExitCodeProcess(p->process_handle, &code))
-                    p->exit_code = (int32_t) code;
+                bool signalled;
+                if (idx == primary_idx)
+                    signalled = true;
                 else
-                    p->exit_code = -1;
-                p->status = JSL_SUBPROCESS_STATUS_EXITED;
+                    signalled =
+                        (WaitForSingleObject(handles[idx], 0) == WAIT_OBJECT_0);
 
-                int32_t e = 0;
-                JSLSubProcessResultEnum pr =
-                    jsl__subprocess_win_finalize_pending_reads(p, &e);
-                if (pr == JSL_SUBPROCESS_IO_FAILED)
+                if (!signalled)
+                    continue;
+
+                int32_t slot_idx = handle_to_slot[idx];
+                int32_t kind = handle_kind[idx];
+                JSLSubprocess* p = &procs[slot_idx];
+
+                // An earlier pass in this same batch may have processed
+                // this slot's process-exit event and finalized its
+                // pending reads. Skip stale stdin/stdout/stderr events
+                // for slots that are no longer running.
+                if (p->status != JSL_SUBPROCESS_STATUS_RUNNING
+                    && kind != JSL__WIN_RB_KIND_PROCESS)
+                    continue;
+
+                if (kind == JSL__WIN_RB_KIND_PROCESS)
                 {
-                    p->last_errno = e;
-                    any_io_failed = true;
-                }
-                else if (e != 0)
-                {
-                    p->last_errno = e;
-                }
-                still_running_count--;
-            }
-            else
-            {
-                int32_t e = 0;
-                if (kind == JSL__WIN_RB_KIND_STDIN_WRITE)
-                {
-                    (void) jsl__subprocess_win_pump_stdin_once(p, &e);
-                    if (e != 0)
-                        p->last_errno = e;
-                }
-                else
-                {
+                    DWORD code = 0;
+                    if (GetExitCodeProcess(p->process_handle, &code))
+                        p->exit_code = (int32_t) code;
+                    else
+                        p->exit_code = -1;
+                    p->status = JSL_SUBPROCESS_STATUS_EXITED;
+
+                    int32_t e = 0;
                     JSLSubProcessResultEnum pr =
-                        jsl__subprocess_win_pump_output_once(p, &e);
+                        jsl__subprocess_win_finalize_pending_reads(p, &e);
                     if (pr == JSL_SUBPROCESS_IO_FAILED)
                     {
                         p->last_errno = e;
@@ -5411,6 +5436,31 @@ JSLSubProcessResultEnum jsl_subprocess_run_blocking(
                     else if (e != 0)
                     {
                         p->last_errno = e;
+                    }
+                    still_running_count--;
+                }
+                else
+                {
+                    int32_t e = 0;
+                    if (kind == JSL__WIN_RB_KIND_STDIN_WRITE)
+                    {
+                        (void) jsl__subprocess_win_pump_stdin_once(p, &e);
+                        if (e != 0)
+                            p->last_errno = e;
+                    }
+                    else
+                    {
+                        JSLSubProcessResultEnum pr =
+                            jsl__subprocess_win_pump_output_once(p, &e);
+                        if (pr == JSL_SUBPROCESS_IO_FAILED)
+                        {
+                            p->last_errno = e;
+                            any_io_failed = true;
+                        }
+                        else if (e != 0)
+                        {
+                            p->last_errno = e;
+                        }
                     }
                 }
             }
@@ -5434,13 +5484,12 @@ JSLSubProcessResultEnum jsl_subprocess_run_blocking(
         else
         {
             wait_failed = true;
-            wait_failed_errno = (int32_t) wret;
+            wait_failed_errno = (int32_t) GetLastError();
             break;
         }
 
-        int32_t new_num_groups = (still_running_count + group_size - 1) / group_size;
-        if (new_num_groups < 1)
-            new_num_groups = 1;
+        int32_t new_num_groups =
+            jsl__subprocess_compute_num_groups(still_running_count, group_size);
         if (new_num_groups != num_groups)
         {
             num_groups = new_num_groups;
@@ -6035,16 +6084,16 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
     );
     // Stash per-proc fd indices so we don't re-scan the array after
     // poll returns.
-    int* stdin_idx = (int*) jsl_allocator_interface_alloc(
-        allocator, (int64_t) count * (int64_t) sizeof(int),
+    int32_t* stdin_idx = (int32_t*) jsl_allocator_interface_alloc(
+        allocator, (int64_t) count * (int64_t) sizeof(int32_t),
         JSL_DEFAULT_ALLOCATION_ALIGNMENT, false
     );
-    int* stdout_idx = (int*) jsl_allocator_interface_alloc(
-        allocator, (int64_t) count * (int64_t) sizeof(int),
+    int32_t* stdout_idx = (int32_t*) jsl_allocator_interface_alloc(
+        allocator, (int64_t) count * (int64_t) sizeof(int32_t),
         JSL_DEFAULT_ALLOCATION_ALIGNMENT, false
     );
-    int* stderr_idx = (int*) jsl_allocator_interface_alloc(
-        allocator, (int64_t) count * (int64_t) sizeof(int),
+    int32_t* stderr_idx = (int32_t*) jsl_allocator_interface_alloc(
+        allocator, (int64_t) count * (int64_t) sizeof(int32_t),
         JSL_DEFAULT_ALLOCATION_ALIGNMENT, false
     );
     if (pfds == NULL || stdin_idx == NULL || stdout_idx == NULL || stderr_idx == NULL)
@@ -6106,11 +6155,7 @@ JSLSubProcessResultEnum jsl_subprocess_background_wait(
             }
         }
 
-        int self_pipe_idx = nfds;
-        pfds[nfds].fd = jsl__sigchld_pipe[0];
-        pfds[nfds].events = POLLIN;
-        pfds[nfds].revents = 0;
-        nfds++;
+        int self_pipe_idx = jsl__sigchld_pollfd_append(pfds, &nfds);
 
         int wait_ms;
         if (infinite)

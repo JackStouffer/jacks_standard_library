@@ -1230,7 +1230,7 @@ typedef enum
 * jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&stdout_sb));
 * jsl_subprocess_set_stderr_sink(&proc, jsl_string_builder_output_sink(&stderr_sb));
 *
-* jsl_subprocess_run_blocking(&proc, 1, -1, NULL);
+* jsl_subprocess_run_blocking(alloc, &proc, 1, -1, NULL);
 *
 * JSLImmutableMemory out = jsl_string_builder_get_string(&stdout_sb);
 * JSLImmutableMemory err = jsl_string_builder_get_string(&stderr_sb);
@@ -1290,6 +1290,15 @@ typedef enum
 *     still-running child; `background_wait` leaves them running
 *     and returns `TIMEOUT_REACHED` for the caller to handle.
 *
+* `allocator` is used for short-lived helper allocations whose lifetime
+* is bounded by this call (poll/handle-table scratch buffers and similar).
+* It is independent of any `procs[i].allocator` and is not used for
+* per-proc resources. Callers with mixed-allocator procs should pass a
+* dedicated scratch allocator with enough headroom for the batch rather
+* than sharing one of the per-proc allocators, which may be near-full.
+*
+* @param allocator   Allocator for short-lived helper buffers shared
+*                    across the whole batch
 * @param procs       Pointer to an array of configured subprocess handles
 * @param count       Number of elements in `procs`
 * @param timeout_ms  Maximum time to wait for the children, in milliseconds
@@ -1298,6 +1307,7 @@ typedef enum
 * @returns A result enum describing the outcome
 */
 JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_run_blocking(
+    JSLAllocatorInterface allocator,
     JSLSubprocess* procs,
     int32_t count,
     int32_t timeout_ms,
