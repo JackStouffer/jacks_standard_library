@@ -1532,6 +1532,20 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_wait(
 */
 JSL_DEF void jsl_subprocess_cleanup(JSLSubprocess* proc);
 
+/**
+* Get the number of logical processors available on the host machine.
+*
+* On Windows this returns the count across all processor groups, so systems
+* with more than 64 logical processors are reported accurately. On POSIX
+* systems this uses `sysconf(_SC_NPROCESSORS_ONLN)`, which reports the
+* number of processors currently online.
+*
+* @param out_errno Optional pointer that receives the system errno (POSIX) or
+*                  the result of `GetLastError` (Windows) on failure
+* @returns The number of logical processors, or -1 on error
+*/
+JSL_WARN_UNUSED JSL_DEF int32_t jsl_get_logical_processor_count(int32_t* out_errno);
+
 
 #ifdef __cplusplus
 } /* extern "C" */

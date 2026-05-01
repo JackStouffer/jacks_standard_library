@@ -4726,17 +4726,19 @@ static JSLSubProcessResultEnum jsl__subprocess_win_poll(
 
 #endif
 
-// Round still_running_count up to a group count, clamped at >= 1 so the
-// outer loop always has at least one group to schedule.
-static int32_t jsl__subprocess_compute_num_groups(
-    int32_t still_running_count, int32_t group_size
-)
-{
-    int32_t n = (still_running_count + group_size - 1) / group_size;
-    if (n < 1)
-        n = 1;
-    return n;
-}
+#if JSL_IS_WINDOWS
+    // Round still_running_count up to a group count, clamped at >= 1 so the
+    // outer loop always has at least one group to schedule.
+    static int32_t jsl__subprocess_compute_num_groups(
+        int32_t still_running_count, int32_t group_size
+    )
+    {
+        int32_t n = (still_running_count + group_size - 1) / group_size;
+        if (n < 1)
+            n = 1;
+        return n;
+    }
+#endif
 
 JSLSubProcessResultEnum jsl_subprocess_run_blocking(
     JSLAllocatorInterface allocator,
@@ -6773,4 +6775,36 @@ void jsl_subprocess_cleanup(JSLSubprocess* proc)
     proc->env_capacity = 0;
     proc->working_directory = jsl_immutable_memory(NULL, 0);
     proc->stdin_memory = jsl_immutable_memory(NULL, 0);
+}
+
+int32_t jsl_get_logical_processor_count(int32_t* out_errno)
+{
+    int32_t result = -1;
+
+    #if JSL_IS_WINDOWS
+
+        // GetActiveProcessorCount with ALL_PROCESSOR_GROUPS reports the count
+        // across all processor groups, so systems with more than 64 logical
+        // processors are reported accurately.
+        DWORD count = GetActiveProcessorCount(ALL_PROCESSOR_GROUPS);
+        bool ok = (count > 0) && (count <= (DWORD) INT32_MAX);
+        if (ok)
+            result = (int32_t) count;
+        if (!ok && out_errno != NULL)
+            *out_errno = (int32_t) GetLastError();
+
+    #elif JSL_IS_POSIX
+
+        long count = sysconf(_SC_NPROCESSORS_ONLN);
+        bool ok = (count > 0) && (count <= (long) INT32_MAX);
+        if (ok)
+            result = (int32_t) count;
+        if (!ok && out_errno != NULL)
+            *out_errno = errno;
+
+    #else
+        #error "Unsupported platform"
+    #endif
+
+    return result;
 }
