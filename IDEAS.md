@@ -48,28 +48,14 @@ Smaller notes on what's already there. Documenting the Windows arg-quoting rules
   Filesystem:
   - nob_needs_rebuild / nob_needs_rebuild1 (builder.h:694, 695) — mtime comparison
 
-  Path manipulation:
-  - nob_path_name (builder.h:692)
-  - nob_temp_dir_name (builder.h:700)
-  - nob_temp_file_name (builder.h:701)
-  - nob_temp_file_ext (builder.h:702)
-
   Process / current working directory / executable:
   - nob_get_current_dir_temp (builder.h:697)
-  - nob_set_current_dir (builder.h:698)
   - nob_temp_running_executable_path (builder.h:703)
   - nob_nprocs (builder.h:529)
 
   File descriptors / pipes:
   - nob_fd_close (builder.h:405)
   - nob_pipe_create (builder.h:412)
-
-  Process spawn/wait:
-  - nob_proc_wait (builder.h:421)
-  - nob_procs_wait (builder.h:424)
-  - nob_procs_flush (builder.h:427)
-  - nob_procs_wait_and_reset (builder.h:431)
-  - nob_procs_append_with_flush (builder.h:435)
 
   Self-rebuild / win32:
   - nob__go_rebuild_urself (builder.h:803)
