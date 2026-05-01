@@ -1194,7 +1194,8 @@ typedef enum
 * and the usual setters; none may have been started yet.
 *
 * On success, every proc's `status` is `EXITED` (or `KILLED_BY_SIGNAL`
-* on POSIX, when the child died from a signal) and `exit_code` carries
+* when the child died from a signal on POSIX, or when this call's
+* timeout-kill terminated the child on Windows) and `exit_code` carries
 * the child's exit code (negated signal number on POSIX kill; -1 on
 * Windows abnormal termination). Per-proc pump errors are recorded on
 * `procs[i].last_errno`.
@@ -1488,8 +1489,25 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_kill(
 * Not thread safe: only one thread may operate on a given `JSLSubprocess`
 * at a time. Each proc in `procs` must not be touched by any other thread
 * (including via other subprocess APIs) for the duration of this call.
+*
+* `allocator` is used for short-lived helper allocations whose lifetime
+* is bounded by this call (poll/handle-table scratch buffers and similar).
+* It is independent of any `procs[i].allocator` and is not used for
+* per-proc resources. Callers with mixed-allocator procs should pass a
+* dedicated scratch allocator with enough headroom for the batch rather
+* than sharing one of the per-proc allocators, which may be near-full.
+*
+* @param allocator   Allocator for short-lived helper buffers shared
+*                    across the whole batch
+* @param procs       Pointer to an array of background subprocess handles
+* @param count       Number of elements in `procs`
+* @param timeout_ms  Maximum time to wait for the children, in milliseconds
+* @param out_errno   Optional pointer that receives the system errno on
+*                    a top-level wait failure
+* @returns A result enum describing the outcome
 */
 JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_wait(
+    JSLAllocatorInterface allocator,
     JSLSubprocess* procs,
     int32_t count,
     int32_t timeout_ms,

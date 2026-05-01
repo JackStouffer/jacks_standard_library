@@ -4746,11 +4746,11 @@ JSLSubProcessResultEnum jsl_subprocess_run_blocking(
     int32_t* out_errno
 )
 {
-    if (procs == NULL || count <= 0)
-        return JSL_SUBPROCESS_BAD_PARAMETERS;
-
     if (out_errno != NULL)
         *out_errno = 0;
+
+    if (procs == NULL || count <= 0)
+        return JSL_SUBPROCESS_BAD_PARAMETERS;
 
     // Pre-flight: every proc must have a good sentinel and be NOT_STARTED.
     // Reject the whole call before spawning anything if either check fails
@@ -5118,6 +5118,9 @@ JSLSubProcessResultEnum jsl_subprocess_run_blocking(
     // Close any remaining parent-side pipe fds. The pump helpers close
     // fds on EOF/done, but timeouts and IO_FAILED paths can leave them
     // open. Skip procs that never spawned.
+    // On WAIT_FAILED: closing the parent ends will make any surviving
+    // children see EOF / EPIPE; we deliberately do NOT reap them — the
+    // caller is on the hook for that since wait state is indeterminate.
     for (int32_t i = 0; i < count; i++)
     {
         if (procs[i].status == JSL_SUBPROCESS_STATUS_FAILED_TO_START
@@ -5919,34 +5922,24 @@ typedef struct JSL__SubProcessWaitSlot
 } JSL__SubProcessWaitSlot;
 
 JSLSubProcessResultEnum jsl_subprocess_background_wait(
+    JSLAllocatorInterface allocator,
     JSLSubprocess* procs,
     int32_t count,
     int32_t timeout_ms,
     int32_t* out_errno
 )
 {
-    if (procs == NULL || count <= 0)
-        return JSL_SUBPROCESS_BAD_PARAMETERS;
-
     if (out_errno != NULL)
         *out_errno = 0;
 
-    // Pick an allocator from the first proc whose sentinel is valid. If
-    // every proc has a bad sentinel there is nothing to wait on, so the
-    // caller gets a trivial success without any allocation.
-    JSLAllocatorInterface allocator = {0};
-    bool have_allocator = false;
-    for (int32_t i = 0; i < count; i++)
-    {
-        if (procs[i].sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL)
-        {
-            allocator = procs[i].allocator;
-            have_allocator = true;
-            break;
-        }
-    }
-    if (!have_allocator)
-        return JSL_SUBPROCESS_SUCCESS;
+    if (procs == NULL || count <= 0)
+        return JSL_SUBPROCESS_BAD_PARAMETERS;
+
+    // `allocator` backs all cross-subprocess scratch buffers (the
+    // wait-slot table, the POSIX pollfd array and per-proc fd index
+    // maps). Per-proc allocations stay on `procs[i].allocator` — this
+    // function does not own any per-proc resources, so nothing here
+    // touches the per-proc allocators directly.
 
     // First pass: classify every proc as ignored, already-terminal, or
     // still-running. Only still-running procs contribute to the wait

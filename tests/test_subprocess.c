@@ -937,15 +937,20 @@ void test_jsl_subprocess_run_blocking_working_directory(void)
 
 void test_jsl_subprocess_background_wait_bad_parameters(void)
 {
-    JSLSubProcessResultEnum r = jsl_subprocess_background_wait(NULL, 0, -1, NULL);
+    JSLLibcAllocator backing;
+    JSLAllocatorInterface iface = test_libc_allocator_interface(&backing);
+
+    JSLSubProcessResultEnum r = jsl_subprocess_background_wait(iface, NULL, 0, -1, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_BAD_PARAMETERS);
 
     JSLSubprocess dummy;
-    r = jsl_subprocess_background_wait(&dummy, 0, 0, NULL);
+    r = jsl_subprocess_background_wait(iface, &dummy, 0, 0, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_BAD_PARAMETERS);
 
-    r = jsl_subprocess_background_wait(NULL, 1, 0, NULL);
+    r = jsl_subprocess_background_wait(iface, NULL, 1, 0, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_BAD_PARAMETERS);
+
+    jsl_libc_allocator_free_all(&backing);
 }
 
 void test_jsl_subprocess_background_wait_all_ignored(void)
@@ -957,7 +962,7 @@ void test_jsl_subprocess_background_wait_all_ignored(void)
     TEST_BOOL(make_helper(&procs[0], &backing));
     memset(&procs[1], 0, sizeof(procs[1]));
 
-    JSLSubProcessResultEnum r = jsl_subprocess_background_wait(procs, 2, 1000, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_background_wait(procs[0].allocator, procs, 2, 1000, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
 
     jsl_subprocess_cleanup(&procs[0]);
@@ -983,7 +988,7 @@ void test_jsl_subprocess_background_wait_pre_exited(void)
     TEST_INT32_EQUAL(proc.status, JSL_SUBPROCESS_STATUS_EXITED);
 
     int32_t before_code = proc.exit_code;
-    JSLSubProcessResultEnum r = jsl_subprocess_background_wait(&proc, 1, 1000, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_background_wait(proc.allocator, &proc, 1, 1000, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
     TEST_INT32_EQUAL(proc.status, JSL_SUBPROCESS_STATUS_EXITED);
     TEST_INT32_EQUAL(proc.exit_code, before_code);
@@ -1024,7 +1029,7 @@ void test_jsl_subprocess_background_wait_many_healthy(void)
         );
     }
 
-    JSLSubProcessResultEnum r = jsl_subprocess_background_wait(procs, N, 5000, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_background_wait(procs[0].allocator, procs, N, 5000, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
 
     for (int i = 0; i < N; i++)
@@ -1074,7 +1079,7 @@ void test_jsl_subprocess_background_wait_timeout(void)
         JSL_SUBPROCESS_SUCCESS
     );
 
-    JSLSubProcessResultEnum r = jsl_subprocess_background_wait(procs, 2, 300, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_background_wait(procs[0].allocator, procs, 2, 300, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_TIMEOUT_REACHED);
     TEST_INT32_EQUAL(procs[0].status, JSL_SUBPROCESS_STATUS_EXITED);
     TEST_BOOL(procs[1].status == JSL_SUBPROCESS_STATUS_RUNNING);
@@ -1122,7 +1127,7 @@ void test_jsl_subprocess_background_wait_heavy_stdout(void)
         JSL_SUBPROCESS_SUCCESS
     );
 
-    JSLSubProcessResultEnum r = jsl_subprocess_background_wait(&proc, 1, 10000, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_background_wait(proc.allocator, &proc, 1, 10000, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
     TEST_INT32_EQUAL(proc.status, JSL_SUBPROCESS_STATUS_EXITED);
     TEST_INT32_EQUAL(proc.exit_code, 0);
@@ -1175,7 +1180,7 @@ void test_jsl_subprocess_background_wait_post_exit_drain(void)
     // sitting in the pipe buffer with the child already terminal.
     test_sleep_ms(200);
 
-    JSLSubProcessResultEnum r = jsl_subprocess_background_wait(&proc, 1, 5000, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_background_wait(proc.allocator, &proc, 1, 5000, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
     TEST_INT32_EQUAL(proc.status, JSL_SUBPROCESS_STATUS_EXITED);
     TEST_INT32_EQUAL(proc.exit_code, 0);
@@ -1246,7 +1251,7 @@ void test_jsl_subprocess_background_wait_drain_after_poll_exited(void)
     TEST_INT32_EQUAL(status, JSL_SUBPROCESS_STATUS_EXITED);
     TEST_INT32_EQUAL(proc.status, JSL_SUBPROCESS_STATUS_EXITED);
 
-    JSLSubProcessResultEnum r = jsl_subprocess_background_wait(&proc, 1, 5000, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_background_wait(proc.allocator, &proc, 1, 5000, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
 
     JSLImmutableMemory out = jsl_string_builder_get_string(&sb);
@@ -1285,7 +1290,7 @@ void test_jsl_subprocess_background_wait_single_stdin_memory(void)
         JSL_SUBPROCESS_SUCCESS
     );
 
-    JSLSubProcessResultEnum r = jsl_subprocess_background_wait(&proc, 1, 5000, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_background_wait(proc.allocator, &proc, 1, 5000, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
     TEST_INT32_EQUAL(proc.status, JSL_SUBPROCESS_STATUS_EXITED);
     TEST_INT32_EQUAL(proc.exit_code, 0);
@@ -1371,7 +1376,7 @@ void test_jsl_subprocess_background_wait_17_procs_event_driven(void)
         );
     }
 
-    JSLSubProcessResultEnum r = jsl_subprocess_background_wait(procs, N, 5000, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_background_wait(procs[0].allocator, procs, N, 5000, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
 
     for (int i = 0; i < N; i++)
