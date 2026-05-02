@@ -1,5 +1,5 @@
 /**
- * # Jack's Standard Library File Utilities
+ * # Jack's Standard Library OS Utilities
  *
  * File loading and writing utilities. These require linking the standard library.
  *

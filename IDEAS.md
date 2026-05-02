@@ -40,23 +40,3 @@ Smaller things
 # Subprocess 
 
 Smaller notes on what's already there. Documenting the Windows arg-quoting rules the implementation follows (MSDN CommandLineToArgvW conventions) is worth it — callers get bitten by this constantly. And for the streaming-stdin case (feed bytes to a live child over time), MEMORY isn't enough; you'd want either a stdin FD the caller writes to, or a stdin-sink-as-callback. Probably a v2 concern.
-
-# Builder
-
-  OS utility functions in builder.h with no JSL equivalent
-
-  Filesystem:
-  - nob_needs_rebuild / nob_needs_rebuild1 (builder.h:694, 695) — mtime comparison
-
-  Process / current working directory / executable:
-  - nob_get_current_dir_temp (builder.h:697)
-  - nob_temp_running_executable_path (builder.h:703)
-  - nob_nprocs (builder.h:529)
-
-  File descriptors / pipes:
-  - nob_fd_close (builder.h:405)
-  - nob_pipe_create (builder.h:412)
-
-  Self-rebuild / win32:
-  - nob__go_rebuild_urself (builder.h:803)
-  - nob_win32_error_message (builder.h:872)
