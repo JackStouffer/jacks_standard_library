@@ -30,6 +30,7 @@
     #include <windows.h>
     static const char* HELPER_PATH = "tests\\bin\\subprocess_helper.exe";
 #else
+    #include <time.h>
     #include <unistd.h>
     static const char* HELPER_PATH = "tests/bin/subprocess_helper";
 #endif
@@ -40,6 +41,18 @@ static void test_sleep_ms(int ms)
     Sleep((DWORD) ms);
 #else
     usleep((useconds_t) ms * 1000u);
+#endif
+}
+
+static int64_t test_monotonic_ms(void)
+{
+#if JSL_IS_WINDOWS
+    return (int64_t) GetTickCount64();
+#else
+    struct timespec ts;
+    if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
+        return 0;
+    return (int64_t) ts.tv_sec * 1000 + (int64_t) ts.tv_nsec / 1000000;
 #endif
 }
 
@@ -292,17 +305,17 @@ void test_jsl_subprocess_run_blocking_bad_parameters(void)
     TEST_BOOL(make_helper(&proc, &backing));
 
     // NULL procs
-    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(proc.allocator, NULL, 1, -1, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(proc.allocator, NULL, 1, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_BAD_PARAMETERS);
 
     // count <= 0
-    r = jsl_subprocess_run_blocking(proc.allocator, &proc, 0, -1, NULL);
+    r = jsl_subprocess_run_blocking(proc.allocator, &proc, 0, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_BAD_PARAMETERS);
 
     // Bad sentinel
     JSLSubprocess bogus;
     memset(&bogus, 0, sizeof(bogus));
-    r = jsl_subprocess_run_blocking(proc.allocator, &bogus, 1, -1, NULL);
+    r = jsl_subprocess_run_blocking(proc.allocator, &bogus, 1, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_BAD_PARAMETERS);
 
     jsl_subprocess_cleanup(&proc);
@@ -327,7 +340,6 @@ void test_jsl_subprocess_run_blocking_spawn_failed(void)
         iface,
         &proc,
         1,
-        -1,
         &errno_out
     );
 
@@ -358,7 +370,7 @@ void test_jsl_subprocess_run_blocking_exit_code(void)
 
     int32_t errno_out = 0;
     JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(
-        proc.allocator, &proc, 1, -1, &errno_out
+        proc.allocator, &proc, 1, &errno_out
     );
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
     TEST_INT32_EQUAL(proc.exit_code, 7);
@@ -379,10 +391,10 @@ void test_jsl_subprocess_run_blocking_already_started(void)
         JSL_SUBPROCESS_ARG_SUCCESS
     );
 
-    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(proc.allocator, &proc, 1, -1, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(proc.allocator, &proc, 1, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
 
-    r = jsl_subprocess_run_blocking(proc.allocator, &proc, 1, -1, NULL);
+    r = jsl_subprocess_run_blocking(proc.allocator, &proc, 1, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_ALREADY_STARTED);
 
     jsl_subprocess_cleanup(&proc);
@@ -408,7 +420,7 @@ void test_jsl_subprocess_run_blocking_stdout_sink(void)
 
     TEST_BOOL(jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&sb)));
 
-    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(proc.allocator, &proc, 1, -1, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(proc.allocator, &proc, 1, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
     TEST_INT32_EQUAL(proc.exit_code, 0);
 
@@ -448,7 +460,7 @@ void test_jsl_subprocess_run_blocking_stderr_sink(void)
     TEST_BOOL(jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&sb_out)));
     TEST_BOOL(jsl_subprocess_set_stderr_sink(&proc, jsl_string_builder_output_sink(&sb_err)));
 
-    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(proc.allocator, &proc, 1, -1, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(proc.allocator, &proc, 1, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
     TEST_INT32_EQUAL(proc.exit_code, 0);
 
@@ -492,7 +504,7 @@ void test_jsl_subprocess_run_blocking_stdin_memory(void)
     TEST_BOOL(jsl_string_builder_init(&sb, sb_iface, 64));
     TEST_BOOL(jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&sb)));
 
-    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(proc.allocator, &proc, 1, -1, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(proc.allocator, &proc, 1, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
     TEST_INT32_EQUAL(proc.exit_code, 0);
 
@@ -533,7 +545,7 @@ void test_jsl_subprocess_run_blocking_env_var(void)
     TEST_BOOL(jsl_string_builder_init(&sb, sb_iface, 64));
     TEST_BOOL(jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&sb)));
 
-    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(proc.allocator, &proc, 1, -1, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(proc.allocator, &proc, 1, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
     TEST_INT32_EQUAL(proc.exit_code, 0);
 
@@ -916,7 +928,7 @@ void test_jsl_subprocess_run_blocking_working_directory(void)
     TEST_BOOL(jsl_string_builder_init(&sb, sb_iface, 64));
     TEST_BOOL(jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&sb)));
 
-    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(proc.allocator, &proc, 1, -1, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(proc.allocator, &proc, 1, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
     TEST_INT32_EQUAL(proc.exit_code, 0);
 
@@ -1331,7 +1343,7 @@ void test_jsl_subprocess_run_blocking_spew_large(void)
     TEST_BOOL(jsl_string_builder_init(&sb, sb_iface, 4096));
     TEST_BOOL(jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&sb)));
 
-    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(proc.allocator, &proc, 1, -1, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(proc.allocator, &proc, 1, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
     TEST_INT32_EQUAL(proc.exit_code, 0);
 
@@ -1418,7 +1430,7 @@ void test_jsl_subprocess_run_blocking_multi_mixed_exits(void)
         );
     }
 
-    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(procs[0].allocator, procs, N, -1, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(procs[0].allocator, procs, N, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
 
     for (int i = 0; i < N; i++)
@@ -1456,7 +1468,7 @@ void test_jsl_subprocess_run_blocking_multi_already_started_rejects_all(void)
 
     // Run the first proc on its own so its status flips to EXITED.
     TEST_INT32_EQUAL(
-        jsl_subprocess_run_blocking(procs[0].allocator, &procs[0], 1, -1, NULL),
+        jsl_subprocess_run_blocking(procs[0].allocator, &procs[0], 1, NULL),
         JSL_SUBPROCESS_SUCCESS
     );
     TEST_INT32_EQUAL(procs[0].status, JSL_SUBPROCESS_STATUS_EXITED);
@@ -1464,7 +1476,7 @@ void test_jsl_subprocess_run_blocking_multi_already_started_rejects_all(void)
 
     // Now batch them. procs[0] is no longer NOT_STARTED, so the whole
     // call must fail and procs[1] must NOT have been spawned.
-    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(procs[0].allocator, procs, 2, -1, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(procs[0].allocator, procs, 2, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_ALREADY_STARTED);
     TEST_INT32_EQUAL(procs[1].status, JSL_SUBPROCESS_STATUS_NOT_STARTED);
 
@@ -1510,7 +1522,7 @@ void test_jsl_subprocess_run_blocking_multi_partial_spawn_failure(void)
         JSL_SUBPROCESS_ARG_SUCCESS
     );
 
-    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(procs[0].allocator, procs, N, -1, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(procs[0].allocator, procs, N, NULL);
 
     // posix_spawnp may report missing-executable synchronously
     // (macOS/BSD) or let the child exec fail with code 127 (some
@@ -1536,12 +1548,14 @@ void test_jsl_subprocess_run_blocking_multi_partial_spawn_failure(void)
     }
 }
 
-void test_jsl_subprocess_run_blocking_multi_timeout_kills_all(void)
+void test_jsl_subprocess_run_blocking_options_multi_timeout_kills_all(void)
 {
     // Mixed batch: two quick exits and one long sleep. With a tight
     // deadline the call must return TIMEOUT_REACHED, every proc must
     // be terminal on return, and the sleeper must have been killed
-    // (not still RUNNING) — that is run_blocking's contract.
+    // (not still RUNNING) — that is _options' contract. Parallelism
+    // is N so all three are spawned up front and the sleeper is in
+    // the live set when the deadline fires.
     enum { N = 3 };
     JSLLibcAllocator backing[N];
     JSLSubprocess procs[N];
@@ -1562,7 +1576,9 @@ void test_jsl_subprocess_run_blocking_multi_timeout_kills_all(void)
         JSL_SUBPROCESS_ARG_SUCCESS
     );
 
-    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(procs[0].allocator, procs, N, 200, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking_options(
+        procs[0].allocator, procs, N, N, 200, NULL
+    );
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_TIMEOUT_REACHED);
 
     // Every proc must be in a terminal state — none still RUNNING
@@ -1634,7 +1650,7 @@ void test_jsl_subprocess_run_blocking_multi_heterogeneous_io(void)
         JSL_SUBPROCESS_ARG_SUCCESS
     );
 
-    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(procs[0].allocator, procs, N, -1, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(procs[0].allocator, procs, N, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
 
     TEST_INT32_EQUAL(procs[0].status, JSL_SUBPROCESS_STATUS_EXITED);
@@ -1667,10 +1683,11 @@ void test_jsl_subprocess_run_blocking_multi_heterogeneous_io(void)
 
 void test_jsl_subprocess_run_blocking_multi_17_procs(void)
 {
-    // 17 procs is one more than the Windows group-size cap of 16,
-    // exercising group-rotation in run_blocking's wait loop. Each
-    // proc echoes its index so we can verify per-proc sinks did not
-    // get cross-wired.
+    // 17 procs exercises wrapper pipelining: the live set is bounded
+    // by `jsl_get_logical_processor_count()` (and additionally by 16
+    // on Windows, since the WaitForMultipleObjectsEx ceiling is 64
+    // handles / 4 per proc). All 17 must still complete, and per-proc
+    // sinks must not get cross-wired.
     enum { N = 17 };
     JSLLibcAllocator backing[N];
     JSLLibcAllocator sb_backing[N];
@@ -1697,7 +1714,7 @@ void test_jsl_subprocess_run_blocking_multi_17_procs(void)
         ));
     }
 
-    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(procs[0].allocator, procs, N, 5000, NULL);
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(procs[0].allocator, procs, N, NULL);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
 
     for (int i = 0; i < N; i++)
@@ -1715,6 +1732,350 @@ void test_jsl_subprocess_run_blocking_multi_17_procs(void)
     {
         jsl_string_builder_free(&sbs[i]);
         jsl_libc_allocator_free_all(&sb_backing[i]);
+        jsl_subprocess_cleanup(&procs[i]);
+        jsl_libc_allocator_free_all(&backing[i]);
+    }
+}
+
+void test_jsl_subprocess_run_blocking_options_parallelism_one(void)
+{
+    // parallelism_count == 1 with N>1 procs: each proc spawns only
+    // after the previous one has been reaped. All must complete with
+    // the expected per-proc exit codes.
+    enum { N = 3 };
+    JSLLibcAllocator backing[N];
+    JSLSubprocess procs[N];
+    const int codes[N] = { 0, 4, 9 };
+
+    for (int i = 0; i < N; i++)
+    {
+        TEST_BOOL(make_helper(&procs[i], &backing[i]));
+        char code_str[16];
+        snprintf(code_str, sizeof(code_str), "%d", codes[i]);
+        TEST_INT32_EQUAL(
+            jsl_subprocess_arg_cstr(&procs[i], "exit", code_str),
+            JSL_SUBPROCESS_ARG_SUCCESS
+        );
+    }
+
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking_options(
+        procs[0].allocator, procs, N, 1, -1, NULL
+    );
+    TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
+
+    for (int i = 0; i < N; i++)
+    {
+        TEST_INT32_EQUAL(procs[i].status, JSL_SUBPROCESS_STATUS_EXITED);
+        TEST_INT32_EQUAL(procs[i].exit_code, codes[i]);
+    }
+
+    for (int i = 0; i < N; i++)
+    {
+        jsl_subprocess_cleanup(&procs[i]);
+        jsl_libc_allocator_free_all(&backing[i]);
+    }
+}
+
+void test_jsl_subprocess_run_blocking_options_parallelism_caps_live(void)
+{
+    // 4 procs each sleeping ~300 ms with parallelism=2 must take at
+    // least ~600 ms wall (two waves of two). If the cap were ignored
+    // and all 4 ran in parallel, total would be ~300 ms. We assert
+    // > 500 ms to leave headroom for jitter.
+    enum { N = 4 };
+    JSLLibcAllocator backing[N];
+    JSLSubprocess procs[N];
+
+    for (int i = 0; i < N; i++)
+    {
+        TEST_BOOL(make_helper(&procs[i], &backing[i]));
+        TEST_INT32_EQUAL(
+            jsl_subprocess_arg_cstr(&procs[i], "sleep", "300"),
+            JSL_SUBPROCESS_ARG_SUCCESS
+        );
+    }
+
+    int64_t start = test_monotonic_ms();
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking_options(
+        procs[0].allocator, procs, N, 2, -1, NULL
+    );
+    int64_t elapsed = test_monotonic_ms() - start;
+
+    TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
+    TEST_BOOL(elapsed > 500);
+
+    for (int i = 0; i < N; i++)
+    {
+        TEST_INT32_EQUAL(procs[i].status, JSL_SUBPROCESS_STATUS_EXITED);
+        TEST_INT32_EQUAL(procs[i].exit_code, 0);
+    }
+
+    for (int i = 0; i < N; i++)
+    {
+        jsl_subprocess_cleanup(&procs[i]);
+        jsl_libc_allocator_free_all(&backing[i]);
+    }
+}
+
+void test_jsl_subprocess_run_blocking_options_bad_parallelism(void)
+{
+    // parallelism_count <= 0 is rejected up-front with BAD_PARAMETERS.
+    // The proc must remain NOT_STARTED in both branches.
+    JSLLibcAllocator backing;
+    JSLSubprocess proc;
+    TEST_BOOL(make_helper(&proc, &backing));
+    TEST_INT32_EQUAL(
+        jsl_subprocess_arg_cstr(&proc, "exit", "0"),
+        JSL_SUBPROCESS_ARG_SUCCESS
+    );
+
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking_options(
+        proc.allocator, &proc, 1, 0, -1, NULL
+    );
+    TEST_INT32_EQUAL(r, JSL_SUBPROCESS_BAD_PARAMETERS);
+    TEST_INT32_EQUAL(proc.status, JSL_SUBPROCESS_STATUS_NOT_STARTED);
+
+    r = jsl_subprocess_run_blocking_options(
+        proc.allocator, &proc, 1, -1, -1, NULL
+    );
+    TEST_INT32_EQUAL(r, JSL_SUBPROCESS_BAD_PARAMETERS);
+    TEST_INT32_EQUAL(proc.status, JSL_SUBPROCESS_STATUS_NOT_STARTED);
+
+    jsl_subprocess_cleanup(&proc);
+    jsl_libc_allocator_free_all(&backing);
+}
+
+void test_jsl_subprocess_run_blocking_options_clamp_above_count(void)
+{
+    // parallelism_count > count is silently clamped down to count;
+    // every proc still runs to completion.
+    enum { N = 3 };
+    JSLLibcAllocator backing[N];
+    JSLSubprocess procs[N];
+
+    for (int i = 0; i < N; i++)
+    {
+        TEST_BOOL(make_helper(&procs[i], &backing[i]));
+        TEST_INT32_EQUAL(
+            jsl_subprocess_arg_cstr(&procs[i], "exit", "0"),
+            JSL_SUBPROCESS_ARG_SUCCESS
+        );
+    }
+
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking_options(
+        procs[0].allocator, procs, N, 100, -1, NULL
+    );
+    TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
+
+    for (int i = 0; i < N; i++)
+    {
+        TEST_INT32_EQUAL(procs[i].status, JSL_SUBPROCESS_STATUS_EXITED);
+        TEST_INT32_EQUAL(procs[i].exit_code, 0);
+    }
+
+    for (int i = 0; i < N; i++)
+    {
+        jsl_subprocess_cleanup(&procs[i]);
+        jsl_libc_allocator_free_all(&backing[i]);
+    }
+}
+
+void test_jsl_subprocess_run_blocking_options_timeout_unspawned_stay_not_started(void)
+{
+    // parallelism=1 forces strict serial spawning. With a tight
+    // deadline (200 ms) and procs that sleep 5s each, the first proc
+    // is alive when the deadline fires and is killed; later procs
+    // never get spawned and must stay NOT_STARTED.
+    enum { N = 3 };
+    JSLLibcAllocator backing[N];
+    JSLSubprocess procs[N];
+
+    for (int i = 0; i < N; i++)
+    {
+        TEST_BOOL(make_helper(&procs[i], &backing[i]));
+        TEST_INT32_EQUAL(
+            jsl_subprocess_arg_cstr(&procs[i], "sleep", "5000"),
+            JSL_SUBPROCESS_ARG_SUCCESS
+        );
+    }
+
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking_options(
+        procs[0].allocator, procs, N, 1, 200, NULL
+    );
+    TEST_INT32_EQUAL(r, JSL_SUBPROCESS_TIMEOUT_REACHED);
+
+    // procs[0] was alive when the deadline fired and got killed.
+    TEST_INT32_EQUAL(procs[0].status, JSL_SUBPROCESS_STATUS_KILLED_BY_SIGNAL);
+    // Later procs never got spawned and stay NOT_STARTED.
+    TEST_INT32_EQUAL(procs[1].status, JSL_SUBPROCESS_STATUS_NOT_STARTED);
+    TEST_INT32_EQUAL(procs[2].status, JSL_SUBPROCESS_STATUS_NOT_STARTED);
+
+    for (int i = 0; i < N; i++)
+    {
+        jsl_subprocess_cleanup(&procs[i]);
+        jsl_libc_allocator_free_all(&backing[i]);
+    }
+}
+
+void test_jsl_subprocess_run_blocking_options_spawn_failure_backfill(void)
+{
+    // With parallelism=1, a failed spawn at index 1 must NOT consume
+    // the live slot — the next pending proc (index 2) is launched
+    // immediately, so procs[0] and procs[2] both run to completion.
+    enum { N = 3 };
+    JSLLibcAllocator backing[N];
+    JSLAllocatorInterface ifaces[N];
+    JSLSubprocess procs[N];
+
+    TEST_BOOL(make_helper(&procs[0], &backing[0]));
+    TEST_INT32_EQUAL(
+        jsl_subprocess_arg_cstr(&procs[0], "exit", "0"),
+        JSL_SUBPROCESS_ARG_SUCCESS
+    );
+
+    ifaces[1] = test_libc_allocator_interface(&backing[1]);
+    TEST_INT32_EQUAL(
+        jsl_subprocess_create(
+            &procs[1],
+            ifaces[1],
+            jsl_cstr_to_memory("./tests/bin/definitely_not_a_real_binary_xyz")
+        ),
+        JSL_SUBPROCESS_CREATE_SUCCESS
+    );
+
+    TEST_BOOL(make_helper(&procs[2], &backing[2]));
+    TEST_INT32_EQUAL(
+        jsl_subprocess_arg_cstr(&procs[2], "exit", "5"),
+        JSL_SUBPROCESS_ARG_SUCCESS
+    );
+
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking_options(
+        procs[0].allocator, procs, N, 1, -1, NULL
+    );
+
+    // posix_spawnp may report missing-executable synchronously
+    // (macOS/BSD) or let the child exec fail with code 127 (some
+    // glibc). Accept either: aggregated return is SPAWN_FAILED in
+    // the synchronous case, SUCCESS in the async-exec-fail case.
+    bool sync_fail = (r == JSL_SUBPROCESS_SPAWN_FAILED
+        && procs[1].status == JSL_SUBPROCESS_STATUS_FAILED_TO_START);
+    bool async_fail = (r == JSL_SUBPROCESS_SUCCESS
+        && procs[1].status == JSL_SUBPROCESS_STATUS_EXITED
+        && procs[1].exit_code != 0);
+    TEST_BOOL(sync_fail || async_fail);
+
+    // Either way, the surviving siblings must have run to completion
+    // — a failed spawn must not have consumed the lone parallelism
+    // slot.
+    TEST_INT32_EQUAL(procs[0].status, JSL_SUBPROCESS_STATUS_EXITED);
+    TEST_INT32_EQUAL(procs[0].exit_code, 0);
+    TEST_INT32_EQUAL(procs[2].status, JSL_SUBPROCESS_STATUS_EXITED);
+    TEST_INT32_EQUAL(procs[2].exit_code, 5);
+
+    for (int i = 0; i < N; i++)
+    {
+        jsl_subprocess_cleanup(&procs[i]);
+        jsl_libc_allocator_free_all(&backing[i]);
+    }
+}
+
+void test_jsl_subprocess_run_blocking_options_high_parallelism_17_procs(void)
+{
+    // _options companion to multi_17_procs: explicitly request
+    // parallelism=32. On Windows the implementation silently clamps
+    // to 16 (handle ceiling), and all 17 procs must still complete
+    // — observed indirectly by every proc reporting EXITED.
+    enum { N = 17 };
+    JSLLibcAllocator backing[N];
+    JSLLibcAllocator sb_backing[N];
+    JSLSubprocess procs[N];
+    JSLStringBuilder sbs[N];
+
+    char expected[N][16];
+
+    for (int i = 0; i < N; i++)
+    {
+        TEST_BOOL(make_helper(&procs[i], &backing[i]));
+        char idx_str[16];
+        snprintf(idx_str, sizeof(idx_str), "p%d", i);
+        snprintf(expected[i], sizeof(expected[i]), "p%d\n", i);
+        TEST_INT32_EQUAL(
+            jsl_subprocess_arg_cstr(&procs[i], "echo", idx_str),
+            JSL_SUBPROCESS_ARG_SUCCESS
+        );
+
+        JSLAllocatorInterface sb_iface = test_libc_allocator_interface(&sb_backing[i]);
+        TEST_BOOL(jsl_string_builder_init(&sbs[i], sb_iface, 32));
+        TEST_BOOL(jsl_subprocess_set_stdout_sink(
+            &procs[i], jsl_string_builder_output_sink(&sbs[i])
+        ));
+    }
+
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking_options(
+        procs[0].allocator, procs, N, 32, 5000, NULL
+    );
+    TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
+
+    for (int i = 0; i < N; i++)
+    {
+        TEST_INT32_EQUAL(procs[i].status, JSL_SUBPROCESS_STATUS_EXITED);
+        TEST_INT32_EQUAL(procs[i].exit_code, 0);
+        JSLImmutableMemory out = jsl_string_builder_get_string(&sbs[i]);
+        int64_t expected_len = (int64_t) strlen(expected[i]);
+        TEST_INT64_EQUAL(out.length, expected_len);
+        if (out.length == expected_len)
+            TEST_BUFFERS_EQUAL(out.data, expected[i], (size_t) expected_len);
+    }
+
+    for (int i = 0; i < N; i++)
+    {
+        jsl_string_builder_free(&sbs[i]);
+        jsl_libc_allocator_free_all(&sb_backing[i]);
+        jsl_subprocess_cleanup(&procs[i]);
+        jsl_libc_allocator_free_all(&backing[i]);
+    }
+}
+
+void test_jsl_subprocess_run_blocking_options_zero_timeout_waves(void)
+{
+    // `timeout_ms == 0` runs procs in waves of `parallelism_count`,
+    // pumping each one once and killing any survivors before spawning
+    // the next wave. Every proc must reach a terminal state and the
+    // call must return TIMEOUT_REACHED. With N=4 sleepers and
+    // parallelism=2 the implementation runs two waves; both waves'
+    // sleepers should be killed.
+    enum { N = 4 };
+    JSLLibcAllocator backing[N];
+    JSLSubprocess procs[N];
+
+    for (int i = 0; i < N; i++)
+    {
+        TEST_BOOL(make_helper(&procs[i], &backing[i]));
+        TEST_INT32_EQUAL(
+            jsl_subprocess_arg_cstr(&procs[i], "sleep", "5000"),
+            JSL_SUBPROCESS_ARG_SUCCESS
+        );
+    }
+
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking_options(
+        procs[0].allocator, procs, N, 2, 0, NULL
+    );
+    TEST_INT32_EQUAL(r, JSL_SUBPROCESS_TIMEOUT_REACHED);
+
+    // Every proc must be terminal and must have actually been
+    // spawned — none should remain NOT_STARTED, since the wave loop
+    // is required to spawn + pump every proc before returning. With
+    // sleepers, every wave's procs must be killed.
+    for (int i = 0; i < N; i++)
+    {
+        bool terminal = (procs[i].status == JSL_SUBPROCESS_STATUS_EXITED
+            || procs[i].status == JSL_SUBPROCESS_STATUS_KILLED_BY_SIGNAL);
+        TEST_BOOL(terminal);
+        TEST_INT32_EQUAL(procs[i].status, JSL_SUBPROCESS_STATUS_KILLED_BY_SIGNAL);
+    }
+
+    for (int i = 0; i < N; i++)
+    {
         jsl_subprocess_cleanup(&procs[i]);
         jsl_libc_allocator_free_all(&backing[i]);
     }

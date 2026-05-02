@@ -481,9 +481,17 @@ int main(void)
     RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking multi mixed exits", test_jsl_subprocess_run_blocking_multi_mixed_exits);
     RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking multi already started rejects all", test_jsl_subprocess_run_blocking_multi_already_started_rejects_all);
     RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking multi partial spawn failure", test_jsl_subprocess_run_blocking_multi_partial_spawn_failure);
-    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking multi timeout kills all", test_jsl_subprocess_run_blocking_multi_timeout_kills_all);
     RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking multi heterogeneous I/O", test_jsl_subprocess_run_blocking_multi_heterogeneous_io);
     RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking multi 17 procs", test_jsl_subprocess_run_blocking_multi_17_procs);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking_options multi timeout kills all", test_jsl_subprocess_run_blocking_options_multi_timeout_kills_all);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking_options parallelism one", test_jsl_subprocess_run_blocking_options_parallelism_one);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking_options parallelism caps live", test_jsl_subprocess_run_blocking_options_parallelism_caps_live);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking_options bad parallelism", test_jsl_subprocess_run_blocking_options_bad_parallelism);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking_options clamp above count", test_jsl_subprocess_run_blocking_options_clamp_above_count);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking_options timeout unspawned stay not started", test_jsl_subprocess_run_blocking_options_timeout_unspawned_stay_not_started);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking_options spawn failure backfill", test_jsl_subprocess_run_blocking_options_spawn_failure_backfill);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking_options high parallelism 17 procs", test_jsl_subprocess_run_blocking_options_high_parallelism_17_procs);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking_options zero timeout waves", test_jsl_subprocess_run_blocking_options_zero_timeout_waves);
 
     TEST_RESULTS();
     return lfails != 0;

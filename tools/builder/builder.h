@@ -42,7 +42,17 @@
  * 
  * ## How
  * 
- * First you write your build program.
+ * First you write your build program. 
+ * 
+ * JSL already provides most of the tools you need:
+ * 
+ *      * OS detection
+ *      * File reads/writes
+ *      * Creating/Deleting directories (recursively if needed)
+ *      * Directory iteration
+ *      * Subprocesses
+ * 
+ * What this file provides is,
  * 
  * ## Original Copyright
  * 

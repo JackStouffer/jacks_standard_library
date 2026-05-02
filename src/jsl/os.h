@@ -1183,6 +1183,7 @@ typedef enum
     JSL_SUBPROCESS_WAIT_FAILED,
     JSL_SUBPROCESS_KILLED_BY_SIGNAL,
     JSL_SUBPROCESS_TIMEOUT_REACHED,
+    JSL_SUBPROCESS_PROBE_FAILED,
 
     JSL_SUBPROCESS_ENUM_COUNT
 } JSLSubProcessResultEnum;
@@ -1193,6 +1194,13 @@ typedef enum
 * occurs. Each proc must have been configured via `jsl_subprocess_create`
 * and the usual setters; none may have been started yet.
 *
+* This is the full-control variant. At most `parallelism_count` procs
+* are alive at any time — the call pipelines spawning, so the next
+* pending proc launches immediately when one of the live procs is
+* reaped. Procs are spawned in strict array order. For the convenience
+* default (parallelism = logical CPU count, infinite timeout), see
+* `jsl_subprocess_run_blocking`.
+*
 * On success, every proc's `status` is `EXITED` (or `KILLED_BY_SIGNAL`
 * when the child died from a signal on POSIX, or when this call's
 * timeout-kill terminated the child on Windows) and `exit_code` carries
@@ -1202,57 +1210,46 @@ typedef enum
 *
 * Pre-flight rejection (no children are spawned):
 *   - `procs == NULL` or `count <= 0` → `BAD_PARAMETERS`.
+*   - `parallelism_count <= 0` → `BAD_PARAMETERS`.
 *   - any `procs[i].sentinel` is invalid → `BAD_PARAMETERS`.
 *   - any `procs[i].status` is not `NOT_STARTED` → `ALREADY_STARTED`.
 *
-* If the pre-flight passes, the call attempts to spawn every proc.
-* A per-proc spawn or pre-spawn failure (pipe creation, allocation,
-* posix_spawnp / CreateProcess error) marks that proc as
-* `FAILED_TO_START` with `last_errno` set, but does *not* abort the
-* batch — siblings still run to completion. If at least one proc
-* failed this way, the call returns `SPAWN_FAILED` (unless a
-* higher-priority code wins, see below).
+* `parallelism_count` is silently clamped to `count`. On Windows it is
+* additionally clamped to 16 so the live set fits within
+* `WaitForMultipleObjectsEx`'s 64-handle ceiling (4 handles per proc).
+*
+* If the pre-flight passes, the call attempts to spawn every proc
+* (subject to the timeout). A per-proc spawn or pre-spawn failure
+* (pipe creation, allocation, posix_spawnp / CreateProcess error)
+* marks that proc as `FAILED_TO_START` with `last_errno` set, but
+* does *not* abort the batch — siblings still run to completion and
+* the failed proc's parallelism slot is immediately reused for the
+* next pending proc. If at least one proc failed this way, the call
+* returns `SPAWN_FAILED` (unless a higher-priority code wins, see
+* below).
 *
 * Not thread safe: only one thread may operate on a given `JSLSubprocess`
 * at a time. None of the procs in `procs` may be touched by any other
 * thread (including via other subprocess APIs) for the duration of this
 * call.
 *
-* Example — feed stdin, capture stdout/stderr for a single proc:
-*
-* ```c
-* JSLStringBuilder stdout_sb, stderr_sb;
-* jsl_string_builder_init(&stdout_sb, out_alloc, 4096);
-* jsl_string_builder_init(&stderr_sb, err_alloc, 4096);
-*
-* JSLSubprocess proc = {0};
-* jsl_subprocess_create(&proc, alloc, jsl_cstr_to_memory("my-tool"));
-* jsl_subprocess_set_stdin_memory(&proc, jsl_cstr_to_memory("input data\n"));
-* jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&stdout_sb));
-* jsl_subprocess_set_stderr_sink(&proc, jsl_string_builder_output_sink(&stderr_sb));
-*
-* jsl_subprocess_run_blocking(alloc, &proc, 1, -1, NULL);
-*
-* JSLImmutableMemory out = jsl_string_builder_get_string(&stdout_sb);
-* JSLImmutableMemory err = jsl_string_builder_get_string(&stderr_sb);
-*
-* // use out, err, proc.exit_code ...
-*
-* jsl_subprocess_cleanup(&proc);
-* ```
-*
 * `timeout_ms` semantics (single shared deadline across the whole batch):
 *   - < 0: wait forever for every child to terminate.
-*   -   0: single-shot — pump once; any proc still running afterwards
-*           is killed and reaped.
-*   - > 0: wait up to that many milliseconds.
+*   -   0: single-shot per wave — spawn up to `parallelism_count` procs,
+*           pump once, kill any that are still running, then move on
+*           to the next wave. Every proc in `procs[]` is spawned and
+*           pumped at least once before this call returns.
+*   - > 0: wait up to that many milliseconds for the entire pipeline.
+*           Procs that were never spawned because the deadline expired
+*           remain `NOT_STARTED`.
 *
 * When the deadline expires while at least one child is still running,
 * every still-running child is forcefully killed (SIGKILL on POSIX,
 * TerminateProcess on Windows), its I/O is drained, and it is reaped
 * before this function returns. So on `TIMEOUT_REACHED`, every proc
-* the call spawned is in a terminal state — the caller does not need
-* to follow up with a kill or another wait.
+* the call has spawned is in a terminal state — the caller does not
+* need to follow up with a kill or another wait. Procs the call never
+* got to spawn stay `NOT_STARTED`.
 *
 * Return value (in priority order, highest first):
 *   - `BAD_PARAMETERS` / `ALREADY_STARTED` / `ALLOCATION_FAILED` —
@@ -1276,18 +1273,14 @@ typedef enum
 * `out_errno` may be NULL. It only receives top-level wait-primitive
 * errnos; per-proc pump errnos land on `procs[i].last_errno`.
 *
-* On Windows the implementation batches internally into groups of at
-* most 16 procs at a time to stay under the `WaitForMultipleObjectsEx`
-* 64-handle ceiling; callers do not observe group boundaries.
-*
 * The caller remains responsible for calling `jsl_subprocess_cleanup`
 * on each proc after this function returns.
 *
 * Note: this is not equivalent to a series of `background_start` +
 * `background_wait` calls. Differences:
-*   - `run_blocking` spawns each child itself; `background_wait`
+*   - `run_blocking_options` spawns each child itself; `background_wait`
 *     requires procs already started via `background_start`.
-*   - On timeout, `run_blocking` kills, drains, and reaps every
+*   - On timeout, `run_blocking_options` kills, drains, and reaps every
 *     still-running child; `background_wait` leaves them running
 *     and returns `TIMEOUT_REACHED` for the caller to handle.
 *
@@ -1298,20 +1291,74 @@ typedef enum
 * dedicated scratch allocator with enough headroom for the batch rather
 * than sharing one of the per-proc allocators, which may be near-full.
 *
+* @param allocator         Allocator for short-lived helper buffers shared
+*                          across the whole batch
+* @param procs             Pointer to an array of configured subprocess
+*                          handles
+* @param count             Number of elements in `procs`
+* @param parallelism_count Maximum number of procs alive at one time;
+*                          must be > 0
+* @param timeout_ms        Maximum time to wait for the entire batch,
+*                          in milliseconds
+* @param out_errno         Optional pointer that receives the system
+*                          errno on a top-level wait failure
+* @returns A result enum describing the outcome
+*/
+JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_run_blocking_options(
+    JSLAllocatorInterface allocator,
+    JSLSubprocess* procs,
+    int32_t count,
+    int32_t parallelism_count,
+    int32_t timeout_ms,
+    int32_t* out_errno
+);
+
+/**
+* Convenience wrapper around `jsl_subprocess_run_blocking_options` that
+* picks sensible defaults: parallelism is set to
+* `jsl_get_logical_processor_count()` and the timeout is infinite. All
+* other semantics (including pre-flight rejection, per-proc spawn
+* failure handling, and return-code priority) are identical.
+*
+* If the logical-processor probe itself fails, this function returns
+* `JSL_SUBPROCESS_PROBE_FAILED` with `*out_errno` set to the probe's
+* errno; no procs are spawned.
+*
+* Example — feed stdin, capture stdout/stderr for a single proc:
+*
+* ```c
+* JSLStringBuilder stdout_sb, stderr_sb;
+* jsl_string_builder_init(&stdout_sb, out_alloc, 4096);
+* jsl_string_builder_init(&stderr_sb, err_alloc, 4096);
+*
+* JSLSubprocess proc = {0};
+* jsl_subprocess_create(&proc, alloc, jsl_cstr_to_memory("my-tool"));
+* jsl_subprocess_set_stdin_memory(&proc, jsl_cstr_to_memory("input data\n"));
+* jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&stdout_sb));
+* jsl_subprocess_set_stderr_sink(&proc, jsl_string_builder_output_sink(&stderr_sb));
+*
+* jsl_subprocess_run_blocking(alloc, &proc, 1, NULL);
+*
+* JSLImmutableMemory out = jsl_string_builder_get_string(&stdout_sb);
+* JSLImmutableMemory err = jsl_string_builder_get_string(&stderr_sb);
+*
+* // use out, err, proc.exit_code ...
+*
+* jsl_subprocess_cleanup(&proc);
+* ```
+*
 * @param allocator   Allocator for short-lived helper buffers shared
 *                    across the whole batch
 * @param procs       Pointer to an array of configured subprocess handles
 * @param count       Number of elements in `procs`
-* @param timeout_ms  Maximum time to wait for the children, in milliseconds
 * @param out_errno   Optional pointer that receives the system errno on
-*                    a top-level wait failure
+*                    a top-level wait failure or probe failure
 * @returns A result enum describing the outcome
 */
 JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_run_blocking(
     JSLAllocatorInterface allocator,
     JSLSubprocess* procs,
     int32_t count,
-    int32_t timeout_ms,
     int32_t* out_errno
 );
 
