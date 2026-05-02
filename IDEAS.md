@@ -17,14 +17,9 @@ Nice to haves or ideas for enhancement
 9. No process group / session control. No start_new_session / setpgid (POSIX) or CREATE_NEW_PROCESS_GROUP / DETACHED_PROCESS (Windows). Important for daemonizing, for kill-the-whole-tree, and for preventing   Ctrl+C from propagating into the child.
 10. No fd-inheritance control. When the user passes set_stdin_fd(fd), what happens to other open fds in the parent? POSIX posix_spawn inherits everything not marked O_CLOEXEC; Windows inheritance is
 per-handle. Inherited-by-accident fds are a classic source of "child holds a port the parent tried to close" bugs. The header should at least state the policy.
-11. Background mode is too manual for the common case. The doc example shows users hand-rolling send_stdin → receive_output → poll in a loop. background_wait already pumps internally — but it's array-only
-and blocks until all are done. A single-proc jsl_subprocess_background_wait_one(proc, timeout, ...) that pumps internally would let users skip the manual pump entirely. Keep the manual primitives for
-event-loop integration but don't make them the default.
 12. Setters return bool, configuration calls return enums. set_stdin_memory, set_stdout_sink, change_working_directory all return bool, while subprocess_create, _args, _env return enums distinguishing
 BAD_PARAMETERS vs COULD_NOT_ALLOCATE. Inconsistent — and the setters can fail for either reason, so they're losing information. Pick one.
-13. TODO: docs markers on JSLSubProcessCreateResultEnum, JSLSubProcessArgResultEnum, JSLSubProcessEnvResultEnum, and JSLSubProcessResultEnum (lines 673, 685, 697, 1126). The result enums are part of the
-public API and should be documented.
-14. Hard-coded 4 KiB scratch buffers (stdout_read_buffer[4096], etc.) bloat the struct (~26 KiB on Windows) and aren't tunable. For a chatty child the buffer size matters. Either dynamically size from the allocator or expose a tunable.
+13. TODO: docs markers on JSLSubProcessCreateResultEnum, JSLSubProcessArgResultEnum, JSLSubProcessEnvResultEnum, and JSLSubProcessResultEnum (lines 673, 685, 697, 1126). The result enums are part of the public API and should be documented.
 15. Windows takes CRT fds, not HANDLEs. Native Windows code overwhelmingly speaks HANDLE. Forcing a _open_osfhandle round-trip is awkward. Consider an additional set_stdin_handle / set_stdout_handle on Windows.
 16. exit_code overloads "exit code OR negated signal" based on status. Workable but easy to misuse if someone reads exit_code without checking status. A separate signal_number field, or a tagged accessor,
 would prevent that. Python keeps returncode but signals show up as negative — same convention you've picked, so this is at least familiar.

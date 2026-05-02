@@ -2480,6 +2480,12 @@ JSLSubProcessCreateResultEnum jsl_subprocess_create(
     proc->stdout_read_pending = false;
     proc->stderr_read_pending = false;
     proc->stdin_write_buffer_len = 0;
+    proc->stdin_write_buffer = NULL;
+    proc->stdin_write_buffer_capacity = 0;
+    proc->stdout_read_buffer = NULL;
+    proc->stdout_read_buffer_capacity = 0;
+    proc->stderr_read_buffer = NULL;
+    proc->stderr_read_buffer_capacity = 0;
 #elif JSL_IS_POSIX
     proc->pid = 0;
     proc->stdin_write_fd = -1;
@@ -4409,6 +4415,62 @@ static JSLSubProcessResultEnum jsl__subprocess_win_spawn(
     return JSL_SUBPROCESS_SUCCESS;
 }
 
+#define JSL__SUBPROCESS_WIN_BUFFER_INITIAL 4096
+#define JSL__SUBPROCESS_WIN_BUFFER_MAX (1 << 20)
+
+// Allocate-or-grow a Windows pump scratch buffer. Returns false on
+// allocation failure, leaving `*buffer_ptr`/`*capacity` untouched. Must
+// only be called when no overlapped op is pending on the buffer — the
+// kernel still owns the pointer until the op completes, so swapping it
+// mid-flight would corrupt the I/O. The contents of the old buffer are
+// not preserved (callers always re-fill before issuing the next op).
+static bool jsl__subprocess_win_buffer_ensure(
+    JSLAllocatorInterface allocator,
+    uint8_t** buffer_ptr,
+    int64_t* capacity,
+    bool grow
+)
+{
+    int64_t target = *capacity;
+    bool needs_alloc = false;
+
+    if (*buffer_ptr == NULL || *capacity <= 0)
+    {
+        target = JSL__SUBPROCESS_WIN_BUFFER_INITIAL;
+        needs_alloc = true;
+    }
+    else if (grow && *capacity < JSL__SUBPROCESS_WIN_BUFFER_MAX)
+    {
+        target = *capacity * 2;
+        if (target > JSL__SUBPROCESS_WIN_BUFFER_MAX)
+            target = JSL__SUBPROCESS_WIN_BUFFER_MAX;
+        needs_alloc = true;
+    }
+
+    bool ok = true;
+    if (needs_alloc)
+    {
+        uint8_t* new_buf = (uint8_t*) jsl_allocator_interface_alloc(
+            allocator,
+            target,
+            JSL_DEFAULT_ALLOCATION_ALIGNMENT,
+            false
+        );
+        if (new_buf == NULL)
+        {
+            ok = false;
+        }
+        else
+        {
+            if (*buffer_ptr != NULL)
+                (void) jsl_allocator_interface_free(allocator, *buffer_ptr);
+            *buffer_ptr = new_buf;
+            *capacity = target;
+        }
+    }
+    return ok;
+}
+
 // Overlapped stdin pump. Drives the write side of the child's stdin
 // pipe through a two-state machine: no op pending → kick one, op
 // pending → check completion. Returns SUCCESS in the normal case and
@@ -4472,9 +4534,25 @@ static JSLSubProcessResultEnum jsl__subprocess_win_pump_stdin_once(
         return JSL_SUBPROCESS_SUCCESS;
     }
 
+    // Allocate on first use; grow when there is more input left than
+    // the current chunk can carry. Safe here because no op is pending.
+    bool want_grow = (proc->stdin_write_buffer_capacity > 0
+        && remaining > proc->stdin_write_buffer_capacity);
+    if (!jsl__subprocess_win_buffer_ensure(
+            proc->allocator,
+            &proc->stdin_write_buffer,
+            &proc->stdin_write_buffer_capacity,
+            want_grow))
+    {
+        if (out_errno != NULL)
+            *out_errno = (int32_t) ERROR_NOT_ENOUGH_MEMORY;
+        jsl__subprocess_win_close_handle(&proc->stdin_write_handle);
+        return JSL_SUBPROCESS_IO_FAILED;
+    }
+
     DWORD chunk =
-        (DWORD)(remaining > (int64_t) sizeof(proc->stdin_write_buffer)
-            ? (int64_t) sizeof(proc->stdin_write_buffer)
+        (DWORD)(remaining > proc->stdin_write_buffer_capacity
+            ? proc->stdin_write_buffer_capacity
             : remaining);
 
     JSL_MEMCPY(
@@ -4538,12 +4616,13 @@ static JSLSubProcessResultEnum jsl__subprocess_win_pump_stdin_once(
 // failures; EOF (ERROR_BROKEN_PIPE / ERROR_HANDLE_EOF) is a normal
 // termination.
 static JSLSubProcessResultEnum jsl__subprocess_win_pump_output_stream(
+    JSLAllocatorInterface allocator,
     HANDLE* h_ptr,
     OVERLAPPED* ov,
     HANDLE ev,
     bool* pending,
-    uint8_t* buffer,
-    DWORD buffer_size,
+    uint8_t** buffer_ptr,
+    int64_t* buffer_capacity,
     JSLOutputSink sink,
     bool* eof_seen,
     int32_t* out_errno
@@ -4551,6 +4630,10 @@ static JSLSubProcessResultEnum jsl__subprocess_win_pump_output_stream(
 {
     if (*h_ptr == INVALID_HANDLE_VALUE || *eof_seen)
         return JSL_SUBPROCESS_SUCCESS;
+
+    // -1 = no drain happened yet this call. Used to decide whether the
+    // upcoming ReadFile should grow the scratch buffer first.
+    int64_t last_drain_bytes = -1;
 
     // Loop: drain completions, then kick the next read. Bounded by
     // each iteration either returning immediately (pending/EOF/error)
@@ -4589,14 +4672,34 @@ static JSLSubProcessResultEnum jsl__subprocess_win_pump_output_stream(
                 *eof_seen = true;
                 return JSL_SUBPROCESS_SUCCESS;
             }
-            jsl_output_sink_write(sink, jsl_immutable_memory(buffer, (int64_t) bytes));
+            jsl_output_sink_write(sink, jsl_immutable_memory(*buffer_ptr, (int64_t) bytes));
+            last_drain_bytes = (int64_t) bytes;
             // Fall through to kick another read.
         }
+
+        // Allocate on first use; grow when the prior read saturated
+        // the buffer (signal the child has more queued than we drained
+        // in one go). Safe here because no op is pending on the buffer.
+        bool want_grow = (last_drain_bytes >= 0
+            && last_drain_bytes == *buffer_capacity);
+        if (!jsl__subprocess_win_buffer_ensure(
+                allocator, buffer_ptr, buffer_capacity, want_grow))
+        {
+            if (out_errno != NULL)
+                *out_errno = (int32_t) ERROR_NOT_ENOUGH_MEMORY;
+            jsl__subprocess_win_close_handle(h_ptr);
+            *eof_seen = true;
+            return JSL_SUBPROCESS_IO_FAILED;
+        }
+        last_drain_bytes = -1;
 
         ZeroMemory(ov, sizeof(*ov));
         ov->hEvent = ev;
 
-        BOOL rok = ReadFile(*h_ptr, buffer, buffer_size, NULL, ov);
+        DWORD read_size = (*buffer_capacity > (int64_t) MAXDWORD)
+            ? MAXDWORD
+            : (DWORD) *buffer_capacity;
+        BOOL rok = ReadFile(*h_ptr, *buffer_ptr, read_size, NULL, ov);
         if (rok)
         {
             // Completed synchronously. Mark pending so the completion
@@ -4636,12 +4739,13 @@ static JSLSubProcessResultEnum jsl__subprocess_win_pump_output_once(
     if (proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_SINK)
     {
         JSLSubProcessResultEnum r = jsl__subprocess_win_pump_output_stream(
+            proc->allocator,
             &proc->stdout_read_handle,
             &proc->stdout_read_overlapped,
             proc->stdout_read_event,
             &proc->stdout_read_pending,
-            proc->stdout_read_buffer,
-            (DWORD) sizeof(proc->stdout_read_buffer),
+            &proc->stdout_read_buffer,
+            &proc->stdout_read_buffer_capacity,
             proc->stdout_sink,
             &proc->stdout_eof_seen,
             out_errno
@@ -4653,12 +4757,13 @@ static JSLSubProcessResultEnum jsl__subprocess_win_pump_output_once(
     if (proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_SINK)
     {
         JSLSubProcessResultEnum r = jsl__subprocess_win_pump_output_stream(
+            proc->allocator,
             &proc->stderr_read_handle,
             &proc->stderr_read_overlapped,
             proc->stderr_read_event,
             &proc->stderr_read_pending,
-            proc->stderr_read_buffer,
-            (DWORD) sizeof(proc->stderr_read_buffer),
+            &proc->stderr_read_buffer,
+            &proc->stderr_read_buffer_capacity,
             proc->stderr_sink,
             &proc->stderr_eof_seen,
             result == JSL_SUBPROCESS_SUCCESS ? out_errno : NULL
@@ -6779,6 +6884,47 @@ void jsl_subprocess_cleanup(JSLSubprocess* proc)
                 && proc->stderr_read_handle != INVALID_HANDLE_VALUE)
                 CancelIoEx(proc->stderr_read_handle, &proc->stderr_read_overlapped);
 
+            // Wait for any cancelled ops to fully drain so the kernel
+            // releases its reference to the heap scratch buffers before
+            // we free them at the end of cleanup. Without this an
+            // in-flight read/write could land in freed memory.
+            if (proc->stdin_write_pending
+                && proc->stdin_write_handle != NULL
+                && proc->stdin_write_handle != INVALID_HANDLE_VALUE)
+            {
+                DWORD bytes = 0;
+                (void) GetOverlappedResult(
+                    proc->stdin_write_handle,
+                    &proc->stdin_write_overlapped,
+                    &bytes,
+                    TRUE
+                );
+            }
+            if (proc->stdout_read_pending
+                && proc->stdout_read_handle != NULL
+                && proc->stdout_read_handle != INVALID_HANDLE_VALUE)
+            {
+                DWORD bytes = 0;
+                (void) GetOverlappedResult(
+                    proc->stdout_read_handle,
+                    &proc->stdout_read_overlapped,
+                    &bytes,
+                    TRUE
+                );
+            }
+            if (proc->stderr_read_pending
+                && proc->stderr_read_handle != NULL
+                && proc->stderr_read_handle != INVALID_HANDLE_VALUE)
+            {
+                DWORD bytes = 0;
+                (void) GetOverlappedResult(
+                    proc->stderr_read_handle,
+                    &proc->stderr_read_overlapped,
+                    &bytes,
+                    TRUE
+                );
+            }
+
             if (proc->stdin_write_handle != NULL && proc->stdin_write_handle != INVALID_HANDLE_VALUE)
                 CloseHandle(proc->stdin_write_handle);
             if (proc->stdout_read_handle != NULL && proc->stdout_read_handle != INVALID_HANDLE_VALUE)
@@ -6829,6 +6975,26 @@ void jsl_subprocess_cleanup(JSLSubprocess* proc)
         #endif
         proc->is_background = false;
     }
+
+#if JSL_IS_WINDOWS
+    // Free the overlapped scratch buffers. Run_blocking procs reach
+    // here with `is_background == false` after the pumps have drained
+    // and closed handles; background procs reach here after the
+    // `GetOverlappedResult(..., TRUE)` waits above. Either way, no op
+    // is in flight against these buffers anymore.
+    if (proc->stdin_write_buffer != NULL)
+        (void) jsl_allocator_interface_free(proc->allocator, proc->stdin_write_buffer);
+    if (proc->stdout_read_buffer != NULL)
+        (void) jsl_allocator_interface_free(proc->allocator, proc->stdout_read_buffer);
+    if (proc->stderr_read_buffer != NULL)
+        (void) jsl_allocator_interface_free(proc->allocator, proc->stderr_read_buffer);
+    proc->stdin_write_buffer = NULL;
+    proc->stdin_write_buffer_capacity = 0;
+    proc->stdout_read_buffer = NULL;
+    proc->stdout_read_buffer_capacity = 0;
+    proc->stderr_read_buffer = NULL;
+    proc->stderr_read_buffer_capacity = 0;
+#endif
 
     proc->sentinel = 0;
     proc->executable = jsl_immutable_memory(NULL, 0);
