@@ -852,23 +852,30 @@ typedef struct JSLSubprocess
     // Overlapped-I/O state for the three parent-side pipe ends. The
     // parent ends are opened with FILE_FLAG_OVERLAPPED so that readiness
     // can participate in WaitForMultipleObjectsEx. Each pipe has its own
-    // OVERLAPPED struct, manual-reset event, pending flag, and a fixed
-    // scratch buffer whose lifetime is the subprocess lifetime.
+    // OVERLAPPED struct, manual-reset event, pending flag, and a heap
+    // scratch buffer allocated from the subprocess allocator. Buffers
+    // start at 4 KiB on first use and double up to 1 MiB when a
+    // transfer saturates them, and are freed in `jsl_subprocess_cleanup`.
+    // Reallocation only happens between overlapped ops — never while
+    // one is pending, since the kernel still holds the buffer pointer.
     OVERLAPPED stdin_write_overlapped;
     HANDLE stdin_write_event;
     bool stdin_write_pending;
     DWORD stdin_write_buffer_len;
-    uint8_t stdin_write_buffer[4096];
+    uint8_t* stdin_write_buffer;
+    int64_t stdin_write_buffer_capacity;
 
     OVERLAPPED stdout_read_overlapped;
     HANDLE stdout_read_event;
     bool stdout_read_pending;
-    uint8_t stdout_read_buffer[4096];
+    uint8_t* stdout_read_buffer;
+    int64_t stdout_read_buffer_capacity;
 
     OVERLAPPED stderr_read_overlapped;
     HANDLE stderr_read_event;
     bool stderr_read_pending;
-    uint8_t stderr_read_buffer[4096];
+    uint8_t* stderr_read_buffer;
+    int64_t stderr_read_buffer_capacity;
 #elif JSL_IS_POSIX
     int32_t pid;
     int stdin_write_fd;
