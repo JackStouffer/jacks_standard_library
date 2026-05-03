@@ -1,10 +1,25 @@
 /**
  * # Jack's Standard Library OS Utilities
  *
- * File loading and writing utilities. These require linking the standard library.
+ * Functions to work with data from the operating system, mainly
+ * 
+ *      * Reading and writing files
+ *      * Creating and deleting directories
+ *      * Recursively traversing directories
+ *      * Spawning subprocesses
+ * 
+ * These require linking the standard library.
+ * 
+ * **THESE FUNCTIONS ARE NOT MEANT FOR SERIOUS PROGRAMS!**
  *
- * See README.md for a detailed intro.
+ * These functions are designed around 1980's style blocking I/O and should not be
+ * used as the main I/O for serious projects. Serious projects should be built around
+ * I/O completion ports (Windows), io_uring (Linux), or kqueue (macOS, BSD). Blocking
+ * code like this is only acceptable in debug code, scripts, or getting a project
+ * going at the begining. 
  *
+ * ## Other References
+ * 
  * See DESIGN.md for background on the design decisions.
  *
  * See DOCUMENTATION.md for a single markdown file containing all of the docstrings
@@ -52,6 +67,7 @@
 #endif
 
 #include "core.h"
+#include "allocator.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -90,7 +106,13 @@ extern "C" {
 #endif
 
 /**
-* TODO: docs
+* Result codes for `jsl_get_file_size`.
+*
+* `OK` indicates the size was written to the caller's output. `BAD_PARAMETERS`
+* is returned when arguments are invalid (e.g., null output pointer or empty
+* path). `NOT_FOUND` is reported when no file system entry exists at the
+* given path. `NOT_REGULAR_FILE` is reported when the entry exists but is
+* not a regular file (e.g., directory, device, socket).
 */
 typedef enum
 {
@@ -103,118 +125,175 @@ typedef enum
 } JSLGetFileSizeResultEnum;
 
 /**
-* TODO: docs
-*/
+ * Result codes for `jsl_load_file_contents`.
+ */
 typedef enum
 {
+    /// @brief arguments are invalid
     JSL_FILE_LOAD_BAD_PARAMETERS,
+    /// @brief the entire file was read into the buffer
     JSL_FILE_LOAD_SUCCESS,
+    /// @brief the file could not be opened (missing, permission denied, etc.)
     JSL_FILE_LOAD_COULD_NOT_OPEN,
+    /// @brief stat'ing the file failed
     JSL_FILE_LOAD_COULD_NOT_GET_FILE_SIZE,
+    /// @brief the allocator could not provide a buffer large enough for the file
     JSL_FILE_LOAD_COULD_NOT_GET_MEMORY,
+    /// @brief I/O error during read
     JSL_FILE_LOAD_READ_FAILED,
+    /// @brief read finished but the descriptor could not be closed
     JSL_FILE_LOAD_CLOSE_FAILED,
+    /// @brief other unexpected OS error
     JSL_FILE_LOAD_ERROR_UNKNOWN,
 
     JSL_FILE_LOAD_ENUM_COUNT
 } JSLLoadFileResultEnum;
 
 /**
-* TODO: docs
-*/
+ * Result codes for `jsl_write_file_contents`.
+ */
 typedef enum
 {
+    /// @brief arguments are invalid
     JSL_FILE_WRITE_BAD_PARAMETERS = 0,
+    /// @brief input was written to disk
     JSL_FILE_WRITE_SUCCESS,
+    /// @brief the file could not be opened or created
     JSL_FILE_WRITE_COULD_NOT_OPEN,
+    /// @brief I/O error during write
     JSL_FILE_WRITE_COULD_NOT_WRITE,
+    /// @brief data was written but flushing and closing the file descriptor failed
     JSL_FILE_WRITE_COULD_NOT_CLOSE,
 
     JSL_FILE_WRITE_ENUM_COUNT
 } JSLWriteFileResultEnum;
 
 /**
-* TODO: docs
-*/
+ * Result codes for `jsl_make_directory`.
+ */
 typedef enum
 {
+    /// @brief arguments are invalid
     JSL_MAKE_DIRECTORY_BAD_PARAMETERS = 0,
+    /// @brief directory was created
     JSL_MAKE_DIRECTORY_SUCCESS,
+    /// @brief already present at the given path
     JSL_MAKE_DIRECTORY_ALREADY_EXISTS,
+    /// @brief the path exceeded the platform's maximum length
     JSL_MAKE_DIRECTORY_PATH_TOO_LONG,
+    /// @brief process lacks write access on the parent directory
     JSL_MAKE_DIRECTORY_PERMISSION_DENIED,
+    /// @brief parent path does not exist
     JSL_MAKE_DIRECTORY_PARENT_NOT_FOUND,
+    /// @brief the filesystem has no room for a new entry
     JSL_MAKE_DIRECTORY_NO_SPACE,
+    /// @brief  the filesystem is mounted as read-only
     JSL_MAKE_DIRECTORY_READ_ONLY_FS,
+    /// @brief unexpected OS error
     JSL_MAKE_DIRECTORY_ERROR_UNKNOWN,
 
     JSL_MAKE_DIRECTORY_ENUM_COUNT
 } JSLMakeDirectoryResultEnum;
 
 /**
-* TODO: docs
-*/
+ * Result codes for `jsl_delete_file`.
+ */
 typedef enum
 {
+    /// @brief arguments are invalid
     JSL_DELETE_FILE_BAD_PARAMETERS = 0,
+    /// @brief file was deleted
     JSL_DELETE_FILE_SUCCESS,
+    /// @brief no entry at the path
     JSL_DELETE_FILE_NOT_FOUND,
+    /// @brief exists but is a directory
     JSL_DELETE_FILE_IS_DIRECTORY,
+    /// @brief the process lacks the required permissions on the file
     JSL_DELETE_FILE_PERMISSION_DENIED,
+    /// @brief the path exceeded the platform's maximum length
     JSL_DELETE_FILE_PATH_TOO_LONG,
+    /// @brief unexpected OS error
     JSL_DELETE_FILE_ERROR_UNKNOWN,
 
     JSL_DELETE_FILE_ENUM_COUNT
 } JSLDeleteFileResultEnum;
 
 /**
-* TODO: docs
-*/
+ * Result codes for `jsl_delete_directory`.
+ */
 typedef enum
 {
+    /// @brief arguments are invalid
     JSL_DELETE_DIRECTORY_BAD_PARAMETERS = 0,
+    /// @brief directory and its contents were deleted
     JSL_DELETE_DIRECTORY_SUCCESS,
+    /// @brief not found
     JSL_DELETE_DIRECTORY_NOT_FOUND,
+    /// @brief entry exists but is not a directory
     JSL_DELETE_DIRECTORY_NOT_A_DIRECTORY,
+    /// @brief process lacks the required permissions
     JSL_DELETE_DIRECTORY_PERMISSION_DENIED,
+    /// @brief path exceeded the platform's maximum length
     JSL_DELETE_DIRECTORY_PATH_TOO_LONG,
+    /// @brief unexpected OS error
     JSL_DELETE_DIRECTORY_ERROR_UNKNOWN,
 
     JSL_DELETE_DIRECTORY_ENUM_COUNT
 } JSLDeleteDirectoryResultEnum;
 
 /**
-* TODO: docs
-*/
+ * Result codes for `jsl_copy_file`.
+ */
 typedef enum
 {
+    /// @brief arguments are invalid
     JSL_COPY_FILE_BAD_PARAMETERS = 0,
+    /// @brief file was copied
     JSL_COPY_FILE_SUCCESS,
+    /// @brief path exceeded the platform's maximum length
     JSL_COPY_FILE_PATH_TOO_LONG,
+    /// @brief the source path does not exist
     JSL_COPY_FILE_SOURCE_NOT_FOUND,
+    /// @brief the source path is a directory
     JSL_COPY_FILE_SOURCE_IS_DIRECTORY,
+    /// @brief the file could not be opened
     JSL_COPY_FILE_COULD_NOT_OPEN_SOURCE,
+    /// @brief the file could not be opened
     JSL_COPY_FILE_COULD_NOT_OPEN_DEST,
+    /// @brief I/O failure during source read
     JSL_COPY_FILE_READ_FAILED,
+    /// @brief I/O failure during dest write
     JSL_COPY_FILE_WRITE_FAILED,
+    /// @brief the process lacks the required permissions
     JSL_COPY_FILE_PERMISSION_DENIED,
+    /// @brief unexpected OS error
     JSL_COPY_FILE_ERROR_UNKNOWN,
 
     JSL_COPY_FILE_ENUM_COUNT
 } JSLCopyFileResultEnum;
 
 /**
-* TODO: docs
-*/
+ * Classification of a file system entry as reported by `jsl_get_file_type`
+ * and the directory iterator. 
+ */
 typedef enum {
+    /// @brief type could not be determined
     JSL_FILE_TYPE_UNKNOWN = 0,
+    /// @brief no entry exists at the queried path
     JSL_FILE_TYPE_NOT_FOUND,
+    /// @brief regular file
     JSL_FILE_TYPE_REG,
+    /// @brief directory
     JSL_FILE_TYPE_DIR,
+    /// @brief symbolic link (not followed)
     JSL_FILE_TYPE_SYMLINK,
+    /// @brief `BLOCK` and `CHAR` are block- and character-special device files
     JSL_FILE_TYPE_BLOCK,
+    /// @brief `BLOCK` and `CHAR` are block- and character-special device files
     JSL_FILE_TYPE_CHAR,
+    /// @brief named pipe
     JSL_FILE_TYPE_FIFO,
+    /// @brief Unix domain socket
     JSL_FILE_TYPE_SOCKET,
 
     JSL_FILE_TYPE_COUNT
@@ -376,7 +455,17 @@ JSL_WARN_UNUSED JSL_DEF JSLWriteFileResultEnum jsl_write_file_contents(
 int64_t jsl_write_to_c_file(FILE* out, JSLImmutableMemory data);
 
 /**
-* TODO: docs
+* Build a `JSLOutputSink` that writes through libc's `fwrite` to the given
+* `FILE*` stream.
+*
+* The returned sink does not take ownership of the stream; the caller is
+* responsible for keeping `file` alive for as long as the sink is used and
+* for `fflush` and closing it when done. Convenient for adapting any of the
+* `jsl_output_sink_write_*` helpers (or `jsl_format`) to write directly
+* to a `FILE*` such as `stdout` or `stderr`.
+*
+* @param file Destination `FILE*` stream that the sink will forward writes to
+* @returns A configured output sink
 */
 JSLOutputSink jsl_c_file_output_sink(FILE* file);
 
@@ -547,35 +636,35 @@ JSL_WARN_UNUSED JSL_DEF bool jsl_directory_iterator_next(
 );
 
 /**
-* Release any OS handles still held by the iterator.
-*
-* Safe to call any number of times and on a fully drained iterator. Calling
-* this is only required when iteration is abandoned early - draining the
-* iterator with `jsl_directory_iterator_next` until it returns `false`
-* releases all resources automatically.
-*
-* @param iterator The iterator state, may be null
-*/
+ * Release any OS handles still held by the iterator.
+ *
+ * Safe to call any number of times and on a fully drained iterator. Calling
+ * this is only required when iteration is abandoned early - draining the
+ * iterator with `jsl_directory_iterator_next` until it returns `false`
+ * releases all resources automatically.
+ *
+ * @param iterator The iterator state, may be null
+ */
 JSL_DEF void jsl_directory_iterator_end(JSLDirectoryIterator* iterator);
 
 /**
-* Copy the file at `src_path` to `dst_path`.
-*
-* The paths may be relative or absolute. Both paths are copied into stack
-* buffers so no heap allocation is performed. On POSIX, the copy is
-* performed using `open`/`read`/`write` with an 8 KiB stack buffer and
-* the destination is created with permissions `0600` (subject to the
-* process umask). On Windows, `CopyFileA` is used and any existing
-* destination file is overwritten.
-*
-* Only regular files may be used as the source. Attempting to copy a
-* directory returns `JSL_COPY_FILE_SOURCE_IS_DIRECTORY`.
-*
-* @param src_path File system path of the source file
-* @param dst_path File system path for the destination file
-* @param out_errno Optional pointer that receives the system error code on failure
-* @returns A result enum describing the outcome
-*/
+ * Copy the file at `src_path` to `dst_path`.
+ *
+ * The paths may be relative or absolute. Both paths are copied into stack
+ * buffers so no heap allocation is performed. On POSIX, the copy is
+ * performed using `open`/`read`/`write` with an 8 KiB stack buffer and
+ * the destination is created with permissions `0600` (subject to the
+ * process umask). On Windows, `CopyFileA` is used and any existing
+ * destination file is overwritten.
+ *
+ * Only regular files may be used as the source. Attempting to copy a
+ * directory returns `JSL_COPY_FILE_SOURCE_IS_DIRECTORY`.
+ *
+ * @param src_path File system path of the source file
+ * @param dst_path File system path for the destination file
+ * @param out_errno Optional pointer that receives the system error code on failure
+ * @returns A result enum describing the outcome
+ */
 JSL_WARN_UNUSED JSL_DEF JSLCopyFileResultEnum jsl_copy_file(
     JSLImmutableMemory src_path,
     JSLImmutableMemory dst_path,
@@ -583,42 +672,51 @@ JSL_WARN_UNUSED JSL_DEF JSLCopyFileResultEnum jsl_copy_file(
 );
 
 /**
-* TODO: docs
-*/
+ * Result codes for `jsl_rename_file`.
+ */
 typedef enum
 {
+    /// @brief entry was renamed or moved
     JSL_RENAME_FILE_BAD_PARAMETERS = 0,
+    /// @brief arguments are invalid
     JSL_RENAME_FILE_SUCCESS,
+    /// @brief no entry at the source path
     JSL_RENAME_FILE_SOURCE_NOT_FOUND,
+    /// @brief the destination exists and could not be replaced
     JSL_RENAME_FILE_DEST_ALREADY_EXISTS,
+    /// @brief  path exceeded the platform's maximum length
     JSL_RENAME_FILE_PATH_TOO_LONG,
+    /// @brief the process lacks the required permissions
     JSL_RENAME_FILE_PERMISSION_DENIED,
+    /// @brief the source and destination live on different filesystems and the OS cannot rename across them
     JSL_RENAME_FILE_CROSS_DEVICE,
+    /// @brief the filesystem is mounted read-only
     JSL_RENAME_FILE_READ_ONLY_FS,
+    /// @brief unexpected OS error
     JSL_RENAME_FILE_ERROR_UNKNOWN,
 
     JSL_RENAME_FILE_ENUM_COUNT
 } JSLRenameFileResultEnum;
 
 /**
-* Rename or move the file system entry at `src_path` to `dst_path`.
-*
-* Works on files, directories, and symbolic links. The paths may be relative
-* or absolute. Both paths are copied into stack buffers so no heap allocation
-* is performed.
-*
-* On POSIX, `rename()` is used; it atomically replaces the destination if
-* it names an existing file of compatible type. On Windows, `MoveFileExA`
-* is used with `MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED`.
-*
-* Cross-device moves (source and destination on different filesystems)
-* return `JSL_RENAME_FILE_CROSS_DEVICE`.
-*
-* @param src_path File system path of the source entry
-* @param dst_path File system path for the destination entry
-* @param out_errno Optional pointer that receives the system error code on failure
-* @returns A result enum describing the outcome
-*/
+ * Rename or move the file system entry at `src_path` to `dst_path`.
+ *
+ * Works on files, directories, and symbolic links. The paths may be relative
+ * or absolute. Both paths are copied into stack buffers so no heap allocation
+ * is performed.
+ *
+ * On POSIX, `rename()` is used; it atomically replaces the destination if
+ * it names an existing file of compatible type. On Windows, `MoveFileExA`
+ * is used with `MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED`.
+ *
+ * Cross-device moves (source and destination on different filesystems)
+ * return `JSL_RENAME_FILE_CROSS_DEVICE`.
+ *
+ * @param src_path File system path of the source entry
+ * @param dst_path File system path for the destination entry
+ * @param out_errno Optional pointer that receives the system error code on failure
+ * @returns A result enum describing the outcome
+ */
 JSL_WARN_UNUSED JSL_DEF JSLRenameFileResultEnum jsl_rename_file(
     JSLImmutableMemory src_path,
     JSLImmutableMemory dst_path,
@@ -626,44 +724,56 @@ JSL_WARN_UNUSED JSL_DEF JSLRenameFileResultEnum jsl_rename_file(
 );
 
 /**
-* TODO: docs
-*/
+ * Result codes for `jsl_copy_directory`.
+ */
 typedef enum
 {
+    /// @brief arguments are invalid
     JSL_COPY_DIRECTORY_BAD_PARAMETERS = 0,
+    /// @brief source tree was reproduced at the destination
     JSL_COPY_DIRECTORY_SUCCESS,
+    /// @brief path exceeded the platform's maximum length
     JSL_COPY_DIRECTORY_PATH_TOO_LONG,
+    /// @brief source path does not exist.
     JSL_COPY_DIRECTORY_SOURCE_NOT_FOUND,
+    /// @brief the source path is not a directory
     JSL_COPY_DIRECTORY_SOURCE_NOT_A_DIRECTORY,
+    /// @brief an entry was already present at the destination
     JSL_COPY_DIRECTORY_DEST_ALREADY_EXISTS,
+    /// @brief the top-level destination directory could not be created
     JSL_COPY_DIRECTORY_COULD_NOT_CREATE_DEST,
+    /// @brief the source directory could not be opened for iteration
     JSL_COPY_DIRECTORY_COULD_NOT_OPEN_SOURCE,
+    /// @brief indicates failures while reproducing individual files
     JSL_COPY_DIRECTORY_COPY_FILE_FAILED,
+    /// @brief indicates failures while reproducing individual subdirectories
     JSL_COPY_DIRECTORY_MAKE_SUBDIR_FAILED,
+    /// @brief the process lacks the required permissions
     JSL_COPY_DIRECTORY_PERMISSION_DENIED,
+    /// @brief unexpected OS error
     JSL_COPY_DIRECTORY_ERROR_UNKNOWN,
 
     JSL_COPY_DIRECTORY_ENUM_COUNT
 } JSLCopyDirectoryResultEnum;
 
 /**
-* Copy the directory at `src_path` to `dst_path` recursively.
-*
-* The paths may be relative or absolute. Both paths are copied into stack
-* buffers so no heap allocation is performed. The destination directory must
-* not already exist; if it does, `JSL_COPY_DIRECTORY_DEST_ALREADY_EXISTS` is
-* returned. Symbolic links encountered during the walk are not followed and
-* are not copied to the destination. Only regular files and subdirectories
-* are reproduced in the destination tree.
-*
-* The copy is not atomic. If an error occurs mid-copy the destination may
-* already contain a partial copy of the source tree.
-*
-* @param src_path File system path of the source directory
-* @param dst_path File system path for the destination directory
-* @param out_errno Optional pointer that receives the system error code on failure
-* @returns A result enum describing the outcome
-*/
+ * Copy the directory at `src_path` to `dst_path` recursively.
+ *
+ * The paths may be relative or absolute. Both paths are copied into stack
+ * buffers so no heap allocation is performed. The destination directory must
+ * not already exist; if it does, `JSL_COPY_DIRECTORY_DEST_ALREADY_EXISTS` is
+ * returned. Symbolic links encountered during the walk are not followed and
+ * are not copied to the destination. Only regular files and subdirectories
+ * are reproduced in the destination tree.
+ *
+ * The copy is not atomic. If an error occurs mid-copy the destination may
+ * already contain a partial copy of the source tree.
+ *
+ * @param src_path File system path of the source directory
+ * @param dst_path File system path for the destination directory
+ * @param out_errno Optional pointer that receives the system error code on failure
+ * @returns A result enum describing the outcome
+ */
 JSL_WARN_UNUSED JSL_DEF JSLCopyDirectoryResultEnum jsl_copy_directory(
     JSLImmutableMemory src_path,
     JSLImmutableMemory dst_path,
@@ -671,36 +781,45 @@ JSL_WARN_UNUSED JSL_DEF JSLCopyDirectoryResultEnum jsl_copy_directory(
 );
 
 /**
-* TODO: docs
-*/
+ * Result codes for `jsl_subprocess_create`.
+ */
 typedef enum
 {
+    /// @brief is returned when arguments are invalid
     JSL_SUBPROCESS_CREATE_BAD_PARAMETERS = 0,
+    /// @brief the subprocess handle was initialized
     JSL_SUBPROCESS_CREATE_SUCCESS,
+    /// @brief the supplied allocator could not satisfy the initial allocations required
     JSL_SUBPROCESS_CREATE_COULD_NOT_ALLOCATE,
 
     JSL_SUBPROCESS_CREATE_ENUM_COUNT
 } JSLSubProcessCreateResultEnum;
 
 /**
-* TODO: docs
-*/
+ * Result codes for `jsl_subprocess_arg`.
+ */
 typedef enum
 {
+    /// @brief is returned when arguments are invalid
     JSL_SUBPROCESS_ARG_BAD_PARAMETERS = 0,
+    /// @brief the argument was appended to the argv list
     JSL_SUBPROCESS_ARG_SUCCESS,
+    /// @brief the subprocess allocator could not provide needed memory
     JSL_SUBPROCESS_ARG_COULD_NOT_ALLOCATE,
 
     JSL_SUBPROCESS_ARG_ENUM_COUNT
 } JSLSubProcessArgResultEnum;
 
 /**
-* TODO: docs
-*/
+ * Result codes for `jsl_subprocess_env`.
+ */
 typedef enum
 {
+    /// @brief is returned when arguments are invalid
     JSL_SUBPROCESS_ENV_BAD_PARAMETERS = 0,
+    /// @brief the key/value pair was appended to the environment list
     JSL_SUBPROCESS_ENV_SUCCESS,
+    /// @brief the subprocess allocator could not provide needed memory
     JSL_SUBPROCESS_ENV_COULD_NOT_ALLOCATE,
 
     JSL_SUBPROCESS_ENV_ENUM_COUNT
@@ -1176,7 +1295,25 @@ JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stderr_null(
 );
 
 /**
-* TODO: docs
+* Result codes for the subprocess run/wait/poll APIs
+* (`jsl_subprocess_run_blocking`, `jsl_subprocess_run_blocking_options`,
+* `jsl_subprocess_background_start`, `jsl_subprocess_background_poll`,
+* `jsl_subprocess_background_wait`).
+*
+* `SUCCESS` means the operation completed and the per-proc `status` and
+* `exit_code` fields are populated. `BAD_PARAMETERS` is returned when
+* arguments are invalid. `ALREADY_STARTED` means a proc passed in had
+* already been launched. `ALLOCATION_FAILED` means an allocation needed for
+* pipes, buffers, or bookkeeping could not be satisfied. `PIPE_FAILED`
+* means the OS could not create one of the stdin/stdout/stderr pipes.
+* `SPAWN_FAILED` means `fork`/`posix_spawn`/`CreateProcess` failed.
+* `IO_FAILED` indicates an error pumping data to/from a child stream.
+* `WAIT_FAILED` means waiting for child termination failed at the OS level.
+* `KILLED_BY_SIGNAL` means a child was terminated by a signal on POSIX
+* (the signal number is recorded as a negative `exit_code`).
+* `TIMEOUT_REACHED` means the configured timeout expired before all procs
+* finished. `PROBE_FAILED` means a non-blocking poll could not determine
+* whether a child had exited.
 */
 typedef enum
 {
