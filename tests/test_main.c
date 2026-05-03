@@ -443,7 +443,13 @@ int main(void)
     RUN_TEST_FUNCTION("Test jsl_subprocess_args bad parameters", test_jsl_subprocess_args_bad_parameters);
     RUN_TEST_FUNCTION("Test jsl_subprocess_arg macro", test_jsl_subprocess_arg_macro);
     RUN_TEST_FUNCTION("Test jsl_subprocess_arg_cstr macro", test_jsl_subprocess_arg_cstr_macro);
-    RUN_TEST_FUNCTION("Test jsl_subprocess_env bad parameters", test_jsl_subprocess_env_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_set_env bad parameters", test_jsl_subprocess_set_env_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_unset_env bad parameters", test_jsl_subprocess_unset_env_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_subprocess env override last wins", test_jsl_subprocess_env_override_last_wins);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_set_env_base bad parameters", test_jsl_subprocess_set_env_base_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking env base empty", test_jsl_subprocess_run_blocking_env_base_empty);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking env base inherit", test_jsl_subprocess_run_blocking_env_base_inherit);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking unset env", test_jsl_subprocess_run_blocking_unset_env);
     RUN_TEST_FUNCTION("Test jsl_subprocess_change_working_directory bad parameters", test_jsl_subprocess_change_working_directory_bad_parameters);
     RUN_TEST_FUNCTION("Test jsl_subprocess_set_stdin_memory bad parameters", test_jsl_subprocess_set_stdin_memory_bad_parameters);
     RUN_TEST_FUNCTION("Test jsl_subprocess_set_stdin_fd bad parameters", test_jsl_subprocess_set_stdin_fd_bad_parameters);

@@ -181,7 +181,7 @@ void test_jsl_subprocess_arg_cstr_macro(void)
     jsl_libc_allocator_free_all(&backing);
 }
 
-void test_jsl_subprocess_env_bad_parameters(void)
+void test_jsl_subprocess_set_env_bad_parameters(void)
 {
     JSLLibcAllocator backing;
     JSLSubprocess proc;
@@ -190,14 +190,63 @@ void test_jsl_subprocess_env_bad_parameters(void)
     JSLImmutableMemory empty = { NULL, 0 };
     JSLImmutableMemory value = JSL_CSTR_EXPRESSION("x");
 
-    JSLSubProcessEnvResultEnum r = jsl_subprocess_env(NULL, value, value);
+    JSLSubProcessEnvResultEnum r = jsl_subprocess_set_env(NULL, value, value);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_ENV_BAD_PARAMETERS);
 
-    r = jsl_subprocess_env(&proc, empty, value);
+    r = jsl_subprocess_set_env(&proc, empty, value);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_ENV_BAD_PARAMETERS);
 
-    r = jsl_subprocess_env(&proc, value, empty);
+    r = jsl_subprocess_set_env(&proc, value, empty);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_ENV_BAD_PARAMETERS);
+
+    jsl_subprocess_cleanup(&proc);
+    jsl_libc_allocator_free_all(&backing);
+}
+
+void test_jsl_subprocess_unset_env_bad_parameters(void)
+{
+    JSLLibcAllocator backing;
+    JSLSubprocess proc;
+    TEST_BOOL(make_helper(&proc, &backing));
+
+    JSLImmutableMemory empty = { NULL, 0 };
+    JSLImmutableMemory key = JSL_CSTR_EXPRESSION("FOO");
+
+    JSLSubProcessEnvResultEnum r = jsl_subprocess_unset_env(NULL, key);
+    TEST_INT32_EQUAL(r, JSL_SUBPROCESS_ENV_BAD_PARAMETERS);
+
+    r = jsl_subprocess_unset_env(&proc, empty);
+    TEST_INT32_EQUAL(r, JSL_SUBPROCESS_ENV_BAD_PARAMETERS);
+
+    jsl_subprocess_cleanup(&proc);
+    jsl_libc_allocator_free_all(&backing);
+}
+
+void test_jsl_subprocess_env_override_last_wins(void)
+{
+    JSLLibcAllocator backing;
+    JSLSubprocess proc;
+    TEST_BOOL(make_helper(&proc, &backing));
+
+    JSLImmutableMemory key = JSL_CSTR_EXPRESSION("FOO");
+    JSLImmutableMemory v1 = JSL_CSTR_EXPRESSION("first");
+    JSLImmutableMemory v2 = JSL_CSTR_EXPRESSION("second");
+
+    TEST_INT32_EQUAL(jsl_subprocess_set_env(&proc, key, v1), JSL_SUBPROCESS_ENV_SUCCESS);
+    TEST_INT32_EQUAL(jsl_subprocess_set_env(&proc, key, v2), JSL_SUBPROCESS_ENV_SUCCESS);
+
+    TEST_INT64_EQUAL(proc.env_count, 1);
+    TEST_BOOL(!proc.env_vars[0].unset);
+    TEST_INT64_EQUAL(proc.env_vars[0].value.length, v2.length);
+    TEST_BUFFERS_EQUAL(proc.env_vars[0].value.data, v2.data, (size_t) v2.length);
+
+    TEST_INT32_EQUAL(jsl_subprocess_unset_env(&proc, key), JSL_SUBPROCESS_ENV_SUCCESS);
+    TEST_INT64_EQUAL(proc.env_count, 1);
+    TEST_BOOL(proc.env_vars[0].unset);
+
+    TEST_INT32_EQUAL(jsl_subprocess_set_env(&proc, key, v1), JSL_SUBPROCESS_ENV_SUCCESS);
+    TEST_INT64_EQUAL(proc.env_count, 1);
+    TEST_BOOL(!proc.env_vars[0].unset);
 
     jsl_subprocess_cleanup(&proc);
     jsl_libc_allocator_free_all(&backing);
@@ -519,6 +568,176 @@ void test_jsl_subprocess_run_blocking_stdin_memory(void)
     jsl_libc_allocator_free_all(&backing);
 }
 
+void test_jsl_subprocess_set_env_base_bad_parameters(void)
+{
+    JSLLibcAllocator backing;
+    JSLSubprocess proc;
+    TEST_BOOL(make_helper(&proc, &backing));
+
+    TEST_BOOL(!jsl_subprocess_set_env_base(NULL, JSL_SUBPROCESS_ENV_BASE_EMPTY));
+    TEST_BOOL(!jsl_subprocess_set_env_base(&proc, (JSLSubProcessEnvBaseEnum) -1));
+    TEST_BOOL(!jsl_subprocess_set_env_base(&proc, JSL_SUBPROCESS_ENV_BASE_ENUM_COUNT));
+
+    // Successful call flips the field.
+    TEST_BOOL(jsl_subprocess_set_env_base(&proc, JSL_SUBPROCESS_ENV_BASE_INHERIT));
+    TEST_INT32_EQUAL(proc.env_base, JSL_SUBPROCESS_ENV_BASE_INHERIT);
+    TEST_BOOL(jsl_subprocess_set_env_base(&proc, JSL_SUBPROCESS_ENV_BASE_EMPTY));
+    TEST_INT32_EQUAL(proc.env_base, JSL_SUBPROCESS_ENV_BASE_EMPTY);
+
+    jsl_subprocess_cleanup(&proc);
+    jsl_libc_allocator_free_all(&backing);
+}
+
+void test_jsl_subprocess_run_blocking_env_base_empty(void)
+{
+    JSLLibcAllocator backing;
+    JSLSubprocess proc;
+    TEST_BOOL(make_helper(&proc, &backing));
+
+    // Plant a value in the parent env. With the default EMPTY base it
+    // must NOT leak into the child.
+#if JSL_IS_WINDOWS
+    _putenv_s("JSL_TEST_SUBPROCESS_BASE_EMPTY_VAR", "leaked-value");
+#else
+    setenv("JSL_TEST_SUBPROCESS_BASE_EMPTY_VAR", "leaked-value", 1);
+#endif
+
+    TEST_INT32_EQUAL(
+        jsl_subprocess_arg_cstr(&proc, "env", "JSL_TEST_SUBPROCESS_BASE_EMPTY_VAR"),
+        JSL_SUBPROCESS_ARG_SUCCESS
+    );
+
+    JSLLibcAllocator sb_backing;
+    JSLAllocatorInterface sb_iface = test_libc_allocator_interface(&sb_backing);
+
+    JSLStringBuilder sb;
+    TEST_BOOL(jsl_string_builder_init(&sb, sb_iface, 64));
+    TEST_BOOL(jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&sb)));
+
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(proc.allocator, &proc, 1, NULL);
+    TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
+    TEST_INT32_EQUAL(proc.exit_code, 0);
+
+    JSLImmutableMemory out = jsl_string_builder_get_string(&sb);
+    TEST_INT64_EQUAL(out.length, 6);
+    if (out.length == 6)
+        TEST_BUFFERS_EQUAL(out.data, "<null>", 6);
+
+#if JSL_IS_WINDOWS
+    _putenv_s("JSL_TEST_SUBPROCESS_BASE_EMPTY_VAR", "");
+#else
+    unsetenv("JSL_TEST_SUBPROCESS_BASE_EMPTY_VAR");
+#endif
+
+    jsl_string_builder_free(&sb);
+    jsl_libc_allocator_free_all(&sb_backing);
+    jsl_subprocess_cleanup(&proc);
+    jsl_libc_allocator_free_all(&backing);
+}
+
+void test_jsl_subprocess_run_blocking_env_base_inherit(void)
+{
+    JSLLibcAllocator backing;
+    JSLSubprocess proc;
+    TEST_BOOL(make_helper(&proc, &backing));
+
+#if JSL_IS_WINDOWS
+    _putenv_s("JSL_TEST_SUBPROCESS_BASE_INHERIT_VAR", "inherited-99");
+#else
+    setenv("JSL_TEST_SUBPROCESS_BASE_INHERIT_VAR", "inherited-99", 1);
+#endif
+
+    TEST_INT32_EQUAL(
+        jsl_subprocess_arg_cstr(&proc, "env", "JSL_TEST_SUBPROCESS_BASE_INHERIT_VAR"),
+        JSL_SUBPROCESS_ARG_SUCCESS
+    );
+    TEST_BOOL(jsl_subprocess_set_env_base(&proc, JSL_SUBPROCESS_ENV_BASE_INHERIT));
+
+    JSLLibcAllocator sb_backing;
+    JSLAllocatorInterface sb_iface = test_libc_allocator_interface(&sb_backing);
+
+    JSLStringBuilder sb;
+    TEST_BOOL(jsl_string_builder_init(&sb, sb_iface, 64));
+    TEST_BOOL(jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&sb)));
+
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(proc.allocator, &proc, 1, NULL);
+    TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
+    TEST_INT32_EQUAL(proc.exit_code, 0);
+
+    JSLImmutableMemory out = jsl_string_builder_get_string(&sb);
+    TEST_INT64_EQUAL(out.length, 12);
+    if (out.length == 12)
+        TEST_BUFFERS_EQUAL(out.data, "inherited-99", 12);
+
+#if JSL_IS_WINDOWS
+    _putenv_s("JSL_TEST_SUBPROCESS_BASE_INHERIT_VAR", "");
+#else
+    unsetenv("JSL_TEST_SUBPROCESS_BASE_INHERIT_VAR");
+#endif
+
+    jsl_string_builder_free(&sb);
+    jsl_libc_allocator_free_all(&sb_backing);
+    jsl_subprocess_cleanup(&proc);
+    jsl_libc_allocator_free_all(&backing);
+}
+
+void test_jsl_subprocess_run_blocking_unset_env(void)
+{
+    JSLLibcAllocator backing;
+    JSLSubprocess proc;
+    TEST_BOOL(make_helper(&proc, &backing));
+
+    // Plant a value in the parent env so we can prove unset removes it
+    // from the inherited set rather than only undoing a prior set_env.
+#if JSL_IS_WINDOWS
+    _putenv_s("JSL_TEST_SUBPROCESS_UNSET_VAR", "leaked-value");
+#else
+    setenv("JSL_TEST_SUBPROCESS_UNSET_VAR", "leaked-value", 1);
+#endif
+
+    TEST_INT32_EQUAL(
+        jsl_subprocess_arg_cstr(&proc, "env", "JSL_TEST_SUBPROCESS_UNSET_VAR"),
+        JSL_SUBPROCESS_ARG_SUCCESS
+    );
+    // The base must be INHERIT for unset_env to have anything to remove —
+    // the default EMPTY base would mask the planted parent var on its own.
+    TEST_BOOL(jsl_subprocess_set_env_base(&proc, JSL_SUBPROCESS_ENV_BASE_INHERIT));
+    TEST_INT32_EQUAL(
+        jsl_subprocess_unset_env(
+            &proc,
+            JSL_CSTR_EXPRESSION("JSL_TEST_SUBPROCESS_UNSET_VAR")
+        ),
+        JSL_SUBPROCESS_ENV_SUCCESS
+    );
+
+    JSLLibcAllocator sb_backing;
+    JSLAllocatorInterface sb_iface = test_libc_allocator_interface(&sb_backing);
+
+    JSLStringBuilder sb;
+    TEST_BOOL(jsl_string_builder_init(&sb, sb_iface, 64));
+    TEST_BOOL(jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&sb)));
+
+    JSLSubProcessResultEnum r = jsl_subprocess_run_blocking(proc.allocator, &proc, 1, NULL);
+    TEST_INT32_EQUAL(r, JSL_SUBPROCESS_SUCCESS);
+    TEST_INT32_EQUAL(proc.exit_code, 0);
+
+    JSLImmutableMemory out = jsl_string_builder_get_string(&sb);
+    TEST_INT64_EQUAL(out.length, 6);
+    if (out.length == 6)
+        TEST_BUFFERS_EQUAL(out.data, "<null>", 6);
+
+#if JSL_IS_WINDOWS
+    _putenv_s("JSL_TEST_SUBPROCESS_UNSET_VAR", "");
+#else
+    unsetenv("JSL_TEST_SUBPROCESS_UNSET_VAR");
+#endif
+
+    jsl_string_builder_free(&sb);
+    jsl_libc_allocator_free_all(&sb_backing);
+    jsl_subprocess_cleanup(&proc);
+    jsl_libc_allocator_free_all(&backing);
+}
+
 void test_jsl_subprocess_run_blocking_env_var(void)
 {
     JSLLibcAllocator backing;
@@ -530,7 +749,7 @@ void test_jsl_subprocess_run_blocking_env_var(void)
         JSL_SUBPROCESS_ARG_SUCCESS
     );
     TEST_INT32_EQUAL(
-        jsl_subprocess_env(
+        jsl_subprocess_set_env(
             &proc,
             JSL_CSTR_EXPRESSION("JSL_TEST_SUBPROCESS_VAR"),
             JSL_CSTR_EXPRESSION("env-value-42")
@@ -792,7 +1011,7 @@ void test_jsl_subprocess_background_env_var(void)
         JSL_SUBPROCESS_ARG_SUCCESS
     );
     TEST_INT32_EQUAL(
-        jsl_subprocess_env(
+        jsl_subprocess_set_env(
             &proc,
             JSL_CSTR_EXPRESSION("JSL_TEST_SUBPROCESS_BG_VAR"),
             JSL_CSTR_EXPRESSION("bg-value-7")

@@ -2445,6 +2445,7 @@ JSLSubProcessCreateResultEnum jsl_subprocess_create(
     proc->env_vars = env_vars;
     proc->env_count = 0;
     proc->env_capacity = JSL__SUBPROCESS_INITIAL_CAPACITY;
+    proc->env_base = JSL_SUBPROCESS_ENV_BASE_EMPTY;
     proc->working_directory = jsl_immutable_memory(NULL, 0);
 
     proc->stdin_kind = JSL_SUBPROCESS_STDIN_INHERIT;
@@ -2609,7 +2610,67 @@ JSLSubProcessArgResultEnum jsl__subprocess_args_cstr_va(
     return result;
 }
 
-JSLSubProcessEnvResultEnum jsl_subprocess_env(
+// Drop any existing entry matching `key` (override-last-wins).
+// Frees the entry's owned key/value buffers and swap-deletes the slot.
+static void jsl__subprocess_drop_env_entry_for_key(
+    JSLSubprocess* proc,
+    JSLImmutableMemory key
+)
+{
+    int64_t i = 0;
+    while (i < proc->env_count)
+    {
+        bool match = (proc->env_vars[i].key.length == key.length
+            && JSL_MEMCMP(proc->env_vars[i].key.data, key.data, (size_t) key.length) == 0);
+
+        if (match)
+        {
+            if (proc->env_vars[i].key.data != NULL)
+                (void) jsl_allocator_interface_free(proc->allocator, proc->env_vars[i].key.data);
+            if (proc->env_vars[i].value.data != NULL)
+                (void) jsl_allocator_interface_free(proc->allocator, proc->env_vars[i].value.data);
+
+            proc->env_count--;
+            if (i < proc->env_count)
+                proc->env_vars[i] = proc->env_vars[proc->env_count];
+        }
+        else
+        {
+            i++;
+        }
+    }
+}
+
+// Reserve room for one more entry, growing the env_vars array if needed.
+static JSLSubProcessEnvResultEnum jsl__subprocess_env_reserve_one(JSLSubprocess* proc)
+{
+    JSLSubProcessEnvResultEnum result = JSL_SUBPROCESS_ENV_SUCCESS;
+
+    if (proc->env_count >= proc->env_capacity)
+    {
+        int64_t new_capacity = proc->env_capacity * 2;
+        JSLSubProcessEnvVar* new_env = (JSLSubProcessEnvVar*) jsl_allocator_interface_realloc(
+            proc->allocator,
+            proc->env_vars,
+            new_capacity * (int64_t) sizeof(JSLSubProcessEnvVar),
+            JSL_DEFAULT_ALLOCATION_ALIGNMENT
+        );
+
+        if (new_env == NULL)
+        {
+            result = JSL_SUBPROCESS_ENV_COULD_NOT_ALLOCATE;
+        }
+        else
+        {
+            proc->env_vars = new_env;
+            proc->env_capacity = new_capacity;
+        }
+    }
+
+    return result;
+}
+
+JSLSubProcessEnvResultEnum jsl_subprocess_set_env(
     JSLSubprocess* proc,
     JSLImmutableMemory key,
     JSLImmutableMemory value
@@ -2624,24 +2685,9 @@ JSLSubProcessEnvResultEnum jsl_subprocess_env(
     if (!proceed)
         return JSL_SUBPROCESS_ENV_BAD_PARAMETERS;
 
-    if (proc->env_count >= proc->env_capacity)
-    {
-        int64_t new_capacity = proc->env_capacity * 2;
-        JSLSubProcessEnvVar* new_env = (JSLSubProcessEnvVar*) jsl_allocator_interface_realloc(
-            proc->allocator,
-            proc->env_vars,
-            new_capacity * (int64_t) sizeof(JSLSubProcessEnvVar),
-            JSL_DEFAULT_ALLOCATION_ALIGNMENT
-        );
-
-        proceed = (new_env != NULL);
-
-        if (!proceed)
-            return JSL_SUBPROCESS_ENV_COULD_NOT_ALLOCATE;
-
-        proc->env_vars = new_env;
-        proc->env_capacity = new_capacity;
-    }
+    JSLSubProcessEnvResultEnum reserve = jsl__subprocess_env_reserve_one(proc);
+    if (reserve != JSL_SUBPROCESS_ENV_SUCCESS)
+        return reserve;
 
     JSLImmutableMemory key_dup = jsl_duplicate(proc->allocator, key);
     proceed = (key_dup.data != NULL);
@@ -2653,13 +2699,68 @@ JSLSubProcessEnvResultEnum jsl_subprocess_env(
     proceed = (value_dup.data != NULL);
 
     if (!proceed)
+    {
+        (void) jsl_allocator_interface_free(proc->allocator, key_dup.data);
         return JSL_SUBPROCESS_ENV_COULD_NOT_ALLOCATE;
+    }
+
+    jsl__subprocess_drop_env_entry_for_key(proc, key);
 
     proc->env_vars[proc->env_count].key = key_dup;
     proc->env_vars[proc->env_count].value = value_dup;
+    proc->env_vars[proc->env_count].unset = false;
     proc->env_count++;
 
     return JSL_SUBPROCESS_ENV_SUCCESS;
+}
+
+JSLSubProcessEnvResultEnum jsl_subprocess_unset_env(
+    JSLSubprocess* proc,
+    JSLImmutableMemory key
+)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL
+        && key.data != NULL
+        && key.length > 0);
+
+    if (!proceed)
+        return JSL_SUBPROCESS_ENV_BAD_PARAMETERS;
+
+    JSLSubProcessEnvResultEnum reserve = jsl__subprocess_env_reserve_one(proc);
+    if (reserve != JSL_SUBPROCESS_ENV_SUCCESS)
+        return reserve;
+
+    JSLImmutableMemory key_dup = jsl_duplicate(proc->allocator, key);
+    proceed = (key_dup.data != NULL);
+
+    if (!proceed)
+        return JSL_SUBPROCESS_ENV_COULD_NOT_ALLOCATE;
+
+    jsl__subprocess_drop_env_entry_for_key(proc, key);
+
+    proc->env_vars[proc->env_count].key = key_dup;
+    proc->env_vars[proc->env_count].value = jsl_immutable_memory(NULL, 0);
+    proc->env_vars[proc->env_count].unset = true;
+    proc->env_count++;
+
+    return JSL_SUBPROCESS_ENV_SUCCESS;
+}
+
+bool jsl_subprocess_set_env_base(
+    JSLSubprocess* proc,
+    JSLSubProcessEnvBaseEnum base
+)
+{
+    bool ok = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL
+        && (int) base >= 0
+        && base < JSL_SUBPROCESS_ENV_BASE_ENUM_COUNT);
+
+    if (ok)
+        proc->env_base = base;
+
+    return ok;
 }
 
 bool jsl_subprocess_change_working_directory(
@@ -2875,6 +2976,31 @@ static int64_t jsl__monotonic_ms(void)
 #endif
 }
 
+// True if any explicit env_vars entry has a key equal to the prefix of
+// `parent_entry` up to the first '='. Used to filter the inherited
+// environment so a user's set/unset wins over the OS-provided value.
+static bool jsl__subprocess_parent_entry_overridden(
+    JSLSubprocess* proc,
+    const char* parent_entry
+)
+{
+    const char* eq = parent_entry;
+    while (*eq != '\0' && *eq != '=')
+        eq++;
+
+    int64_t plen = (int64_t) (eq - parent_entry);
+    bool overridden = false;
+    for (int64_t i = 0; !overridden && i < proc->env_count; i++)
+    {
+        if (proc->env_vars[i].key.length == plen
+            && JSL_MEMCMP(proc->env_vars[i].key.data, parent_entry, (size_t) plen) == 0)
+        {
+            overridden = true;
+        }
+    }
+    return overridden;
+}
+
 #if JSL_IS_POSIX
 
 // Everything needed to spawn a child process. Populated by
@@ -3035,16 +3161,21 @@ static bool jsl__subprocess_posix_build_argv(
     return ok;
 }
 
-// Build the envp array. If no custom env vars are configured, ctx->envp
-// aliases `environ` directly with no allocation. Otherwise we allocate an
-// array large enough for every entry in environ plus one "key=value"
-// string per configured env var, in that order.
+// Build the envp array. With env base INHERIT and no custom env vars,
+// ctx->envp aliases `environ` directly with no allocation. Otherwise we
+// allocate an array large enough for every inherited entry (when
+// inheriting) plus one "key=value" string per configured set entry,
+// filtering inherited entries whose key was explicitly set or unset by
+// the caller. With env base EMPTY, the parent environment is skipped
+// entirely and the child sees only the explicit set entries.
 static bool jsl__subprocess_posix_build_envp(
     JSLSubprocess* proc,
     JSL__SubProcessPosixLaunch* ctx
 )
 {
-    if (proc->env_count == 0)
+    bool inherit = (proc->env_base == JSL_SUBPROCESS_ENV_BASE_INHERIT);
+
+    if (inherit && proc->env_count == 0)
     {
         ctx->envp = environ;
         ctx->envp_is_owned = false;
@@ -3052,7 +3183,7 @@ static bool jsl__subprocess_posix_build_envp(
     }
 
     int64_t parent_count = 0;
-    if (environ != NULL)
+    if (inherit && environ != NULL)
     {
         while (environ[parent_count] != NULL)
             parent_count++;
@@ -3066,18 +3197,29 @@ static bool jsl__subprocess_posix_build_envp(
         true
     );
     ctx->envp_is_owned = true;
-    ctx->envp_owned_start = parent_count;
-    ctx->envp_owned_count = proc->env_count;
 
     bool ok = (ctx->envp != NULL);
     if (!ok)
         return false;
 
+    int64_t out = 0;
     for (int64_t i = 0; i < parent_count; i++)
-        ctx->envp[i] = environ[i];
+    {
+        if (!jsl__subprocess_parent_entry_overridden(proc, environ[i]))
+        {
+            ctx->envp[out] = environ[i];
+            out++;
+        }
+    }
+
+    ctx->envp_owned_start = out;
+    ctx->envp_owned_count = 0;
 
     for (int64_t i = 0; ok && i < proc->env_count; i++)
     {
+        if (proc->env_vars[i].unset)
+            continue;
+
         int64_t klen = proc->env_vars[i].key.length;
         int64_t vlen = proc->env_vars[i].value.length;
         int64_t total_len = klen + 1 + vlen + 1;
@@ -3095,11 +3237,13 @@ static bool jsl__subprocess_posix_build_envp(
             if (vlen > 0)
                 JSL_MEMCPY(kv + klen + 1, proc->env_vars[i].value.data, (size_t) vlen);
             kv[klen + 1 + vlen] = '\0';
-            ctx->envp[parent_count + i] = kv;
+            ctx->envp[out] = kv;
+            out++;
+            ctx->envp_owned_count++;
         }
     }
 
-    ctx->envp[total - 1] = NULL;
+    ctx->envp[out] = NULL;
     return ok;
 }
 
@@ -4130,25 +4274,38 @@ static bool jsl__subprocess_win_build_env_block(
     JSL__SubProcessWindowsLaunch* ctx
 )
 {
-    if (proc->env_count == 0)
+    bool inherit = (proc->env_base == JSL_SUBPROCESS_ENV_BASE_INHERIT);
+
+    // With INHERIT and nothing to overlay, leave env_block NULL so
+    // CreateProcess passes the parent environment through unchanged.
+    if (inherit && proc->env_count == 0)
         return true;
 
-    LPCH parent_env = GetEnvironmentStringsA();
-    int64_t parent_len = 0;
+    LPCH parent_env = inherit ? GetEnvironmentStringsA() : NULL;
+
+    // Worst-case upper bound: full parent block plus all set entries plus
+    // the trailing terminator. Filtered parent entries simply leave unused
+    // tail space — the allocation stays one-shot.
+    int64_t parent_max_len = 0;
     if (parent_env != NULL)
     {
-        while (!(parent_env[parent_len] == '\0' && parent_env[parent_len + 1] == '\0'))
-            parent_len++;
-        parent_len++;
+        while (!(parent_env[parent_max_len] == '\0' && parent_env[parent_max_len + 1] == '\0'))
+            parent_max_len++;
+        parent_max_len++;
     }
 
     int64_t extra_len = 0;
     for (int64_t i = 0; i < proc->env_count; i++)
-        extra_len += proc->env_vars[i].key.length + 1 + proc->env_vars[i].value.length + 1;
+    {
+        if (!proc->env_vars[i].unset)
+            extra_len += proc->env_vars[i].key.length + 1 + proc->env_vars[i].value.length + 1;
+    }
 
+    // +2 so the empty-block case (no parent, no set entries) still has
+    // room for the double-NUL terminator that Windows expects.
     ctx->env_block = (char*) jsl_allocator_interface_alloc(
         proc->allocator,
-        parent_len + extra_len + 1,
+        parent_max_len + extra_len + 2,
         JSL_DEFAULT_ALLOCATION_ALIGNMENT,
         false
     );
@@ -4157,22 +4314,42 @@ static bool jsl__subprocess_win_build_env_block(
     if (ok)
     {
         char* p = ctx->env_block;
-        if (parent_env != NULL)
+
+        const char* entry = parent_env;
+        while (entry != NULL && *entry != '\0')
         {
-            JSL_MEMCPY(p, parent_env, (size_t) parent_len);
-            p += parent_len;
+            int64_t entry_len = (int64_t) strlen(entry);
+            if (!jsl__subprocess_parent_entry_overridden(proc, entry))
+            {
+                JSL_MEMCPY(p, entry, (size_t) entry_len);
+                p += entry_len;
+                *p = '\0';
+                p++;
+            }
+            entry += entry_len + 1;
         }
+
         for (int64_t i = 0; i < proc->env_count; i++)
         {
+            if (proc->env_vars[i].unset)
+                continue;
+
             JSL_MEMCPY(p, proc->env_vars[i].key.data, (size_t) proc->env_vars[i].key.length);
             p += proc->env_vars[i].key.length;
             *p = '=';
             p++;
-            JSL_MEMCPY(p, proc->env_vars[i].value.data, (size_t) proc->env_vars[i].value.length);
-            p += proc->env_vars[i].value.length;
+            if (proc->env_vars[i].value.length > 0)
+            {
+                JSL_MEMCPY(p, proc->env_vars[i].value.data, (size_t) proc->env_vars[i].value.length);
+                p += proc->env_vars[i].value.length;
+            }
             *p = '\0';
             p++;
         }
+        // Double-NUL terminator. The first NUL also serves as the trailing
+        // string-terminator when no entries were emitted.
+        *p = '\0';
+        p++;
         *p = '\0';
     }
 

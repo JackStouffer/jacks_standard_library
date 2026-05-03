@@ -811,19 +811,41 @@ typedef enum
 } JSLSubProcessArgResultEnum;
 
 /**
- * Result codes for `jsl_subprocess_env`.
+ * Result codes for `jsl_subprocess_set_env` and `jsl_subprocess_unset_env`.
  */
 typedef enum
 {
     /// @brief is returned when arguments are invalid
     JSL_SUBPROCESS_ENV_BAD_PARAMETERS = 0,
-    /// @brief the key/value pair was appended to the environment list
+    /// @brief the entry was recorded on the subprocess
     JSL_SUBPROCESS_ENV_SUCCESS,
     /// @brief the subprocess allocator could not provide needed memory
     JSL_SUBPROCESS_ENV_COULD_NOT_ALLOCATE,
 
     JSL_SUBPROCESS_ENV_ENUM_COUNT
 } JSLSubProcessEnvResultEnum;
+
+/**
+* Base environment the child will start from, before the per-key
+* `set_env`/`unset_env` overlay is applied.
+*
+* `EMPTY` (the default) means the child sees only the variables explicitly
+* added via `jsl_subprocess_set_env`. Nothing is inherited from the parent
+* process. This is the safer default: callers must opt into leaking
+* parent-process state (auth tokens, locale, PATH overrides, etc.) into
+* untrusted children.
+*
+* `INHERIT` means the child starts with a copy of the parent's environment
+* and the overlay is applied on top: a `set_env` overrides any inherited
+* entry with the same key, and an `unset_env` removes an inherited entry.
+*/
+typedef enum
+{
+    JSL_SUBPROCESS_ENV_BASE_EMPTY = 0,
+    JSL_SUBPROCESS_ENV_BASE_INHERIT,
+
+    JSL_SUBPROCESS_ENV_BASE_ENUM_COUNT
+} JSLSubProcessEnvBaseEnum;
 
 /**
 * How the child process's standard input stream will be supplied.
@@ -865,15 +887,19 @@ typedef enum
 } JSLSubProcessOutputKindEnum;
 
 /**
-* A key-value pair representing an environment variable to be set on a
-* subprocess before it is started. Both `key` and `value` point into memory
-* owned by the `JSLSubprocess` allocator and are valid for the lifetime of
-* the subprocess handle.
+* A single environment-variable modification to apply when starting a
+* subprocess. `key` always points into memory owned by the `JSLSubprocess`
+* allocator. When `unset` is `false`, the child sees `KEY=value` and any
+* inherited entry with the same key is dropped; `value` is owned by the
+* same allocator. When `unset` is `true`, the child does not see `KEY` at
+* all (any inherited entry with that key is dropped) and `value` is unused
+* (left as `{NULL, 0}`).
 */
 typedef struct JSLSubProcessEnvVar
 {
     JSLImmutableMemory key;
     JSLImmutableMemory value;
+    bool unset;
 } JSLSubProcessEnvVar;
 
 /**
@@ -906,12 +932,12 @@ typedef enum
 *
 * Allocate one of these on the stack and pass a pointer to
 * `jsl_subprocess_create`. After creation, use `jsl_subprocess_arg` and
-* `jsl_subprocess_env` to configure command-line arguments and environment
+* `jsl_subprocess_set_env` to configure command-line arguments and environment
 * variables before running.
 *
 * All dynamically-sized internal arrays are backed by the allocator provided
 * at creation time. The strings passed to `jsl_subprocess_arg` and
-* `jsl_subprocess_env` are duplicated into that allocator, so the caller
+* `jsl_subprocess_set_env` are duplicated into that allocator, so the caller
 * does not need to keep the originals alive.
 */
 typedef struct JSLSubprocess
@@ -941,6 +967,7 @@ typedef struct JSLSubprocess
     JSLSubProcessEnvVar* env_vars;
     int64_t env_count;
     int64_t env_capacity;
+    JSLSubProcessEnvBaseEnum env_base;
 
     JSLImmutableMemory working_directory;
 
@@ -1007,7 +1034,7 @@ typedef struct JSLSubprocess
 * Create a new subprocess handle for the given executable.
 *
 * The handle is not started; use `jsl_subprocess_arg` and
-* `jsl_subprocess_env` to configure it.
+* `jsl_subprocess_set_env` to configure it.
 *
 * The `executable` string is duplicated into `allocator`, so the caller
 * does not need to keep the original alive.
@@ -1115,20 +1142,71 @@ JSLSubProcessArgResultEnum jsl__subprocess_args_cstr_va(
 /**
 * Set an environment variable on the subprocess.
 *
-* The variable will be added to the child process's environment when it is
-* started. Both `key` and `value` are duplicated into the subprocess's
-* allocator. Calling this more than once with the same key appends a
-* duplicate entry; no deduplication is performed.
+* When the child is started it sees `KEY=value` for this `key`. If the env
+* base is `JSL_SUBPROCESS_ENV_BASE_INHERIT`, this overrides any inherited
+* entry with the same key; if the base is `JSL_SUBPROCESS_ENV_BASE_EMPTY`
+* (the default), this is simply added to the otherwise-empty environment.
+* Both `key` and `value` are duplicated into the subprocess's allocator.
+*
+* Calling this more than once with the same key keeps only the most recent
+* call (override-last-wins). A prior `jsl_subprocess_unset_env` for the
+* same key is also discarded.
 *
 * @param proc  Pointer to an initialized subprocess handle
 * @param key   Environment variable name
 * @param value Environment variable value
 * @returns A result enum describing the outcome
 */
-JSL_WARN_UNUSED JSL_DEF JSLSubProcessEnvResultEnum jsl_subprocess_env(
+JSL_WARN_UNUSED JSL_DEF JSLSubProcessEnvResultEnum jsl_subprocess_set_env(
     JSLSubprocess* proc,
     JSLImmutableMemory key,
     JSLImmutableMemory value
+);
+
+/**
+* Remove an environment variable from the subprocess.
+*
+* When the child is started it does not see `key` at all. With env base
+* `JSL_SUBPROCESS_ENV_BASE_INHERIT` this removes an entry the OS would
+* otherwise have passed through; with the default `EMPTY` base the call is
+* a no-op against the base set, but it still wins over a prior `set_env`
+* for the same key. The `key` is duplicated into the subprocess's
+* allocator.
+*
+* Any prior call to `jsl_subprocess_set_env` or `jsl_subprocess_unset_env`
+* for the same key is discarded (override-last-wins). This is the
+* counterpart to POSIX `unsetenv`.
+*
+* @param proc  Pointer to an initialized subprocess handle
+* @param key   Environment variable name to remove from the child env
+* @returns A result enum describing the outcome
+*/
+JSL_WARN_UNUSED JSL_DEF JSLSubProcessEnvResultEnum jsl_subprocess_unset_env(
+    JSLSubprocess* proc,
+    JSLImmutableMemory key
+);
+
+/**
+* Select the base environment the child process will start from.
+*
+* `JSL_SUBPROCESS_ENV_BASE_EMPTY` (the default chosen at
+* `jsl_subprocess_create` time) starts the child with no inherited
+* variables; only entries added via `jsl_subprocess_set_env` will be
+* visible. `JSL_SUBPROCESS_ENV_BASE_INHERIT` starts the child with a copy
+* of the parent's environment, and the per-key overlay is applied on top.
+*
+* Calling this more than once replaces the previous selection. The base
+* and the overlay are independent — switching the base does not discard
+* prior `set_env`/`unset_env` calls.
+*
+* @param proc Pointer to an initialized subprocess handle
+* @param base Which environment to start the overlay from
+* @returns `true` on success, `false` if `proc` is invalid or `base` is
+*          out of range
+*/
+JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_env_base(
+    JSLSubprocess* proc,
+    JSLSubProcessEnvBaseEnum base
 );
 
 /**
