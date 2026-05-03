@@ -4,7 +4,7 @@
  * Tools you need to write your build program (a.k.a metaprogram) in C.
  * 
  * This is a fork of nob.h by Alexey Kutepov
- * 
+ *
  * ## Why
  *
  * C programs are not buildable from their source files. They require some
@@ -39,6 +39,12 @@
  * imagine how much fun future you will have trying to find, build, and install a
  * specific version of CMake 20 years from now on a machine that it wasn't designed
  * to run on.
+ * 
+ * C on the other hand is supported everywhere. The tool chain is easy to install
+ * on every system. Every serious C compiler has C89, C99, and C11 modes and there's
+ * no reason to suspect that future C versions won't also get the same backwards
+ * compatibility treatment. All this to say: getting a single C file to build on some
+ * future computer will almost certainly be a lot easier than any of the alternatives.  
  * 
  * ## How
  * 
@@ -93,6 +99,7 @@
 
     #include "jsl/core.h"
     #include "jsl/os.h"
+    #include "jsl/allocator_libc.h"
 
     int32_t builder_needs_rebuild(const char *output_path, const char **input_paths, size_t input_paths_count);
 
@@ -100,7 +107,7 @@
     //
     //   How to use it:
     //     int32_t main(int32_t argc, char** argv) {
-    //         JSL_BUILDER_GO_REBUILD_URSELF(argc, argv);
+    //         BUILDER_AUTO_BOOTSTRAP(argc, argv);
     //         // actual work
     //         return 0;
     //     }
@@ -118,10 +125,11 @@
     //   do not recommend since the whole idea of NoBuild is to keep the process of bootstrapping
     //   as simple as possible and doing all of the actual work inside of ./nob)
     //
-    void builder__go_rebuild_urself(int32_t argc, char **argv, const char *source_path, ...);
-    #define JSL_BUILDER_GO_REBUILD_URSELF(argc, argv) builder__go_rebuild_urself(argc, argv, __FILE__, NULL)
+    void builder__auto_bootstrap(int32_t argc, char **argv, const char *source_path, ...);
+    #define BUILDER_AUTO_BOOTSTRAP(argc, argv) builder__auto_bootstrap(argc, argv, __FILE__, NULL)
+    
     // Sometimes your nob.c includes additional files, so you want the Go Rebuild Urself™ Technology to check
-    // if they also were modified and rebuild nob.c accordingly. For that we have JSL_BUILDER_GO_REBUILD_URSELF_PLUS():
+    // if they also were modified and rebuild nob.c accordingly. For that we have BUILDER_AUTO_BOOTSTRAP_FILES():
     // ```c
     // #define JSL_BUILDER_IMPLEMENTATION
     // #include "nob.h"
@@ -131,11 +139,11 @@
     //
     // int32_t main(int32_t argc, char **argv)
     // {
-    //     JSL_BUILDER_GO_REBUILD_URSELF_PLUS(argc, argv, "foo.c", "bar.c");
+    //     BUILDER_AUTO_BOOTSTRAP_FILES(argc, argv, "foo.c", "bar.c");
     //     // ...
     //     return 0;
     // }
-    #define JSL_BUILDER_GO_REBUILD_URSELF_PLUS(argc, argv, ...) JSL_BUILDER__go_rebuild_urself(argc, argv, __FILE__, __VA_ARGS__, NULL);
+    #define BUILDER_AUTO_BOOTSTRAP_FILES(argc, argv, ...) JSL_BUILDER__go_rebuild_urself(argc, argv, __FILE__, __VA_ARGS__, NULL);
 
 #endif // JSL_BUILDER_H_
 
@@ -222,20 +230,32 @@
     }
 
     // The implementation idea is stolen from https://github.com/zhiayang/nabs
-    void builder__go_rebuild_urself(int32_t argc, char **argv, const char *source_path, ...)
+    void builder__auto_bootstrap(int32_t argc, char **argv, const char *source_path, ...)
     {
-        const char *binary_path = JSL_BUILDER_shift(argv, argc);
+        static JSLImmutableMemory exe_str = JSL_CSTR_INITIALIZER(".exe");
+
+        JSLLibcAllocator allocator;
+        JSLAllocatorInterface alloc_interface;
+
+        jsl_libc_allocator_init(&allocator);
+        jsl_libc_allocator_get_allocator_interface(&allocator, &alloc_interface);
+
+        const char* binary_path_cstr = argv[0];
+        JSLImmutableMemory binary_path = jsl_cstr_to_memory(argv[0]);
+
         #ifdef _WIN32
             // On Windows executables almost always invoked without extension, so
             // it's ./nob, not ./nob.exe. For renaming the extension is a must.
-            if (!JSL_BUILDER_sv_ends_with_cstr(JSL_BUILDER_sv_from_cstr(binary_path), ".exe"))
+            const bool ends_with_exe = jsl_ends_with(binary_path_cstr, exe_str);
+            if (!ends_with_exe)
             {
-                binary_path = JSL_BUILDER_temp_sprintf("%s.exe", binary_path);
+                binary_path = jsl_format(alloc_interface, "%y.exe", binary_path);
             }
         #endif
 
         JSL_BUILDER_File_Paths source_paths = {0};
         JSL_BUILDER_da_append(&source_paths, source_path);
+
         va_list args;
         va_start(args, source_path);
         for (;;)
@@ -243,16 +263,20 @@
             const char *path = va_arg(args, const char *);
             if (path == NULL)
                 break;
+
             JSL_BUILDER_da_append(&source_paths, path);
         }
         va_end(args);
 
-        int32_t rebuild_is_needed = JSL_BUILDER_needs_rebuild(binary_path, source_paths.items, source_paths.count);
+        int32_t rebuild_is_needed = builder_needs_rebuild(binary_path, source_paths.items, source_paths.count);
         if (rebuild_is_needed < 0)
-            exit(1); // error
+        {
+            exit(EXIT_FAILURE);
+        }
+
         if (!rebuild_is_needed)
-        { // no rebuild is needed
-            JSL_BUILDER_FREE(source_paths.items);
+        {
+            jsl_libc_allocator_free_all(&allocator);
             return;
         }
 
@@ -261,20 +285,27 @@
         const char *old_binary_path = JSL_BUILDER_temp_sprintf("%s.old", binary_path);
 
         if (!JSL_BUILDER_rename(binary_path, old_binary_path))
-            exit(1);
+        {
+            exit(EXIT_FAILURE);
+        }
+
         JSL_BUILDER_cmd_append(&cmd, JSL_BUILDER_REBUILD_URSELF(binary_path, source_path));
         JSL_BUILDER_Cmd_Opt opt = {0};
         if (!JSL_BUILDER_cmd_run_opt(&cmd, opt))
         {
             JSL_BUILDER_rename(old_binary_path, binary_path);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
 
         JSL_BUILDER_cmd_append(&cmd, binary_path);
         JSL_BUILDER_da_append_many(&cmd, argv, argc);
+
         if (!JSL_BUILDER_cmd_run_opt(&cmd, opt))
-            exit(1);
-        exit(0);
+        {
+            exit(EXIT_FAILURE);
+        }
+
+        exit(EXIT_SUCCESS);
     }
 
 #endif // JSL_BUILDER_IMPLEMENTATION

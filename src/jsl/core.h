@@ -1158,6 +1158,30 @@ static JSL__FORCE_INLINE JSL__UNUSED int32_t jsl__find_first_set_u64(uint64_t x)
 #define JSL_DEBUG_DONT_OPTIMIZE_AWAY(x) JSL__DONT_OPTIMIZE_AWAY_IMPL(x)
 
 /**
+ * Zero the entirety of the given struct variable. 
+ * 
+ * This is necessary because `{0}` initialization is not reliable. `{0}` and
+ * `memset` to zero are not the same thing. One, `{0}` is allowed to skip
+ * padding bytes, meaning they will have what ever stack garbage happens to be
+ * at that address. This is really annoying when using structs as hash map/set
+ * keys. Two, `{0}` is allowed to only zero the smallest invariant in a union,
+ * meaning if you have a union where one item is 4 bytes and another is 20 bytes
+ * it only has to zero 4 bytes to be spec compliant.
+ * 
+ * This is yet another case of a C "optimization" being incredibly surprising,
+ * bug prone, and difficult to understand. It's best to just avoid `{0}` in
+ * my opinion.
+ * 
+ * Example:
+ * 
+ * ```
+ * MyHashMap hash_map;
+ * JSL_ZERO_STRUCT(hash_map);
+ * ```
+ */
+#define JSL_ZERO_STRUCT(x) JSL_MEMSET(&x, 0, sizeof(x))
+
+/**
  * An enum which signifies the expected lifetime of the given string value when
  * it's used in a container. In most cases, this controls if the container itself
  * will make a copy of the string with its own allocator and take ownership over

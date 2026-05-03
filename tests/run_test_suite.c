@@ -54,6 +54,7 @@
         #define _GNU_SOURCE 1
     #endif
 #endif
+
 #if defined(__FreeBSD__) || defined(__OpenBSD__) || defined(__NetBSD__) || defined(__DragonFly__)
     #ifndef _BSD_SOURCE
         #define _BSD_SOURCE 1
@@ -63,8 +64,8 @@
     #endif
 #endif
 
-#define NOB_IMPLEMENTATION
-#include "../vendor/nob.h"
+#define JSL_BUILDER_IMPLEMENTATION
+#include "../tools/builder/builder.h"
 
 #include <stdint.h>
 #include <stdio.h>
@@ -598,11 +599,35 @@ static int32_t get_logical_processor_count(void)
 
 int32_t main(int32_t argc, char **argv)
 {
-    NOB_GO_REBUILD_URSELF(argc, argv);
 
-    if (!nob_mkdir_if_not_exists("tests/bin")) return 1;
-    if (!nob_mkdir_if_not_exists("tests/arrays")) return 1;
-    if (!nob_mkdir_if_not_exists("tests/hash_maps")) return 1;
+    static JSLImmutableMemory clang_command = JSL_CSTR_INITIALIZER("clang");
+    static JSLImmutableMemory bin_path = JSL_CSTR_INITIALIZER("tests/bin");
+    static JSLImmutableMemory test_array_path = JSL_CSTR_INITIALIZER("tests/arrays");
+    static JSLImmutableMemory test_hash_map_path = JSL_CSTR_INITIALIZER("tests/hash_maps");
+
+    /**
+     *
+     *
+     *                          SETUP
+     *
+     *
+     */
+
+    BUILDER_AUTO_BOOTSTRAP(argc, argv);
+
+    JSLOutputSink stdout_sink = jsl_c_file_output_sink(stdout);
+    JSLOutputSink stderr_sink = jsl_c_file_output_sink(stderr);
+    
+    int32_t last_errno = 0;
+
+    JSLInfiniteArena build_memory;
+    JSLAllocatorInterface build_memory_interface;
+    jsl_infinite_arena_init(&build_memory);
+    jsl_infinite_arena_get_allocator_interface(&build_memory, &build_memory_interface);
+
+    jsl_make_directory(bin_path, NULL);
+    jsl_make_directory(test_array_path, NULL);
+    jsl_make_directory(test_hash_map_path, NULL);
 
     /**
      *
@@ -613,22 +638,22 @@ int32_t main(int32_t argc, char **argv)
      */
 
     {
-        nob_log(NOB_INFO, "Compiling embed program");
+        jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Compiling embed program"));
 
         #if JSL_IS_WINDOWS
-            char generate_array_exe_name[256] = "tests\\bin\\embed.exe";
-            char generate_array_run_exe_command[256] = ".\\tests\\bin\\embed.exe";
+            char embed_exe_name[256] = "tests\\bin\\embed.exe";
         #elif JSL_IS_POSIX
-            char generate_array_exe_name[256] = "tests/bin/embed";
-            char generate_array_run_exe_command[256] = "./tests/bin/embed";
+            char embed_exe_name[256] = "tests/bin/embed";
         #else
             #error "Unrecognized platform. Only windows and POSIX platforms are supported."
         #endif
 
-        Nob_Cmd embed_compile_command = {0};
-        nob_cmd_append(
+        JSLSubprocess embed_compile_command;
+        JSL_ZERO_STRUCT(embed_compile_command);
+
+        jsl_subprocess_create(&embed_compile_command, build_memory_interface, clang_command);
+        jsl_subprocess_arg_cstr(
             &embed_compile_command,
-            "clang",
             "-DJSL_DEBUG",
             "-fno-omit-frame-pointer",
             "-fno-optimize-sibling-calls",
@@ -644,17 +669,22 @@ int32_t main(int32_t argc, char **argv)
             if (flag == NULL)
                 break;
 
-            nob_cmd_append(&embed_compile_command, flag);
+            jsl_subprocess_arg_cstr(&embed_compile_command, flag);
         }
 
-        nob_cmd_append(
+        jsl_subprocess_arg_cstr(
             &embed_compile_command,
-            "-o", generate_array_exe_name,
+            "-o", embed_exe_name,
             "-Isrc/",
             "tools/embed/embed.c"
         );
 
-        if (!nob_cmd_run(&embed_compile_command)) return 1;
+        JSLSubProcessResultEnum run_res = jsl_subprocess_run_blocking(build_memory_interface, &embed_compile_command, 1, &last_errno);
+        if (run_res != JSL_SUBPROCESS_SUCCESS)
+        {
+            jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Building embed program failed with exit code %d errno %d"), run_res, last_errno);
+            return EXIT_FAILURE;
+        }
     }
 
     /**
@@ -666,7 +696,7 @@ int32_t main(int32_t argc, char **argv)
      */
 
     {
-        nob_log(NOB_INFO, "Compiling subprocess test helper program");
+        jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Compiling subprocess test helper program"));
 
         #if JSL_IS_WINDOWS
             char helper_exe_name[256] = "tests\\bin\\subprocess_helper.exe";
@@ -676,10 +706,10 @@ int32_t main(int32_t argc, char **argv)
             #error "Unrecognized platform. Only windows and POSIX platforms are supported."
         #endif
 
-        Nob_Cmd helper_compile_command = {0};
-        nob_cmd_append(
+        JSLSubprocess helper_compile_command = {0};
+        jsl_subprocess_create(&helper_compile_command, build_memory_interface, clang_command);
+        jsl_subprocess_arg_cstr(
             &helper_compile_command,
-            "clang",
             "-O0",
             "-glldb",
             "-std=c11",
@@ -687,7 +717,12 @@ int32_t main(int32_t argc, char **argv)
             "tests/subprocess_helper.c"
         );
 
-        if (!nob_cmd_run(&helper_compile_command)) return 1;
+        JSLSubProcessResultEnum run_res = jsl_subprocess_run_blocking(build_memory_interface, &helper_compile_command, 1, &last_errno);
+        if (run_res != JSL_SUBPROCESS_SUCCESS)
+        {
+            jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Building subprocess test program failed with exit code %d errno %d"), run_res, last_errno);
+            return EXIT_FAILURE;
+        }
     }
 
     /**
@@ -699,22 +734,24 @@ int32_t main(int32_t argc, char **argv)
      */
 
     {
-        nob_log(NOB_INFO, "Compiling generate array program");
+        jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Compiling generate array program"));
 
         #if JSL_IS_WINDOWS
             char generate_array_exe_name[256] = "tests\\bin\\generate_array.exe";
-            char generate_array_run_exe_command[256] = ".\\tests\\bin\\generate_array.exe";
+            static JSLImmutableMemory generate_array_run_exe_command = JSL_CSTR_INITIALIZER(".\\tests\\bin\\generate_array.exe");
         #elif JSL_IS_POSIX
             char generate_array_exe_name[256] = "tests/bin/generate_array";
-            char generate_array_run_exe_command[256] = "./tests/bin/generate_array";
+            static JSLImmutableMemory generate_array_run_exe_command = JSL_CSTR_INITIALIZER("./tests/bin/generate_array");
         #else
             #error "Unrecognized platform. Only windows and POSIX platforms are supported."
         #endif
 
-        Nob_Cmd generate_array_compile_command = {0};
-        nob_cmd_append(
+        JSLSubprocess generate_array_compile_command;
+        JSL_ZERO_STRUCT(generate_array_compile_command);
+
+        jsl_subprocess_create(&generate_array_compile_command, build_memory_interface, clang_command);
+        jsl_subprocess_arg_cstr(
             &generate_array_compile_command,
-            "clang",
             "-DJSL_DEBUG",
             "-fno-omit-frame-pointer",
             "-fno-optimize-sibling-calls",
@@ -730,41 +767,53 @@ int32_t main(int32_t argc, char **argv)
             if (flag == NULL)
                 break;
 
-            nob_cmd_append(&generate_array_compile_command, flag);
+            jsl_subprocess_arg_cstr(&generate_array_compile_command, flag);
         }
 
-        nob_cmd_append(
+        jsl_subprocess_arg_cstr(
             &generate_array_compile_command,
             "-o", generate_array_exe_name,
             "-Isrc/",
             "tools/generate_array/generate_array.c"
         );
 
-        if (!nob_cmd_run(&generate_array_compile_command)) return 1;
+        JSLSubProcessResultEnum run_res = jsl_subprocess_run_blocking(build_memory_interface, &generate_array_compile_command, 1, NULL);
+        if (run_res != JSL_SUBPROCESS_SUCCESS)
+        {
+            jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Building array generation program failed with exit code %d errno %d"), run_res, last_errno);
+            return EXIT_FAILURE;
+        }
 
         int32_t array_test_count = sizeof(array_declarations) / sizeof(ArrayDecl);
 
-        nob_log(NOB_INFO, "Generating Array Files");
+        jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Generating Array Files"));
 
-        Nob_Procs array_procs = {0};
+        int64_t array_procs_length = array_test_count * 2;
+        JSLSubprocess* array_procs = jsl_allocator_interface_alloc(
+            build_memory_interface,
+            sizeof(JSLSubprocess) * array_procs_length,
+            JSL_DEFAULT_ALLOCATION_ALIGNMENT,
+            true
+        );
 
-        for (int32_t i = 0; i < array_test_count; ++i)
+        int32_t array_decl_idx = 0;
+        int32_t array_proc_idx = 0;
+
+        while (array_decl_idx < array_test_count)
         {
-            ArrayDecl* decl = &array_declarations[i];
+            ArrayDecl* decl = &array_declarations[array_decl_idx];
 
-            Nob_Cmd write_array_header = {0};
-            nob_cmd_append(
-                &write_array_header,
-                generate_array_run_exe_command,
+            JSLSubprocess* write_array_header = &array_procs[array_proc_idx];
+            jsl_subprocess_create(write_array_header, build_memory_interface, generate_array_run_exe_command);
+            ++array_proc_idx;
+
+            jsl_subprocess_arg_cstr(
+                write_array_header,
                 "--name", decl->name,
                 "--function-prefix", decl->prefix,
                 "--value-type", decl->value_type,
                 decl->impl_type,
-                "--header"
-            );
-
-            nob_cmd_append(
-                &write_array_header,
+                "--header",
                 "--add-header",
                 "../test_hash_map_types.h"
             );
@@ -773,16 +822,12 @@ int32_t main(int32_t argc, char **argv)
             strcat(out_path_header, decl->prefix);
             strcat(out_path_header, ".h");
 
-            if (!nob_cmd_run(
-                &write_array_header,
-                .stdout_path = out_path_header,
-                .async = &array_procs
-            )) return 1;
+            JSLSubprocess* write_array_source = &array_procs[array_proc_idx];
+            jsl_subprocess_create(write_array_source, build_memory_interface, generate_array_run_exe_command);
+            ++array_proc_idx;
 
-            Nob_Cmd write_array_source = {0};
-            nob_cmd_append(
+            jsl_subprocess_arg_cstr(
                 &write_array_source,
-                generate_array_run_exe_command,
                 "--name", decl->name,
                 "--function-prefix", decl->prefix,
                 "--value-type", decl->value_type,
@@ -794,12 +839,12 @@ int32_t main(int32_t argc, char **argv)
             strcat(header_name, decl->prefix);
             strcat(header_name, ".h");
 
-            nob_cmd_append(
+            jsl_subprocess_arg_cstr(
                 &write_array_source,
                 "--add-header",
                 "../test_hash_map_types.h"
             );
-            nob_cmd_append(
+            jsl_subprocess_arg_cstr(
                 &write_array_source,
                 "--add-header",
                 header_name
@@ -809,15 +854,15 @@ int32_t main(int32_t argc, char **argv)
             strcat(out_path_source, decl->prefix);
             strcat(out_path_source, ".c");
 
-            if (!nob_cmd_run(
-                &write_array_source,
-                .stdout_path = out_path_source,
-                .async = &array_procs
-            )) return 1;
+            ++array_decl_idx;
         }
 
-        if (!nob_procs_wait(array_procs)) return 1;
-        nob_da_free(array_procs);
+        JSLSubProcessResultEnum run_res = jsl_subprocess_run_blocking(build_memory_interface, array_procs, array_procs_length, &last_errno);
+        if (run_res != JSL_SUBPROCESS_SUCCESS)
+        {
+            jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Generating arrays failed with exit code %d errno %d"), run_res, last_errno);
+            return EXIT_FAILURE;
+        }
     }
 
     /**
