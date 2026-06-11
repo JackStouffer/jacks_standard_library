@@ -73,7 +73,7 @@ static bool make_helper(
 )
 {
     JSLAllocatorInterface iface = test_libc_allocator_interface(backing);
-    JSLSubProcessCreateResultEnum r = jsl_subprocess_create(
+    JSLSubProcessCreateResultEnum r = jsl_subprocess_init(
         proc,
         iface,
         jsl_cstr_to_memory(HELPER_PATH)
@@ -88,19 +88,19 @@ void test_jsl_subprocess_create_bad_parameters(void)
 
     JSLSubprocess proc;
     // NULL proc
-    JSLSubProcessCreateResultEnum r = jsl_subprocess_create(
+    JSLSubProcessCreateResultEnum r = jsl_subprocess_init(
         NULL, iface, jsl_cstr_to_memory("a")
     );
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_CREATE_BAD_PARAMETERS);
 
     // NULL executable data
     JSLImmutableMemory empty = { NULL, 0 };
-    r = jsl_subprocess_create(&proc, iface, empty);
+    r = jsl_subprocess_init(&proc, iface, empty);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_CREATE_BAD_PARAMETERS);
 
     // Zero length executable
     JSLImmutableMemory zero = { (const uint8_t*) "x", 0 };
-    r = jsl_subprocess_create(&proc, iface, zero);
+    r = jsl_subprocess_init(&proc, iface, zero);
     TEST_INT32_EQUAL(r, JSL_SUBPROCESS_CREATE_BAD_PARAMETERS);
 
     jsl_libc_allocator_free_all(&backing);
@@ -377,7 +377,7 @@ void test_jsl_subprocess_run_blocking_spawn_failed(void)
     JSLAllocatorInterface iface = test_libc_allocator_interface(&backing);
 
     JSLSubprocess proc;
-    JSLSubProcessCreateResultEnum cr = jsl_subprocess_create(
+    JSLSubProcessCreateResultEnum cr = jsl_subprocess_init(
         &proc,
         iface,
         jsl_cstr_to_memory("./tests/bin/definitely_not_a_real_binary_xyz")
@@ -1120,7 +1120,7 @@ void test_jsl_subprocess_run_blocking_working_directory(void)
     #endif
 
     JSLSubprocess proc;
-    JSLSubProcessCreateResultEnum cr = jsl_subprocess_create(
+    JSLSubProcessCreateResultEnum cr = jsl_subprocess_init(
         &proc, iface, jsl_cstr_to_memory(abs_helper)
     );
     TEST_INT32_EQUAL(cr, JSL_SUBPROCESS_CREATE_SUCCESS);
@@ -1726,7 +1726,7 @@ void test_jsl_subprocess_run_blocking_multi_partial_spawn_failure(void)
     // procs[1]: bogus path — spawn (or exec) fails
     ifaces[1] = test_libc_allocator_interface(&backing[1]);
     TEST_INT32_EQUAL(
-        jsl_subprocess_create(
+        jsl_subprocess_init(
             &procs[1],
             ifaces[1],
             jsl_cstr_to_memory("./tests/bin/definitely_not_a_real_binary_xyz")
@@ -2154,7 +2154,7 @@ void test_jsl_subprocess_run_blocking_options_spawn_failure_backfill(void)
 
     ifaces[1] = test_libc_allocator_interface(&backing[1]);
     TEST_INT32_EQUAL(
-        jsl_subprocess_create(
+        jsl_subprocess_init(
             &procs[1],
             ifaces[1],
             jsl_cstr_to_memory("./tests/bin/definitely_not_a_real_binary_xyz")

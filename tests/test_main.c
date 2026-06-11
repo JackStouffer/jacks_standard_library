@@ -438,8 +438,8 @@ int main(void)
     //              Test Subprocess
     //
 
-    RUN_TEST_FUNCTION("Test jsl_subprocess_create bad parameters", test_jsl_subprocess_create_bad_parameters);
-    RUN_TEST_FUNCTION("Test jsl_subprocess_create success", test_jsl_subprocess_create_success);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_init bad parameters", test_jsl_subprocess_create_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_init success", test_jsl_subprocess_create_success);
     RUN_TEST_FUNCTION("Test jsl_subprocess_args bad parameters", test_jsl_subprocess_args_bad_parameters);
     RUN_TEST_FUNCTION("Test jsl_subprocess_arg macro", test_jsl_subprocess_arg_macro);
     RUN_TEST_FUNCTION("Test jsl_subprocess_arg_cstr macro", test_jsl_subprocess_arg_cstr_macro);

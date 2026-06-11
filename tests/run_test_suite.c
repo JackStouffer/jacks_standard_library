@@ -599,7 +599,6 @@ static int32_t get_logical_processor_count(void)
 
 int32_t main(int32_t argc, char **argv)
 {
-
     static JSLImmutableMemory clang_command = JSL_CSTR_INITIALIZER("clang");
     static JSLImmutableMemory bin_path = JSL_CSTR_INITIALIZER("tests/bin");
     static JSLImmutableMemory test_array_path = JSL_CSTR_INITIALIZER("tests/arrays");
@@ -623,11 +622,14 @@ int32_t main(int32_t argc, char **argv)
     JSLInfiniteArena build_memory;
     JSLAllocatorInterface build_memory_interface;
     jsl_infinite_arena_init(&build_memory);
-    jsl_infinite_arena_get_allocator_interface(&build_memory, &build_memory_interface);
+    jsl_infinite_arena_get_allocator_interface(&build_memory_interface, &build_memory);
 
     jsl_make_directory(bin_path, NULL);
     jsl_make_directory(test_array_path, NULL);
     jsl_make_directory(test_hash_map_path, NULL);
+
+    int32_t max_parallelism = JSL_MAX(jsl_get_logical_processor_count(NULL), 1);
+    jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Running with %d max parallel processes"), max_parallelism);
 
     /**
      *
@@ -651,7 +653,7 @@ int32_t main(int32_t argc, char **argv)
         JSLSubprocess embed_compile_command;
         JSL_ZERO_STRUCT(embed_compile_command);
 
-        jsl_subprocess_create(&embed_compile_command, build_memory_interface, clang_command);
+        jsl_subprocess_init(&embed_compile_command, build_memory_interface, clang_command);
         jsl_subprocess_arg_cstr(
             &embed_compile_command,
             "-DJSL_DEBUG",
@@ -679,7 +681,16 @@ int32_t main(int32_t argc, char **argv)
             "tools/embed/embed.c"
         );
 
-        JSLSubProcessResultEnum run_res = jsl_subprocess_run_blocking(build_memory_interface, &embed_compile_command, 1, &last_errno);
+        jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("CMD: "));
+        jsl_subprocess_debug_print_command(&embed_compile_command, stdout_sink);
+        jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("\n"));
+
+        JSLSubProcessResultEnum run_res = jsl_subprocess_run_blocking(
+            &embed_compile_command,
+            1,
+            build_memory_interface,
+            &last_errno
+        );
         if (run_res != JSL_SUBPROCESS_SUCCESS)
         {
             jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Building embed program failed with exit code %d errno %d"), run_res, last_errno);
@@ -707,7 +718,7 @@ int32_t main(int32_t argc, char **argv)
         #endif
 
         JSLSubprocess helper_compile_command = {0};
-        jsl_subprocess_create(&helper_compile_command, build_memory_interface, clang_command);
+        jsl_subprocess_init(&helper_compile_command, build_memory_interface, clang_command);
         jsl_subprocess_arg_cstr(
             &helper_compile_command,
             "-O0",
@@ -717,7 +728,12 @@ int32_t main(int32_t argc, char **argv)
             "tests/subprocess_helper.c"
         );
 
-        JSLSubProcessResultEnum run_res = jsl_subprocess_run_blocking(build_memory_interface, &helper_compile_command, 1, &last_errno);
+        JSLSubProcessResultEnum run_res = jsl_subprocess_run_blocking(
+            &helper_compile_command,
+            1,
+            build_memory_interface,
+            &last_errno
+        );
         if (run_res != JSL_SUBPROCESS_SUCCESS)
         {
             jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Building subprocess test program failed with exit code %d errno %d"), run_res, last_errno);
@@ -749,7 +765,7 @@ int32_t main(int32_t argc, char **argv)
         JSLSubprocess generate_array_compile_command;
         JSL_ZERO_STRUCT(generate_array_compile_command);
 
-        jsl_subprocess_create(&generate_array_compile_command, build_memory_interface, clang_command);
+        jsl_subprocess_init(&generate_array_compile_command, build_memory_interface, clang_command);
         jsl_subprocess_arg_cstr(
             &generate_array_compile_command,
             "-DJSL_DEBUG",
@@ -777,7 +793,12 @@ int32_t main(int32_t argc, char **argv)
             "tools/generate_array/generate_array.c"
         );
 
-        JSLSubProcessResultEnum run_res = jsl_subprocess_run_blocking(build_memory_interface, &generate_array_compile_command, 1, NULL);
+        JSLSubProcessResultEnum run_res = jsl_subprocess_run_blocking(
+            &generate_array_compile_command,
+            1,
+            build_memory_interface,
+            NULL
+        );
         if (run_res != JSL_SUBPROCESS_SUCCESS)
         {
             jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Building array generation program failed with exit code %d errno %d"), run_res, last_errno);
@@ -804,7 +825,7 @@ int32_t main(int32_t argc, char **argv)
             ArrayDecl* decl = &array_declarations[array_decl_idx];
 
             JSLSubprocess* write_array_header = &array_procs[array_proc_idx];
-            jsl_subprocess_create(write_array_header, build_memory_interface, generate_array_run_exe_command);
+            jsl_subprocess_init(write_array_header, build_memory_interface, generate_array_run_exe_command);
             ++array_proc_idx;
 
             jsl_subprocess_arg_cstr(
@@ -823,11 +844,15 @@ int32_t main(int32_t argc, char **argv)
             strcat(out_path_header, ".h");
 
             JSLSubprocess* write_array_source = &array_procs[array_proc_idx];
-            jsl_subprocess_create(write_array_source, build_memory_interface, generate_array_run_exe_command);
+            jsl_subprocess_init(
+                write_array_source,
+                build_memory_interface,
+                generate_array_run_exe_command
+            );
             ++array_proc_idx;
 
             jsl_subprocess_arg_cstr(
-                &write_array_source,
+                write_array_source,
                 "--name", decl->name,
                 "--function-prefix", decl->prefix,
                 "--value-type", decl->value_type,
@@ -840,12 +865,12 @@ int32_t main(int32_t argc, char **argv)
             strcat(header_name, ".h");
 
             jsl_subprocess_arg_cstr(
-                &write_array_source,
+                write_array_source,
                 "--add-header",
                 "../test_hash_map_types.h"
             );
             jsl_subprocess_arg_cstr(
-                &write_array_source,
+                write_array_source,
                 "--add-header",
                 header_name
             );
@@ -857,7 +882,12 @@ int32_t main(int32_t argc, char **argv)
             ++array_decl_idx;
         }
 
-        JSLSubProcessResultEnum run_res = jsl_subprocess_run_blocking(build_memory_interface, array_procs, array_procs_length, &last_errno);
+        JSLSubProcessResultEnum run_res = jsl_subprocess_run_blocking(
+            array_procs,
+            array_procs_length,
+            build_memory_interface,
+            &last_errno
+        );
         if (run_res != JSL_SUBPROCESS_SUCCESS)
         {
             jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Generating arrays failed with exit code %d errno %d"), run_res, last_errno);
@@ -874,22 +904,24 @@ int32_t main(int32_t argc, char **argv)
      */
 
     {
-        nob_log(NOB_INFO, "Compiling generate hash map program");
+        jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Compiling generate hash map program"));
 
         #if JSL_IS_WINDOWS
             char generate_hash_map_exe_name[256] = "tests\\bin\\generate_hash_map.exe";
-            char generate_hash_map_run_exe_command[256] = ".\\tests\\bin\\generate_hash_map.exe";
+            static JSLImmutableMemory generate_hash_map_run_exe_command = JSL_CSTR_INITIALIZER(".\\tests\\bin\\generate_hash_map.exe");
         #elif JSL_IS_POSIX
             char generate_hash_map_exe_name[256] = "tests/bin/generate_hash_map";
-            char generate_hash_map_run_exe_command[256] = "./tests/bin/generate_hash_map";
+            static JSLImmutableMemory generate_hash_map_run_exe_command = JSL_CSTR_INITIALIZER("./tests/bin/generate_hash_map");
         #else
             #error "Unrecognized platform. Only windows and POSIX platforms are supported."
         #endif
 
-        Nob_Cmd generate_hash_map_compile_command = {0};
-        nob_cmd_append(
+        JSLSubprocess generate_hash_map_compile_command;
+        JSL_ZERO_STRUCT(generate_hash_map_compile_command);
+
+        jsl_subprocess_init(&generate_hash_map_compile_command, build_memory_interface, clang_command);
+        jsl_subprocess_arg_cstr(
             &generate_hash_map_compile_command,
-            "clang",
             "-DJSL_DEBUG",
             "-fno-omit-frame-pointer",
             "-fno-optimize-sibling-calls",
@@ -905,34 +937,58 @@ int32_t main(int32_t argc, char **argv)
             if (flag == NULL)
                 break;
 
-            nob_cmd_append(&generate_hash_map_compile_command, flag);
+            jsl_subprocess_arg_cstr(&generate_hash_map_compile_command, flag);
         }
 
-        nob_cmd_append(
+        jsl_subprocess_arg_cstr(
             &generate_hash_map_compile_command,
             "-o", generate_hash_map_exe_name,
             "-Isrc/",
             "tools/generate_hash_map/generate_hash_map.c"
         );
 
-        if (!nob_cmd_run(&generate_hash_map_compile_command)) return 1;
+        JSLSubProcessResultEnum run_compile_res = jsl_subprocess_run_blocking(
+            &generate_hash_map_compile_command,
+            1,
+            build_memory_interface,
+            &last_errno
+        );
+        if (run_compile_res != JSL_SUBPROCESS_SUCCESS)
+        {
+            jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Building hash map generation program failed with exit code %d errno %d"), run_compile_res, last_errno);
+            return EXIT_FAILURE;
+        }
+
+        printf("Generating Hash Map Files\n");
 
         int32_t hash_map_test_count = sizeof(hash_map_declarations) / sizeof(HashMapDecl);
+        int32_t hash_map_procs_length = hash_map_test_count * 2;
+        JSLSubprocess* hash_map_procs = jsl_allocator_interface_alloc(
+            build_memory_interface,
+            sizeof(JSLSubprocess) * hash_map_procs_length,
+            JSL_DEFAULT_ALLOCATION_ALIGNMENT,
+            true
+        );
 
-        nob_log(NOB_INFO, "Generating Hash Map Files");
+        int32_t hash_decl_idx = 0;
+        int32_t hash_proc_idx = 0;
 
-        Nob_Procs hash_map_procs = {0};
-
-        for (int32_t i = 0; i < hash_map_test_count; ++i)
+        while (hash_decl_idx < hash_map_test_count)
         {
             HashMapDecl* decl = &hash_map_declarations[i];
+            JSLSubprocess* write_hash_map_header = &hash_map_procs[hash_proc_idx];
+            ++hash_proc_idx;
 
-            Nob_Cmd write_hash_map_header = {0};
+            jsl_subprocess_init(
+                write_hash_map_header,
+                build_memory_interface,
+                generate_hash_map_run_exe_command
+            );
 
             if (decl->key_is_str)
-                nob_cmd_append(
-                    &write_hash_map_header,
-                    generate_hash_map_run_exe_command,
+            {
+                jsl_subprocess_arg_cstr(
+                    write_hash_map_header,
                     "--name", decl->name,
                     "--function-prefix", decl->prefix,
                     "--key-is-string",
@@ -940,10 +996,11 @@ int32_t main(int32_t argc, char **argv)
                     decl->impl_type,
                     "--header"
                 );
+            }
             else if (decl->value_is_str)
-                nob_cmd_append(
+            {
+                jsl_subprocess_arg_cstr(
                     &write_hash_map_header,
-                    generate_hash_map_run_exe_command,
                     "--name", decl->name,
                     "--function-prefix", decl->prefix,
                     "--key-type", decl->key_type,
@@ -951,10 +1008,11 @@ int32_t main(int32_t argc, char **argv)
                     decl->impl_type,
                     "--header"
                 );
+            }
             else
-                nob_cmd_append(
+            {
+                jsl_subprocess_arg_cstr(
                     &write_hash_map_header,
-                    generate_hash_map_run_exe_command,
                     "--name", decl->name,
                     "--function-prefix", decl->prefix,
                     "--key-type", decl->key_type,
@@ -962,15 +1020,16 @@ int32_t main(int32_t argc, char **argv)
                     decl->impl_type,
                     "--header"
                 );
+            }
 
-            for (int32_t header_idx = 0;;++header_idx)
+            for (int32_t header_idx = 0;; ++header_idx)
             {
                 if (decl->headers == NULL)
                     break;
                 if (decl->headers[header_idx] == NULL)
                     break;
 
-                nob_cmd_append(
+                jsl_subprocess_arg_cstr(
                     &write_hash_map_header,
                     "--add-header",
                     decl->headers[header_idx]
@@ -980,6 +1039,12 @@ int32_t main(int32_t argc, char **argv)
             char out_path_header[256] = "tests/hash_maps/";
             strcat(out_path_header, decl->prefix);
             strcat(out_path_header, ".h");
+            FILE* header_out = fopen(out_path_header, "wb");
+
+            jsl_subprocess_set_stdout_sink(
+                &write_hash_map_header,
+                jsl_string_builder_output_sink(&stdout_sb)
+            );
 
             if (!nob_cmd_run(
                 &write_hash_map_header,
@@ -1041,15 +1106,19 @@ int32_t main(int32_t argc, char **argv)
             strcat(out_path_source, decl->prefix);
             strcat(out_path_source, ".c");
 
-            if (!nob_cmd_run(
-                &write_hash_map_source,
-                .stdout_path = out_path_source,
-                .async = &hash_map_procs
-            )) return 1;
         }
 
-        if (!nob_procs_wait(hash_map_procs)) return 1;
-        nob_da_free(hash_map_procs);
+        JSLSubProcessResultEnum run_res = jsl_subprocess_run_blocking(
+            hash_map_procs,
+            hash_map_procs_length,
+            build_memory_interface,
+            &last_errno
+        );
+        if (run_res != JSL_SUBPROCESS_SUCCESS)
+        {
+            jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Generating hash maps failed with exit code %d errno %d"), run_res, last_errno);
+            return EXIT_FAILURE;
+        }
     }
     
 

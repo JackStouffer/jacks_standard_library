@@ -307,7 +307,7 @@ typedef enum {
 * @param out_os_error_code Pointer where an error code will be stored when applicable. Can be null
 * @returns An enum which denotes success or failure
 */
-JSL_WARN_UNUSED JSLGetFileSizeResultEnum jsl_get_file_size(
+JSLGetFileSizeResultEnum jsl_get_file_size(
     JSLImmutableMemory path,
     int64_t* out_size,
     int32_t* out_os_error_code
@@ -323,7 +323,7 @@ JSL_WARN_UNUSED JSLGetFileSizeResultEnum jsl_get_file_size(
 * @param out_errno Optional pointer that receives the system errno on failure
 * @returns A result enum describing the outcome
 */
-JSL_WARN_UNUSED JSL_DEF JSLMakeDirectoryResultEnum jsl_make_directory(
+JSL_DEF JSLMakeDirectoryResultEnum jsl_make_directory(
     JSLImmutableMemory path,
     int32_t* out_errno
 );
@@ -342,7 +342,7 @@ JSL_WARN_UNUSED JSL_DEF JSLMakeDirectoryResultEnum jsl_make_directory(
 * @param out_errno Optional pointer that receives the system errno on failure
 * @returns A result enum describing the outcome
 */
-JSL_WARN_UNUSED JSL_DEF JSLDeleteFileResultEnum jsl_delete_file(
+JSL_DEF JSLDeleteFileResultEnum jsl_delete_file(
     JSLImmutableMemory path,
     int32_t* out_errno
 );
@@ -363,7 +363,7 @@ JSL_WARN_UNUSED JSL_DEF JSLDeleteFileResultEnum jsl_delete_file(
 * @param out_errno Optional pointer that receives a system error code on failure
 * @returns A result enum describing the outcome
 */
-JSL_WARN_UNUSED JSL_DEF JSLDeleteDirectoryResultEnum jsl_delete_directory(
+JSL_DEF JSLDeleteDirectoryResultEnum jsl_delete_directory(
     JSLImmutableMemory path,
     int32_t* out_errno
 );
@@ -385,7 +385,7 @@ JSL_WARN_UNUSED JSL_DEF JSLDeleteDirectoryResultEnum jsl_delete_directory(
 * @param path The file system path
 * @returns A `JSLFileTypeEnum` value describing the entry type
 */
-JSL_WARN_UNUSED JSLFileTypeEnum jsl_get_file_type(JSLImmutableMemory path);
+JSLFileTypeEnum jsl_get_file_type(JSLImmutableMemory path);
 
 /**
     * Load the contents of the file at `path` into a newly allocated buffer
@@ -393,7 +393,7 @@ JSL_WARN_UNUSED JSLFileTypeEnum jsl_get_file_type(JSLImmutableMemory path);
     *
     * If the arena does not have enough space,
     */
-JSL_WARN_UNUSED JSL_DEF JSLLoadFileResultEnum jsl_load_file_contents(
+JSL_DEF JSLLoadFileResultEnum jsl_load_file_contents(
     JSLAllocatorInterface allocator,
     JSLImmutableMemory path,
     JSLImmutableMemory* out_contents,
@@ -413,7 +413,7 @@ JSL_WARN_UNUSED JSL_DEF JSLLoadFileResultEnum jsl_load_file_contents(
 * @param out_errno A pointer which will be written to with the errno on failure
 * @returns An enum which represents the result
 */
-JSL_WARN_UNUSED JSL_DEF JSLLoadFileResultEnum jsl_load_file_contents_buffer(
+JSL_DEF JSLLoadFileResultEnum jsl_load_file_contents_buffer(
     JSLMutableMemory* buffer,
     JSLImmutableMemory path,
     int32_t* out_errno
@@ -433,7 +433,7 @@ JSL_WARN_UNUSED JSL_DEF JSLLoadFileResultEnum jsl_load_file_contents_buffer(
 * @param out_errno Optional pointer that receives the system errno on failure
 * @returns A result enum describing the write outcome
 */
-JSL_WARN_UNUSED JSL_DEF JSLWriteFileResultEnum jsl_write_file_contents(
+JSL_DEF JSLWriteFileResultEnum jsl_write_file_contents(
     JSLImmutableMemory contents,
     JSLImmutableMemory path,
     int64_t* bytes_written,
@@ -602,7 +602,7 @@ typedef struct JSLDirectoryIterator
 * @param follow_symlinks Whether to follow symbolic links into directories
 * @returns A result enum describing the outcome of the init step
 */
-JSL_WARN_UNUSED JSL_DEF JSLDirectoryIteratorInitResultEnum jsl_directory_iterator_init(
+JSL_DEF JSLDirectoryIteratorInitResultEnum jsl_directory_iterator_init(
     JSLImmutableMemory path,
     JSLDirectoryIterator* iterator,
     bool follow_symlinks
@@ -629,7 +629,7 @@ JSL_WARN_UNUSED JSL_DEF JSLDirectoryIteratorInitResultEnum jsl_directory_iterato
 *                  failure code is reported on this entry
 * @returns `true` if a new entry was produced, `false` when iteration is done
 */
-JSL_WARN_UNUSED JSL_DEF bool jsl_directory_iterator_next(
+JSL_DEF bool jsl_directory_iterator_next(
     JSLDirectoryIterator* iterator,
     JSLDirectoryIteratorResult* result,
     int32_t* out_errno
@@ -665,7 +665,7 @@ JSL_DEF void jsl_directory_iterator_end(JSLDirectoryIterator* iterator);
  * @param out_errno Optional pointer that receives the system error code on failure
  * @returns A result enum describing the outcome
  */
-JSL_WARN_UNUSED JSL_DEF JSLCopyFileResultEnum jsl_copy_file(
+JSL_DEF JSLCopyFileResultEnum jsl_copy_file(
     JSLImmutableMemory src_path,
     JSLImmutableMemory dst_path,
     int32_t* out_errno
@@ -717,7 +717,7 @@ typedef enum
  * @param out_errno Optional pointer that receives the system error code on failure
  * @returns A result enum describing the outcome
  */
-JSL_WARN_UNUSED JSL_DEF JSLRenameFileResultEnum jsl_rename_file(
+JSL_DEF JSLRenameFileResultEnum jsl_rename_file(
     JSLImmutableMemory src_path,
     JSLImmutableMemory dst_path,
     int32_t* out_errno
@@ -774,14 +774,14 @@ typedef enum
  * @param out_errno Optional pointer that receives the system error code on failure
  * @returns A result enum describing the outcome
  */
-JSL_WARN_UNUSED JSL_DEF JSLCopyDirectoryResultEnum jsl_copy_directory(
+JSL_DEF JSLCopyDirectoryResultEnum jsl_copy_directory(
     JSLImmutableMemory src_path,
     JSLImmutableMemory dst_path,
     int32_t* out_errno
 );
 
 /**
- * Result codes for `jsl_subprocess_create`.
+ * Result codes for `jsl_subprocess_init`.
  */
 typedef enum
 {
@@ -905,7 +905,7 @@ typedef struct JSLSubProcessEnvVar
 /**
 * Lifecycle status for a `JSLSubprocess`.
 *
-* `NOT_STARTED` is the state immediately after `jsl_subprocess_create`.
+* `NOT_STARTED` is the state immediately after `jsl_subprocess_init`.
 * `RUNNING` is set while a child is alive — during
 * `jsl_subprocess_run_blocking`'s wait loop, or after
 * `jsl_subprocess_background_start` returns and before the child is
@@ -931,7 +931,7 @@ typedef enum
 * Handle for a subprocess that has been configured but not yet started.
 *
 * Allocate one of these on the stack and pass a pointer to
-* `jsl_subprocess_create`. After creation, use `jsl_subprocess_arg` and
+* `jsl_subprocess_init`. After creation, use `jsl_subprocess_arg` and
 * `jsl_subprocess_set_env` to configure command-line arguments and environment
 * variables before running.
 *
@@ -1044,7 +1044,7 @@ typedef struct JSLSubprocess
 * @param executable Path or name of the executable to run
 * @returns A result enum describing the outcome
 */
-JSL_WARN_UNUSED JSL_DEF JSLSubProcessCreateResultEnum jsl_subprocess_create(
+JSL_DEF JSLSubProcessCreateResultEnum jsl_subprocess_init(
     JSLSubprocess* proc,
     JSLAllocatorInterface allocator,
     JSLImmutableMemory executable
@@ -1066,7 +1066,7 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessCreateResultEnum jsl_subprocess_create(
 * @param count Number of elements in `args`
 * @returns A result enum describing the outcome
 */
-JSL_WARN_UNUSED JSL_DEF JSLSubProcessArgResultEnum jsl_subprocess_args(
+JSL_DEF JSLSubProcessArgResultEnum jsl_subprocess_args(
     JSLSubprocess* proc,
     const JSLImmutableMemory* args,
     int64_t count
@@ -1157,7 +1157,7 @@ JSLSubProcessArgResultEnum jsl__subprocess_args_cstr_va(
 * @param value Environment variable value
 * @returns A result enum describing the outcome
 */
-JSL_WARN_UNUSED JSL_DEF JSLSubProcessEnvResultEnum jsl_subprocess_set_env(
+JSL_DEF JSLSubProcessEnvResultEnum jsl_subprocess_set_env(
     JSLSubprocess* proc,
     JSLImmutableMemory key,
     JSLImmutableMemory value
@@ -1181,7 +1181,7 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessEnvResultEnum jsl_subprocess_set_env(
 * @param key   Environment variable name to remove from the child env
 * @returns A result enum describing the outcome
 */
-JSL_WARN_UNUSED JSL_DEF JSLSubProcessEnvResultEnum jsl_subprocess_unset_env(
+JSL_DEF JSLSubProcessEnvResultEnum jsl_subprocess_unset_env(
     JSLSubprocess* proc,
     JSLImmutableMemory key
 );
@@ -1190,7 +1190,7 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessEnvResultEnum jsl_subprocess_unset_env(
 * Select the base environment the child process will start from.
 *
 * `JSL_SUBPROCESS_ENV_BASE_EMPTY` (the default chosen at
-* `jsl_subprocess_create` time) starts the child with no inherited
+* `jsl_subprocess_init` time) starts the child with no inherited
 * variables; only entries added via `jsl_subprocess_set_env` will be
 * visible. `JSL_SUBPROCESS_ENV_BASE_INHERIT` starts the child with a copy
 * of the parent's environment, and the per-key overlay is applied on top.
@@ -1204,7 +1204,7 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessEnvResultEnum jsl_subprocess_unset_env(
 * @returns `true` on success, `false` if `proc` is invalid or `base` is
 *          out of range
 */
-JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_env_base(
+JSL_DEF bool jsl_subprocess_set_env_base(
     JSLSubprocess* proc,
     JSLSubProcessEnvBaseEnum base
 );
@@ -1222,7 +1222,7 @@ JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_env_base(
 * @returns `true` on success, `false` if parameters were invalid or the
 *          path could not be duplicated into the allocator
 */
-JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_change_working_directory(
+JSL_DEF bool jsl_subprocess_change_working_directory(
     JSLSubprocess* proc,
     JSLImmutableMemory path
 );
@@ -1240,7 +1240,7 @@ JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_change_working_directory(
 * @returns `true` on success, `false` if parameters were invalid or the
 *          buffer could not be duplicated into the allocator
 */
-JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdin_memory(
+JSL_DEF bool jsl_subprocess_set_stdin_memory(
     JSLSubprocess* proc,
     JSLImmutableMemory data
 );
@@ -1253,13 +1253,13 @@ JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdin_memory(
 * close or duplicate the descriptor; the caller is responsible for its
 * lifetime. On Windows, `fd` must be a CRT file descriptor (see
 * `JSLSubProcessStdinKindEnum`). Replaces any previously configured stdin
-* source.
+* source. fun
 *
 * @param proc Pointer to an initialized subprocess handle
 * @param fd   Caller-owned file descriptor to use as the child's stdin
 * @returns `true` on success, `false` if parameters were invalid
 */
-JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdin_fd(
+JSL_DEF bool jsl_subprocess_set_stdin_fd(
     JSLSubprocess* proc,
     int fd
 );
@@ -1274,7 +1274,7 @@ JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdin_fd(
 * @param proc Pointer to an initialized subprocess handle
 * @returns `true` on success, `false` if parameters were invalid
 */
-JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdin_null(
+JSL_DEF bool jsl_subprocess_set_stdin_null(
     JSLSubprocess* proc
 );
 
@@ -1290,7 +1290,7 @@ JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdin_null(
 * @param fd   Caller-owned file descriptor to receive the child's stdout
 * @returns `true` on success, `false` if parameters were invalid
 */
-JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdout_fd(
+JSL_DEF bool jsl_subprocess_set_stdout_fd(
     JSLSubprocess* proc,
     int fd
 );
@@ -1306,7 +1306,7 @@ JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdout_fd(
 * @param sink Output sink that receives the child's stdout
 * @returns `true` on success, `false` if parameters were invalid
 */
-JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdout_sink(
+JSL_DEF bool jsl_subprocess_set_stdout_sink(
     JSLSubprocess* proc,
     JSLOutputSink sink
 );
@@ -1323,7 +1323,7 @@ JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdout_sink(
 * @param fd   Caller-owned file descriptor to receive the child's stderr
 * @returns `true` on success, `false` if parameters were invalid
 */
-JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stderr_fd(
+JSL_DEF bool jsl_subprocess_set_stderr_fd(
     JSLSubprocess* proc,
     int fd
 );
@@ -1339,7 +1339,7 @@ JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stderr_fd(
 * @param sink Output sink that receives the child's stderr
 * @returns `true` on success, `false` if parameters were invalid
 */
-JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stderr_sink(
+JSL_DEF bool jsl_subprocess_set_stderr_sink(
     JSLSubprocess* proc,
     JSLOutputSink sink
 );
@@ -1354,7 +1354,7 @@ JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stderr_sink(
 * @param proc Pointer to an initialized subprocess handle
 * @returns `true` on success, `false` if parameters were invalid
 */
-JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdout_null(
+JSL_DEF bool jsl_subprocess_set_stdout_null(
     JSLSubprocess* proc
 );
 
@@ -1368,8 +1368,28 @@ JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stdout_null(
 * @param proc Pointer to an initialized subprocess handle
 * @returns `true` on success, `false` if parameters were invalid
 */
-JSL_WARN_UNUSED JSL_DEF bool jsl_subprocess_set_stderr_null(
+JSL_DEF bool jsl_subprocess_set_stderr_null(
     JSLSubprocess* proc
+);
+
+/**
+* Print the executable path and all configured command-line arguments
+* of `proc` to `sink` for debugging.
+*
+* The output format is the executable followed by each argument, all
+* separated by single spaces, with no trailing newline. Arguments are
+* written verbatim — no shell quoting or escaping is applied, so the
+* output is intended for human inspection, not for re-execution.
+*
+* If `proc` is NULL or not a valid subprocess handle, nothing is
+* written.
+*
+* @param proc Pointer to an initialized subprocess handle
+* @param sink Output sink to write the formatted command to
+*/
+JSL_DEF void jsl_subprocess_debug_print_command(
+    JSLSubprocess* proc,
+    JSLOutputSink sink
 );
 
 /**
@@ -1413,7 +1433,7 @@ typedef enum
 /**
 * Spawn every proc in `procs[0 .. count-1]` and block until they all
 * terminate, the optional timeout elapses, or a fatal wait error
-* occurs. Each proc must have been configured via `jsl_subprocess_create`
+* occurs. Each proc must have been configured via `jsl_subprocess_init`
 * and the usual setters; none may have been started yet.
 *
 * This is the full-control variant. At most `parallelism_count` procs
@@ -1526,10 +1546,10 @@ typedef enum
 *                          errno on a top-level wait failure
 * @returns A result enum describing the outcome
 */
-JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_run_blocking_options(
-    JSLAllocatorInterface allocator,
+JSL_DEF JSLSubProcessResultEnum jsl_subprocess_run_blocking_options(
     JSLSubprocess* procs,
     int32_t count,
+    JSLAllocatorInterface allocator,
     int32_t parallelism_count,
     int32_t timeout_ms,
     int32_t* out_errno
@@ -1554,7 +1574,7 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_run_blocking_opti
 * jsl_string_builder_init(&stderr_sb, err_alloc, 4096);
 *
 * JSLSubprocess proc = {0};
-* jsl_subprocess_create(&proc, alloc, jsl_cstr_to_memory("my-tool"));
+* jsl_subprocess_init(&proc, alloc, jsl_cstr_to_memory("my-tool"));
 * jsl_subprocess_set_stdin_memory(&proc, jsl_cstr_to_memory("input data\n"));
 * jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&stdout_sb));
 * jsl_subprocess_set_stderr_sink(&proc, jsl_string_builder_output_sink(&stderr_sb));
@@ -1577,10 +1597,10 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_run_blocking_opti
 *                    a top-level wait failure or probe failure
 * @returns A result enum describing the outcome
 */
-JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_run_blocking(
-    JSLAllocatorInterface allocator,
+JSL_DEF JSLSubProcessResultEnum jsl_subprocess_run_blocking(
     JSLSubprocess* procs,
     int32_t count,
+    JSLAllocatorInterface allocator,
     int32_t* out_errno
 );
 
@@ -1605,7 +1625,7 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_run_blocking(
 * jsl_string_builder_init(&stderr_sb, err_alloc, 4096);
 *
 * JSLSubprocess proc;
-* jsl_subprocess_create(&proc, alloc, jsl_cstr_to_memory("my-tool"));
+* jsl_subprocess_init(&proc, alloc, jsl_cstr_to_memory("my-tool"));
 * jsl_subprocess_set_stdin_memory(&proc, jsl_cstr_to_memory("input data\n"));
 * jsl_subprocess_set_stdout_sink(&proc, jsl_string_builder_output_sink(&stdout_sb));
 * jsl_subprocess_set_stderr_sink(&proc, jsl_string_builder_output_sink(&stderr_sb));
@@ -1632,7 +1652,7 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_run_blocking(
 * jsl_subprocess_cleanup(&proc);
 * ```
 */
-JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_start(
+JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_start(
     JSLSubprocess* proc,
     int32_t* out_errno
 );
@@ -1654,7 +1674,7 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_start(
 * via `jsl_subprocess_background_start`. Idempotent once the child has
 * exited: subsequent calls re-write the same status and exit code.
 */
-JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_poll(
+JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_poll(
     JSLSubprocess* proc,
     int32_t timeout_ms,
     JSLSubProcessStatusEnum* out_status,
@@ -1671,7 +1691,7 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_poll(
 * write end. Safe to call repeatedly. Returns `BAD_PARAMETERS` if the
 * subprocess is not a background one.
 */
-JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_send_stdin(
+JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_send_stdin(
     JSLSubprocess* proc,
     int32_t* out_errno
 );
@@ -1688,7 +1708,7 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_send_s
 * The caller is responsible for calling this often enough that a chatty
 * child does not fill the kernel pipe buffer and block.
 */
-JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_receive_output(
+JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_receive_output(
     JSLSubprocess* proc,
     int32_t* out_errno
 );
@@ -1702,7 +1722,7 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_receiv
 * Returns `SUCCESS` if the process has already exited (no-op). Returns
 * `BAD_PARAMETERS` if the subprocess is not a background one.
 */
-JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_kill(
+JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_kill(
     JSLSubprocess* proc,
     int32_t* out_errno
 );
@@ -1775,7 +1795,7 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_kill(
 *                    a top-level wait failure
 * @returns A result enum describing the outcome
 */
-JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_wait(
+JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_wait(
     JSLAllocatorInterface allocator,
     JSLSubprocess* procs,
     int32_t count,
@@ -1791,7 +1811,7 @@ JSL_WARN_UNUSED JSL_DEF JSLSubProcessResultEnum jsl_subprocess_background_wait(
 *
 * Must only be called on a subprocess that is no longer running, i.e. one
 * whose status is not `JSL_SUBPROCESS_STATUS_RUNNING`. Calling this on a
-* subprocess whose `jsl_subprocess_create` call failed, or one that has
+* subprocess whose `jsl_subprocess_init` call failed, or one that has
 * already been cleaned up, is a no-op.
 *
 * After this returns, the handle's sentinel is zero and all other subprocess
@@ -1813,7 +1833,7 @@ JSL_DEF void jsl_subprocess_cleanup(JSLSubprocess* proc);
 *                  the result of `GetLastError` (Windows) on failure
 * @returns The number of logical processors, or -1 on error
 */
-JSL_WARN_UNUSED JSL_DEF int32_t jsl_get_logical_processor_count(int32_t* out_errno);
+JSL_DEF int32_t jsl_get_logical_processor_count(int32_t* out_errno);
 
 
 #ifdef __cplusplus

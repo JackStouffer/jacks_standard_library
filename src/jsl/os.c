@@ -2390,7 +2390,7 @@ JSLRenameFileResultEnum jsl_rename_file(
 #define JSL__SUBPROCESS_PRIVATE_SENTINEL 4729185036281947563U
 #define JSL__SUBPROCESS_INITIAL_CAPACITY 8
 
-JSLSubProcessCreateResultEnum jsl_subprocess_create(
+JSLSubProcessCreateResultEnum jsl_subprocess_init(
     JSLSubprocess* proc,
     JSLAllocatorInterface allocator,
     JSLImmutableMemory executable
@@ -2957,6 +2957,23 @@ bool jsl_subprocess_set_stderr_null(JSLSubprocess* proc)
     }
 
     return proceed;
+}
+
+void jsl_subprocess_debug_print_command(JSLSubprocess* proc, JSLOutputSink sink)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL
+        && sink.write_fp != NULL);
+
+    if (proceed)
+    {
+        jsl_format_sink(sink, JSL_CSTR_EXPRESSION("%y"), proc->executable);
+
+        for (int64_t i = 0; i < proc->args_count; i += 1)
+        {
+            jsl_format_sink(sink, JSL_CSTR_EXPRESSION(" %y"), proc->args[i]);
+        }
+    }
 }
 
 // Current monotonic time in milliseconds. Used to implement the
@@ -5180,9 +5197,9 @@ static void jsl__subprocess_terminate_and_reap_all(
 #endif
 
 JSLSubProcessResultEnum jsl_subprocess_run_blocking_options(
-    JSLAllocatorInterface allocator,
     JSLSubprocess* procs,
     int32_t count,
+    JSLAllocatorInterface allocator,
     int32_t parallelism_count,
     int32_t timeout_ms,
     int32_t* out_errno
@@ -5963,9 +5980,9 @@ JSLSubProcessResultEnum jsl_subprocess_run_blocking_options(
 }
 
 JSLSubProcessResultEnum jsl_subprocess_run_blocking(
-    JSLAllocatorInterface allocator,
     JSLSubprocess* procs,
     int32_t count,
+    JSLAllocatorInterface allocator,
     int32_t* out_errno
 )
 {
@@ -5978,7 +5995,7 @@ JSLSubProcessResultEnum jsl_subprocess_run_blocking(
         return JSL_SUBPROCESS_PROBE_FAILED;
     }
     return jsl_subprocess_run_blocking_options(
-        allocator, procs, count, cpu_count, -1, out_errno
+        procs, count, allocator, cpu_count, -1, out_errno
     );
 }
 
