@@ -2445,22 +2445,25 @@ JSLSubProcessCreateResultEnum jsl_subprocess_init(
     proc->env_vars = env_vars;
     proc->env_count = 0;
     proc->env_capacity = JSL__SUBPROCESS_INITIAL_CAPACITY;
-    proc->env_base = JSL_SUBPROCESS_ENV_BASE_EMPTY;
+    proc->env_base = JSL_SUBPROCESS_ENV_BASE_INHERIT_PATH_ONLY;
     proc->working_directory = jsl_immutable_memory(NULL, 0);
 
     proc->stdin_kind = JSL_SUBPROCESS_STDIN_INHERIT;
     proc->stdin_memory = jsl_immutable_memory(NULL, 0);
     proc->stdin_fd = -1;
+    proc->stdin_file_name = jsl_immutable_memory(NULL, 0);
 
     proc->stdout_kind = JSL_SUBPROCESS_OUTPUT_INHERIT;
     proc->stdout_fd = -1;
     proc->stdout_sink.write_fp = NULL;
     proc->stdout_sink.user_data = NULL;
+    proc->stdout_file_name = jsl_immutable_memory(NULL, 0);
 
     proc->stderr_kind = JSL_SUBPROCESS_OUTPUT_INHERIT;
     proc->stderr_fd = -1;
     proc->stderr_sink.write_fp = NULL;
     proc->stderr_sink.user_data = NULL;
+    proc->stderr_file_name = jsl_immutable_memory(NULL, 0);
 
     proc->is_background = false;
     proc->stdin_write_offset = 0;
@@ -2959,6 +2962,130 @@ bool jsl_subprocess_set_stderr_null(JSLSubprocess* proc)
     return proceed;
 }
 
+// Duplicate `file_name` into the subprocess allocator as a NUL-terminated
+// string. The returned memory's `.length` excludes the terminator, and the
+// byte at `.data[length]` is `\0`, so it can be passed directly as a
+// `const char*` to `open`/`addopen`/`CreateFileA`. Returns `{NULL, 0}` on
+// allocator failure. The caller must already have validated that
+// `file_name` is non-empty and no longer than `FILENAME_MAX`.
+static JSLImmutableMemory jsl__subprocess_dup_file_name(
+    JSLSubprocess* proc,
+    JSLImmutableMemory file_name
+)
+{
+    JSLImmutableMemory result = jsl_immutable_memory(NULL, 0);
+
+    char path_buffer[FILENAME_MAX + 1];
+    JSL_MEMCPY(path_buffer, file_name.data, (size_t) file_name.length);
+    path_buffer[file_name.length] = '\0';
+
+    void* allocation = jsl_allocator_interface_alloc(
+        proc->allocator, file_name.length + 1, JSL_DEFAULT_ALLOCATION_ALIGNMENT, false
+    );
+
+    if (allocation != NULL)
+    {
+        JSLMutableMemory dest = { (uint8_t*) allocation, file_name.length + 1 };
+        int64_t written = jsl_cstr_memory_copy(&dest, path_buffer, true);
+        if (written == file_name.length + 1)
+            result = jsl_immutable_memory((const uint8_t*) allocation, file_name.length);
+    }
+
+    return result;
+}
+
+bool jsl_subprocess_set_stdin_file_name(
+    JSLSubprocess* proc,
+    JSLImmutableMemory file_name
+)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL
+        && file_name.data != NULL
+        && file_name.length > 0
+        && file_name.length <= (int64_t) FILENAME_MAX);
+
+    JSLImmutableMemory name_dup = jsl_immutable_memory(NULL, 0);
+
+    if (proceed)
+    {
+        name_dup = jsl__subprocess_dup_file_name(proc, file_name);
+        proceed = (name_dup.data != NULL);
+    }
+
+    if (proceed)
+    {
+        proc->stdin_kind = JSL_SUBPROCESS_STDIN_FILE;
+        proc->stdin_file_name = name_dup;
+        proc->stdin_memory = jsl_immutable_memory(NULL, 0);
+        proc->stdin_fd = -1;
+    }
+
+    return proceed;
+}
+
+bool jsl_subprocess_set_stdout_file_name(
+    JSLSubprocess* proc,
+    JSLImmutableMemory file_name
+)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL
+        && file_name.data != NULL
+        && file_name.length > 0
+        && file_name.length <= (int64_t) FILENAME_MAX);
+
+    JSLImmutableMemory name_dup = jsl_immutable_memory(NULL, 0);
+
+    if (proceed)
+    {
+        name_dup = jsl__subprocess_dup_file_name(proc, file_name);
+        proceed = (name_dup.data != NULL);
+    }
+
+    if (proceed)
+    {
+        proc->stdout_kind = JSL_SUBPROCESS_OUTPUT_FILE;
+        proc->stdout_file_name = name_dup;
+        proc->stdout_fd = -1;
+        proc->stdout_sink.write_fp = NULL;
+        proc->stdout_sink.user_data = NULL;
+    }
+
+    return proceed;
+}
+
+bool jsl_subprocess_set_stderr_file_name(
+    JSLSubprocess* proc,
+    JSLImmutableMemory file_name
+)
+{
+    bool proceed = (proc != NULL
+        && proc->sentinel == JSL__SUBPROCESS_PRIVATE_SENTINEL
+        && file_name.data != NULL
+        && file_name.length > 0
+        && file_name.length <= (int64_t) FILENAME_MAX);
+
+    JSLImmutableMemory name_dup = jsl_immutable_memory(NULL, 0);
+
+    if (proceed)
+    {
+        name_dup = jsl__subprocess_dup_file_name(proc, file_name);
+        proceed = (name_dup.data != NULL);
+    }
+
+    if (proceed)
+    {
+        proc->stderr_kind = JSL_SUBPROCESS_OUTPUT_FILE;
+        proc->stderr_file_name = name_dup;
+        proc->stderr_fd = -1;
+        proc->stderr_sink.write_fp = NULL;
+        proc->stderr_sink.user_data = NULL;
+    }
+
+    return proceed;
+}
+
 void jsl_subprocess_debug_print_command(JSLSubprocess* proc, JSLOutputSink sink)
 {
     bool proceed = (proc != NULL
@@ -3016,6 +3143,26 @@ static bool jsl__subprocess_parent_entry_overridden(
         }
     }
     return overridden;
+}
+
+// True if `entry` (a "key=value" string) names the PATH variable, i.e. its
+// key is exactly "PATH". Used by the INHERIT_PATH_ONLY base to pass just the
+// parent's PATH through to the child. The compare is case-insensitive so a
+// Windows "Path=..." entry matches too; the trailing '=' check keeps
+// siblings like "PATHEXT=..." from matching.
+static bool jsl__subprocess_entry_is_path(const char* entry)
+{
+    static const char path_key[] = "PATH";
+    int64_t i = 0;
+    bool match = true;
+    while (match && path_key[i] != '\0')
+    {
+        char c = entry[i];
+        char upper = (char) (c - (((unsigned) (c - 'a') <= ('z' - 'a')) << 5));
+        match = (upper == path_key[i]);
+        i++;
+    }
+    return match && entry[i] == '=';
 }
 
 #if JSL_IS_POSIX
@@ -3190,9 +3337,13 @@ static bool jsl__subprocess_posix_build_envp(
     JSL__SubProcessPosixLaunch* ctx
 )
 {
-    bool inherit = (proc->env_base == JSL_SUBPROCESS_ENV_BASE_INHERIT);
+    bool inherit_all = (proc->env_base == JSL_SUBPROCESS_ENV_BASE_INHERIT);
+    bool inherit_path = (proc->env_base == JSL_SUBPROCESS_ENV_BASE_INHERIT_PATH_ONLY);
+    bool scan_parent = (inherit_all || inherit_path);
 
-    if (inherit && proc->env_count == 0)
+    // Only full inheritance with an empty overlay can alias environ with no
+    // allocation; PATH-only must build a filtered array.
+    if (inherit_all && proc->env_count == 0)
     {
         ctx->envp = environ;
         ctx->envp_is_owned = false;
@@ -3200,7 +3351,7 @@ static bool jsl__subprocess_posix_build_envp(
     }
 
     int64_t parent_count = 0;
-    if (inherit && environ != NULL)
+    if (scan_parent && environ != NULL)
     {
         while (environ[parent_count] != NULL)
             parent_count++;
@@ -3222,7 +3373,9 @@ static bool jsl__subprocess_posix_build_envp(
     int64_t out = 0;
     for (int64_t i = 0; i < parent_count; i++)
     {
-        if (!jsl__subprocess_parent_entry_overridden(proc, environ[i]))
+        bool keep = !jsl__subprocess_parent_entry_overridden(proc, environ[i])
+            && (inherit_all || jsl__subprocess_entry_is_path(environ[i]));
+        if (keep)
         {
             ctx->envp[out] = environ[i];
             out++;
@@ -3372,6 +3525,23 @@ static JSLSubProcessResultEnum jsl__subprocess_posix_spawn(
     {
         err = posix_spawn_file_actions_addopen(&file_actions, STDIN_FILENO, "/dev/null", O_RDONLY, 0);
     }
+    else if (err == 0 && proc->stdin_kind == JSL_SUBPROCESS_STDIN_FILE)
+    {
+        err = posix_spawn_file_actions_addopen(
+            &file_actions,
+            STDIN_FILENO,
+            (const char*) proc->stdin_file_name.data,
+            O_RDONLY,
+            0
+        );
+    }
+
+    // When stdout and stderr name the same file, stderr shares stdout's
+    // open file description (one open, one offset) for clean `2>&1` merging.
+    bool merge_stderr_into_stdout =
+        proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_FILE
+        && proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_FILE
+        && jsl_memory_compare(proc->stdout_file_name, proc->stderr_file_name);
 
     // Stdout
     if (err == 0 && proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_SINK)
@@ -3390,6 +3560,16 @@ static JSLSubProcessResultEnum jsl__subprocess_posix_spawn(
     {
         err = posix_spawn_file_actions_addopen(&file_actions, STDOUT_FILENO, "/dev/null", O_WRONLY, 0);
     }
+    else if (err == 0 && proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_FILE)
+    {
+        err = posix_spawn_file_actions_addopen(
+            &file_actions,
+            STDOUT_FILENO,
+            (const char*) proc->stdout_file_name.data,
+            O_CREAT | O_WRONLY | O_TRUNC,
+            S_IRUSR | S_IWUSR
+        );
+    }
 
     // Stderr
     if (err == 0 && proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_SINK)
@@ -3407,6 +3587,22 @@ static JSLSubProcessResultEnum jsl__subprocess_posix_spawn(
     else if (err == 0 && proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_NULL)
     {
         err = posix_spawn_file_actions_addopen(&file_actions, STDERR_FILENO, "/dev/null", O_WRONLY, 0);
+    }
+    else if (err == 0 && proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_FILE && merge_stderr_into_stdout)
+    {
+        // stdout already opened STDOUT_FILENO above; point stderr at the
+        // same description so both streams share one file and one offset.
+        err = posix_spawn_file_actions_adddup2(&file_actions, STDOUT_FILENO, STDERR_FILENO);
+    }
+    else if (err == 0 && proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_FILE)
+    {
+        err = posix_spawn_file_actions_addopen(
+            &file_actions,
+            STDERR_FILENO,
+            (const char*) proc->stderr_file_name.data,
+            O_CREAT | O_WRONLY | O_TRUNC,
+            S_IRUSR | S_IWUSR
+        );
     }
 
     // chdir in the child before exec. Requires glibc >= 2.29, musl >=
@@ -4291,14 +4487,16 @@ static bool jsl__subprocess_win_build_env_block(
     JSL__SubProcessWindowsLaunch* ctx
 )
 {
-    bool inherit = (proc->env_base == JSL_SUBPROCESS_ENV_BASE_INHERIT);
+    bool inherit_all = (proc->env_base == JSL_SUBPROCESS_ENV_BASE_INHERIT);
+    bool inherit_path = (proc->env_base == JSL_SUBPROCESS_ENV_BASE_INHERIT_PATH_ONLY);
+    bool scan_parent = (inherit_all || inherit_path);
 
-    // With INHERIT and nothing to overlay, leave env_block NULL so
+    // With full INHERIT and nothing to overlay, leave env_block NULL so
     // CreateProcess passes the parent environment through unchanged.
-    if (inherit && proc->env_count == 0)
+    if (inherit_all && proc->env_count == 0)
         return true;
 
-    LPCH parent_env = inherit ? GetEnvironmentStringsA() : NULL;
+    LPCH parent_env = scan_parent ? GetEnvironmentStringsA() : NULL;
 
     // Worst-case upper bound: full parent block plus all set entries plus
     // the trailing terminator. Filtered parent entries simply leave unused
@@ -4336,7 +4534,9 @@ static bool jsl__subprocess_win_build_env_block(
         while (entry != NULL && *entry != '\0')
         {
             int64_t entry_len = (int64_t) strlen(entry);
-            if (!jsl__subprocess_parent_entry_overridden(proc, entry))
+            bool keep = !jsl__subprocess_parent_entry_overridden(proc, entry)
+                && (inherit_all || jsl__subprocess_entry_is_path(entry));
+            if (keep)
             {
                 JSL_MEMCPY(p, entry, (size_t) entry_len);
                 p += entry_len;
@@ -4477,8 +4677,18 @@ static JSLSubProcessResultEnum jsl__subprocess_win_spawn(
     HANDLE stdin_null = INVALID_HANDLE_VALUE;
     HANDLE stdout_null = INVALID_HANDLE_VALUE;
     HANDLE stderr_null = INVALID_HANDLE_VALUE;
+    HANDLE stdin_file = INVALID_HANDLE_VALUE;
+    HANDLE stdout_file = INVALID_HANDLE_VALUE;
+    HANDLE stderr_file = INVALID_HANDLE_VALUE;
     bool null_open_failed = false;
     DWORD null_open_err = 0;
+
+    // When stdout and stderr name the same file, stderr shares stdout's
+    // handle (one open) for clean `2>&1` merging.
+    bool merge_stderr_into_stdout =
+        proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_FILE
+        && proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_FILE
+        && jsl_memory_compare(proc->stdout_file_name, proc->stderr_file_name);
 
     if (use_stdhandles)
     {
@@ -4511,6 +4721,24 @@ static JSLSubProcessResultEnum jsl__subprocess_win_spawn(
             }
             si.hStdInput = stdin_null;
         }
+        else if (proc->stdin_kind == JSL_SUBPROCESS_STDIN_FILE)
+        {
+            stdin_file = CreateFileA(
+                (const char*) proc->stdin_file_name.data,
+                GENERIC_READ,
+                FILE_SHARE_READ,
+                &null_sa,
+                OPEN_EXISTING,
+                FILE_ATTRIBUTE_NORMAL,
+                NULL
+            );
+            if (stdin_file == INVALID_HANDLE_VALUE)
+            {
+                null_open_failed = true;
+                null_open_err = GetLastError();
+            }
+            si.hStdInput = stdin_file;
+        }
         else
             si.hStdInput = GetStdHandle(STD_INPUT_HANDLE);
 
@@ -4536,6 +4764,24 @@ static JSLSubProcessResultEnum jsl__subprocess_win_spawn(
             }
             si.hStdOutput = stdout_null;
         }
+        else if (proc->stdout_kind == JSL_SUBPROCESS_OUTPUT_FILE)
+        {
+            stdout_file = CreateFileA(
+                (const char*) proc->stdout_file_name.data,
+                GENERIC_WRITE,
+                FILE_SHARE_READ,
+                &null_sa,
+                CREATE_ALWAYS,
+                FILE_ATTRIBUTE_NORMAL,
+                NULL
+            );
+            if (stdout_file == INVALID_HANDLE_VALUE)
+            {
+                null_open_failed = true;
+                null_open_err = GetLastError();
+            }
+            si.hStdOutput = stdout_file;
+        }
         else
             si.hStdOutput = GetStdHandle(STD_OUTPUT_HANDLE);
 
@@ -4560,6 +4806,31 @@ static JSLSubProcessResultEnum jsl__subprocess_win_spawn(
                 null_open_err = GetLastError();
             }
             si.hStdError = stderr_null;
+        }
+        else if (proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_FILE && merge_stderr_into_stdout)
+        {
+            // stdout already opened the shared file above; reuse its handle
+            // so both streams write through one description. Closed once
+            // below (stderr_file stays INVALID).
+            si.hStdError = stdout_file;
+        }
+        else if (proc->stderr_kind == JSL_SUBPROCESS_OUTPUT_FILE)
+        {
+            stderr_file = CreateFileA(
+                (const char*) proc->stderr_file_name.data,
+                GENERIC_WRITE,
+                FILE_SHARE_READ,
+                &null_sa,
+                CREATE_ALWAYS,
+                FILE_ATTRIBUTE_NORMAL,
+                NULL
+            );
+            if (stderr_file == INVALID_HANDLE_VALUE)
+            {
+                null_open_failed = true;
+                null_open_err = GetLastError();
+            }
+            si.hStdError = stderr_file;
         }
         else
             si.hStdError = GetStdHandle(STD_ERROR_HANDLE);
@@ -4589,6 +4860,9 @@ static JSLSubProcessResultEnum jsl__subprocess_win_spawn(
     jsl__subprocess_win_close_handle(&stdin_null);
     jsl__subprocess_win_close_handle(&stdout_null);
     jsl__subprocess_win_close_handle(&stderr_null);
+    jsl__subprocess_win_close_handle(&stdin_file);
+    jsl__subprocess_win_close_handle(&stdout_file);
+    jsl__subprocess_win_close_handle(&stderr_file);
 
     if (null_open_failed)
     {

@@ -829,20 +829,27 @@ typedef enum
 * Base environment the child will start from, before the per-key
 * `set_env`/`unset_env` overlay is applied.
 *
-* `EMPTY` (the default) means the child sees only the variables explicitly
-* added via `jsl_subprocess_set_env`. Nothing is inherited from the parent
-* process. This is the safer default: callers must opt into leaking
-* parent-process state (auth tokens, locale, PATH overrides, etc.) into
-* untrusted children.
+* `EMPTY` means the child sees only the variables explicitly added via
+* `jsl_subprocess_set_env`. Nothing is inherited from the parent process.
+* Use this to fully isolate untrusted children from parent-process state
+* (auth tokens, locale, PATH overrides, etc.).
 *
-* `INHERIT` means the child starts with a copy of the parent's environment
-* and the overlay is applied on top: a `set_env` overrides any inherited
-* entry with the same key, and an `unset_env` removes an inherited entry.
+* `INHERIT_PATH_ONLY` (the default) inherits exactly one variable from the
+* parent — `PATH` — and nothing else, with the overlay applied on top. This
+* keeps the child able to locate executables (the common case: spawning a
+* compiler that must in turn find its linker) without leaking the rest of
+* the parent's environment. If the overlay sets or unsets `PATH`, that wins.
+*
+* `INHERIT` means the child starts with a copy of the parent's entire
+* environment and the overlay is applied on top: a `set_env` overrides any
+* inherited entry with the same key, and an `unset_env` removes an inherited
+* entry.
 */
 typedef enum
 {
     JSL_SUBPROCESS_ENV_BASE_EMPTY = 0,
     JSL_SUBPROCESS_ENV_BASE_INHERIT,
+    JSL_SUBPROCESS_ENV_BASE_INHERIT_PATH_ONLY,
 
     JSL_SUBPROCESS_ENV_BASE_ENUM_COUNT
 } JSLSubProcessEnvBaseEnum;
@@ -855,7 +862,9 @@ typedef enum
 * once the buffer is exhausted. `FD` wires up a caller-provided file
 * descriptor as the child's stdin. On Windows, `fd` is a CRT file
 * descriptor from `_open`/`_sopen_s`/`_fileno`, which can be converted to
-* a `HANDLE` with `_get_osfhandle` when the child is spawned.
+* a `HANDLE` with `_get_osfhandle` when the child is spawned. `FILE` makes
+* the child read its stdin directly from a named file opened by JSL at
+* spawn time (JSL owns the file's lifecycle).
 */
 typedef enum
 {
@@ -863,6 +872,7 @@ typedef enum
     JSL_SUBPROCESS_STDIN_MEMORY,
     JSL_SUBPROCESS_STDIN_FD,
     JSL_SUBPROCESS_STDIN_NULL,
+    JSL_SUBPROCESS_STDIN_FILE,
 
     JSL_SUBPROCESS_STDIN_ENUM_COUNT
 } JSLSubProcessStdinKindEnum;
@@ -874,7 +884,10 @@ typedef enum
 * standard stream. `FD` redirects writes into a caller-provided file
 * descriptor. `SINK` captures writes at run time and delivers them to a
 * `JSLOutputSink`. On Windows, `fd` is a CRT file descriptor (see the
-* notes on `JSLSubProcessStdinKindEnum`).
+* notes on `JSLSubProcessStdinKindEnum`). `FILE` redirects writes into a
+* named file opened (created/truncated) by JSL at spawn time; when stdout
+* and stderr name the same file, output is merged through one shared
+* handle.
 */
 typedef enum
 {
@@ -882,6 +895,7 @@ typedef enum
     JSL_SUBPROCESS_OUTPUT_FD,
     JSL_SUBPROCESS_OUTPUT_SINK,
     JSL_SUBPROCESS_OUTPUT_NULL,
+    JSL_SUBPROCESS_OUTPUT_FILE,
 
     JSL_SUBPROCESS_OUTPUT_ENUM_COUNT
 } JSLSubProcessOutputKindEnum;
@@ -974,14 +988,25 @@ typedef struct JSLSubprocess
     JSLSubProcessStdinKindEnum stdin_kind;
     JSLImmutableMemory stdin_memory;
     int stdin_fd;
+    // NUL-terminated path used when `stdin_kind` is
+    // `JSL_SUBPROCESS_STDIN_FILE`. `.length` excludes the terminator; the
+    // byte at `.data[length]` is `\0` so it can be passed directly as a
+    // `const char*`. Owned by the subprocess allocator.
+    JSLImmutableMemory stdin_file_name;
 
     JSLSubProcessOutputKindEnum stdout_kind;
     int stdout_fd;
     JSLOutputSink stdout_sink;
+    // NUL-terminated path used when `stdout_kind` is
+    // `JSL_SUBPROCESS_OUTPUT_FILE`. See `stdin_file_name`.
+    JSLImmutableMemory stdout_file_name;
 
     JSLSubProcessOutputKindEnum stderr_kind;
     int stderr_fd;
     JSLOutputSink stderr_sink;
+    // NUL-terminated path used when `stderr_kind` is
+    // `JSL_SUBPROCESS_OUTPUT_FILE`. See `stdin_file_name`.
+    JSLImmutableMemory stderr_file_name;
 
     // Background-mode runtime state. Zero / -1 / INVALID_HANDLE_VALUE when
     // the process was not started via `jsl_subprocess_background_start`.
@@ -1189,11 +1214,14 @@ JSL_DEF JSLSubProcessEnvResultEnum jsl_subprocess_unset_env(
 /**
 * Select the base environment the child process will start from.
 *
-* `JSL_SUBPROCESS_ENV_BASE_EMPTY` (the default chosen at
-* `jsl_subprocess_init` time) starts the child with no inherited
-* variables; only entries added via `jsl_subprocess_set_env` will be
+* `JSL_SUBPROCESS_ENV_BASE_INHERIT_PATH_ONLY` (the default chosen at
+* `jsl_subprocess_init` time) starts the child with only the parent's
+* `PATH` plus any entries added via `jsl_subprocess_set_env`.
+* `JSL_SUBPROCESS_ENV_BASE_EMPTY` starts the child with no inherited
+* variables at all; only entries added via `jsl_subprocess_set_env` will be
 * visible. `JSL_SUBPROCESS_ENV_BASE_INHERIT` starts the child with a copy
-* of the parent's environment, and the per-key overlay is applied on top.
+* of the parent's entire environment, and the per-key overlay is applied on
+* top.
 *
 * Calling this more than once replaces the previous selection. The base
 * and the overlay are independent — switching the base does not discard
@@ -1370,6 +1398,68 @@ JSL_DEF bool jsl_subprocess_set_stdout_null(
 */
 JSL_DEF bool jsl_subprocess_set_stderr_null(
     JSLSubprocess* proc
+);
+
+/**
+* Configure the subprocess to read its standard input from the named file.
+*
+* The file is not opened here; JSL opens it read-only at spawn time (inside
+* `jsl_subprocess_run_blocking[_options]` and `jsl_subprocess_background_start`)
+* and the child reads from it directly. If the file cannot be opened at
+* spawn, the run reports `JSL_SUBPROCESS_FAILED_TO_START`. The filename is
+* duplicated into the subprocess allocator, so the caller need not keep the
+* original alive. Replaces any previously configured stdin source.
+*
+* @param proc      Pointer to an initialized subprocess handle
+* @param file_name Path the child's stdin is read from
+* @returns `true` if the filename was valid and recorded, `false` on bad
+*          parameters (NULL data, empty, or longer than `FILENAME_MAX`) or
+*          allocator failure
+*/
+JSL_DEF bool jsl_subprocess_set_stdin_file_name(
+    JSLSubprocess* proc,
+    JSLImmutableMemory file_name
+);
+
+/**
+* Redirect the subprocess's standard output into the named file.
+*
+* The file is not opened here; JSL creates/truncates it at spawn time and
+* the child writes to it directly. If the file cannot be opened at spawn,
+* the run reports `JSL_SUBPROCESS_FAILED_TO_START`. When stdout and stderr
+* are configured with the same filename, their output is merged through a
+* single shared handle (like shell `2>&1`). The filename is duplicated into
+* the subprocess allocator. Replaces any previously configured stdout
+* destination.
+*
+* @param proc      Pointer to an initialized subprocess handle
+* @param file_name Path the child's stdout is written to (created/truncated)
+* @returns `true` if the filename was valid and recorded, `false` on bad
+*          parameters (NULL data, empty, or longer than `FILENAME_MAX`) or
+*          allocator failure
+*/
+JSL_DEF bool jsl_subprocess_set_stdout_file_name(
+    JSLSubprocess* proc,
+    JSLImmutableMemory file_name
+);
+
+/**
+* Redirect the subprocess's standard error into the named file.
+*
+* Behaves exactly like `jsl_subprocess_set_stdout_file_name` for the stderr
+* stream. When stdout and stderr name the same file, output is merged
+* through a single shared handle. Replaces any previously configured stderr
+* destination.
+*
+* @param proc      Pointer to an initialized subprocess handle
+* @param file_name Path the child's stderr is written to (created/truncated)
+* @returns `true` if the filename was valid and recorded, `false` on bad
+*          parameters (NULL data, empty, or longer than `FILENAME_MAX`) or
+*          allocator failure
+*/
+JSL_DEF bool jsl_subprocess_set_stderr_file_name(
+    JSLSubprocess* proc,
+    JSLImmutableMemory file_name
 );
 
 /**

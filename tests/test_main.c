@@ -498,6 +498,16 @@ int main(void)
     RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking_options spawn failure backfill", test_jsl_subprocess_run_blocking_options_spawn_failure_backfill);
     RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking_options high parallelism 17 procs", test_jsl_subprocess_run_blocking_options_high_parallelism_17_procs);
     RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking_options zero timeout waves", test_jsl_subprocess_run_blocking_options_zero_timeout_waves);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_set_stdin_file_name bad parameters", test_jsl_subprocess_set_stdin_file_name_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_set_stdout_file_name bad parameters", test_jsl_subprocess_set_stdout_file_name_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_set_stderr_file_name bad parameters", test_jsl_subprocess_set_stderr_file_name_bad_parameters);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking stdin file", test_jsl_subprocess_run_blocking_stdin_file);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking stdout file", test_jsl_subprocess_run_blocking_stdout_file);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking stderr file", test_jsl_subprocess_run_blocking_stderr_file);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking stdout/stderr merge file", test_jsl_subprocess_run_blocking_stdout_stderr_merge_file);
+    RUN_TEST_FUNCTION("Test jsl_subprocess_run_blocking stdin file missing", test_jsl_subprocess_run_blocking_stdin_file_missing);
+    RUN_TEST_FUNCTION("Test jsl_subprocess stdout file last call wins", test_jsl_subprocess_stdout_file_last_call_wins);
+    RUN_TEST_FUNCTION("Test jsl_subprocess background stdout file", test_jsl_subprocess_background_stdout_file);
 
     TEST_RESULTS();
     return lfails != 0;

@@ -500,42 +500,6 @@ static ArrayDecl array_declarations[] = {
     }
 };
 
-typedef struct CStringArray {
-    char** array;
-    int32_t length;
-    int32_t capacity;
-} CStringArray;
-
-static char* my_strdup(char* str)
-{
-    size_t len = strlen(str) + 1;
-    char* ret = calloc(len, sizeof(char));
-    assert(ret != NULL);
-    memcpy(ret, str, len);
-    return ret;
-}
-
-static void cstring_array_init(CStringArray* array)
-{
-    memset(array, 0, sizeof(CStringArray));
-    array->capacity = 32;
-    array->array = malloc(sizeof(char*) * array->capacity);
-    assert(array->array != NULL);
-}
-
-static void cstring_array_insert(CStringArray* array, char* string)
-{
-    if (array->length == array->capacity)
-    {
-        array->capacity = jsl_next_power_of_two_u32(array->capacity + 1);
-        array->array = realloc(array->array, sizeof(char*) * array->capacity);
-        assert(array->array != NULL);
-    }
-
-    array->array[array->length] = my_strdup(string);
-    ++array->length;
-}
-
 static int32_t get_logical_processor_count(void)
 {
     // Returns the number of logical (including SMT) processors available.
@@ -629,7 +593,11 @@ int32_t main(int32_t argc, char **argv)
     jsl_make_directory(test_hash_map_path, NULL);
 
     int32_t max_parallelism = JSL_MAX(jsl_get_logical_processor_count(NULL), 1);
-    jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Running with %d max parallel processes"), max_parallelism);
+    jsl_format_sink(
+        stdout_sink,
+        JSL_CSTR_EXPRESSION("Running with %d max parallel processes\n"),
+        max_parallelism
+    );
 
     /**
      *
@@ -640,7 +608,7 @@ int32_t main(int32_t argc, char **argv)
      */
 
     {
-        jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Compiling embed program"));
+        jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Compiling embed program\n"));
 
         #if JSL_IS_WINDOWS
             char embed_exe_name[256] = "tests\\bin\\embed.exe";
@@ -691,9 +659,9 @@ int32_t main(int32_t argc, char **argv)
             build_memory_interface,
             &last_errno
         );
-        if (run_res != JSL_SUBPROCESS_SUCCESS)
+        if (run_res != JSL_SUBPROCESS_SUCCESS || embed_compile_command.exit_code != 0)
         {
-            jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Building embed program failed with exit code %d errno %d"), run_res, last_errno);
+            jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Building embed program failed with result %d exit code %d errno %d\n"), run_res, embed_compile_command.exit_code, last_errno);
             return EXIT_FAILURE;
         }
     }
@@ -707,7 +675,7 @@ int32_t main(int32_t argc, char **argv)
      */
 
     {
-        jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Compiling subprocess test helper program"));
+        jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Compiling subprocess test helper program\n"));
 
         #if JSL_IS_WINDOWS
             char helper_exe_name[256] = "tests\\bin\\subprocess_helper.exe";
@@ -734,9 +702,9 @@ int32_t main(int32_t argc, char **argv)
             build_memory_interface,
             &last_errno
         );
-        if (run_res != JSL_SUBPROCESS_SUCCESS)
+        if (run_res != JSL_SUBPROCESS_SUCCESS || helper_compile_command.exit_code != 0)
         {
-            jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Building subprocess test program failed with exit code %d errno %d"), run_res, last_errno);
+            jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Building subprocess test program failed with result %d exit code %d errno %d\n"), run_res, helper_compile_command.exit_code, last_errno);
             return EXIT_FAILURE;
         }
     }
@@ -750,7 +718,7 @@ int32_t main(int32_t argc, char **argv)
      */
 
     {
-        jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Compiling generate array program"));
+        jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Compiling generate array program\n"));
 
         #if JSL_IS_WINDOWS
             char generate_array_exe_name[256] = "tests\\bin\\generate_array.exe";
@@ -799,15 +767,15 @@ int32_t main(int32_t argc, char **argv)
             build_memory_interface,
             NULL
         );
-        if (run_res != JSL_SUBPROCESS_SUCCESS)
+        if (run_res != JSL_SUBPROCESS_SUCCESS || generate_array_compile_command.exit_code != 0)
         {
-            jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Building array generation program failed with exit code %d errno %d"), run_res, last_errno);
+            jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Building array generation program failed with result %d exit code %d errno %d\n"), run_res, generate_array_compile_command.exit_code, last_errno);
             return EXIT_FAILURE;
         }
 
         int32_t array_test_count = sizeof(array_declarations) / sizeof(ArrayDecl);
 
-        jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Generating Array Files"));
+        jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Generating Array Files\n"));
 
         int64_t array_procs_length = array_test_count * 2;
         JSLSubprocess* array_procs = jsl_allocator_interface_alloc(
@@ -839,9 +807,12 @@ int32_t main(int32_t argc, char **argv)
                 "../test_hash_map_types.h"
             );
 
-            char out_path_header[256] = "tests/arrays/";
-            strcat(out_path_header, decl->prefix);
-            strcat(out_path_header, ".h");
+            JSLImmutableMemory header_out_file_name = jsl_format(
+                build_memory_interface,
+                JSL_CSTR_EXPRESSION("tests/arrays/%s.h"),
+                decl->prefix
+            );
+            jsl_subprocess_set_stdout_file_name(write_array_header, header_out_file_name);
 
             JSLSubprocess* write_array_source = &array_procs[array_proc_idx];
             jsl_subprocess_init(
@@ -875,14 +846,17 @@ int32_t main(int32_t argc, char **argv)
                 header_name
             );
 
-            char out_path_source[256] = "tests/arrays/";
-            strcat(out_path_source, decl->prefix);
-            strcat(out_path_source, ".c");
+            JSLImmutableMemory source_out_file_name = jsl_format(
+                build_memory_interface,
+                JSL_CSTR_EXPRESSION("tests/arrays/%s.c"),
+                decl->prefix
+            );
+            jsl_subprocess_set_stdout_file_name(write_array_source, source_out_file_name);
 
             ++array_decl_idx;
         }
 
-        JSLSubProcessResultEnum run_res = jsl_subprocess_run_blocking(
+        run_res = jsl_subprocess_run_blocking(
             array_procs,
             array_procs_length,
             build_memory_interface,
@@ -890,7 +864,7 @@ int32_t main(int32_t argc, char **argv)
         );
         if (run_res != JSL_SUBPROCESS_SUCCESS)
         {
-            jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Generating arrays failed with exit code %d errno %d"), run_res, last_errno);
+            jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Generating arrays failed with exit code %d errno %d\n"), run_res, last_errno);
             return EXIT_FAILURE;
         }
     }
@@ -904,7 +878,7 @@ int32_t main(int32_t argc, char **argv)
      */
 
     {
-        jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Compiling generate hash map program"));
+        jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Compiling generate hash map program\n"));
 
         #if JSL_IS_WINDOWS
             char generate_hash_map_exe_name[256] = "tests\\bin\\generate_hash_map.exe";
@@ -953,9 +927,9 @@ int32_t main(int32_t argc, char **argv)
             build_memory_interface,
             &last_errno
         );
-        if (run_compile_res != JSL_SUBPROCESS_SUCCESS)
+        if (run_compile_res != JSL_SUBPROCESS_SUCCESS || generate_hash_map_compile_command.exit_code != 0)
         {
-            jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Building hash map generation program failed with exit code %d errno %d"), run_compile_res, last_errno);
+            jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Building hash map generation program failed with result %d exit code %d errno %d\n"), run_compile_res, generate_hash_map_compile_command.exit_code, last_errno);
             return EXIT_FAILURE;
         }
 
@@ -975,7 +949,7 @@ int32_t main(int32_t argc, char **argv)
 
         while (hash_decl_idx < hash_map_test_count)
         {
-            HashMapDecl* decl = &hash_map_declarations[i];
+            HashMapDecl* decl = &hash_map_declarations[hash_decl_idx];
             JSLSubprocess* write_hash_map_header = &hash_map_procs[hash_proc_idx];
             ++hash_proc_idx;
 
@@ -1000,7 +974,7 @@ int32_t main(int32_t argc, char **argv)
             else if (decl->value_is_str)
             {
                 jsl_subprocess_arg_cstr(
-                    &write_hash_map_header,
+                    write_hash_map_header,
                     "--name", decl->name,
                     "--function-prefix", decl->prefix,
                     "--key-type", decl->key_type,
@@ -1012,7 +986,7 @@ int32_t main(int32_t argc, char **argv)
             else
             {
                 jsl_subprocess_arg_cstr(
-                    &write_hash_map_header,
+                    write_hash_map_header,
                     "--name", decl->name,
                     "--function-prefix", decl->prefix,
                     "--key-type", decl->key_type,
@@ -1030,34 +1004,31 @@ int32_t main(int32_t argc, char **argv)
                     break;
 
                 jsl_subprocess_arg_cstr(
-                    &write_hash_map_header,
+                    write_hash_map_header,
                     "--add-header",
                     decl->headers[header_idx]
                 );
             }
 
-            char out_path_header[256] = "tests/hash_maps/";
-            strcat(out_path_header, decl->prefix);
-            strcat(out_path_header, ".h");
-            FILE* header_out = fopen(out_path_header, "wb");
+            JSLImmutableMemory out_file_name = jsl_format(
+                build_memory_interface,
+                JSL_CSTR_EXPRESSION("tests/hash_maps/%s.h"),
+                decl->prefix
+            );
+            jsl_subprocess_set_stdout_file_name(write_hash_map_header, out_file_name);
 
-            jsl_subprocess_set_stdout_sink(
-                &write_hash_map_header,
-                jsl_string_builder_output_sink(&stdout_sb)
+            JSLSubprocess* write_hash_map_source = &hash_map_procs[hash_proc_idx];
+            ++hash_proc_idx;
+
+            jsl_subprocess_init(
+                write_hash_map_source,
+                build_memory_interface,
+                generate_hash_map_run_exe_command
             );
 
-            if (!nob_cmd_run(
-                &write_hash_map_header,
-                .stdout_path = out_path_header,
-                .async = &hash_map_procs
-            )) return 1;
-
-            Nob_Cmd write_hash_map_source = {0};
-
             if (decl->key_is_str)
-                nob_cmd_append(
-                    &write_hash_map_source,
-                    generate_hash_map_run_exe_command,
+                jsl_subprocess_arg_cstr(
+                    write_hash_map_source,
                     "--name", decl->name,
                     "--function-prefix", decl->prefix,
                     "--key-is-string",
@@ -1066,9 +1037,8 @@ int32_t main(int32_t argc, char **argv)
                     "--source"
                 );
             else if (decl->value_is_str)
-                nob_cmd_append(
-                    &write_hash_map_source,
-                    generate_hash_map_run_exe_command,
+                jsl_subprocess_arg_cstr(
+                    write_hash_map_source,
                     "--name", decl->name,
                     "--function-prefix", decl->prefix,
                     "--key-type", decl->key_type,
@@ -1077,9 +1047,8 @@ int32_t main(int32_t argc, char **argv)
                     "--source"
                 );
             else
-                nob_cmd_append(
-                    &write_hash_map_source,
-                    generate_hash_map_run_exe_command,
+                jsl_subprocess_arg_cstr(
+                    write_hash_map_source,
                     "--name", decl->name,
                     "--function-prefix", decl->prefix,
                     "--key-type", decl->key_type,
@@ -1095,17 +1064,21 @@ int32_t main(int32_t argc, char **argv)
                 if (decl->headers[header_idx] == NULL)
                     break;
 
-                nob_cmd_append(
-                    &write_hash_map_source,
+                jsl_subprocess_arg_cstr(
+                    write_hash_map_source,
                     "--add-header",
                     decl->headers[header_idx]
                 );
             }
 
-            char out_path_source[256] = "tests/hash_maps/";
-            strcat(out_path_source, decl->prefix);
-            strcat(out_path_source, ".c");
+            out_file_name = jsl_format(
+                build_memory_interface,
+                JSL_CSTR_EXPRESSION("tests/hash_maps/%s.c"),
+                decl->prefix
+            );
+            jsl_subprocess_set_stdout_file_name(write_hash_map_source, out_file_name);
 
+            ++hash_decl_idx;
         }
 
         JSLSubProcessResultEnum run_res = jsl_subprocess_run_blocking(
@@ -1116,7 +1089,7 @@ int32_t main(int32_t argc, char **argv)
         );
         if (run_res != JSL_SUBPROCESS_SUCCESS)
         {
-            jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Generating hash maps failed with exit code %d errno %d"), run_res, last_errno);
+            jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Generating hash maps failed with result %d errno %d\n"), run_res, last_errno);
             return EXIT_FAILURE;
         }
     }
@@ -1130,47 +1103,82 @@ int32_t main(int32_t argc, char **argv)
      *
      */
 
-    nob_log(NOB_INFO, "Running unit test suite");
+    printf("Running unit test suite\n");
 
-    CStringArray executables;
-    cstring_array_init(&executables);
+    int32_t test_count = (int32_t) (sizeof(unit_test_declarations) / sizeof(UnitTestDecl));
+    int32_t clang_config_count = (int32_t) (sizeof(clang_configs) / sizeof(CompilerConfig));
 
-    int32_t test_count = sizeof(unit_test_declarations) / sizeof(UnitTestDecl);
-    Nob_Procs compile_procs = {0};
+    #if JSL_IS_WINDOWS
+        int32_t msvc_config_count = (int32_t) (sizeof(msvc_configs) / sizeof(CompilerConfig));
+        int32_t configs_per_test = clang_config_count + msvc_config_count;
+    #elif JSL_IS_POSIX
+        // clang configs plus the two gcc configs (debug + optimized).
+        int32_t configs_per_test = clang_config_count + 2;
+    #else
+        #error "Unrecognized platform. Only windows and POSIX platforms are supported."
+    #endif
+
+    int32_t total_compile_count = test_count * configs_per_test;
+
+    JSLSubprocess* test_compile_procs = jsl_allocator_interface_alloc(
+        build_memory_interface,
+        sizeof(JSLSubprocess) * total_compile_count,
+        JSL_DEFAULT_ALLOCATION_ALIGNMENT,
+        true
+    );
+
+    // Executable paths, filled in lockstep with `test_compile_procs` so each
+    // compiled binary can be run after the compile batch finishes.
+    JSLImmutableMemory* test_executables = jsl_allocator_interface_alloc(
+        build_memory_interface,
+        sizeof(JSLImmutableMemory) * total_compile_count,
+        JSL_DEFAULT_ALLOCATION_ALIGNMENT,
+        true
+    );
+
     int32_t logical_processors = get_logical_processor_count();
-    nob_log(NOB_INFO, "Compiling unit tests with up to %d parallel jobs", logical_processors);
+    printf("Compiling unit tests with up to %d parallel jobs\n", logical_processors);
 
-    for (int32_t i = 0; i < test_count; i++)
+    int32_t compile_idx = 0;
+
+    for (int32_t test_idx = 0; test_idx < test_count; ++test_idx)
     {
-        UnitTestDecl* unit_test = &unit_test_declarations[i];
+        UnitTestDecl* unit_test = &unit_test_declarations[test_idx];
 
         /**
          * Loop over the clang configs creating compile commands for each.
          *
-         * Also insert the exe name into the list of executables to be run
+         * Also record the exe name in the list of executables to be run
          * later.
          */
 
-        int32_t clang_config_count = sizeof(clang_configs) / sizeof(CompilerConfig);
-        for (int32_t i = 0; i < clang_config_count; ++i)
+        for (int32_t config_idx = 0; config_idx < clang_config_count; ++config_idx)
         {
-            CompilerConfig* compiler_config = &clang_configs[i];
-
-            char exe_name[256] = "tests/bin/";
-            strcat(exe_name, compiler_config->prefix);
-            strcat(exe_name, unit_test->executable_name);
+            CompilerConfig* compiler_config = &clang_configs[config_idx];
 
             #if JSL_IS_WINDOWS
-                strcat(exe_name, ".exe");
+                JSLImmutableMemory exe_name = jsl_format(
+                    build_memory_interface,
+                    JSL_CSTR_EXPRESSION("tests/bin/%s%s.exe"),
+                    compiler_config->prefix,
+                    unit_test->executable_name
+                );
             #else
-                strcat(exe_name, ".out");
+                JSLImmutableMemory exe_name = jsl_format(
+                    build_memory_interface,
+                    JSL_CSTR_EXPRESSION("tests/bin/%s%s.out"),
+                    compiler_config->prefix,
+                    unit_test->executable_name
+                );
             #endif
 
-            Nob_Cmd compile_command = {0};
-            nob_cmd_append(
-                &compile_command,
-                "clang",
-                "-o", exe_name
+            JSLSubprocess* compile_command = &test_compile_procs[compile_idx];
+            jsl_subprocess_init(compile_command, build_memory_interface, clang_command);
+
+            jsl_subprocess_arg(
+                compile_command,
+                JSL_CSTR_EXPRESSION("-o"),
+                exe_name
             );
 
             // add compiler flags from config
@@ -1180,12 +1188,12 @@ int32_t main(int32_t argc, char **argv)
                 if (flag == NULL)
                     break;
 
-                nob_cmd_append(&compile_command, flag);
+                jsl_subprocess_arg_cstr(compile_command, flag);
             }
 
             // nftw(3) and its flags require _XOPEN_SOURCE >= 500 on Linux
             #if JSL_IS_LINUX
-                nob_cmd_append(&compile_command, "-D_XOPEN_SOURCE=700");
+                jsl_subprocess_arg_cstr(compile_command, "-D_XOPEN_SOURCE=700");
             #endif
 
             // add clang warnings
@@ -1195,7 +1203,7 @@ int32_t main(int32_t argc, char **argv)
                 if (flag == NULL)
                     break;
 
-                nob_cmd_append(&compile_command, flag);
+                jsl_subprocess_arg_cstr(compile_command, flag);
             }
 
             for (int32_t source_file_idx = 0;; ++source_file_idx)
@@ -1204,13 +1212,11 @@ int32_t main(int32_t argc, char **argv)
                 if (source_file == NULL)
                     break;
 
-                nob_cmd_append(&compile_command, source_file);
+                jsl_subprocess_arg_cstr(compile_command, source_file);
             }
 
-            // if (!nob_cmd_run(&compile_command)) return 1;
-            if (!nob_cmd_run(&compile_command, .async = &compile_procs, .max_procs = (size_t)logical_processors)) return 1;
-
-            cstring_array_insert(&executables, exe_name);
+            test_executables[compile_idx] = exe_name;
+            ++compile_idx;
         }
 
         #if JSL_IS_WINDOWS
@@ -1218,43 +1224,53 @@ int32_t main(int32_t argc, char **argv)
             /**
              * Loop over the MSVC configs creating compile commands for each.
              *
-             * Also insert the exe name into the list of executables to be run
+             * Also record the exe name in the list of executables to be run
              * later.
              */
 
-            int32_t msvc_config_count = sizeof(msvc_configs) / sizeof(CompilerConfig);
-            for (int32_t i = 0; i < msvc_config_count; ++i)
+            for (int32_t config_idx = 0; config_idx < msvc_config_count; ++config_idx)
             {
-                CompilerConfig* compiler_config = &msvc_configs[i];
+                CompilerConfig* compiler_config = &msvc_configs[config_idx];
 
-                char exe_output_param[256] = "/Fe";
-                char exe_name[256] = "tests\\bin\\";
-                char obj_output_param[256] = "/Fo";
-                char obj_dir[256] = "tests\\bin\\";
-                char pdb_output_param[256] = "/Fd";
-                char pdb_name[256] = "tests\\bin\\";
+                JSLImmutableMemory exe_name = jsl_format(
+                    build_memory_interface,
+                    JSL_CSTR_EXPRESSION("tests\\bin\\%s%s.exe"),
+                    compiler_config->prefix,
+                    unit_test->executable_name
+                );
 
-                strcat(exe_name, compiler_config->prefix);
-                strcat(exe_name, unit_test->executable_name);
-                strcat(exe_name, ".exe");
+                JSLImmutableMemory obj_dir = jsl_format(
+                    build_memory_interface,
+                    JSL_CSTR_EXPRESSION("tests\\bin\\%s%s_obj\\"),
+                    compiler_config->prefix,
+                    unit_test->executable_name
+                );
 
-                strcat(exe_output_param, exe_name);
+                jsl_make_directory(obj_dir, NULL);
 
-                strcat(obj_dir, compiler_config->prefix);
-                strcat(obj_dir, unit_test->executable_name);
-                strcat(obj_dir, "_obj\\");
+                JSLImmutableMemory exe_output_param = jsl_format(
+                    build_memory_interface,
+                    JSL_CSTR_EXPRESSION("/Fe%y"),
+                    exe_name
+                );
+                JSLImmutableMemory obj_output_param = jsl_format(
+                    build_memory_interface,
+                    JSL_CSTR_EXPRESSION("/Fo%y"),
+                    obj_dir
+                );
+                JSLImmutableMemory pdb_output_param = jsl_format(
+                    build_memory_interface,
+                    JSL_CSTR_EXPRESSION("/Fdtests\\bin\\%s%s.pdb"),
+                    compiler_config->prefix,
+                    unit_test->executable_name
+                );
 
-                if (!nob_mkdir_if_not_exists(obj_dir)) return 1;
-
-                strcat(obj_output_param, obj_dir);
-
-                strcat(pdb_name, compiler_config->prefix);
-                strcat(pdb_name, unit_test->executable_name);
-                strcat(pdb_name, ".pdb");
-                strcat(pdb_output_param, pdb_name);
-
-                Nob_Cmd compile_command = {0};
-                nob_cmd_append(&compile_command, "cl.exe");
+                JSLSubprocess* compile_command = &test_compile_procs[compile_idx];
+                jsl_subprocess_init(
+                    compile_command,
+                    build_memory_interface,
+                    JSL_CSTR_EXPRESSION("cl.exe")
+                );
 
                 // add compiler flags from config
                 for (int32_t flag_idx = 0;; ++flag_idx)
@@ -1263,11 +1279,11 @@ int32_t main(int32_t argc, char **argv)
                     if (flag == NULL)
                         break;
 
-                    nob_cmd_append(&compile_command, flag);
+                    jsl_subprocess_arg_cstr(compile_command, flag);
                 }
 
-                nob_cmd_append(
-                    &compile_command,
+                jsl_subprocess_arg(
+                    compile_command,
                     pdb_output_param,
                     obj_output_param,
                     exe_output_param
@@ -1280,29 +1296,31 @@ int32_t main(int32_t argc, char **argv)
                     if (source_file == NULL)
                         break;
 
-                    nob_cmd_append(&compile_command, source_file);
+                    jsl_subprocess_arg_cstr(compile_command, source_file);
                 }
 
-                // if (!nob_cmd_run(&compile_command)) return 1;
-                if (!nob_cmd_run(&compile_command, .async = &compile_procs, .max_procs = (size_t)logical_processors)) return 1;
-
-                cstring_array_insert(&executables, exe_name);
+                test_executables[compile_idx] = exe_name;
+                ++compile_idx;
             }
 
         #elif JSL_IS_POSIX
 
-            const char* test_file_name = unit_test->executable_name;
-
             {
-                char exe_name[256] = "tests/bin/debug_gcc_";
+                JSLImmutableMemory exe_name = jsl_format(
+                    build_memory_interface,
+                    JSL_CSTR_EXPRESSION("tests/bin/debug_gcc_%s.out"),
+                    unit_test->executable_name
+                );
 
-                strcat(exe_name, test_file_name);
-                strcat(exe_name, ".out");
+                JSLSubprocess* compile_command = &test_compile_procs[compile_idx];
+                jsl_subprocess_init(
+                    compile_command,
+                    build_memory_interface,
+                    JSL_CSTR_EXPRESSION("gcc")
+                );
 
-                Nob_Cmd gcc_debug_compile_command = {0};
-                nob_cmd_append(
-                    &gcc_debug_compile_command,
-                    "gcc",
+                jsl_subprocess_arg_cstr(
+                    compile_command,
                     "-O0",
                     "-g",
                     "-std=c11",
@@ -1310,11 +1328,17 @@ int32_t main(int32_t argc, char **argv)
                     "-Wall",
                     "-Wextra",
                     "-pedantic",
-                    "-fsanitize=address",
-                    #if JSL_IS_LINUX
-                        "-D_XOPEN_SOURCE=700",
-                    #endif
-                    "-o", exe_name
+                    "-fsanitize=address"
+                );
+
+                #if JSL_IS_LINUX
+                    jsl_subprocess_arg_cstr(compile_command, "-D_XOPEN_SOURCE=700");
+                #endif
+
+                jsl_subprocess_arg(
+                    compile_command,
+                    JSL_CSTR_EXPRESSION("-o"),
+                    exe_name
                 );
 
                 for (int32_t source_file_idx = 0;; ++source_file_idx)
@@ -1323,35 +1347,46 @@ int32_t main(int32_t argc, char **argv)
                     if (source_file == NULL)
                         break;
 
-                    nob_cmd_append(&gcc_debug_compile_command, source_file);
+                    jsl_subprocess_arg_cstr(compile_command, source_file);
                 }
 
-                if (!nob_cmd_run(&gcc_debug_compile_command, .async = &compile_procs, .max_procs = (size_t)logical_processors)) return 1;
-
-                cstring_array_insert(&executables, exe_name);
+                test_executables[compile_idx] = exe_name;
+                ++compile_idx;
             }
 
             {
-                char exe_name[256] = "tests/bin/opt_gcc_";
+                JSLImmutableMemory exe_name = jsl_format(
+                    build_memory_interface,
+                    JSL_CSTR_EXPRESSION("tests/bin/opt_gcc_%s.out"),
+                    unit_test->executable_name
+                );
 
-                strcat(exe_name, test_file_name);
-                strcat(exe_name, ".out");
+                JSLSubprocess* compile_command = &test_compile_procs[compile_idx];
+                jsl_subprocess_init(
+                    compile_command,
+                    build_memory_interface,
+                    JSL_CSTR_EXPRESSION("gcc")
+                );
 
-                Nob_Cmd gcc_optimized_compile_command = {0};
-                nob_cmd_append(
-                    &gcc_optimized_compile_command,
-                    "gcc",
+                jsl_subprocess_arg_cstr(
+                    compile_command,
                     "-O3",
                     "-march=native",
                     "-std=c11",
                     "-Isrc/",
                     "-Wall",
                     "-Wextra",
-                    "-pedantic",
-                    #if JSL_IS_LINUX
-                        "-D_XOPEN_SOURCE=700",
-                    #endif
-                    "-o", exe_name
+                    "-pedantic"
+                );
+
+                #if JSL_IS_LINUX
+                    jsl_subprocess_arg_cstr(compile_command, "-D_XOPEN_SOURCE=700");
+                #endif
+
+                jsl_subprocess_arg(
+                    compile_command,
+                    JSL_CSTR_EXPRESSION("-o"),
+                    exe_name
                 );
 
                 for (int32_t source_file_idx = 0;; ++source_file_idx)
@@ -1360,12 +1395,11 @@ int32_t main(int32_t argc, char **argv)
                     if (source_file == NULL)
                         break;
 
-                    nob_cmd_append(&gcc_optimized_compile_command, source_file);
+                    jsl_subprocess_arg_cstr(compile_command, source_file);
                 }
 
-                if (!nob_cmd_run(&gcc_optimized_compile_command, .async = &compile_procs, .max_procs = (size_t)logical_processors)) return 1;
-
-                cstring_array_insert(&executables, exe_name);
+                test_executables[compile_idx] = exe_name;
+                ++compile_idx;
             }
 
         #else
@@ -1373,26 +1407,57 @@ int32_t main(int32_t argc, char **argv)
         #endif
     }
 
-    if (!nob_procs_wait(compile_procs)) return 1;
-    nob_da_free(compile_procs);
+    JSLSubProcessResultEnum compile_run_res = jsl_subprocess_run_blocking(
+        test_compile_procs,
+        total_compile_count,
+        build_memory_interface,
+        &last_errno
+    );
+    if (compile_run_res != JSL_SUBPROCESS_SUCCESS)
+    {
+        jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Compiling unit tests failed with result %d errno %d"), compile_run_res, last_errno);
+        return EXIT_FAILURE;
+    }
 
-    for (int32_t i = 0; i < executables.length; ++i)
+    // A compiler that ran but reported errors exits non-zero. The batch still
+    // "succeeds" from the runner's point of view, so check each proc's exit
+    // code and fail the suite if any compile failed.
+    for (int32_t proc_idx = 0; proc_idx < total_compile_count; ++proc_idx)
+    {
+        if (test_compile_procs[proc_idx].exit_code != 0)
+        {
+            jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Compiling %y failed with exit code %d"), test_executables[proc_idx], test_compile_procs[proc_idx].exit_code);
+            return EXIT_FAILURE;
+        }
+    }
+
+    for (int32_t exe_idx = 0; exe_idx < total_compile_count; ++exe_idx)
     {
         #if JSL_IS_WINDOWS
-
-            Nob_Cmd run_command = {0};
-            nob_cmd_append(&run_command, executables.array[i]);
-            if (!nob_cmd_run(&run_command)) return 1;
-
+            JSLImmutableMemory run_path = test_executables[exe_idx];
         #else
-
-            char execute_command[256] = "./";
-            strcat(execute_command, executables.array[i]);
-            Nob_Cmd run_command = {0};
-            nob_cmd_append(&run_command, execute_command);
-            if (!nob_cmd_run(&run_command)) return 1;
-
+            JSLImmutableMemory run_path = jsl_format(
+                build_memory_interface,
+                JSL_CSTR_EXPRESSION("./%y"),
+                test_executables[exe_idx]
+            );
         #endif
+
+        JSLSubprocess run_command;
+        JSL_ZERO_STRUCT(run_command);
+        jsl_subprocess_init(&run_command, build_memory_interface, run_path);
+
+        JSLSubProcessResultEnum run_res = jsl_subprocess_run_blocking(
+            &run_command,
+            1,
+            build_memory_interface,
+            &last_errno
+        );
+        if (run_res != JSL_SUBPROCESS_SUCCESS || run_command.exit_code != 0)
+        {
+            jsl_format_sink(stderr_sink, JSL_CSTR_EXPRESSION("Test %y failed with result %d exit code %d errno %d"), test_executables[exe_idx], run_res, run_command.exit_code, last_errno);
+            return EXIT_FAILURE;
+        }
     }
 
     return 0;
