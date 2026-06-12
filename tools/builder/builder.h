@@ -243,30 +243,37 @@
         #endif
     #endif
 
+    // The path to the JSL source tree. It is passed to the compiler as an
+    // include path during the self rebuild so that `#include "jsl/..."` lines
+    // resolve. Override it before including this file if your layout differs.
+    #ifndef BUILDER_JSL_PATH
+        #define BUILDER_JSL_PATH "jsl/"
+    #endif
+
     #ifndef BUILDER_SELF_REBUILD
         #if defined(_WIN32)
             #if defined(__clang__)
                 #if defined(__cplusplus)
-                    #define BUILDER_SELF_REBUILD(binary_path, source_path) "clang", "-x", "c++", "-o", binary_path, source_path
+                    #define BUILDER_SELF_REBUILD(binary_path, source_path, jsl_path) "-x", "c++", "-I" jsl_path, "-o", binary_path, source_path
                 #else
-                    #define BUILDER_SELF_REBUILD(binary_path, source_path) "clang", "-x", "c", "-o", binary_path, source_path
+                    #define BUILDER_SELF_REBUILD(binary_path, source_path, jsl_path) "-x", "c", "-I" jsl_path, "-o", binary_path, source_path
                 #endif
             #elif defined(__GNUC__)
                 #if defined(__cplusplus)
-                    #define BUILDER_SELF_REBUILD(binary_path, source_path) "gcc", "-x", "c++", "-o", binary_path, source_path
+                    #define BUILDER_SELF_REBUILD(binary_path, source_path, jsl_path) "-x", "c++", "-I" jsl_path, "-o", binary_path, source_path
                 #else
-                    #define BUILDER_SELF_REBUILD(binary_path, source_path) "gcc", "-x", "c", "-o", binary_path, source_path
+                    #define BUILDER_SELF_REBUILD(binary_path, source_path, jsl_path) "-x", "c", "-I" jsl_path, "-o", binary_path, source_path
                 #endif
             #elif defined(_MSC_VER)
-                #define BUILDER_SELF_REBUILD(binary_path, source_path) "cl.exe", nob_temp_sprintf("/Fe:%s", (binary_path)), source_path
+                #define BUILDER_SELF_REBUILD(binary_path, source_path, jsl_path) "/I" jsl_path, nob_temp_sprintf("/Fe:%s", (binary_path)), source_path
             #elif defined(__TINYC__)
-                #define BUILDER_SELF_REBUILD(binary_path, source_path) "tcc", "-o", binary_path, source_path
+                #define BUILDER_SELF_REBUILD(binary_path, source_path, jsl_path) "-I" jsl_path, "-o", binary_path, source_path
             #endif
         #else
             #if defined(__cplusplus)
-                #define BUILDER_SELF_REBUILD(binary_path, source_path) "cc", "-x", "c++", "-o", binary_path, source_path
+                #define BUILDER_SELF_REBUILD(binary_path, source_path, jsl_path) "-x", "c++", "-I" jsl_path, "-o", binary_path, source_path
             #else
-                #define BUILDER_SELF_REBUILD(binary_path, source_path) "cc", "-x", "c", "-o", binary_path, source_path
+                #define BUILDER_SELF_REBUILD(binary_path, source_path, jsl_path) "-x", "c", "-I" jsl_path, "-o", binary_path, source_path
             #endif
         #endif
     #endif
@@ -471,7 +478,7 @@
                 exit(EXIT_FAILURE);
             }
 
-            jsl_subprocess_arg_cstr(&self_rebuild_cmd, BUILDER_SELF_REBUILD(binary_path, source_path));
+            jsl_subprocess_arg_cstr(&self_rebuild_cmd, BUILDER_SELF_REBUILD(binary_path, source_path, BUILDER_JSL_PATH));
 
             JSLSubProcessResultEnum run_res = jsl_subprocess_run_blocking(&self_rebuild_cmd, 1, alloc_interface, NULL);
             if (run_res != JSL_SUBPROCESS_SUCCESS)

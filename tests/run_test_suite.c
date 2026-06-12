@@ -65,6 +65,7 @@
 #endif
 
 #define JSL_BUILDER_IMPLEMENTATION
+#define BUILDER_JSL_PATH "src/"
 #include "../tools/builder/builder.h"
 
 #include <stdint.h>
@@ -580,7 +581,16 @@ int32_t main(int32_t argc, char **argv)
 
     JSLOutputSink stdout_sink = jsl_c_file_output_sink(stdout);
     JSLOutputSink stderr_sink = jsl_c_file_output_sink(stderr);
-    
+
+    JSLTerminalInfo terminal_info;
+    jsl_cmd_line_get_terminal_info(&terminal_info, 0);
+
+    JSLCmdLineStyle bold_style;
+    jsl_cmd_line_style(&bold_style, JSL_CMD_LINE_STYLE_BOLD);
+
+    JSLCmdLineStyle italic_style;
+    jsl_cmd_line_style(&italic_style, JSL_CMD_LINE_STYLE_ITALIC);
+
     int32_t last_errno = 0;
 
     JSLInfiniteArena build_memory;
@@ -593,11 +603,13 @@ int32_t main(int32_t argc, char **argv)
     jsl_make_directory(test_hash_map_path, NULL);
 
     int32_t max_parallelism = JSL_MAX(jsl_get_logical_processor_count(NULL), 1);
+    jsl_cmd_line_write_style(stdout_sink, &terminal_info, &bold_style);
     jsl_format_sink(
         stdout_sink,
         JSL_CSTR_EXPRESSION("Running with %d max parallel processes\n"),
         max_parallelism
     );
+    jsl_cmd_line_write_reset(stdout_sink, &terminal_info);
 
     /**
      *
@@ -608,7 +620,9 @@ int32_t main(int32_t argc, char **argv)
      */
 
     {
+        jsl_cmd_line_write_style(stdout_sink, &terminal_info, &bold_style);
         jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Compiling embed program\n"));
+        jsl_cmd_line_write_reset(stdout_sink, &terminal_info);
 
         #if JSL_IS_WINDOWS
             char embed_exe_name[256] = "tests\\bin\\embed.exe";
@@ -649,8 +663,10 @@ int32_t main(int32_t argc, char **argv)
             "tools/embed/embed.c"
         );
 
+        jsl_cmd_line_write_style(stdout_sink, &terminal_info, &italic_style);
         jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("CMD: "));
         jsl_subprocess_debug_print_command(&embed_compile_command, stdout_sink);
+        jsl_cmd_line_write_reset(stdout_sink, &terminal_info);
         jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("\n"));
 
         JSLSubProcessResultEnum run_res = jsl_subprocess_run_blocking(
@@ -675,7 +691,9 @@ int32_t main(int32_t argc, char **argv)
      */
 
     {
+        jsl_cmd_line_write_style(stdout_sink, &terminal_info, &bold_style);
         jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Compiling subprocess test helper program\n"));
+        jsl_cmd_line_write_reset(stdout_sink, &terminal_info);
 
         #if JSL_IS_WINDOWS
             char helper_exe_name[256] = "tests\\bin\\subprocess_helper.exe";
@@ -695,6 +713,12 @@ int32_t main(int32_t argc, char **argv)
             "-o", helper_exe_name,
             "tests/subprocess_helper.c"
         );
+
+        jsl_cmd_line_write_style(stdout_sink, &terminal_info, &italic_style);
+        jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("CMD: "));
+        jsl_subprocess_debug_print_command(&helper_compile_command, stdout_sink);
+        jsl_cmd_line_write_reset(stdout_sink, &terminal_info);
+        jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("\n"));
 
         JSLSubProcessResultEnum run_res = jsl_subprocess_run_blocking(
             &helper_compile_command,
@@ -718,7 +742,9 @@ int32_t main(int32_t argc, char **argv)
      */
 
     {
+        jsl_cmd_line_write_style(stdout_sink, &terminal_info, &bold_style);
         jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Compiling generate array program\n"));
+        jsl_cmd_line_write_reset(stdout_sink, &terminal_info);
 
         #if JSL_IS_WINDOWS
             char generate_array_exe_name[256] = "tests\\bin\\generate_array.exe";
@@ -761,6 +787,12 @@ int32_t main(int32_t argc, char **argv)
             "tools/generate_array/generate_array.c"
         );
 
+        jsl_cmd_line_write_style(stdout_sink, &terminal_info, &italic_style);
+        jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("CMD: "));
+        jsl_subprocess_debug_print_command(&generate_array_compile_command, stdout_sink);
+        jsl_cmd_line_write_reset(stdout_sink, &terminal_info);
+        jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("\n"));
+
         JSLSubProcessResultEnum run_res = jsl_subprocess_run_blocking(
             &generate_array_compile_command,
             1,
@@ -775,7 +807,9 @@ int32_t main(int32_t argc, char **argv)
 
         int32_t array_test_count = sizeof(array_declarations) / sizeof(ArrayDecl);
 
+        jsl_cmd_line_write_style(stdout_sink, &terminal_info, &bold_style);
         jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Generating Array Files\n"));
+        jsl_cmd_line_write_reset(stdout_sink, &terminal_info);
 
         int64_t array_procs_length = array_test_count * 2;
         JSLSubprocess* array_procs = jsl_allocator_interface_alloc(
@@ -813,6 +847,12 @@ int32_t main(int32_t argc, char **argv)
                 decl->prefix
             );
             jsl_subprocess_set_stdout_file_name(write_array_header, header_out_file_name);
+
+            jsl_cmd_line_write_style(stdout_sink, &terminal_info, &italic_style);
+            jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("CMD: "));
+            jsl_subprocess_debug_print_command(write_array_header, stdout_sink);
+            jsl_cmd_line_write_reset(stdout_sink, &terminal_info);
+            jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("\n"));
 
             JSLSubprocess* write_array_source = &array_procs[array_proc_idx];
             jsl_subprocess_init(
@@ -853,6 +893,12 @@ int32_t main(int32_t argc, char **argv)
             );
             jsl_subprocess_set_stdout_file_name(write_array_source, source_out_file_name);
 
+            jsl_cmd_line_write_style(stdout_sink, &terminal_info, &italic_style);
+            jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("CMD: "));
+            jsl_subprocess_debug_print_command(write_array_source, stdout_sink);
+            jsl_cmd_line_write_reset(stdout_sink, &terminal_info);
+            jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("\n"));
+
             ++array_decl_idx;
         }
 
@@ -878,7 +924,9 @@ int32_t main(int32_t argc, char **argv)
      */
 
     {
+        jsl_cmd_line_write_style(stdout_sink, &terminal_info, &bold_style);
         jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Compiling generate hash map program\n"));
+        jsl_cmd_line_write_reset(stdout_sink, &terminal_info);
 
         #if JSL_IS_WINDOWS
             char generate_hash_map_exe_name[256] = "tests\\bin\\generate_hash_map.exe";
@@ -921,6 +969,12 @@ int32_t main(int32_t argc, char **argv)
             "tools/generate_hash_map/generate_hash_map.c"
         );
 
+        jsl_cmd_line_write_style(stdout_sink, &terminal_info, &italic_style);
+        jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("CMD: "));
+        jsl_subprocess_debug_print_command(&generate_hash_map_compile_command, stdout_sink);
+        jsl_cmd_line_write_reset(stdout_sink, &terminal_info);
+        jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("\n"));
+
         JSLSubProcessResultEnum run_compile_res = jsl_subprocess_run_blocking(
             &generate_hash_map_compile_command,
             1,
@@ -933,7 +987,9 @@ int32_t main(int32_t argc, char **argv)
             return EXIT_FAILURE;
         }
 
-        printf("Generating Hash Map Files\n");
+        jsl_cmd_line_write_style(stdout_sink, &terminal_info, &bold_style);
+        jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Generating Hash Map Files\n"));
+        jsl_cmd_line_write_reset(stdout_sink, &terminal_info);
 
         int32_t hash_map_test_count = sizeof(hash_map_declarations) / sizeof(HashMapDecl);
         int32_t hash_map_procs_length = hash_map_test_count * 2;
@@ -1017,6 +1073,12 @@ int32_t main(int32_t argc, char **argv)
             );
             jsl_subprocess_set_stdout_file_name(write_hash_map_header, out_file_name);
 
+            jsl_cmd_line_write_style(stdout_sink, &terminal_info, &italic_style);
+            jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("CMD: "));
+            jsl_subprocess_debug_print_command(write_hash_map_header, stdout_sink);
+            jsl_cmd_line_write_reset(stdout_sink, &terminal_info);
+            jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("\n"));
+
             JSLSubprocess* write_hash_map_source = &hash_map_procs[hash_proc_idx];
             ++hash_proc_idx;
 
@@ -1078,6 +1140,12 @@ int32_t main(int32_t argc, char **argv)
             );
             jsl_subprocess_set_stdout_file_name(write_hash_map_source, out_file_name);
 
+            jsl_cmd_line_write_style(stdout_sink, &terminal_info, &italic_style);
+            jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("CMD: "));
+            jsl_subprocess_debug_print_command(write_hash_map_source, stdout_sink);
+            jsl_cmd_line_write_reset(stdout_sink, &terminal_info);
+            jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("\n"));
+
             ++hash_decl_idx;
         }
 
@@ -1103,7 +1171,9 @@ int32_t main(int32_t argc, char **argv)
      *
      */
 
-    printf("Running unit test suite\n");
+    jsl_cmd_line_write_style(stdout_sink, &terminal_info, &bold_style);
+    jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Running unit test suite\n"));
+    jsl_cmd_line_write_reset(stdout_sink, &terminal_info);
 
     int32_t test_count = (int32_t) (sizeof(unit_test_declarations) / sizeof(UnitTestDecl));
     int32_t clang_config_count = (int32_t) (sizeof(clang_configs) / sizeof(CompilerConfig));
@@ -1137,7 +1207,9 @@ int32_t main(int32_t argc, char **argv)
     );
 
     int32_t logical_processors = get_logical_processor_count();
-    printf("Compiling unit tests with up to %d parallel jobs\n", logical_processors);
+    jsl_cmd_line_write_style(stdout_sink, &terminal_info, &bold_style);
+    jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("Compiling unit tests with up to %d parallel jobs\n"), logical_processors);
+    jsl_cmd_line_write_reset(stdout_sink, &terminal_info);
 
     int32_t compile_idx = 0;
 
@@ -1214,6 +1286,12 @@ int32_t main(int32_t argc, char **argv)
 
                 jsl_subprocess_arg_cstr(compile_command, source_file);
             }
+
+            jsl_cmd_line_write_style(stdout_sink, &terminal_info, &italic_style);
+            jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("CMD: "));
+            jsl_subprocess_debug_print_command(compile_command, stdout_sink);
+            jsl_cmd_line_write_reset(stdout_sink, &terminal_info);
+            jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("\n"));
 
             test_executables[compile_idx] = exe_name;
             ++compile_idx;
@@ -1299,6 +1377,12 @@ int32_t main(int32_t argc, char **argv)
                     jsl_subprocess_arg_cstr(compile_command, source_file);
                 }
 
+                jsl_cmd_line_write_style(stdout_sink, &terminal_info, &italic_style);
+                jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("CMD: "));
+                jsl_subprocess_debug_print_command(compile_command, stdout_sink);
+                jsl_cmd_line_write_reset(stdout_sink, &terminal_info);
+                jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("\n"));
+
                 test_executables[compile_idx] = exe_name;
                 ++compile_idx;
             }
@@ -1350,6 +1434,12 @@ int32_t main(int32_t argc, char **argv)
                     jsl_subprocess_arg_cstr(compile_command, source_file);
                 }
 
+                jsl_cmd_line_write_style(stdout_sink, &terminal_info, &italic_style);
+                jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("CMD: "));
+                jsl_subprocess_debug_print_command(compile_command, stdout_sink);
+                jsl_cmd_line_write_reset(stdout_sink, &terminal_info);
+                jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("\n"));
+
                 test_executables[compile_idx] = exe_name;
                 ++compile_idx;
             }
@@ -1397,6 +1487,12 @@ int32_t main(int32_t argc, char **argv)
 
                     jsl_subprocess_arg_cstr(compile_command, source_file);
                 }
+
+                jsl_cmd_line_write_style(stdout_sink, &terminal_info, &italic_style);
+                jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("CMD: "));
+                jsl_subprocess_debug_print_command(compile_command, stdout_sink);
+                jsl_cmd_line_write_reset(stdout_sink, &terminal_info);
+                jsl_format_sink(stdout_sink, JSL_CSTR_EXPRESSION("\n"));
 
                 test_executables[compile_idx] = exe_name;
                 ++compile_idx;
